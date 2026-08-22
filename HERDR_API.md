@@ -148,6 +148,10 @@ against a real pane). Empirically enumerated against Herdr 0.7.0 — it is **NOT
 - **Modifier chords (join with `+`):** `ctrl+c`, `ctrl+u`, `ctrl+d`, `ctrl+l`, `ctrl+r`,
   `shift+tab`, `ctrl+left`, `alt+f`, … Modifiers: `ctrl` / `shift` / `alt` / `cmd` / `super`
   (case-insensitive). This is the **same grammar as `config.toml [keys]`**.
+- **Herdr 0.8.0 Shift+Tab defect:** `shift+tab` is accepted but writes a bare Tab (`0x09`) instead
+  of BackTab (`ESC [ Z`). Collie's socket adapter expands that one chord to
+  `["Escape","[","Z"]` inside the same `pane.send_keys` call. The expansion is also valid on
+  releases containing the upstream fix, so mixed key queues keep one ordered RPC on every version.
 - **Multi-modifier chords work, in any modifier order** (live-verified 2026-07-20 against 0.7.3 on
   a throwaway sandbox pane, with `PageUp` → `invalid_key` in the same run as proof the validator was
   active): `ctrl+shift+p` / `shift+ctrl+p`, `alt+shift+p` / `shift+alt+p`, triple

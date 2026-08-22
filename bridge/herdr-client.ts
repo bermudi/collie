@@ -138,6 +138,20 @@ let idCounter = 0;
 /** Per-request wall-clock budget. Exported so callers can pass it explicitly alongside a dial mode. */
 export const DEFAULT_TIMEOUT_MS = 5000;
 
+/**
+ * Turn semantic key names into the sequence Herdr should write to the terminal.
+ *
+ * Herdr 0.8.0 accepts `shift+tab`, but incorrectly writes a bare Tab. Spell BackTab as its standard
+ * terminal sequence instead, using three key names Herdr already supports. Keeping the expansion in
+ * one `pane.send_keys` call preserves the ordering of composed queues, and the sequence remains
+ * correct on Herdr releases that fixed the chord itself.
+ */
+export function keysForHerdr(keys: readonly string[]): string[] {
+  return keys.flatMap((key) =>
+    key.toLowerCase() === "shift+tab" ? ["Escape", "[", "Z"] : [key],
+  );
+}
+
 export class HerdrClient {
   constructor(
     private readonly socketPath: string,
@@ -444,7 +458,7 @@ export class HerdrClient {
 
   /** Send key names (e.g. ["Enter"]) to a pane — used to submit a reply. */
   sendPaneKeys(paneId: string, keys: string[]): Promise<void> {
-    return this.request<void>("pane.send_keys", { pane_id: paneId, keys });
+    return this.request<void>("pane.send_keys", { pane_id: paneId, keys: keysForHerdr(keys) });
   }
 
   /** Close a pane, terminating its agent ("kill"). Resolves on Herdr's `{type:"ok"}` reply. */
