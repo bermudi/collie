@@ -5,7 +5,7 @@
 // The rule and its reasoning are ADR 0018's; this module is only where it is computed.
 
 /** The catalog's own names for the agent families a scope may address. Pinned against CATALOG. */
-export const AGENT_FAMILIES = ["claude", "codex", "pi", "opencode", "omp"] as const;
+export const AGENT_FAMILIES = ["claude", "codex", "pi", "devin", "opencode", "omp"] as const;
 
 const FAMILIES: ReadonlySet<string> = new Set<string>(AGENT_FAMILIES);
 
@@ -31,6 +31,7 @@ export function canonicalAgent(key: string): string {
   if (FAMILIES.has(key)) return key;
   if (key.startsWith("claude")) return "claude";
   if (key.startsWith("codex")) return "codex";
+  if (key.startsWith("devin")) return "devin";
   if (key.startsWith("opencode")) return "opencode";
   if (key === "pi" || key.startsWith("pi-") || key.startsWith("pi.")) return "pi";
   // `omp` is its own prefix — no other agent string in the catalog starts with it, and it must NOT

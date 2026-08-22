@@ -1,7 +1,7 @@
 // Pre-generated slash-command catalogs, keyed by Herdr's detected agent type (`pane.agent`).
 // Sourced from each agent's official docs (Claude Code: code.claude.com/docs; Codex:
-// developers.openai.com/codex + openai/codex; pi: pi.dev/docs; opencode: opencode.ai/docs) and
-// curated for one-tap use from a phone. A slash command is just text:
+// developers.openai.com/codex + openai/codex; pi: pi.dev/docs; Devin CLI: docs.devin.ai/cli;
+// opencode: opencode.ai/docs) and curated for one-tap use from a phone. A slash command is just text:
 // the UI sends `/command` (+ submit key) for no-arg commands, or inserts `/command ` into the
 // composer for the user to complete when the command takes an argument.
 //
@@ -146,6 +146,36 @@ const PI: readonly AgentCommand[] = [
   { command: "/quit", description: "Quit pi", takesArg: false, argHint: "", common: false, dangerous: true },
 ];
 
+// ── Devin CLI (docs.devin.ai/cli) ────────────────────────────────────────────
+const DEVIN: readonly AgentCommand[] = [
+  { command: "/compact", description: "Force conversation compaction", takesArg: false, argHint: "", common: true, dangerous: false },
+  { command: "/clear", description: "Clear conversation history and start fresh (alias: /new)", takesArg: false, argHint: "", common: true, dangerous: true },
+  { command: "/model", description: "Switch model by name; omit it to open the selector", takesArg: true, argHint: "[model]", common: true, dangerous: false },
+  { command: "/resume", description: "Open the session picker or resume a session by id", takesArg: true, argHint: "[id]", common: true, dangerous: false },
+  { command: "/plan", description: "Switch to Plan mode", takesArg: false, argHint: "", common: true, dangerous: false },
+  { command: "/ask", description: "Ask a question without making code changes", takesArg: true, argHint: "<question>", common: true, dangerous: false },
+  { command: "/accept-edits", description: "Auto-approve workspace edits but still ask for commands", takesArg: false, argHint: "", common: true, dangerous: true },
+  { command: "/smart", description: "Auto-approve edits and actions a fast model judges safe", takesArg: false, argHint: "", common: true, dangerous: true },
+  { command: "/handoff", description: "Upload conversation, branch, and uncommitted diff to cloud Devin", takesArg: true, argHint: "[task]", common: true, dangerous: false },
+  { command: "/help", description: "Show all available commands", takesArg: false, argHint: "", common: true, dangerous: false },
+  { command: "/mode", description: "Show the current permission mode", takesArg: false, argHint: "", common: false, dangerous: false },
+  { command: "/normal", description: "Switch to Normal permission mode", takesArg: false, argHint: "", common: false, dangerous: false },
+  { command: "/bypass", description: "Auto-approve all tool calls, writes, and shell commands", takesArg: false, argHint: "", common: false, dangerous: true },
+  { command: "/ls", description: "List recent sessions in this directory", takesArg: false, argHint: "", common: false, dangerous: false },
+  { command: "/continue", description: "Resume the latest session or one named by id", takesArg: true, argHint: "[id]", common: false, dangerous: false },
+  { command: "/workspace", description: "List workspace directories", takesArg: false, argHint: "", common: false, dangerous: false },
+  { command: "/add-dir", description: "Add another workspace directory", takesArg: true, argHint: "<path>", common: false, dangerous: false },
+  { command: "/undo-add-dir", description: "Remove a workspace directory", takesArg: true, argHint: "<path>", common: false, dangerous: false },
+  { command: "/loop", description: "Run a prompt and auto-review its diff in a loop", takesArg: true, argHint: "<prompt>", common: false, dangerous: false },
+  { command: "/hooks", description: "List loaded hooks and their event types", takesArg: false, argHint: "", common: false, dangerous: false },
+  { command: "/login", description: "Authenticate with Devin", takesArg: false, argHint: "", common: false, dangerous: false },
+  { command: "/logout", description: "Clear stored credentials and exit", takesArg: false, argHint: "", common: false, dangerous: true },
+  { command: "/update", description: "Check for and install Devin CLI updates", takesArg: false, argHint: "", common: false, dangerous: true },
+  { command: "/upgrade", description: "Upgrade the Devin subscription plan", takesArg: false, argHint: "", common: false, dangerous: false },
+  { command: "/bug", description: "Report a bug to the Devin CLI developers", takesArg: false, argHint: "", common: false, dangerous: false },
+  { command: "/exit", description: "Exit Devin CLI (alias: /quit)", takesArg: false, argHint: "", common: false, dangerous: true },
+];
+
 // ── opencode (opencode.ai) ───────────────────────────────────────────────────
 const OPENCODE: readonly AgentCommand[] = [
   { command: "/compact", description: "Compact (summarize) the current session", takesArg: false, argHint: "", common: true, dangerous: false },
@@ -226,6 +256,7 @@ const CATALOG: Record<string, readonly AgentCommand[]> = {
   claude: CLAUDE,
   codex: CODEX,
   pi: PI,
+  devin: DEVIN,
   opencode: OPENCODE,
   omp: OMP,
 };

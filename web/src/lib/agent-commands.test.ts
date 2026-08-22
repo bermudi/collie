@@ -1,4 +1,4 @@
-import { commandsFor } from "./agent-commands";
+import { CATALOG_AGENTS, commandsFor } from "./agent-commands";
 
 describe("commandsFor", () => {
   it("returns the Claude catalog for 'claude'", () => {
@@ -19,6 +19,18 @@ describe("commandsFor", () => {
     expect(cmds.length).toBeGreaterThan(0);
     expect(cmds.some((c) => c.command === "/tree")).toBe(true); // Pi-specific command
     expect(cmds.some((c) => c.command === "/branch")).toBe(false); // in Claude's and omp's, not here
+  });
+
+  it("returns the Devin CLI catalog for 'devin'", () => {
+    const cmds = commandsFor("devin");
+    expect(cmds.length).toBeGreaterThan(0);
+    expect(cmds.some((c) => c.command === "/handoff")).toBe(true); // Devin-specific command
+    expect(cmds.some((c) => c.command === "/tree")).toBe(false); // Pi-specific command
+    expect(cmds.some((c) => c.command === "/rm-session")).toBe(false); // irreversible arg commands cannot two-tap
+    expect(cmds.find((c) => c.command === "/accept-edits")?.dangerous).toBe(true);
+    expect(cmds.find((c) => c.command === "/smart")?.dangerous).toBe(true);
+    expect(cmds.find((c) => c.command === "/bypass")?.dangerous).toBe(true);
+    expect(cmds.find((c) => c.command === "/model")?.takesArg).toBe(true);
   });
 
   it("returns the opencode catalog for 'opencode'", () => {
@@ -61,6 +73,7 @@ describe("commandsFor", () => {
     expect(commandsFor("CLAUDE")).toBe(commandsFor("claude"));
     expect(commandsFor("Codex")).toBe(commandsFor("codex"));
     expect(commandsFor("PI")).toBe(commandsFor("pi"));
+    expect(commandsFor("DEVIN")).toBe(commandsFor("devin"));
     expect(commandsFor("OpenCode")).toBe(commandsFor("opencode"));
     expect(commandsFor("OMP")).toBe(commandsFor("omp"));
   });
@@ -69,9 +82,10 @@ describe("commandsFor", () => {
     expect(commandsFor("  claude  ")).toBe(commandsFor("claude"));
   });
 
-  it("tolerates label variants via prefix (claude-code, codex-cli, opencode-dev)", () => {
+  it("tolerates label variants via prefix (claude-code, codex-cli, devin-cli, opencode-dev)", () => {
     expect(commandsFor("claude-code")).toBe(commandsFor("claude"));
     expect(commandsFor("codex-cli")).toBe(commandsFor("codex"));
+    expect(commandsFor("devin-cli")).toBe(commandsFor("devin"));
     expect(commandsFor("opencode-dev")).toBe(commandsFor("opencode"));
     expect(commandsFor("pi-go")).toBe(commandsFor("pi"));
     expect(commandsFor("omp-dev")).toBe(commandsFor("omp"));
@@ -98,7 +112,7 @@ describe("commandsFor", () => {
     }
   });
 
-  it.each(["claude", "codex", "pi", "opencode", "omp"])(
+  it.each(CATALOG_AGENTS)(
     "exposes for '%s' a 'common' subset that is a proper, non-empty subset of all commands",
     (agent) => {
       const all = commandsFor(agent);
@@ -110,7 +124,7 @@ describe("commandsFor", () => {
     },
   );
 
-  it.each(["claude", "codex", "pi", "opencode", "omp"])(
+  it.each(CATALOG_AGENTS)(
     "'%s' entries are well-formed (slash-prefixed, unique, arg hints only when takesArg)",
     (agent) => {
       const all = commandsFor(agent);
