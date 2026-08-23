@@ -41,7 +41,7 @@ export function HomeRoute() {
   const drillInto = (id: string) => navigate(spacePath(id, data.session));
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-screen-sm flex-1 flex-col">
+    <div className="mx-auto flex min-h-0 w-full max-w-screen-sm flex-1 flex-col overflow-hidden">
       {/* The dashboard header: wordmark + the session switcher (dashboard-only), then the shared pill
           and the Settings gear. The switcher self-hides on a single-session install. */}
       <AppHeader
@@ -53,8 +53,11 @@ export function HomeRoute() {
         rightTrail={<SettingsGear session={data.session} />}
       />
 
-      {/* Content region below the header: a viewport-clipped internal scroller. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {/* Content region below the header: a viewport-clipped internal scroller.
+          This is the ONLY scroll container on this route — html/body/#root and the frame
+          are overflow-hidden so the page never scrolls under the sticky header (the
+          "two independent scrollings" in w65_p1-mt68ee2y). */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
         <ReadOnlyBanner device={data.device} />
 
         <main className="flex-1">

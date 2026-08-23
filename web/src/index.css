@@ -236,10 +236,18 @@
     /* Respect notches; keep the app glued to the viewport edges on mobile. */
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    height: 100%;
+    overflow: hidden;
   }
   body {
     @apply bg-background text-foreground;
     overscroll-behavior-y: none;
+    height: 100%;
+    overflow: hidden;
+  }
+  #root {
+    height: 100%;
+    overflow: hidden;
   }
 }
 
