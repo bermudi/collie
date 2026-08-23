@@ -255,8 +255,9 @@ export type PaneHistoryResponse =
 /**
  * POST /api/pane/:id/{reply,keys} — result of a send. Discriminated on `ok`: a failure always
  * carries the reason Herdr rejected it. `textDelivered` distinguishes the reply partial-failure case
- * (text was typed but the submit keypress failed) so the client knows NOT to resend — resending would
- * duplicate the already-typed text. Absent/false ⇒ nothing landed, so a resend is safe.
+ * (text was typed but the submit keypress failed); `keysDelivered` does the same for a semantic key
+ * queue split around Shift+Tab. Either tells the client NOT to resend because the pane may already
+ * have changed. Both absent/false ⇒ nothing landed, so a resend is safe.
  */
 export type ActionResponse =
   | { ok: true }
@@ -264,6 +265,7 @@ export type ActionResponse =
       ok: false;
       error: string;
       textDelivered?: boolean;
+      keysDelivered?: boolean;
       code?: "prompt_changed";
     };
 

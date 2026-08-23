@@ -252,6 +252,8 @@ export type ActionResponse =
       ok: false;
       error: string;
       textDelivered?: boolean;
+      /** Part of a segmented key queue landed; inspect the pane instead of retrying it. */
+      keysDelivered?: boolean;
       code?: "prompt_changed";
     };
 
