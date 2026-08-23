@@ -138,18 +138,67 @@ let idCounter = 0;
 /** Per-request wall-clock budget. Exported so callers can pass it explicitly alongside a dial mode. */
 export const DEFAULT_TIMEOUT_MS = 5000;
 
+export type HerdrInput =
+  | { kind: "keys"; keys: string[] }
+  | { kind: "text"; text: string };
+
+/** A segmented key queue failed after an earlier segment had already reached the pane. */
+export class PartialKeySendError extends Error {
+  readonly keysDelivered = true;
+
+  constructor(cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    super(`key sequence partially delivered — check the pane before retrying (${detail})`, {
+      cause,
+    });
+    this.name = "PartialKeySendError";
+  }
+}
+
 /**
- * Turn semantic key names into the sequence Herdr should write to the terminal.
+ * Plan the RPCs that write one semantic key queue to Herdr.
  *
- * Herdr 0.8.0 accepts `shift+tab`, but incorrectly writes a bare Tab. Spell BackTab as its standard
- * terminal sequence instead, using three key names Herdr already supports. Keeping the expansion in
- * one `pane.send_keys` call preserves the ordering of composed queues, and the sequence remains
- * correct on Herdr releases that fixed the chord itself.
+ * Herdr 0.8.0 accepts `shift+tab`, but incorrectly writes a bare Tab. Its `send_keys` path also
+ * cannot spell BackTab as `Escape`, `[`, `Z`: the Escape is handled separately and the visible
+ * input becomes `[Z`. Only one raw `pane.send_text` payload containing the complete `ESC [ Z`
+ * sequence works. Adjacent operations of the same kind stay coalesced; mixed queues are executed
+ * serially by {@link sendPaneKeys}, preserving their order.
  */
-export function keysForHerdr(keys: readonly string[]): string[] {
-  return keys.flatMap((key) =>
-    key.toLowerCase() === "shift+tab" ? ["Escape", "[", "Z"] : [key],
-  );
+export function planHerdrInput(keys: readonly string[]): HerdrInput[] {
+  const plan: HerdrInput[] = [];
+  for (const key of keys) {
+    const kind = key.toLowerCase() === "shift+tab" ? "text" : "keys";
+    const previous = plan.at(-1);
+    if (kind === "text") {
+      if (previous?.kind === "text") previous.text += "\x1b[Z";
+      else plan.push({ kind: "text", text: "\x1b[Z" });
+    } else if (previous?.kind === "keys") {
+      previous.keys.push(key);
+    } else {
+      plan.push({ kind: "keys", keys: [key] });
+    }
+  }
+  return plan;
+}
+
+/**
+ * Execute a planned queue strictly in order. Stop at the first failure; when an earlier segment
+ * already landed, replace the ordinary transport error with an explicit do-not-retry outcome.
+ */
+export async function executeHerdrInput(
+  plan: readonly HerdrInput[],
+  send: (input: HerdrInput) => Promise<void>,
+): Promise<void> {
+  let delivered = false;
+  for (const input of plan) {
+    try {
+      await send(input);
+      delivered = true;
+    } catch (error) {
+      if (!delivered) throw error;
+      throw new PartialKeySendError(error);
+    }
+  }
 }
 
 export class HerdrClient {
@@ -456,9 +505,19 @@ export class HerdrClient {
     return this.request<void>("pane.send_text", { pane_id: paneId, text });
   }
 
-  /** Send key names (e.g. ["Enter"]) to a pane — used to submit a reply. */
-  sendPaneKeys(paneId: string, keys: string[]): Promise<void> {
-    return this.request<void>("pane.send_keys", { pane_id: paneId, keys: keysForHerdr(keys) });
+  /**
+   * Send semantic key names to a pane in order. Almost every queue is one `pane.send_keys` RPC;
+   * Shift+Tab uses a raw `pane.send_text` BackTab sequence because affected Herdr releases
+   * mis-encode the named chord.
+   */
+  async sendPaneKeys(paneId: string, keys: string[]): Promise<void> {
+    await executeHerdrInput(planHerdrInput(keys), async (input) => {
+      if (input.kind === "keys") {
+        await this.request<void>("pane.send_keys", { pane_id: paneId, keys: input.keys });
+      } else {
+        await this.request<void>("pane.send_text", { pane_id: paneId, text: input.text });
+      }
+    });
   }
 
   /** Close a pane, terminating its agent ("kill"). Resolves on Herdr's `{type:"ok"}` reply. */

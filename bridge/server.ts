@@ -4,7 +4,7 @@ import { extname, join, normalize, sep } from "node:path";
 import type { ActivityLedger } from "./activity.ts";
 import type { AuditLog } from "./audit.ts";
 import type { Config } from "./config.ts";
-import type { HerdrClient, PaneRead } from "./herdr-client.ts";
+import { PartialKeySendError, type HerdrClient, type PaneRead } from "./herdr-client.ts";
 import { computeEtag, gzipJsonResponse, notModified } from "./http-cache.ts";
 import type { NotifyPrefs, NotifyPrefsStore } from "./notify-prefs.ts";
 import { createOperatorCommands } from "./operator-commands.ts";
@@ -734,16 +734,24 @@ export async function keysPane(
     });
     return json({ ok: true } satisfies ActionResponse, ae);
   } catch (err) {
-    if (binding) {
-      audit.record({
-        action: "keys",
-        paneId,
-        session,
-        device,
-        detail: { keys, sent: false, promptBinding: binding.audit },
-      });
-    }
-    return json({ ok: false, error: (err as Error).message } satisfies ActionResponse, ae);
+    const keysDelivered = err instanceof PartialKeySendError;
+    audit.record({
+      action: "keys",
+      paneId,
+      session,
+      device,
+      detail: {
+        keys,
+        sent: false,
+        keysDelivered,
+        ...(binding ? { promptBinding: binding.audit } : {}),
+      },
+    });
+    return json({
+      ok: false,
+      error: (err as Error).message,
+      ...(keysDelivered ? { keysDelivered: true } : {}),
+    } satisfies ActionResponse, ae);
   }
 }
 

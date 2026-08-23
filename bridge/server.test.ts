@@ -23,7 +23,7 @@ import {
 } from "./server.ts";
 import { AuditLog } from "./audit.ts";
 import type { Config } from "./config.ts";
-import type { HerdrClient, PaneRead } from "./herdr-client.ts";
+import { PartialKeySendError, type HerdrClient, type PaneRead } from "./herdr-client.ts";
 
 // checkAccess is the API security gate (same-origin/CSRF + optional Tailscale identity). A
 // regression here silently opens remote shell access, so it gets the most direct coverage.
@@ -389,6 +389,36 @@ describe("pane write prompt binding", () => {
     expect(res.status).toBe(200);
     expect(client.reads).toEqual([]);
     expect(client.keys).toEqual([["w1:p1", ["1"]]]);
+  });
+
+  test("a partially delivered key queue is unsafe to retry and is audited", async () => {
+    const client = new FakePaneClient();
+    client.sendPaneKeys = (paneId: string, keys: string[]) => {
+      client.keys.push([paneId, keys]);
+      return Promise.reject(new PartialKeySendError(new Error("socket closed")));
+    };
+    const { audit, entries } = auditEntries();
+
+    const res = await keysPane(
+      client as unknown as HerdrClient,
+      cfg(),
+      "w1:p1",
+      request({ keys: ["Down", "shift+Tab", "Enter"] }),
+      audit,
+      "phone",
+      "default",
+    );
+
+    expect(await res.json()).toEqual({
+      ok: false,
+      error: "key sequence partially delivered — check the pane before retrying (socket closed)",
+      keysDelivered: true,
+    });
+    expect(entries[0]?.detail).toMatchObject({
+      keys: ["Down", "shift+Tab", "Enter"],
+      sent: false,
+      keysDelivered: true,
+    });
   });
 
   test("reply without expected_prompt writes without an extra pane read", async () => {

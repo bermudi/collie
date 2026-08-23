@@ -6,8 +6,10 @@ Status: **Accepted** (2026-08-03)
 
 The nav tray's key queue ([`use-key-queue.ts`](../web/src/hooks/use-key-queue.ts)) lets you compose a
 sequence of keys — `ctrl+alt+shift+p`, or an ordered run of several chords — review it as chips, and
-send the whole thing as ONE `pane.send_keys` call. The review step is the entire point: these keys go
-straight into a live terminal, and the strip is the last place a mistake is cheap.
+send the whole thing as one ordered logical action. This is normally one `pane.send_keys` call; the
+Herdr 0.8.0 Shift+Tab workaround may split it into sequential `send_keys` / `send_text` RPCs. The
+review step is the entire point: these keys go straight into a live terminal, and the strip is the
+last place a mistake is cheap.
 
 `NavTray` unmounts when its dock closes, so `useKeyQueue`'s state resets and the composed queue is
 gone. That is a real papercut — a mis-tap on the ✕ (or on the Keys toggle, or on Quick/Agent/Display,
