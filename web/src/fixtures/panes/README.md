@@ -43,7 +43,7 @@ and the observed commands were approved with no dialog painted.
 | `codex--ask-wizard-q2.txt` | Same set, `Question 2/2`; footer `enter to submit all`. Digit probed: submits the whole set | `blocked` |
 | `codex--ask-notes-focused.txt` | Notes box open (`› Add notes`, footer `tab or esc to clear notes`): a digit would TYPE — the adapter refuses to raw | `blocked` |
 
-## Grok corpus (structure from live panes 2026-08-21, SANITIZED)
+## Grok corpus (live panes 2026-08-21–23)
 
 Grok's composer is a rounded box at the tail: `╭─…─╮` / `│ ❯ … │` / `╰─ <status> ─╯`, then a blank and a key-hint row. The status run is opaque (display name, optional effort, optional permission mode). User-message bubbles use **square** corners (`┌ ┐ └ ┘`) and must never be read as the composer. **All identifying content genericized** per the repo's public-repo rule.
 
