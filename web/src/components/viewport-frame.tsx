@@ -17,6 +17,17 @@ export function ViewportFrame({ children }: { children: ReactNode }) {
     if (!viewport || !element) return;
 
     let animationFrame = 0;
+    const isInputFocused = () => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName;
+      return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        el.isContentEditable ||
+        el.getAttribute("role") === "textbox"
+      );
+    };
     const applyHeight = () => {
       const { height, offsetTop, scale } = viewport;
       // VisualViewport is browser input. A transient invalid sample must remove, not retain, an old
@@ -35,7 +46,20 @@ export function ViewportFrame({ children }: { children: ReactNode }) {
       // At scale 1 Chrome may pan the visual viewport down to a focused control. The frame starts
       // at layout-viewport zero, so include that offset to keep its bottom at the visible bottom.
       const visibleBottom = height + Math.max(0, offsetTop);
-      const next = `${visibleBottom}px`;
+      // Firefox (and stale Chrome dvh) can leave VisualViewport stuck at the keyboard/toolbar
+      // height after dismissal — the page then shows a white strip and the header clips the list
+      // (w65_p1-mt66huw8). window.innerHeight is the layout viewport and recovers immediately.
+      // When no text control is focused the keyboard is not up, so a viewport smaller than the
+      // window is stale — use the larger window value instead. When an input IS focused, the
+      // keyboard really is covering the bottom, so honour the smaller visual height.
+      let effective = visibleBottom;
+      if (!isInputFocused()) {
+        const winH = window.innerHeight;
+        if (Number.isFinite(winH) && winH > 0 && winH > visibleBottom + 24) {
+          effective = winH;
+        }
+      }
+      const next = `${effective}px`;
       if (element.style.height !== next) element.style.height = next;
     };
     const scheduleHeight = () => {
@@ -51,6 +75,9 @@ export function ViewportFrame({ children }: { children: ReactNode }) {
     window.addEventListener("resize", scheduleHeight);
     window.addEventListener("pageshow", scheduleHeight);
     document.addEventListener("visibilitychange", scheduleHeight);
+    // Keyboard show/hide changes focus without always firing a viewport resize (Firefox).
+    document.addEventListener("focusin", scheduleHeight);
+    document.addEventListener("focusout", scheduleHeight);
     return () => {
       cancelAnimationFrame(animationFrame);
       viewport.removeEventListener("resize", scheduleHeight);
@@ -58,6 +85,8 @@ export function ViewportFrame({ children }: { children: ReactNode }) {
       window.removeEventListener("resize", scheduleHeight);
       window.removeEventListener("pageshow", scheduleHeight);
       document.removeEventListener("visibilitychange", scheduleHeight);
+      document.removeEventListener("focusin", scheduleHeight);
+      document.removeEventListener("focusout", scheduleHeight);
     };
   }, []);
 

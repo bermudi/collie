@@ -15,12 +15,18 @@ class FakeVisualViewport extends EventTarget {
 
 describe("ViewportFrame", () => {
   const original = window.visualViewport;
+  const origInner = window.innerHeight;
 
   afterEach(() => {
     Object.defineProperty(window, "visualViewport", {
       configurable: true,
       value: original,
     });
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: origInner,
+    });
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   });
 
   it("repairs a stale dvh frame when Android reports the restored visual viewport", async () => {
@@ -29,6 +35,7 @@ describe("ViewportFrame", () => {
       configurable: true,
       value: viewport,
     });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 412 });
 
     const { container } = render(
       <ViewportFrame>
@@ -51,6 +58,7 @@ describe("ViewportFrame", () => {
       configurable: true,
       value: viewport,
     });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 740 });
 
     const { container } = render(<ViewportFrame>herd</ViewportFrame>);
     const frame = container.querySelector<HTMLElement>("[data-viewport-frame]");
@@ -76,6 +84,7 @@ describe("ViewportFrame", () => {
       configurable: true,
       value: viewport,
     });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 500 });
 
     const { container } = render(<ViewportFrame>herd</ViewportFrame>);
     const frame = container.querySelector<HTMLElement>("[data-viewport-frame]");
@@ -98,5 +107,32 @@ describe("ViewportFrame", () => {
     const frame = container.querySelector<HTMLElement>("[data-viewport-frame]");
     expect(frame).toHaveClass("h-[100dvh]");
     expect(frame?.style.height).toBe("");
+  });
+
+  it("repairs a stale small visual viewport when no input is focused (w65_p1-mt66huw8)", async () => {
+    const viewport = new FakeVisualViewport(400);
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: viewport,
+    });
+    const origInner = window.innerHeight;
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 780 });
+
+    const { container } = render(<ViewportFrame>herd</ViewportFrame>);
+    const frame = container.querySelector<HTMLElement>("[data-viewport-frame]");
+    // No input focused → stale 400 is ignored, window height wins
+    expect(frame).toHaveStyle({ height: "780px" });
+
+    // When an input IS focused, the keyboard really is up — honour the smaller visual height
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    act(() => {
+      viewport.dispatchEvent(new Event("resize"));
+    });
+    await waitFor(() => expect(frame).toHaveStyle({ height: "400px" }));
+
+    input.remove();
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: origInner });
   });
 });
