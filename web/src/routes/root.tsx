@@ -6,6 +6,7 @@ import { useAgentTransitions } from "@/hooks/use-transitions";
 import { usePushSetup } from "@/hooks/use-push";
 import { useConnectionLost } from "@/hooks/use-connection-lost";
 import { UpdateAvailableBanner } from "@/components/update-available-banner";
+import { ViewportFrame } from "@/components/viewport-frame";
 import { ConnectionBanner } from "@/components/connection-banner";
 import { DogGallop } from "@/components/dog-gallop";
 import { homePath } from "@/lib/nav";
@@ -57,11 +58,12 @@ export function RootLayout() {
   useAgentTransitions(data.agents, paneId ?? null);
   usePushSetup();
 
-  // A viewport-height flex column: the top banners (when shown) are in-flow rows at the top and the
+  // A viewport-height flex column: ViewportFrame repairs Android Chrome's occasionally stale `dvh`
+  // after keyboard/toolbar changes. The top banners (when shown) are in-flow rows at the top and the
   // active route fills the rest (each route root is `min-h-0 flex-1`). This is what keeps a banner
   // from covering the route's sticky header — it reserves real space instead of overlaying.
   return (
-    <div className="flex h-[100dvh] flex-col">
+    <ViewportFrame>
       {/* API-observed self-update: mounted unconditionally so its controller runs (and can
           auto-update) for the app's lifetime; renders the slim "tap to update" row only when a fresh
           build is confirmed but auto-update is held off (unsent work) or already spent. */}
@@ -77,7 +79,7 @@ export function RootLayout() {
         lastSeenAt={shownLastSeenAt(data, pane)}
       />
       <Outlet />
-    </div>
+    </ViewportFrame>
   );
 }
 
