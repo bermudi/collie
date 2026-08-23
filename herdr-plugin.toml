@@ -100,3 +100,9 @@ id = "push-test"
 title = "Send a test notification"
 contexts = ["workspace"]
 command = ["bash", "scripts/collie-ctl.sh", "push-test"]
+
+[[actions]]
+id = "doctor"
+title = "Check phone setup"
+contexts = ["workspace"]
+command = ["bash", "scripts/collie-ctl.sh", "doctor"]

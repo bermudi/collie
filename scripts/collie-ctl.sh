@@ -1251,6 +1251,77 @@ cmd_push_keys() {
   "$BUN" run "${PLUGIN_ROOT}/scripts/push-keys.ts" "${CONFIG_DIR}/.env" "$@"
 }
 
+# Phone-setup health check: what `status` shows plus the three things that burned a phone
+# this week — host filter blocking the tailnet name, missing VAPID keys, and the tailnet ACL.
+# Exits 0 even when it finds problems so a Herdr action never shows a red error for a diagnosis.
+cmd_doctor() {
+  print_status_banner
+  # Extra checks beyond the banner — best-effort, never aborts the report.
+  echo "  checks:"
+  # 1. VAPID
+  if [ -n "${COLLIE_VAPID_PUBLIC:-}" ] && [ -n "${COLLIE_VAPID_PRIVATE:-}" ]; then
+    echo "    ✓ push keys present (VAPID)"
+  else
+    echo "    ✗ push keys missing — run: herdr plugin action invoke push-keys --plugin herdr.collie"
+  fi
+  # 2. Host filter
+  if [ -n "${COLLIE_PUBLIC_HOSTS:-}" ]; then
+    # Host header the phone will send = bridge_url host without scheme/path
+    _doctor_url="$(bridge_url 2>/dev/null || echo "")"
+    _doctor_host="$(printf '%s' "$_doctor_url" | sed -E 's#^https?://##; s#/.*##; s/:.*//')"
+    # COLLIE_PUBLIC_HOSTS is comma-separated
+    _doctor_hit=1
+    IFS=',' read -ra _hosts <<< "${COLLIE_PUBLIC_HOSTS}"
+    for _h in "${_hosts[@]}"; do
+      _h="$(printf '%s' "$_h" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s/:.*//')"
+      if [ "$_h" = "$_doctor_host" ]; then _doctor_hit=0; break; fi
+    done
+    if [ "$_doctor_hit" = 0 ]; then
+      echo "    ✓ host filter allows ${_doctor_host}"
+    else
+      echo "    ✗ host filter blocks the tailnet name — COLLIE_PUBLIC_HOSTS=${COLLIE_PUBLIC_HOSTS} does not include ${_doctor_host}"
+      echo "      fix: remove COLLIE_PUBLIC_HOSTS (tailnet-only is fine) or add ${_doctor_host}"
+    fi
+    unset _doctor_url _doctor_host _doctor_hit _hosts _h
+  else
+    echo "    ✓ host filter off (tailnet-only)"
+  fi
+  # 3. Serve vs skip
+  if [ "${COLLIE_SKIP_SERVE:-}" = "1" ] && [ -z "${COLLIE_PUBLIC_URL:-}" ]; then
+    echo "    ✗ COLLIE_SKIP_SERVE=1 with no COLLIE_PUBLIC_URL — phone has no URL to open"
+  fi
+  # 4. Subscriptions (best-effort: count via bridge API)
+  _doctor_subs=""
+  if command -v curl >/dev/null 2>&1; then
+    _doctor_cfg="$(curl -s --max-time 3 "http://127.0.0.1:${PORT}/api/config" 2>/dev/null || true)"
+    _doctor_push="$(printf '%s' "$_doctor_cfg" | sed -n 's/.*"push"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p')"
+    if [ "$_doctor_push" = "true" ]; then
+      echo "    ✓ push enabled on bridge"
+    elif [ "$_doctor_push" = "false" ]; then
+      echo "    ✗ push disabled on bridge (no VAPID or bridge not ready)"
+    fi
+    unset _doctor_cfg _doctor_push
+  fi
+  # 5. Herdr socket
+  if [ -S "${HERDR_SOCKET_PATH:-$HOME/.config/herdr/herdr.sock}" ] || [ -S "$HOME/.config/herdr/herdr.sock" ]; then
+    echo "    ✓ Herdr socket present"
+  else
+    echo "    · Herdr socket not found (Herdr not running yet — bridge will retry)"
+  fi
+  echo
+  echo "  phone (Android Firefox):"
+  echo "    1. Tailscale app → Settings → Use Tailscale DNS → ON, then toggle Tailscale off/on"
+  echo "    2. Firefox → Settings → Privacy and security → DNS over HTTPS → Off"
+  echo "    3. Open $(bridge_url 2>/dev/null || echo "https://<your-tailnet-name>")  (must be https, not http://IP)"
+  echo "    4. Collie → Settings → Notifications → Enable → Allow when Firefox asks"
+  echo "    5. Test: herdr plugin action invoke push-test --plugin herdr.collie"
+  echo
+  echo "  quick fixes:"
+  echo "    host blocked?  remove the filter: sed -i '/^COLLIE_PUBLIC_HOSTS=/d' \"${CONFIG_DIR}/.env\" && herdr plugin action invoke restart --plugin herdr.collie"
+  echo "    no push?     herdr plugin action invoke push-keys --plugin herdr.collie && herdr plugin action invoke restart --plugin herdr.collie"
+  echo
+}
+
 # Sourced (by scripts/collie-ctl.test.sh) rather than run: define the functions and stop before the
 # dispatch, so a test can call one function in isolation with its dependencies stubbed out.
 if [ "${BASH_SOURCE[0]}" != "$0" ]; then
@@ -1274,6 +1345,7 @@ case "${1:-}" in
   version) cmd_version ;;
   push-keys) shift || true; cmd_push_keys "$@" ;;
   push-test) shift || true; cmd_push_test "$@" ;;
+  doctor)  cmd_doctor ;;
   logs)    cmd_logs "${2:-50}" ;;
-  *) echo "usage: collie-ctl.sh {start|stop|restart|uninstall|update|version|push-keys|push-test|build|serve|unserve|status|url|qr|logs}" >&2; exit 2 ;;
+  *) echo "usage: collie-ctl.sh {start|stop|restart|uninstall|update|version|push-keys|push-test|doctor|build|serve|unserve|status|url|qr|logs}" >&2; exit 2 ;;
 esac
