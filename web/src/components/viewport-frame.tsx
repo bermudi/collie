@@ -15,6 +15,10 @@ export function ViewportFrame({ children }: { children: ReactNode }) {
     const viewport = window.visualViewport;
     const element = frameRef.current;
     if (!viewport || !element) return;
+    // Firefox (Android and desktop) manages the dynamic toolbar correctly via CSS dvh
+    // and its VisualViewport is often stale/small, leaving the white gap/header clip
+    // seen in w65_p1-mt68ee2y (Firefox tab, no keyboard). Skip the Chrome workaround there.
+    if (navigator.userAgent.includes("Firefox")) return;
 
     let animationFrame = 0;
     const isInputFocused = () => {

@@ -110,6 +110,9 @@ describe("ViewportFrame", () => {
   });
 
   it("repairs a stale small visual viewport when no input is focused (w65_p1-mt66huw8)", async () => {
+    // Chrome path — Firefox is skipped (uses pure CSS dvh)
+    const origUA = navigator.userAgent;
+    Object.defineProperty(window.navigator, "userAgent", { configurable: true, value: "Chrome" });
     const viewport = new FakeVisualViewport(400);
     Object.defineProperty(window, "visualViewport", {
       configurable: true,
@@ -134,5 +137,24 @@ describe("ViewportFrame", () => {
 
     input.remove();
     Object.defineProperty(window, "innerHeight", { configurable: true, value: origInner });
+    Object.defineProperty(window.navigator, "userAgent", { configurable: true, value: origUA });
+  });
+
+  it("leaves Firefox to CSS dvh (no JS height override)", async () => {
+    const viewport = new FakeVisualViewport(400);
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: viewport,
+    });
+    const origUA = navigator.userAgent;
+    Object.defineProperty(window.navigator, "userAgent", { configurable: true, value: "Firefox/135" });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 780 });
+
+    const { container } = render(<ViewportFrame>herd</ViewportFrame>);
+    const frame = container.querySelector<HTMLElement>("[data-viewport-frame]");
+    expect(frame?.style.height).toBe("");
+    expect(frame).toHaveClass("h-[100dvh]");
+
+    Object.defineProperty(window.navigator, "userAgent", { configurable: true, value: origUA });
   });
 });
