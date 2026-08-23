@@ -173,6 +173,78 @@ ensure_build() {
   cmd_build || { echo "warn: web build failed; API will run but the UI will 503 until built" >&2; return 1; }
 }
 
+# Make the server half of Web Push ready on first start. The browser still owns the meaningful
+# consent: no endpoint exists and nothing can be sent until the operator enables notifications on
+# that device. Keys are generated once into the same mode-600 .env every service path reads; an
+# existing pair is never replaced, because rotating it would silently invalidate every subscriber.
+#
+# Best-effort by design. A read-only/symlinked config or missing Bun may leave push off, but must not
+# take the bridge down with it. Concurrent starts serialize through a tiny PID lock: after acquiring
+# it each contender re-checks disk, so exactly one identity is generated and every process uses that
+# same pair. Export the freshly-written canonical assignments for the unsupervised fallback; systemd
+# and launchd read the file afresh themselves.
+load_generated_push_keys() {
+  local generated_public generated_private
+  generated_public="$(sed -n 's/^COLLIE_VAPID_PUBLIC=//p' "${CONFIG_DIR}/.env" 2>/dev/null | tail -1 || true)"
+  generated_private="$(sed -n 's/^COLLIE_VAPID_PRIVATE=//p' "${CONFIG_DIR}/.env" 2>/dev/null | tail -1 || true)"
+  [ -n "$generated_public" ] && [ -n "$generated_private" ] || return 1
+  COLLIE_VAPID_PUBLIC="$generated_public"
+  COLLIE_VAPID_PRIVATE="$generated_private"
+  export COLLIE_VAPID_PUBLIC COLLIE_VAPID_PRIVATE
+}
+
+ensure_push_keys() {
+  if [ -n "${COLLIE_VAPID_PUBLIC:-}" ] && [ -n "${COLLIE_VAPID_PRIVATE:-}" ]; then return 0; fi
+  if [ -z "$BUN" ]; then
+    echo "warn: push keys were not generated — bun not found" >&2
+    return 0
+  fi
+
+  mkdir -p "$CONFIG_DIR"
+  local lock="${CONFIG_DIR}/.push-keys.lock" acquired=0 i
+  for i in $(seq 1 50); do
+    if mkdir "$lock" 2>/dev/null; then
+      printf '%s\n' "$$" > "${lock}/pid"
+      acquired=1
+      break
+    fi
+    sleep 0.1
+  done
+  if [ "$acquired" != 1 ]; then
+    # The winner may have completed just as our wait expired. Prefer its identity to a warning.
+    if load_generated_push_keys; then return 0; fi
+    # Never "recover" an apparently stale lock by deleting it: without an atomic compare-and-delete,
+    # that can remove a NEW owner's lock and let two identities race. A crashed owner therefore
+    # fails safely; the documented `push-keys` recovery command does not need this automatic lock.
+    echo "warn: push key generation is locked; continuing with push disabled (run push-keys to recover)" >&2
+    return 0
+  fi
+
+  # Another start may have won while this process waited for the lock.
+  if load_generated_push_keys; then
+    rm -f "${lock}/pid"
+    rmdir "$lock" 2>/dev/null || true
+    return 0
+  fi
+
+  echo "enabling Web Push (first run)…"
+  if ! cmd_push_keys; then
+    rm -f "${lock}/pid"
+    rmdir "$lock" 2>/dev/null || true
+    echo "warn: push key generation failed; continuing with push disabled" >&2
+    return 0
+  fi
+
+  local loaded=0
+  if load_generated_push_keys; then loaded=1; fi
+  rm -f "${lock}/pid"
+  rmdir "$lock" 2>/dev/null || true
+  if [ "$loaded" != 1 ]; then
+    echo "warn: push key generation produced no usable pair; continuing with push disabled" >&2
+  fi
+  return 0
+}
+
 self_dnsname() {
   tailscale status --json 2>/dev/null | bun -e \
     "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{process.stdout.write(JSON.parse(d).Self.DNSName.replace(/\.\$/,''))}catch{}})"
@@ -445,9 +517,17 @@ start_unsupervised() {
 
 cmd_start() {
   ensure_build || true
+  ensure_push_keys
   if have_systemd; then
     write_unit
-    systemctl --user enable --now "$UNIT"
+    if systemctl --user is-active --quiet "$UNIT"; then
+      # `enable --now` does not restart an active unit. Restart so a retry that just created VAPID
+      # keys (and any freshly-written unit path/config) is actually read by the running bridge.
+      systemctl --user enable "$UNIT"
+      systemctl --user restart "$UNIT"
+    else
+      systemctl --user enable --now "$UNIT"
+    fi
     echo "bridge started (systemd --user: ${UNIT})"
   elif have_launchd; then
     write_agent
@@ -486,6 +566,8 @@ cmd_start() {
     done
     [ "$supervised" = 0 ] || echo "bridge started (launchd: ${AGENT_LABEL})"
   else
+    # `start` is idempotent here too: release the port before replacing an unsupervised bridge.
+    stop_pidfile_process
     start_unsupervised
   fi
   # A front door that won't come up must not abort `start`. The bridge is already running on

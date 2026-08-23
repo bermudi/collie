@@ -5,16 +5,20 @@ import {
   enablePush,
   getPushState,
   isPushDisabledByUser,
+  shouldAutoRepairPush,
   type EnableResult,
   type PushState,
 } from "@/lib/push";
 
-// On mount, subscribe to Web Push — unless the user turned it off in Settings. Best-effort and
-// silent: service workers + Push need a secure context, so over plain HTTP this no-ops (it lights up
-// once served over HTTPS). The subscribe flow lives in lib/push so the settings page can reuse it.
+// On mount, repair Web Push only when the browser ALREADY holds a grant and the user did not turn it
+// off in Settings. The first permission request belongs to the Settings tap — Firefox requires that
+// user gesture, and no browser should get an unsolicited prompt on page load. The subscribe flow
+// lives in lib/push so the explicit control and this repair path share one implementation.
 export function usePushSetup() {
   useEffect(() => {
-    if (isPushDisabledByUser()) return;
+    const userDisabled = isPushDisabledByUser();
+    const permission = typeof Notification === "undefined" ? undefined : Notification.permission;
+    if (!shouldAutoRepairPush(userDisabled, permission)) return;
     let cancelled = false;
     void (async () => {
       try {

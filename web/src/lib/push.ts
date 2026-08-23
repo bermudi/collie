@@ -47,6 +47,19 @@ export function isPushDisabledByUser(): boolean {
   }
 }
 
+/**
+ * Background setup may repair a previously-approved device, but must never create the browser's
+ * first permission prompt. Firefox requires `subscribe()` to follow a user gesture, and an
+ * unsolicited notification prompt is poor consent UX everywhere. The Settings toggle owns the
+ * first request; a stored browser grant lets later page loads repair a missing/stale subscription.
+ */
+export function shouldAutoRepairPush(
+  userDisabled: boolean,
+  permission: NotificationPermission | undefined,
+): boolean {
+  return !userDisabled && permission === "granted";
+}
+
 function setUserDisabled(disabled: boolean): void {
   try {
     if (disabled) localStorage.setItem(PREF_KEY, "1");
