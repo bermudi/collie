@@ -1237,9 +1237,153 @@ test_push_keys_refuses_a_symlinked_env() {
   assert_eq "$(cat "$real")" "COLLIE_PORT=8787"
 }
 
+test_start_enables_push_once_by_default() {
+  setup_case push-default
+  command -v bun > /dev/null || { echo "  (skipped push default: no bun on PATH)"; return 0; }
+
+  local harness="${CASE_DIR}/push-default.sh"
+  cat > "$harness" <<EOF
+set -euo pipefail
+export HOME="$HOME_DIR"
+export HERDR_PLUGIN_CONFIG_DIR="$CONFIG_DIR"
+export PATH="$BIN_DIR:$BASE_PATH"
+source "$CTL"
+BUN="\$(command -v bun)"
+ensure_push_keys
+[ -n "\${COLLIE_VAPID_PUBLIC:-}" ]
+[ -n "\${COLLIE_VAPID_PRIVATE:-}" ]
+printf '%s' "\$COLLIE_VAPID_PUBLIC" > "\$1"
+EOF
+  # Two simultaneous first starts must converge on one identity, never race into an immediate
+  # rotation where one process runs key A while disk (and the other process) holds key B.
+  bash "$harness" "${CASE_DIR}/public-a" > "${CASE_DIR}/first-a.out" 2>&1 &
+  local first_a=$!
+  bash "$harness" "${CASE_DIR}/public-b" > "${CASE_DIR}/first-b.out" 2>&1 &
+  local first_b=$!
+  wait "$first_a" || fail "first concurrent start did not enable push: $(cat "${CASE_DIR}/first-a.out")"
+  wait "$first_b" || fail "second concurrent start did not enable push: $(cat "${CASE_DIR}/first-b.out")"
+  assert_eq "$(cat "${CASE_DIR}/public-a")" "$(cat "${CASE_DIR}/public-b")"
+
+  local env_file="${CONFIG_DIR}/.env" before
+  [ -f "$env_file" ] || fail "default push setup did not create ${env_file}"
+  assert_contains "$(cat "$env_file")" "COLLIE_VAPID_PUBLIC="
+  assert_contains "$(cat "$env_file")" "COLLIE_VAPID_PRIVATE="
+  assert_eq "$(stat -c '%a' "$env_file" 2>/dev/null || stat -f '%Lp' "$env_file")" "600"
+
+  # A restart must preserve the identity: replacing it strands every existing browser subscription.
+  before="$(cat "$env_file")"
+  bash "$harness" "${CASE_DIR}/public-restart" > "${CASE_DIR}/second.out" 2>&1 ||
+    fail "second default push setup failed: $(cat "${CASE_DIR}/second.out")"
+  assert_eq "$(cat "$env_file")" "$before"
+}
+
+test_push_default_failure_does_not_abort_start() {
+  setup_case push-default-failure
+  command -v bun > /dev/null || return 0
+
+  local real="${CASE_DIR}/managed-env" harness="${CASE_DIR}/push-default-failure.sh"
+  printf 'COLLIE_PORT=8787\n' > "$real"
+  ln -s "$real" "${CONFIG_DIR}/.env"
+  cat > "$harness" <<EOF
+set -euo pipefail
+export HOME="$HOME_DIR"
+export HERDR_PLUGIN_CONFIG_DIR="$CONFIG_DIR"
+export PATH="$BIN_DIR:$BASE_PATH"
+source "$CTL"
+BUN="\$(command -v bun)"
+ensure_push_keys
+EOF
+  bash "$harness" > "${CASE_DIR}/failure.out" 2>&1 ||
+    fail "a refused automatic key write aborted startup"
+  assert_contains "$(cat "${CASE_DIR}/failure.out")" "continuing with push disabled"
+  [ -L "${CONFIG_DIR}/.env" ] || fail "automatic push setup replaced a managed .env symlink"
+}
+
+test_push_default_never_breaks_a_stale_lock() {
+  setup_case push-default-stale-lock
+  command -v bun > /dev/null || return 0
+
+  mkdir "${CONFIG_DIR}/.push-keys.lock"
+  # No pid: model a process killed between atomic mkdir and recording its owner.
+  local harness="${CASE_DIR}/stale-lock.sh"
+  cat > "$harness" <<EOF
+set -euo pipefail
+export HOME="$HOME_DIR"
+export HERDR_PLUGIN_CONFIG_DIR="$CONFIG_DIR"
+export PATH="$BIN_DIR:$BASE_PATH"
+source "$CTL"
+BUN="\$(command -v bun)"
+sleep() { :; }
+ensure_push_keys
+EOF
+  bash "$harness" > "${CASE_DIR}/stale.out" 2>&1 ||
+    fail "a stale automatic push lock aborted startup"
+  assert_contains "$(cat "${CASE_DIR}/stale.out")" "run push-keys to recover"
+  [ -d "${CONFIG_DIR}/.push-keys.lock" ] || fail "automatic setup broke a lock it did not own"
+  [ ! -f "${CONFIG_DIR}/.env" ] || fail "automatic setup generated through a lock it did not own"
+}
+
+test_start_reloads_supervisors_after_default_setup() {
+  setup_case start-reloads
+  local calls="${CASE_DIR}/systemctl.calls" harness="${CASE_DIR}/systemd-start.sh"
+  cat > "${BIN_DIR}/systemctl" <<EOF
+#!/bin/sh
+echo "\$*" >> "$calls"
+case " \$* " in
+  *" show-environment "*|*" is-active "*) exit 0 ;;
+esac
+exit 0
+EOF
+  chmod +x "${BIN_DIR}/systemctl"
+  cat > "$harness" <<EOF
+set -euo pipefail
+export HOME="$HOME_DIR"
+export HERDR_PLUGIN_CONFIG_DIR="$CONFIG_DIR"
+export PATH="$BIN_DIR:$BASE_PATH"
+source "$CTL"
+BUN=/bin/true
+ensure_build() { return 0; }
+ensure_push_keys() { return 0; }
+cmd_serve() { return 0; }
+print_status_banner() { :; }
+cmd_start
+EOF
+  bash "$harness" > "${CASE_DIR}/systemd.out" 2>&1 ||
+    fail "start failed while replacing an active systemd bridge"
+  assert_contains "$(cat "$calls")" "--user restart collie"
+
+  # Hosts with no supervisor must also release the old pidfile process before launching its
+  # replacement; otherwise the push-enabled bridge loses the port to the old push-disabled one.
+  local fallback="${CASE_DIR}/fallback-start.sh"
+  cat > "$fallback" <<EOF
+set -euo pipefail
+export HOME="$HOME_DIR"
+export HERDR_PLUGIN_CONFIG_DIR="$CONFIG_DIR"
+export PATH="$BIN_DIR:$BASE_PATH"
+source "$CTL"
+BUN=/bin/true
+ensure_build() { return 0; }
+ensure_push_keys() { return 0; }
+have_systemd() { return 1; }
+have_launchd() { return 1; }
+stop_pidfile_process() { echo stop-old; }
+start_unsupervised() { echo start-new; }
+cmd_serve() { return 0; }
+print_status_banner() { :; }
+cmd_start
+EOF
+  bash "$fallback" > "${CASE_DIR}/fallback.out" 2>&1 ||
+    fail "unsupervised replacement start failed"
+  assert_contains "$(cat "${CASE_DIR}/fallback.out")" $'stop-old\nstart-new'
+}
+
 test_suite_ignores_an_inherited_git_dir
 test_push_keys_writes_the_resolved_env
 test_push_keys_refuses_a_symlinked_env
+test_start_enables_push_once_by_default
+test_push_default_failure_does_not_abort_start
+test_push_default_never_breaks_a_stale_lock
+test_start_reloads_supervisors_after_default_setup
 test_tailscale_cutovers_and_collisions
 test_missing_tailscale_cli
 test_state_delete_failures

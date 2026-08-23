@@ -227,7 +227,7 @@ $ scripts/collie-ctl.sh status
 
 ```console
 $ scripts/collie-ctl.sh logs        # journal timestamps trimmed here
-[push] disabled (no VAPID keys configured)
+[push] enabled (0 saved subscription(s))
 [bridge] listening on http://127.0.0.1:8787  (poll 1500ms)
 [bridge] WARNING: COLLIE_TRUSTED_USER is empty — any tailnet device/user that reaches the bridge gets full write access. Set it to your tailnet login (see README → Variant A).
 [bridge] WARNING: COLLIE_PUBLIC_HOSTS is empty — Host-header validation is OFF (DNS rebinding not blocked). Set it to your MagicDNS name, especially under COLLIE_SERVE_MODE=http.
@@ -364,7 +364,7 @@ below as `invoke <cmd>`). The ones you'll actually use:
 | **Update** — advance the checkout + rebuild + restart | `collie-ctl.sh update` | `invoke update` |
 | **Uninstall** — remove the service; keep `.env` + checkout | `collie-ctl.sh uninstall` | `invoke uninstall` |
 | **Logs** — tail the journal / log file | `collie-ctl.sh logs` | — (script only) |
-| **Push keys** — generate the VAPID keypair into your `.env` | `collie-ctl.sh push-keys` | `invoke push-keys` |
+| **Push keys** — generate the VAPID identity if automatic setup failed | `collie-ctl.sh push-keys` | `invoke push-keys` |
 | **Push test** — send one notification to prove it works | `collie-ctl.sh push-test` | `invoke push-test` |
 
 The actions are declared in `herdr-plugin.toml` and each one shells out to the control script; list
@@ -539,19 +539,19 @@ over the pipe, so Windows gets the same live updates as Linux, not degraded poll
 `COLLIE_HERDR_DIAL=net` forces that same dialer on Linux/macOS. It exists so the Windows code path
 can be exercised — and regression-tested — without a Windows box; `bridge/dial.test.ts` uses it.
 
-## Web Push (optional)
+## Web Push
 
-Off unless you opt in. Three steps, and nothing to install — the sender (`web-push`) is already an
-optional dependency, installed by the build:
+The server half is ready by default: the first `start` generates a VAPID identity into the protected
+plugin `.env`, and every later start preserves it. The phone still opts in explicitly — browsers do
+not create a subscription or allow Collie to send anything before that permission:
 
 ```bash
-herdr plugin action invoke push-keys --plugin herdr.collie   # 1. generate + write the VAPID keys
-herdr plugin action invoke restart   --plugin herdr.collie   # 2. the bridge reads them at start
-#                                                              3. on your phone: Settings → notifications
+# On your phone: Collie → Settings → notifications
 ```
 
-Step 1 is the one that used to be fiddly. `push-keys` generates the keypair *and* writes
-`COLLIE_VAPID_PUBLIC` / `_PRIVATE` into the `.env` the service actually reads, at mode 600.
+`push-keys` remains available for an install whose automatic setup could not write its config, and
+for deliberately rotating the identity. It writes `COLLIE_VAPID_PUBLIC` / `_PRIVATE` into the
+`.env` the service actually reads, at mode 600.
 
 **Worth one extra keystroke:** pass a *subject* — the contact address RFC 8292 wants, so a push
 service has a way to reach whoever is sending. An action carries no arguments, so this form is the

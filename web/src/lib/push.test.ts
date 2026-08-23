@@ -1,4 +1,17 @@
-import { keysMatch, subscribeBody } from "./push";
+import { keysMatch, shouldAutoRepairPush, subscribeBody } from "./push";
+
+describe("shouldAutoRepairPush", () => {
+  it("never creates the first notification prompt on page load", () => {
+    expect(shouldAutoRepairPush(false, "default")).toBe(false);
+    expect(shouldAutoRepairPush(false, "denied")).toBe(false);
+    expect(shouldAutoRepairPush(false, undefined)).toBe(false);
+  });
+
+  it("repairs a device only after the browser already holds an explicit grant", () => {
+    expect(shouldAutoRepairPush(false, "granted")).toBe(true);
+    expect(shouldAutoRepairPush(true, "granted")).toBe(false);
+  });
+});
 
 // The VAPID-rotation guard in enablePush hinges on this byte compare: an existing PushManager
 // subscription is bound to the applicationServerKey it was created with, so when the server rotates
