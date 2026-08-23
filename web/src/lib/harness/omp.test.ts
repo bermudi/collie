@@ -15,9 +15,9 @@ import { parseKeyHintFooter } from "./menu-hints";
 // entire corpus rather than over a chosen subset: no interactive block kind is ever constructed, so no
 // tap can reach a keystroke. See harness/omp/index.ts for why the dialog layer is a later PR.
 //
-// The FOREIGN cohort is every claude and codex capture, which pins the cross-adapter fail-closed leg.
-// The other directions of that loop live in conformance.test.ts (Claude's leg takes omp--* + codex--*)
-// and harness/codex.test.ts (codex's leg takes claude--* + omp--*).
+// The FOREIGN cohort is every claude, codex and grok capture, which pins the cross-adapter fail-closed leg.
+// The other directions of that loop live in conformance.test.ts (Claude's leg takes omp--* + codex--* + grok--*),
+// harness/codex.test.ts (codex's leg takes claude--* + omp--* + grok--*) and harness/grok.test.ts.
 
 const PANES_DIR = join(import.meta.dirname, "..", "..", "fixtures", "panes");
 
@@ -29,6 +29,9 @@ const allClaudeFixtures = readdirSync(PANES_DIR)
   .sort();
 const allCodexFixtures = readdirSync(PANES_DIR)
   .filter((f) => f.startsWith("codex--") && f.endsWith(".txt"))
+  .sort();
+const allGrokFixtures = readdirSync(PANES_DIR)
+  .filter((f) => f.startsWith("grok--") && f.endsWith(".txt"))
   .sort();
 
 // Every omp screen this adapter DECLINES — which is every screen IN THIS CORPUS, not every screen omp
@@ -84,7 +87,7 @@ const neutralFixtures = allOmpFixtures.filter((f) => DECLINED.includes(f));
 
 describeAdapterConformance(ompAdapter, {
   ownFixtures,
-  foreignFixtures: [...allClaudeFixtures, ...allCodexFixtures],
+  foreignFixtures: [...allClaudeFixtures, ...allCodexFixtures, ...allGrokFixtures],
   neutralFixtures,
 });
 
