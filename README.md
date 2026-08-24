@@ -1,7 +1,9 @@
-# Collie
+# Collie Pup
+
+> **Stable fork of [AltanS/collie](https://github.com/AltanS/collie).** Pup is small, no pack — just the herd on your phone that scrolls. No HA, no ASR, fix-first: scrolling, missing agents, keystrokes.
 
 <p align="center">
-  <img src="assets/collie-hero.webp" alt="A collie herding a flock of sheep" width="640">
+  <img src="assets/collie-hero.webp" alt="A collie pup herding a flock of sheep" width="640">
 </p>
 
 A phone web UI for your [Herdr](https://herdr.dev) agent herd, served over Tailscale. Open a URL, see
