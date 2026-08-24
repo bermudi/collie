@@ -412,7 +412,7 @@ describe("AgentChat — block-grammar scoping (an agent with no adapter)", () =>
       "",
       "  Shift+Tab:mode  │  Ctrl+.:shortcuts",
     ].join("\n");
-    const grokAgent = { ...codexAgent, agent: "grok", paneId: "w9:p5" };
+    const grokAgent = { ...opencodeAgent, agent: "grok", paneId: "w9:p5" };
     renderChat({ text: grokBox, agent: grokAgent });
     const strip = screen.getByText("Local Llama (xhigh) · plan");
     expect(strip.closest("pre")).toBeNull();

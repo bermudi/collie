@@ -6,6 +6,26 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.34.0] - 2026-08-24
+
+### Added
+
+- `COLLIE_SERVE_PORT`: publish the https front door on a chosen tailnet port — several Collies per host (#98) (c02e3ea)
+- **Codex CLI first-class harness adapter** — boxless composer chrome stripped with the status row re-surfaced, folder-trust prompt, exec approvals and `request_user_input` question cards lifted into native buttons (by @kennymcavoy) (e5fab3a)
+- **Grok Build first-class harness adapter** — composer chrome stripped with the status strip re-surfaced, permission cards, `ask_user_question` radios/wizards and plan approval lifted into native buttons, plus a Grok session-journal adapter (by @kennymcavoy) (bd01e51)
+- **Devin harness slash catalog** — `/Agent` palette + `AGENT_FAMILIES` (Pup) (0c58737)
+- **`doctor` phone-setup check** — VAPID/host-filter/push/ Herdr socket + 5-step phone checklist as `herdr plugin action invoke doctor` (Pup) (b39656a)
+- **Collie Pup fork charter** — `herdr-plugin.toml` display name `Collie Pup`, `AGENTS.md` stable-fork charter (Pup) (50931a2 / 3000ce2)
+
+### Fixed
+
+- **omp replies no longer stall on an inline completion suggestion** — the ghost omp paints after the typed text is dropped from the draft the send guard verifies (by @enieuwy) (bdfac02)
+- **Codex adapter review fixes** — drafts wrapping past 8 rows keep the composer, and the persistent "don't ask again" approval row stays visible in the mirror (d469507)
+- **`journal-probe` checks each root on its own** — a populated healthy root can no longer hide a broken sibling (by @kennymcavoy) (6f68677)
+- **Shift+Tab sends BackTab `ESC [ Z`** instead of bare Tab `0x09` (Pup) (3bfd767)
+- **Single scroll container + Firefox viewport fix** — `html/body/#root overflow:hidden`, `ViewportFrame` skips VisualViewport hack on Firefox and scrolls only the list inner `overflow-y-auto` — eliminates double scroll / header clip / white gap (Pup) (4cec1bc / 8fc4ae0)
+- **Web Push default-on** — `ensure_push_keys` auto-generates VAPID on first start and `shouldAutoRepairPush` repairs when permission granted (Pup) (e760720)
+
 ## [0.32.1] - 2026-08-23
 
 ### Fixed
