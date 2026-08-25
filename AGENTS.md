@@ -6,6 +6,10 @@ Upstream repo: `AltanS/collie` · Fork: `bermudi/collie` · Plugin id stays `her
 
 **Read [`CLAUDE.md`](./CLAUDE.md) before changing anything.** It is the working agreement — versioning, build/run, data layer, Herdr socket grammar, journal containment, security posture. This file only explains what Pup is and what matters here; it does not restate CLAUDE.md.
 
+## Decision records — read before you re-argue
+
+[`.adr/`](./.adr/) holds the decisions that **close off an option someone will reasonably propose again**. If you're about to argue *why not* rather than *how*, check there first — if the answer isn't there and the decision is that shape, add one (see [`.adr/README.md`](./.adr/README.md)). Pup's gates live there: one managed front door (0001), no terminal emulator (0008), one major gate (0020), opencode pane-scoped (0021), generic menu digit ban (0009), etc. Don't restate an ADR's reasoning here; link to it.
+
 ## Project
 
 Phone web UI for your Herdr herd over Tailscale. Bun bridge + Vite/React PWA. Single-user, tailnet-only. Pup's job is to be the boring, reliable viewer you open 20 times a day — not the place for distributed quorum or voice pipelines.
@@ -16,7 +20,7 @@ Bun + TypeScript (bridge) · Vite + React + Tailwind v4 + shadcn (web) · Herdr 
 
 ## Why this fork exists
 
-Upstream `1.0-beta` adds pack/HA (lead/deputy, warrants, takeover) and a server-side speech-to-text seam. Both are real scope for the bridge: more state, more attack surface, and for most single-host tailnet users, no day-to-day win — the phone keyboard mic is already world-class. Pup tracks `0.32.x` stable: port upstream fixes that matter to the viewer, skip the subsystems that belong to the mesh or the OS.
+Upstream `1.0-beta` adds pack/HA (lead/deputy, warrants, takeover) and a server-side speech-to-text seam. Both are real scope for the bridge: more state, more attack surface, and for most single-host tailnet users, no day-to-day win — the phone keyboard mic is already world-class. Pup tracks `0.32.x` stable: port upstream fixes that matter to the viewer, skip the subsystems that belong to the mesh or the OS. See [`.adr/0020`](./.adr/0020-a-major-upgrade-is-consented-by-flag.md) (major gate) and [`.adr/0021`](./.adr/0021-opencode-sessions-are-pane-scoped.md) (why we don't list all opencode sessions).
 
 ## What Pup does and doesn't do
 
@@ -26,8 +30,10 @@ Upstream `1.0-beta` adds pack/HA (lead/deputy, warrants, takeover) and a server-
 
 ## Constraints & Red Lines
 
-- Tailnet-only. `tailscale serve` is the one front door Pup manages (ADR 0001). Never `funnel`, never `0.0.0.0`. The dashboard is remote shell access — treat it like a root login.
+- Tailnet-only. `tailscale serve` is the one front door Pup manages ([ADR 0001](./.adr/0001-one-managed-front-door.md)). Never `funnel`, never `0.0.0.0`. The dashboard is remote shell access — treat it like a root login.
 - Single scroll container on the dashboard. The page (`html`/`body`/`#root`) is `overflow-hidden`; only the list's inner `overflow-y-auto` scrolls. That's what fixed the double-scroll/header-clip/white-gap in `w65_p1-mt68*`.
+- Opencode sessions are pane-scoped ([ADR 0021](./.adr/0021-opencode-sessions-are-pane-scoped.md)) — don't enumerate `opencode.db` / `GET /api/session` into phantom agents.
+- Major gate ([ADR 0020](./.adr/0020-a-major-upgrade-is-consented-by-flag.md)), menu digit ban ([ADR 0009](./.adr/0009-a-generic-menu-is-driven-by-the-keys-it-names.md)). Don't regress.
 - Same-origin + CSP, React text nodes for pane output. Don't regress.
 
 ## Workflow

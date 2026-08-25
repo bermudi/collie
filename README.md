@@ -17,6 +17,8 @@ and it is **single-user**: one operator, one tailnet, no multi-tenant auth. If y
 public access, Collie isn't built for it. Read the
 [security note](#%EF%B8%8F-security--read-before-you-run-it) either way.
 
+> **Decisions that close off a road live in [`.adr/`](./.adr/)** — one front door (0001), no emulator (0008), major gate (0020), opencode pane-scoped (0021), etc. Read before you re-argue *why not*.
+
 **Features**
 
 - **React Router + Vite** — TypeScript, Tailwind, shadcn, and a Bun bridge
