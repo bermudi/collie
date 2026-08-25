@@ -6,6 +6,12 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.35.0] - 2026-08-25
+
+### Added
+
+- **opencode first-class harness adapter (Tier-1)** — composer chrome stripped with Build/status re-surfaced, draft extraction (single + wrapped), idle/draft/working/done fixtures (Pup) (92cf018)
+
 ## [0.34.0] - 2026-08-24
 
 ### Added
