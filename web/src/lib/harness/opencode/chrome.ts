@@ -66,26 +66,41 @@ export function locateComposer(lines: StyledLine[]): ComposerBox | null {
   }
 
   // (a) Bottom border, and hint run below it.
+  // Find the last bottom border in the buffer (tail-most). Don't anchor to `end`
+  // which may be a far footer (Tip / cwd) 20+ rows below the box — we only
+  // require the hint to be directly below the bottom, not that bottom is near `end`.
   let bottom = -1;
-  if (isComposerBottom(texts[end]!)) {
-    bottom = end;
-  } else {
-    for (let k = end - 1; k >= 0 && end - k < MAX_HINT_ROWS; k--) {
-      if (isComposerBottom(texts[k]!)) {
-        bottom = k;
-        break;
-      }
-    }
-    if (bottom < 0) return null;
-    for (let row = bottom + 1; row <= end; row++) {
-      const t = texts[row]!;
-      if (isBlank(t)) continue;
-      if (composerInnerText(t) !== null) return null; // another box (should not be under composer)
-      if (isComposerHint(t) || isVersionRow(t)) continue;
-      return null; // unknown non-blank under the box => not a composer tail
+  for (let k = texts.length - 1; k >= 0; k--) {
+    if (isComposerBottom(texts[k]!)) {
+      bottom = k;
+      break;
     }
   }
-  const hintEnd = end + 1;
+  if (bottom < 0) return null;
+  // Hint run directly below bottom (blanks allowed, up to MAX_HINT_ROWS).
+  let hintEnd = bottom + 1;
+  let hintSeen = false;
+  for (let row = bottom + 1; row < texts.length && row - bottom <= MAX_HINT_ROWS; row++) {
+    const t = texts[row]!;
+    if (isBlank(t)) continue;
+    if (composerInnerText(t) !== null) return null;
+    if (isComposerHint(t) || isVersionRow(t)) {
+      hintSeen = true;
+      hintEnd = row + 1;
+      // Continue to allow blanks between hint and version, but stop after first hint block.
+      // Keep scanning to include a trailing version row if present within window.
+      continue;
+    }
+    if (hintSeen) break; // first non-hint after we've seen hint → end of hint run
+    // No hint yet and this is unknown non-blank directly under box → not a composer tail
+    // But tolerate Tip / cwd far below: if first non-blank under box is not hint, still
+    // accept bottom as composer if we haven't seen hint yet? No — require hint directly below.
+    return null;
+  }
+  if (!hintSeen) {
+    // No hint found directly below bottom → not a composer (e.g. mid-turn)
+    return null;
+  }
 
   // (b) Contiguous inner rows walking up from bottom.
   let i = bottom - 1;

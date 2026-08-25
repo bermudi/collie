@@ -6,6 +6,12 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.35.1] - 2026-08-25
+
+### Fixed
+
+- **opencode adapter handles far footer (Tip + cwd)** — throw-away `1.18.22` pane kept `~/build/collie:main` 22 rows below the `╹▀▀` box, outside the 8-row tail window, so `locateComposer` returned null and the red `input box isn't on screen` banner stayed (92cf018)
+
 ## [0.35.0] - 2026-08-25
 
 ### Added
