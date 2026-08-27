@@ -303,6 +303,95 @@ describe("parseMarkdown", () => {
     });
   });
 
+  // The other dialect agents emit: TUI box-drawing summaries. Regression — unhandled, these fell
+  // into the paragraph branch and became one run-on line that break-words shredded on a phone.
+  describe("box-drawing tables", () => {
+    const text = (s: string) => ({ kind: "text", text: s });
+
+    it("parses the real-world TUI summary shape", () => {
+      // Verbatim shape from a Devin session summary (widths preserved).
+      const src = [
+        "┌──────────────────────┬─────────┬────────┬──────────┬────────────────────┬─────────────────────┐",
+        "│ Package              │ Before  │ After  │ Fixed in │ Severity           │",
+        "├──────────────────────┼─────────┼────────┼──────────┼────────────────────┤",
+        "│ urllib3              │ 2.6.3   │ 2.7.0  │ ≥2.7.0   │ high (×2)          │",
+        "│ pymdown-extensions   │ 10.21.2 │ 11.0.2 │ ≥11.0.1  │ high (×1), med (×2) │",
+        "└──────────────────────┴─────────┴────────┴──────────┴────────────────────┘",
+      ].join("\n");
+      const [table] = parseMarkdown(src);
+      expect(table).toMatchObject({
+        kind: "table",
+        header: [
+          [text("Package")],
+          [text("Before")],
+          [text("After")],
+          [text("Fixed in")],
+          [text("Severity")],
+        ],
+        rows: [
+          [[text("urllib3")], [text("2.6.3")], [text("2.7.0")], [text("≥2.7.0")], [text("high (×2)")]],
+          [
+            [text("pymdown-extensions")],
+            [text("10.21.2")],
+            [text("11.0.2")],
+            [text("≥11.0.1")],
+            [text("high (×1), med (×2)")],
+          ],
+        ],
+      });
+    });
+
+    it("reads the first ├ separator as the header boundary and pads ragged rows", () => {
+      const src = [
+        "┌────┬────┐",
+        "│ a  │ b  │",
+        "├────┼────┤",
+        "│ 1  │",
+        "└────┴────┘",
+      ].join("\n");
+      expect(parseMarkdown(src)).toEqual([
+        {
+          kind: "table",
+          align: [null, null],
+          header: [[text("a")], [text("b")]],
+          rows: [[[text("1")], []]],
+        },
+      ]);
+    });
+
+    it("treats the first row as the header when there is no ├ separator", () => {
+      const src = ["┌────┬────┐", "│ a  │ b  │", "│ 1  │ 2  │", "└────┴────┘"].join("\n");
+      const [table] = parseMarkdown(src);
+      expect(table).toMatchObject({
+        header: [[text("a")], [text("b")]],
+        rows: [[[text("1")], [text("2")]]],
+      });
+    });
+
+    it("inline-parses cells", () => {
+      const src = [
+        "┌──────┬───────┐",
+        "│ Flag │ On?   │",
+        "├──────┼───────┤",
+        "│ `--x`│ **y** │",
+        "└──────┴───────┘",
+      ].join("\n");
+      const [table] = parseMarkdown(src);
+      expect(table).toMatchObject({
+        rows: [[[{ kind: "code", text: "--x" }], [{ kind: "bold", spans: [text("y")] }]]],
+      });
+    });
+
+    it("refuses a ┌ line with no │ row under it — a stray glyph stays prose", () => {
+      expect(parseMarkdown("┌──┐\nnothing here").map((b) => b.kind)).toEqual(["paragraph"]);
+    });
+
+    it("starts after a paragraph and ends at a blank line", () => {
+      const src = ["intro", "┌────┐", "│ a  │", "└────┘", "", "after"].join("\n");
+      expect(parseMarkdown(src).map((b) => b.kind)).toEqual(["paragraph", "table", "paragraph"]);
+    });
+  });
+
   it("empty input yields no blocks", () => {
     expect(parseMarkdown("")).toEqual([]);
     expect(parseMarkdown("\n\n  \n")).toEqual([]);

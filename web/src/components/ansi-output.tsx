@@ -12,6 +12,7 @@ import {
   type MultiSelectModel,
   type PreviewSelectModel,
   type PromptModel,
+  type TableBlock,
   type WizardModel,
 } from "@/lib/blocks";
 import { MIRROR_SPACE, MIRROR_INVERT, styleFor } from "@/components/mirror-space";
@@ -347,11 +348,35 @@ export const AnsiOutput = memo(function AnsiOutput({
     );
   };
 
+  // A lifted box-drawing table: rendered verbatim INSIDE the mirror pre as a block-level span that
+  // pans horizontally instead of wrapping — the one behavior change of the lift. Its text is not in
+  // the find haystack (lifted regions drop out, like dialogs), so segments render plain: styles yes,
+  // find/link splitting no — renderSegment's offsets would point into the wrong coordinate space.
+  const renderTableBlock = (block: TableBlock) => (
+    <span className="block max-w-full overflow-x-auto overscroll-x-contain whitespace-pre [touch-action:pan-x_pan-y]">
+      {block.lines.map((line, li) => (
+        <Fragment key={li}>
+          {li > 0 ? "\n" : null}
+          {line.segments.map((s, si) => (
+            <span key={si} style={styleFor(s)}>
+              {s.text}
+            </span>
+          ))}
+        </Fragment>
+      ))}
+    </span>
+  );
+
   return (
     <>
-      {rawBlocks.length > 0 && (
+      {blocks.length > 0 && (
         <pre className={preClass(wrap, className)} style={{ fontSize: `${fontSize}px` }}>
-          {rawBlocks.map(renderBlock)}
+          {(() => {
+            let rawIdx = 0;
+            return blocks.map((b) =>
+              b.kind === "raw" ? renderBlock(b, rawIdx++) : b.kind === "table" ? renderTableBlock(b) : null,
+            );
+          })()}
         </pre>
       )}
       {prompt}

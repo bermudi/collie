@@ -132,6 +132,25 @@ const QUOTE = /^\s*>\s?(.*)$/;
 // horizontal rule, and every cell must be dashes (optionally colon-flanked), so `|---|:` is not one.
 const TABLE_DELIM = /^\s*\|?(?:\s*:?-+:?\s*\|)+\s*(?::?-+:?\s*\|?)?\s*$/;
 
+// Box-drawing tables (┌─┬┐ / │ / ├─┼┤ / └─┴┘) are the OTHER dialect agents emit — TUI-styled
+// summaries that carry NO ASCII pipes, so the GFM branch above never sees them. Unhandled they fall
+// into the paragraph branch, which joins the rows into one run-on line that break-words shreds on a
+// phone: every `─` run wraps mid-glyph and cell text shuffles. The ┌ top border is the recognition
+// signal — nothing else in prose starts a line with ┌ — and like TABLE_DELIM it needs a lookahead
+// (the next line must be a │ row) so a stray ┌ never swallows prose.
+const BOX_TOP = /^\s*┌[─┬]*┐\s*$/;
+const BOX_SEP = /^\s*├[─┼]*┤\s*$/;
+const BOX_BOTTOM = /^\s*└[─┴]*┘\s*$/;
+const BOX_ROW = /^\s*│/;
+
+/** Split one box-drawing row (`│ a │ b │`) into raw cell strings, padding trimmed. */
+function splitBoxRow(line: string): string[] {
+  let s = line.trim();
+  if (s.startsWith("│")) s = s.slice(1);
+  if (s.endsWith("│")) s = s.slice(0, -1);
+  return s.split("│").map((c) => c.trim());
+};
+
 /** Split one table row into raw cell strings. `\|` is an escaped pipe, not a column break. */
 function splitRow(line: string): string[] {
   const cells: string[] = [];
@@ -169,11 +188,14 @@ function parseAlign(line: string): MdAlign[] {
  * rows are legal GFM and agents emit them; a ragged delimiter row is not — see `startsTable`.
  */
 function fitRow(line: string, width: number): MdSpan[][] {
-  const cells = splitRow(line)
-    .slice(0, width)
-    .map((cell) => parseInline(cell));
-  while (cells.length < width) cells.push([]);
-  return cells;
+  return fitCells(splitRow(line), width);
+}
+
+/** Parse raw cell strings into spans, squared off to `width` so the renderer gets a rectangle. */
+function fitCells(cells: string[], width: number): MdSpan[][] {
+  const parsed = cells.slice(0, width).map((cell) => parseInline(cell));
+  while (parsed.length < width) parsed.push([]);
+  return parsed;
 }
 
 /**
@@ -192,6 +214,10 @@ const startsTable = (line: string, next: string | undefined) =>
   next !== undefined &&
   TABLE_DELIM.test(next) &&
   splitRow(next).length === splitRow(line).length;
+
+/** True when `line` opens a box-drawing table — a ┌ border with a │ row under it. */
+const startsBoxTable = (line: string, next: string | undefined) =>
+  BOX_TOP.test(line) && next !== undefined && BOX_ROW.test(next);
 
 /**
  * Parse Markdown into blocks. Pure — no React, no DOM — so the whole grammar is unit-testable and
@@ -287,6 +313,43 @@ export function parseMarkdown(source: string): MdBlock[] {
       continue;
     }
 
+    // Box-drawing tables sit beside the GFM branch (a ┌ line holds no ASCII pipes, so the two
+    // recognisers can never claim the same line). Rows before the first ├ separator are the header;
+    // with no separator at all, the first row IS the header. Box tables don't encode alignment, so
+    // every column reads as unaligned — the cells' own padding was for the terminal, not us.
+    if (startsBoxTable(line, lines[i + 1])) {
+      i++; // consume the ┌ top border
+      const head: string[][] = [];
+      const body: string[][] = [];
+      let inBody = false;
+      while (i < lines.length) {
+        const l = lines[i]!;
+        if (BOX_SEP.test(l)) {
+          inBody = true;
+          i++;
+        } else if (BOX_TOP.test(l) || BOX_BOTTOM.test(l)) {
+          i++; // consume the border (└ closes; a second ┌ means two tables ran together)
+          break;
+        } else if (BOX_ROW.test(l)) {
+          (inBody ? body : head).push(splitBoxRow(l));
+          i++;
+        } else break; // blank or unrelated line — the table ends here
+      }
+      const headerCells = head[0] ?? [];
+      const width = headerCells.length;
+      if (width > 0) {
+        blocks.push({
+          kind: "table",
+          align: Array<MdAlign>(width).fill(null),
+          header: fitCells(headerCells, width),
+          rows: [...(head.length > 1 ? head.slice(1) : []), ...body].map((r) =>
+            fitCells(r, width),
+          ),
+        });
+      }
+      continue;
+    }
+
     // Paragraph: consecutive lines until a blank or a line that starts some other block. Joined with
     // a space, since a hard-wrapped paragraph should reflow to the phone's width, not keep its
     // source line breaks.
@@ -300,7 +363,8 @@ export function parseMarkdown(source: string): MdBlock[] {
         RULE.test(l) ||
         QUOTE.test(l) ||
         isItem(l) ||
-        startsTable(l, lines[i + 1])
+        startsTable(l, lines[i + 1]) ||
+        startsBoxTable(l, lines[i + 1])
       )
         break;
       para.push(l.trim());

@@ -6,15 +6,18 @@
 // (and any future agent's) run; every non-adapter agent keeps the pure raw mirror.
 
 import type { Block, StyledLine } from "../blocks";
+import { liftBoxTables } from "../blocks";
 import { adapterFor, hasBlockGrammar } from "./registry";
 
 /**
- * Group lines into semantic blocks by routing through the agent's adapter. With no `ctx` (or an agent
- * that has no adapter) this is the trivial single-raw-block wrap it always was — conservative gating
- * lives entirely in the registry, so a non-adapter pane is never mis-parsed.
+ * Group lines into semantic blocks by routing through the agent's adapter, then lift box-drawing
+ * table runs out of the surviving raw blocks. The lift is harness-NEUTRAL — every TUI dialect draws
+ * tables with ┌─┬┐, adapter or not — so it runs over the adapter's output uniformly. With no `ctx`
+ * (or an agent that has no adapter) this is the single-raw-block wrap plus the table lift —
+ * conservative gating lives entirely in the registry, so a non-adapter pane is never mis-parsed.
  */
 export function buildBlocks(lines: StyledLine[], ctx?: { agent?: string }): Block[] {
-  return adapterFor(ctx?.agent)?.buildBlocks(lines) ?? [{ kind: "raw", lines }];
+  return liftBoxTables(adapterFor(ctx?.agent)?.buildBlocks(lines) ?? [{ kind: "raw", lines }]);
 }
 
 export { adapterFor, hasBlockGrammar };

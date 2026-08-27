@@ -21,7 +21,11 @@
 // (find covers the raw mirror only).
 
 import type { AnsiSegment } from "./ansi";
-import { PURE_HORIZONTAL_RULE_GLYPH_CLASS } from "./rule-glyphs";
+import {
+  CLAUDE_RULE_GLYPH_CLASS,
+  PURE_HORIZONTAL_RULE_GLYPH_CLASS,
+} from "./rule-glyphs";
+import { displayWidth } from "./text-width";
 import type { PromptModel } from "./harness/prompt-model";
 import type { WizardModel } from "./harness/wizard-model";
 import type { PreviewSelectModel } from "./harness/preview-model";
@@ -122,6 +126,18 @@ export interface MenuBlock {
 }
 
 /**
+ * A run of box-drawing table lines (┌─┬┐ / │ / ├─┼┤ / └─┴┘) — the TUI table dialect every agent
+ * emits — lifted out of the raw mirror so the renderer can keep it on one line per row and pan
+ * horizontally, even in wrap mode. Phone-width wrapping shreds these grids: each ~100-column row
+ * breaks mid-`─` and the cell columns shuffle into noise. `lines` IS rendered verbatim (styles
+ * preserved) but, like every lifted region, is NOT part of the find haystack.
+ */
+export interface TableBlock {
+  kind: "table";
+  lines: StyledLine[];
+}
+
+/**
  * A semantic block. A discriminated union on `kind`; new members are added purely additively, so a
  * `switch (block.kind)` in the renderer stays exhaustive.
  */
@@ -131,7 +147,8 @@ export type Block =
   | WizardBlock
   | PreviewSelectBlock
   | MultiSelectBlock
-  | MenuBlock;
+  | MenuBlock
+  | TableBlock;
 
 /**
  * Split parsed segments into visual lines at "\n" boundaries. The newline characters become the
@@ -175,8 +192,9 @@ export function splitLines(segments: AnsiSegment[]): StyledLine[] {
 }
 
 // A terminal-width horizontal border is visually useless when browser wrapping turns it into several rows.
-// This deliberately accepts only one repeated horizontal rule glyph (apart from terminal padding): labels,
-// mixed rows, corners/tables, prose, and ASCII rules keep the mirror's ordinary wrapping.
+// Pure borders (one repeated glyph) and labelled borders (same glyph on both flanks with a real
+// label, e.g. "──── (bypass permissions on) ────") are both clipped; mixed rows, corners/tables,
+// prose, and ASCII rules keep the mirror's ordinary wrapping.
 //
 // Twenty stands on two facts of its own, and deliberately cites no other threshold. (1) Nothing in prose,
 // markdown or code runs to twenty IDENTICAL rule glyphs, so the classifier cannot fire on real content.
@@ -194,9 +212,34 @@ const PURE_HORIZONTAL_BORDER = new RegExp(
   `^([${PURE_HORIZONTAL_RULE_GLYPH_CLASS}])\\1{${MIN_NO_WRAP_BORDER_LENGTH - 1},}$`,
 );
 
+// A labelled border: same horizontal glyph on both flanks with a real label in the middle,
+// e.g. "──── (bypass permissions on) ────" or "──── collie upgrades ────".
+// This is the shape that makes the bottom of an input box wrap on a narrow phone while the
+// pure top stays clipped — the two must behave the same or the box looks broken.
+// Flanks may be different lengths but must be the same glyph; total display width must still
+// clear the 20-cell floor so a short prose line like "─ hello ─" never clips.
+const LABELED_HORIZONTAL_BORDER = new RegExp(
+  `^([${PURE_HORIZONTAL_RULE_GLYPH_CLASS}])\\1*\\s+(.+)\\s+\\1+$`,
+);
+const RULE_OR_SPACE_ONLY = new RegExp(`^[${CLAUDE_RULE_GLYPH_CLASS}\\s]*$`);
+
+function isLabelledNoWrapBorder(text: string): boolean {
+  const trimmed = text.trim();
+  if (displayWidth(trimmed) < MIN_NO_WRAP_BORDER_LENGTH) return false;
+  const m = LABELED_HORIZONTAL_BORDER.exec(trimmed);
+  if (m === null) return false;
+  const label = m[2]!;
+  // Label must contain something other than rule glyphs / whitespace — otherwise
+  // "── ─ ──" or "──   ──" would count as a labelled border.
+  return label.trim().length > 0 && !RULE_OR_SPACE_ONLY.test(label);
+}
+
 function styledLine(segments: AnsiSegment[]): StyledLine {
   const text = segments.map((segment) => segment.text).join("");
-  return PURE_HORIZONTAL_BORDER.test(text.trim()) ? { segments, noWrap: true } : { segments };
+  const trimmed = text.trim();
+  const noWrap =
+    PURE_HORIZONTAL_BORDER.test(trimmed) || isLabelledNoWrapBorder(trimmed);
+  return noWrap ? { segments, noWrap: true } : { segments };
 }
 
 // The two generic StyledLine probes. They live HERE, in the core AST module that imports nothing
@@ -222,4 +265,58 @@ export function trimTrailingBlank(lines: StyledLine[]): StyledLine[] {
   let end = lines.length;
   while (end > 0 && isBlank(lineText(lines[end - 1]!))) end--;
   return end === lines.length ? lines : lines.slice(0, end);
+}
+
+// Box-drawing table lines. A table OPENS with a ┌ top border — nothing in prose starts a line with
+// ┌ — and its body is │ rows plus ├/└ borders. A stray │ or a box run with no rows stays raw (and
+// keeps ordinary wrapping), so diagrams and single glyphs are never reflowed by this.
+const BOX_TOP = /^\s*┌[─┬]*┐\s*$/;
+const BOX_SEP = /^\s*├[─┼]*┤\s*$/;
+const BOX_BOTTOM = /^\s*└[─┴]*┘\s*$/;
+const BOX_ROW = /^\s*│/;
+
+const isBoxTableLine = (text: string): boolean =>
+  BOX_TOP.test(text) || BOX_SEP.test(text) || BOX_BOTTOM.test(text) || BOX_ROW.test(text);
+
+/** Split raw blocks on box-drawing table runs, lifting each run into a `table` block. Runs over
+ *  RAW blocks only — dialog regions were already claimed by their grammars and are never touched.
+ *  Pure; runs once per unique mirror text (memoised upstream), off the polling hot path. */
+export function liftBoxTables(blocks: Block[]): Block[] {
+  return blocks.flatMap((block) => {
+    if (block.kind !== "raw") return [block];
+    const out: Block[] = [];
+    let raw: StyledLine[] = [];
+    let lifted = false;
+    const flush = () => {
+      if (raw.length > 0) out.push({ kind: "raw", lines: raw });
+      raw = [];
+    };
+    let i = 0;
+    while (i < block.lines.length) {
+      if (!BOX_TOP.test(lineText(block.lines[i]!))) {
+        raw.push(block.lines[i++]!);
+        continue;
+      }
+      // Candidate run: ┌ border, then consecutive box lines. Only a run holding at least one │
+      // row is a table; a lone ┌ box (or ┌ followed by prose) stays raw.
+      let end = i;
+      let rows = 0;
+      while (end < block.lines.length && isBoxTableLine(lineText(block.lines[end]!))) {
+        if (BOX_ROW.test(lineText(block.lines[end]!))) rows++;
+        end++;
+      }
+      if (rows > 0) {
+        flush();
+        out.push({ kind: "table", lines: block.lines.slice(i, end) });
+        lifted = true;
+      } else {
+        for (let k = i; k < end; k++) raw.push(block.lines[k]!);
+      }
+      i = end;
+    }
+    flush();
+    // Nothing lifted → return the ORIGINAL block, identity intact (callers may rely on the same
+    // lines array passing through when the pass is a no-op).
+    return lifted ? out : [block];
+  });
 }

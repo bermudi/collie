@@ -182,3 +182,52 @@ describe("clickable links in the mirror", () => {
     expect(a.className).not.toMatch(/\bpy-\[[\d.]+px\]/);
   });
 });
+
+// Box-drawing tables lift out of the raw mirror (lib/blocks liftBoxTables) so a ~100-column TUI
+// grid pans instead of wrapping into confetti — even in wrap mode, which is the default. The table
+// renders INSIDE the mirror pre as a block-level pan span; its text drops out of the find haystack
+// by design (lifted regions do), which these tests pin along with the pan behavior.
+describe("box-drawing table lift in the mirror", () => {
+  const TABLE = [
+    "┌──────────┬─────────┐",
+    "│ Package  │ Fixed in │",
+    "├──────────┼─────────┤",
+    "│ urllib3  │ ≥2.7.0   │",
+    "└──────────┴─────────┘",
+  ].join("\n");
+
+  function renderMirror(text: string, props: Partial<ComponentProps<typeof AnsiOutput>> = {}) {
+    const { container } = render(<AnsiOutput text={text} {...props} />);
+    return container.querySelector("pre")!;
+  }
+
+  it("renders the table verbatim in a pan span while surrounding prose stays raw", () => {
+    const pre = renderMirror(`before\n${TABLE}\nafter`);
+    const pan = pre.querySelector("span.block")!;
+    expect(pan).toBeDefined();
+    expect(pan.className).toContain("whitespace-pre");
+    expect(pan.className).toContain("overflow-x-auto");
+    expect(pan.textContent).toBe(TABLE);
+  });
+
+  it("does not split table text for find — the lift drops it from the haystack", () => {
+    const pre = renderMirror(`before\n${TABLE}\nafter`, { query: "urllib3" });
+    // "urllib3" exists only inside the lifted table, which is NOT haystack text → no hits.
+    expect(pre.querySelectorAll("[data-find-match]")).toHaveLength(0);
+    // Raw text still searches across the table boundary; hits never land inside the pan span.
+    const pre2 = renderMirror(`before\n${TABLE}\nafter`, { query: "a" });
+    const hits = [...pre2.querySelectorAll("[data-find-match]")];
+    expect(hits.map((h) => h.textContent)).toEqual(["a"]); // "after" — nothing from the table
+    expect(hits[0]!.closest("span.block")).toBeNull();
+  });
+
+  it("keeps table cell styling (ANSI colours survive the lift)", () => {
+    const styled = TABLE.replace("urllib3", `${ESC}[32murllib3${ESC}[0m`);
+    const pre = renderMirror(styled);
+    const span = [...pre.querySelectorAll("span span")].find(
+      (s): s is HTMLElement => s.textContent === "urllib3",
+    );
+    expect(span).toBeDefined();
+    expect(span!.style.color).toBe("var(--ansi-2)");
+  });
+});
