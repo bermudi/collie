@@ -1,6 +1,6 @@
 # AGENTS.md — Collie Pup
 
-**Collie Pup is a stable fork of [`AltanS/collie`](https://github.com/AltanS/collie).** Pup is small, no pack — just the herd on your phone that scrolls. Upstream is heading to 1.0 with HA/pack and server-side ASR; Pup stays on the 0.32.x line fix-first: scrolling, missing agents, keystroke fidelity, push, Firefox — the phone you actually use.
+**Collie Pup is a stable fork of [`AltanS/collie`](https://github.com/AltanS/collie).** Pup is small, no pack — just the herd on your phone that scrolls. Upstream is heading to 1.0 with HA/pack and server-side ASR; Pup stays on the 0.x.x line fix-first: scrolling, missing agents, keystroke fidelity, push, Firefox — the phone you actually use.
 
 Upstream repo: `AltanS/collie` · Fork: `bermudi/collie` · Plugin id stays `herdr.collie` (display name `Collie Pup`) so linked installs don't need a reinstall. `https://github.com/bermudi/collie` is the origin for this fork; `https://github.com/AltanS/collie` is `upstream` for porting.
 
@@ -20,7 +20,7 @@ Bun + TypeScript (bridge) · Vite + React + Tailwind v4 + shadcn (web) · Herdr 
 
 ## Why this fork exists
 
-Upstream `1.0-beta` adds pack/HA (lead/deputy, warrants, takeover) and a server-side speech-to-text seam. Both are real scope for the bridge: more state, more attack surface, and for most single-host tailnet users, no day-to-day win — the phone keyboard mic is already world-class. Pup tracks `0.32.x` stable: port upstream fixes that matter to the viewer, skip the subsystems that belong to the mesh or the OS. See [`.adr/0020`](./.adr/0020-a-major-upgrade-is-consented-by-flag.md) (major gate) and [`.adr/0021`](./.adr/0021-opencode-sessions-are-pane-scoped.md) (why we don't list all opencode sessions).
+Upstream `1.0-beta` adds pack/HA (lead/deputy, warrants, takeover) and a server-side speech-to-text seam. Both are real scope for the bridge: more state, more attack surface, and for most single-host tailnet users, no day-to-day win — the phone keyboard mic is already world-class. Pup tracks `0.x.x` stable: port upstream fixes that matter to the viewer, skip the subsystems that belong to the mesh or the OS. See [`.adr/0020`](./.adr/0020-a-major-upgrade-is-consented-by-flag.md) (major gate) and [`.adr/0021`](./.adr/0021-opencode-sessions-are-pane-scoped.md) (why we don't list all opencode sessions).
 
 ## What Pup does and doesn't do
 
@@ -42,7 +42,7 @@ Upstream `1.0-beta` adds pack/HA (lead/deputy, warrants, takeover) and a server-
 - Backend change: `systemctl --user restart collie` (Bun doesn't hot-reload the service).
 - Test: `cd web && bun run test` (Vitest) + `bun run test` at root (Bun runner for `bridge/` + `scripts/collie-ctl.test.sh`). Pre-push hook runs both.
 - Doctor: `bash scripts/collie-ctl.sh doctor` — the one-command phone-setup check (host filter, VAPID, tailnet, Firefox DoH).
-- Versioning: hook-enforced in `CLAUDE.md`. Fork PRs: bump nothing, `SKIP_VERSION_CHECK=1` if needed. Pup stays on `0.32.x`; routine `update` never crosses to `1.0` — `update --major` is opt-in (ADR 0020).
+- Versioning: hook-enforced in `CLAUDE.md`. Fork PRs: bump nothing, `SKIP_VERSION_CHECK=1` if needed. Pup stays on `0.x.x`; routine `update` never crosses to `1.0` — `update --major` is opt-in (ADR 0020).
 
 ## Quality bar for Pup
 
