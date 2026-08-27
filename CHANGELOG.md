@@ -6,6 +6,12 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.35.2] - 2026-08-26
+
+### Fixed
+
+- **Box-drawing tables render instead of shredding** — TUI tables (`┌─┬┐`) from any agent lift out of the mirror into a pan-instead-of-wrap region, and the transcript's markdown parser now reads them as real tables; verified on a live Devin pane at phone width (ca46ffe)
+
 ## [0.35.1] - 2026-08-25
 
 ### Fixed
