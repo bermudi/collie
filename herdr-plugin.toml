@@ -1,6 +1,6 @@
 id = "herdr.collie"
 name = "Collie Pup"
-version = "0.35.2"
+version = "0.36.0"
 min_herdr_version = "0.7.0"
 description = "Collie Pup — Stable fork. Pup is small, no pack, just the herd on your phone that scrolls."
 platforms = ["linux", "macos"]
