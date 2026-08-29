@@ -43,6 +43,7 @@ Upstream `1.0-beta` adds pack/HA (lead/deputy, warrants, takeover) and a server-
 - Test: `cd web && bun run test` (Vitest) + `bun run test` at root (Bun runner for `bridge/` + `scripts/collie-ctl.test.sh`). Pre-push hook runs both.
 - Doctor: `bash scripts/collie-ctl.sh doctor` — the one-command phone-setup check (host filter, VAPID, tailnet, Firefox DoH).
 - Versioning: hook-enforced in `CLAUDE.md`. Fork PRs: bump nothing, `SKIP_VERSION_CHECK=1` if needed. Pup stays on `0.x.x`; routine `update` never crosses to `1.0` — `update --major` is opt-in (ADR 0020).
+- **Fork Actions gate:** GitHub runs no workflows on this fork until enabled once in its Actions tab — tag pushes never created a Release (v0.35.2's didn't either). Until that's enabled, cut the release page by hand: extract the version's CHANGELOG section, append the workflow's `## Update` block, then `gh release create vX.Y.Z -R bermudi/collie --title "Collie vX.Y.Z" --notes-file …`.
 
 ## Quality bar for Pup
 
