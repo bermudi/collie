@@ -6,6 +6,12 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.36.1] - 2026-08-29
+
+### Fixed
+
+- New space/tab directory: `~/…` now expands against home and the path must exist — `~/build` used to silently open `$HOME` (96e94d8)
+
 ## [0.36.0] - 2026-08-28
 
 **Merges upstream 0.36.0 and upstream 0.35.0's security hardening — read the BREAKING block before updating.**
