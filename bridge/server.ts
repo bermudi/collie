@@ -1,6 +1,6 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { extname, join, normalize, sep } from "node:path";
+import { extname, isAbsolute, join, normalize, sep } from "node:path";
 import type { ActivityLedger } from "./activity.ts";
 import type { AuditLog } from "./audit.ts";
 import { isLoopbackBindHost, type Config } from "./config.ts";
@@ -1010,6 +1010,26 @@ async function closeTab(
   }
 }
 
+// Resolve a client-supplied directory for a new pane/space. `~` and `~/…` expand against the
+// bridge's home: the phone keyboard has no shell to do it, and nothing downstream does either —
+// Herdr takes the string verbatim and portable-pty silently swaps a non-directory for $HOME
+// (observed: a `~/build` space opened in /home/daniel with no error anywhere). Everything else
+// must be an absolute path to an existing directory, so a typo fails loudly here instead of
+// opening home as if the field had been ignored.
+export async function resolvePaneCwd(raw: string | undefined): Promise<string> {
+  const trimmed = raw?.trim() ?? "";
+  if (!trimmed) return homedir();
+  const expanded =
+    trimmed === "~" ? homedir() : trimmed.startsWith("~/") ? join(homedir(), trimmed.slice(2)) : trimmed;
+  if (!isAbsolute(expanded)) {
+    throw new Error(`directory must be absolute or start with ~ (got "${trimmed}")`);
+  }
+  const st = await stat(expanded).catch(() => null);
+  if (!st) throw new Error(`no such directory: ${expanded}`);
+  if (!st.isDirectory()) throw new Error(`not a directory: ${expanded}`);
+  return expanded;
+}
+
 // Create a new tab in a workspace, opening a fresh shell pane (you then launch your own agent in
 // it). Structural — no more privilege than typing into an existing pane (you can already spawn a
 // shell that way). `cwd` omitted => inherits the workspace dir. session.* stays unexposed.
@@ -1031,7 +1051,9 @@ async function createTab(
   const ae = req.headers.get("accept-encoding");
   if (!workspaceId) return json({ ok: false, error: "workspaceId required" } satisfies CreateResponse, ae);
   try {
-    const created = await herdr.createTab(workspaceId, { label: body.label, cwd: body.cwd });
+    // Empty/absent cwd means "inherit the workspace dir" — only resolve an explicit one.
+    const cwd = body.cwd?.trim() ? await resolvePaneCwd(body.cwd) : undefined;
+    const created = await herdr.createTab(workspaceId, { label: body.label, cwd });
     const label =
       engine.current().workspaces.find((w) => w.workspaceId === created.workspaceId)?.label ??
       created.workspaceId;
@@ -1040,7 +1062,7 @@ async function createTab(
       paneId: created.paneId,
       session,
       device,
-      detail: { workspaceId, label: body.label, cwd: body.cwd },
+      detail: { workspaceId, label: body.label, cwd },
     });
     return json({
       ok: true,
@@ -1067,9 +1089,9 @@ async function createWorkspace(
   } catch {
     return text("bad body", 400);
   }
-  const cwd = body.cwd?.trim() || homedir();
   const ae = req.headers.get("accept-encoding");
   try {
+    const cwd = await resolvePaneCwd(body.cwd);
     const created = await herdr.createWorkspace({ cwd, label: body.label });
     audit.record({
       action: "workspace.create",

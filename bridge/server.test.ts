@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import {
   BUILD_HEADER,
@@ -16,6 +18,7 @@ import {
   normalizeTabLabel,
   paneReadResponse,
   replyPane,
+  resolvePaneCwd,
   resolveStaticPath,
   sendReplySteps,
   startupWarnings,
@@ -1047,5 +1050,41 @@ describe("marksPaneSeen — CSRF guard on marking a pane seen", () => {
   test("any header value counts — presence is the proof, not the contents", () => {
     expect(marksPaneSeen(withHeader({ [SEEN_HEADER]: "" }), undefined)).toBe(true);
     expect(marksPaneSeen(withHeader({ [SEEN_HEADER]: "anything" }), undefined)).toBe(true);
+  });
+});
+
+// resolvePaneCwd guards every new tab/space directory. The failure it exists for was silent: a
+// `~/build` space reached Herdr as a literal tilde path and portable-pty quietly swapped the
+// non-directory for $HOME — the shell opened in the wrong place with no error anywhere.
+describe("resolvePaneCwd — tilde expansion + loud failures for new-pane directories", () => {
+  test("empty or blank means the default: home", async () => {
+    expect(await resolvePaneCwd(undefined)).toBe(homedir());
+    expect(await resolvePaneCwd("")).toBe(homedir());
+    expect(await resolvePaneCwd("   ")).toBe(homedir());
+  });
+
+  test("~ and ~/… expand against the bridge's home", async () => {
+    expect(await resolvePaneCwd("~")).toBe(homedir());
+    expect(await resolvePaneCwd("~/")).toBe(homedir());
+    expect(await resolvePaneCwd("~/build")).toBe(join(homedir(), "build"));
+    expect(await resolvePaneCwd("  ~/build  ")).toBe(join(homedir(), "build")); // phone whitespace
+  });
+
+  test("an existing absolute directory passes through untouched", async () => {
+    expect(await resolvePaneCwd("/tmp")).toBe("/tmp");
+  });
+
+  test("a typo'd path fails loudly instead of silently opening home", async () => {
+    await expect(resolvePaneCwd("~/no-such-dir-collie-test")).rejects.toThrow(/no such directory/);
+    await expect(resolvePaneCwd("/no/such/dir/collie-test")).rejects.toThrow(/no such directory/);
+  });
+
+  test("a file is rejected, not just a missing path", async () => {
+    await expect(resolvePaneCwd("/etc/passwd")).rejects.toThrow(/not a directory/);
+  });
+
+  test("relative paths are rejected — the bridge won't guess a base", async () => {
+    await expect(resolvePaneCwd("build")).rejects.toThrow(/absolute/);
+    await expect(resolvePaneCwd("./build")).rejects.toThrow(/absolute/);
   });
 });
