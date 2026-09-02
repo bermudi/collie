@@ -23,10 +23,10 @@
 import type { AnsiSegment } from "./ansi";
 import {
   CLAUDE_RULE_GLYPH_CLASS,
+  FRAME_EDGE_GLYPH_CLASS,
   PURE_HORIZONTAL_RULE_GLYPH_CLASS,
 } from "./rule-glyphs";
-import { displayWidth } from "./text-width";
-import type { PromptModel } from "./harness/prompt-model";
+import { displayWidth } from "./text-width";import type { PromptModel } from "./harness/prompt-model";
 import type { WizardModel } from "./harness/wizard-model";
 import type { PreviewSelectModel } from "./harness/preview-model";
 import type { MultiSelectModel } from "./harness/multi-select-model";
@@ -234,11 +234,22 @@ function isLabelledNoWrapBorder(text: string): boolean {
   return label.trim().length > 0 && !RULE_OR_SPACE_ONLY.test(label);
 }
 
+// A FRAMED ROW: the first and the last non-space glyph are both frame edges (a boxed TUI menu row, a
+// panel border). Herdr spawns panes at desktop width while a phone mirror shows ~45 columns, so
+// wrapping such a row splits it across two or three ragged visual lines: the frame scrambles and the
+// inverse-video selection is shredded, exactly while the operator drives that menu from the Keys pad.
+// Clipped instead — the selection marker sits at the line's left edge, so what overflows is the part
+// that carries the least. A leading edge alone is NOT enough (`tree` output starts with "│"), and one
+// glyph cannot be both edges.
+const FRAME_ROW = new RegExp(`^\\s*[${FRAME_EDGE_GLYPH_CLASS}].*[${FRAME_EDGE_GLYPH_CLASS}]\\s*$`);
+
 function styledLine(segments: AnsiSegment[]): StyledLine {
   const text = segments.map((segment) => segment.text).join("");
   const trimmed = text.trim();
   const noWrap =
-    PURE_HORIZONTAL_BORDER.test(trimmed) || isLabelledNoWrapBorder(trimmed);
+    PURE_HORIZONTAL_BORDER.test(trimmed) ||
+    isLabelledNoWrapBorder(trimmed) ||
+    FRAME_ROW.test(text);
   return noWrap ? { segments, noWrap: true } : { segments };
 }
 

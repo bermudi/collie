@@ -91,8 +91,10 @@ type ComposerDrawer = "quick" | "cmd" | "keys" | "display" | null;
 const CONTROL_ON = "bg-control-on text-control-on-foreground hover:bg-control-on";
 const CONTROL_OFF = "text-muted-foreground";
 
-// Pause after clearing a stranded terminal draft so the TUI settles before pane.send_text.
-const TUI_SETTLE_MS = 350;
+// Pause after clearing a stranded terminal draft so the TUI settles before pane.send_text. Exported
+// so the test can pin the WAIT ITSELF (the reply never overtakes the sweep) against the constant
+// rather than against a copy of its value — the number is a measured judgement call (issue #156).
+export const TUI_SETTLE_MS = 350;
 
 // Grace window after a send during which a terminal draft matching what we just sent is treated as
 // our own in-flight reply (still on the "❯" line before the bridge's pending Enter lands), NOT a
