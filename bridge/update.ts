@@ -75,6 +75,19 @@ export function majorOf(version: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+/** The repo Pup's release check + release links point at. The update SIGNAL must watch the same
+ *  repo the update VERB advances the checkout from — `git ls-remote --tags origin`, which on a Pup
+ *  install is `bermudi/collie`. Watch upstream instead and the banner advertises majors the verb
+ *  can never take (upstream's 1.x pack/HA line) while staying blind to every release this fork
+ *  ships. `COLLIE_UPDATE_REPO` overrides it (tests, a fork-of-the-fork). */
+export const UPDATE_REPO_DEFAULT = "bermudi/collie";
+
+/** Resolve the update repo from an env-shaped map: `COLLIE_UPDATE_REPO` when non-blank, the fork
+ *  default otherwise. Pure so the default is pinned by `bun test`. */
+export function resolveUpdateRepo(env: Record<string, string | undefined>): string {
+  return env.COLLIE_UPDATE_REPO?.trim() || UPDATE_REPO_DEFAULT;
+}
+
 /** The newest release WITHIN `major`, dotted, or null — the target a routine `update` may take
  *  (ADR 0020). */
 export function latestReleaseInMajor(tags: string[], major: number): string | null {
@@ -224,7 +237,8 @@ export interface UpdateStore {
 }
 
 export interface UpdateMonitorDeps {
-  /** The `owner/name` repo the release check + release links point at (default `AltanS/collie`). */
+  /** The `owner/name` repo the release check + release links point at
+ *  (default {@link UPDATE_REPO_DEFAULT}). */
   repo: string;
   /** The running plugin version (captured at process start — never re-read from disk, or a post-pull
    *  package.json would mask the very update we're detecting). */

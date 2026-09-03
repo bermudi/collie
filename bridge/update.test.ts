@@ -8,12 +8,25 @@ import {
   latestReleaseTag,
   majorOf,
   parseSemverTag,
+  resolveUpdateRepo,
   shouldNotify,
   stampOf,
   UpdateMonitor,
   type UpdateMonitorDeps,
   type UpdateStore,
 } from "./update.ts";
+
+describe("resolveUpdateRepo", () => {
+  it("defaults to the fork's own repo — the one its update verb pulls from", () => {
+    expect(resolveUpdateRepo({})).toBe("bermudi/collie");
+  });
+  it("COLLIE_UPDATE_REPO overrides it (synthetic test target, fork-of-the-fork)", () => {
+    expect(resolveUpdateRepo({ COLLIE_UPDATE_REPO: "someone/collie" })).toBe("someone/collie");
+  });
+  it("blank/whitespace falls back to the default", () => {
+    expect(resolveUpdateRepo({ COLLIE_UPDATE_REPO: "   " })).toBe("bermudi/collie");
+  });
+});
 
 describe("compareSemver", () => {
   it("orders by major, then minor, then patch", () => {
