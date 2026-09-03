@@ -10,7 +10,7 @@ import { describeAdapterConformance } from "./conformance";
 import { parseKeyHintFooter } from "./menu-hints";
 
 // The omp adapter's CI gate. This adapter is Tier 1 BY CHOICE — it up-levels nothing, so `ownFixtures`
-// is empty and every one of the 20 captures is a NEUTRAL fixture the adapter must leave raw. That is
+// is empty and every one of the 22 captures is a NEUTRAL fixture the adapter must leave raw. That is
 // not a weaker gate than Claude's; it is the whole promise this contribution makes, asserted over the
 // entire corpus rather than over a chosen subset: no interactive block kind is ever constructed, so no
 // tap can reach a keystroke. See harness/omp/index.ts for why the dialog layer is a later PR.
@@ -44,6 +44,9 @@ const DECLINED = [
   //   and stranded-draft probes re-surface what it carried.
   "omp--done--tool-result.txt",
   "omp--done.txt",
+  //   The busy variant: the same box while the agent WORKS — omp 18 colours the draft here, which is
+  //   the shape the ghost rule's relative-colour reading exists for (upstream 0.36.1/1.2.0 port).
+  "omp--draft-ghost-suggestion-busy.txt",
   "omp--draft-ghost-suggestion.txt",
   "omp--draft-single.txt",
   "omp--draft-wrapped.txt",
@@ -81,7 +84,7 @@ const DECLINED = [
 
 // Nothing is up-levelled, so there is no own cohort. `describeAdapterConformance` registers a todo for
 // each leg that needs one rather than passing vacuously, and still runs the leg that matters here:
-// raw-only on all 21 omp captures and all 38 claude ones.
+// raw-only on all 22 omp captures and all 38 claude ones.
 const ownFixtures: string[] = [];
 const neutralFixtures = allOmpFixtures.filter((f) => DECLINED.includes(f));
 
@@ -98,6 +101,7 @@ describe("the omp corpus", () => {
   const PINNED = [
     "omp--done--tool-result.txt",
     "omp--done.txt",
+    "omp--draft-ghost-suggestion-busy.txt",
     "omp--draft-ghost-suggestion.txt",
     "omp--draft-single.txt",
     "omp--draft-wrapped.txt",
@@ -119,11 +123,11 @@ describe("the omp corpus", () => {
     "omp--working.txt",
   ];
 
-  it("is exactly the 21 captures this adapter was developed against", () => {
+  it("is exactly the 22 captures this adapter was developed against", () => {
     expect(allOmpFixtures).toEqual(PINNED);
   });
 
-  it("declines all twenty-one — nothing is up-levelled", () => {
+  it("declines all twenty-two — nothing is up-levelled", () => {
     expect(neutralFixtures).toEqual(PINNED);
     expect(ownFixtures).toEqual([]);
   });
@@ -166,6 +170,7 @@ describe("ompBuildBlocks emits nothing but raw", () => {
 const COMPOSER_FIXTURES = [
   "omp--done--tool-result.txt",
   "omp--done.txt",
+  "omp--draft-ghost-suggestion-busy.txt",
   "omp--draft-ghost-suggestion.txt",
   "omp--draft-single.txt",
   "omp--draft-wrapped.txt",
