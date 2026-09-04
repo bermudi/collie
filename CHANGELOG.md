@@ -6,6 +6,23 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.37.0] - 2026-09-03
+
+Ported from upstream 1.x (fix-first; no pack/HA, no ASR, no new front door).
+
+### Added
+
+- Claude's slash-command completion popup is lifted out of the mirror and rendered as a list — it used to hide the input box from the box walk, so every send stalled with "Message didn't reach the input box" (b17964e)
+
+### Fixed
+
+- Boxed TUI rows (`/model` pickers, panel borders) stay on one clipped line on a narrow phone instead of wrapping into a scrambled frame; `tree` output and prose still wrap (12f1aba)
+- The mirror no longer freezes when the soft keyboard or Keys dock shrinks the pane: a scroll arriving with a changed container height is layout, not the user leaving the bottom (4fd91e0)
+- A notification tap on Android opens the deep-linked pane again when the Collie tab had been discarded (12bfbb6)
+- Android push shows a proper small badge glyph and a full-size mark instead of a grey block (b40cc11)
+- omp ghost suggestions are read by relative colour, so a WORKING pane (where omp 18 colours the whole draft) no longer stalls every send; OMP 18.1.2's clipped `╰─ <draft>` composer shape is recognized (3bbba93)
+- Codex: a dim one-segment status row is recognized (4f9eda0); a draft wrapped onto an indented continuation row locates its composer (763c754)
+
 ## [0.36.2] - 2026-09-03
 
 ### Fixed
