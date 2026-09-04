@@ -31,6 +31,7 @@ import type { WizardModel } from "./harness/wizard-model";
 import type { PreviewSelectModel } from "./harness/preview-model";
 import type { MultiSelectModel } from "./harness/multi-select-model";
 import type { MenuModel } from "./harness/menu-model";
+import type { AutocompleteModel } from "./harness/autocomplete-model";
 
 // Re-export every dialog model so consumers (the block components, the race guards) have one import
 // site for the AST's typed payloads. All five are harness-NEUTRAL contracts (harness/*-model.ts):
@@ -53,6 +54,7 @@ export type {
   MultiPointer,
 } from "./harness/multi-select-model";
 export type { MenuModel, MenuAction, MenuNav, MenuLeftRight } from "./harness/menu-model";
+export type { AutocompleteModel, AutocompleteEntry } from "./harness/autocomplete-model";
 
 /** One visual line: the styled segments that make it up, with the line-terminating "\n" removed. */
 export interface StyledLine {
@@ -126,6 +128,7 @@ export interface MenuBlock {
 }
 
 /**
+/**
  * A run of box-drawing table lines (┌─┬┐ / │ / ├─┼┤ / └─┴┘) — the TUI table dialect every agent
  * emits — lifted out of the raw mirror so the renderer can keep it on one line per row and pan
  * horizontally, even in wrap mode. Phone-width wrapping shreds these grids: each ~100-column row
@@ -134,6 +137,20 @@ export interface MenuBlock {
  */
 export interface TableBlock {
   kind: "table";
+  lines: StyledLine[];
+}
+
+/**
+ * The agent's own COMPLETION POPUP while the operator types into its input box (Claude's slash-command
+ * menu). Unlike every other non-`raw` kind this one is PRESENTATIONAL: it emits no keystrokes and has
+ * no row in harness/dialog-contract.ts, because nothing on that screen owns the keyboard — the input
+ * box is live underneath it and the composer must stay free to type. `lines` is the popup's own region
+ * (provenance; the block renders the parsed entries, not the text) and is not part of the find
+ * haystack.
+ */
+export interface AutocompleteBlock {
+  kind: "autocomplete";
+  autocomplete: AutocompleteModel;
   lines: StyledLine[];
 }
 
@@ -148,7 +165,8 @@ export type Block =
   | PreviewSelectBlock
   | MultiSelectBlock
   | MenuBlock
-  | TableBlock;
+  | TableBlock
+  | AutocompleteBlock;
 
 /**
  * Split parsed segments into visual lines at "\n" boundaries. The newline characters become the

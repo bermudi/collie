@@ -691,6 +691,11 @@ describe("real corpus — pinned so any change to the walk shows up as a diff", 
   // in this corpus is 2 rows (statusline + hint), and pinning the count is what would have caught the
   // first-row-only truncation this table used to tolerate.
   const PINNED: { fixture: string; statusRows: number; draft: string | null; stripped: number }[] = [
+    // The slash-command completion popup below the box (23 rows in the long capture, 3 in the short
+    // one). Both are the regression this table would have caught: before the popup peel the box was
+    // undetectable behind them, so draft was null and stripped was 0.
+    { fixture: "autocomplete-slash-long", statusRows: 0, draft: "/model", stripped: 27 },
+    { fixture: "autocomplete-slash-short", statusRows: 0, draft: "/re", stripped: 7 },
     { fixture: "done", statusRows: 2, draft: "cat hello.txt to verify", stripped: 28 },
     { fixture: "draft-footer-empty", statusRows: 2, draft: null, stripped: 9 },
     { fixture: "draft-footer-single", statusRows: 2, draft: "remember to update the changelo", stripped: 9 },
