@@ -214,3 +214,28 @@ describe("ConnectionBanner — the single connection surface", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 });
+
+// The red row truncates by design, so a long cause reads cut off. The expand control beside
+// Retry/Reload opens the whole message with a copy button (StatusDetailSheet, upstream 747afaa).
+describe("ConnectionBanner — red row expands to the full error", () => {
+  it("opens a sheet with the full, untruncated message and a copy button", async () => {
+    h.trouble = true;
+    h.lost = true;
+    cfg.reachable = true;
+    renderBanner();
+    await act(async () => {}); // flush the probe microtask
+
+    fireEvent.click(screen.getByRole("button", { name: "Show full error" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Herdr is down on the host");
+    expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
+  });
+
+  it("amber stays ambient — no expand control, nothing to diagnose", async () => {
+    h.trouble = true;
+    h.lost = false;
+    renderBanner();
+    await act(async () => {}); // let the bar mount
+    expect(screen.getByRole("status")).toHaveTextContent("Reconnecting…");
+    expect(screen.queryByRole("button", { name: "Show full error" })).toBeNull();
+  });
+});

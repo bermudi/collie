@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 import {
   CheckCircle2,
+  Expand,
   Loader2,
   LogIn,
   Plug,
@@ -10,6 +11,8 @@ import {
   TriangleAlert,
   WifiOff,
 } from "lucide-react";
+
+import { StatusDetailSheet } from "@/components/status-detail-sheet";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -186,6 +189,11 @@ function ConnectionStateBanner({
   const revalidator = useRevalidator();
   const [probe, setProbe] = useState<Probe>("unknown");
   const [retrying, setRetrying] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  // The red row truncates by design, so a long cause reads cut off — the expand control beside
+  // Retry/Reload opens the whole message with a copy button (StatusDetailSheet). Declared with
+  // the rest of the state (not next to its button below): the early `!rendered` return sits
+  // between, and a hook past it would render conditionally.
 
   const runProbe = useCallback(async () => {
     try {
@@ -218,6 +226,7 @@ function ConnectionStateBanner({
   const view = resolveView(shownTone, online, probe, lastSeenAt);
 
   return (
+    <>
     // Outer grid collapses 0fr → 1fr (an in-flow height animation the layout below rides), fading with
     // opacity; the inner wrapper clips the content while it's collapsed. Snaps under reduced motion.
     <div
@@ -243,6 +252,15 @@ function ConnectionStateBanner({
           {/* Actions only in red — amber is ambient (no buttons), green is a passing confirmation. */}
           {shownTone === "red" && (
             <>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Show full error"
+                className="size-6 shrink-0 text-muted-foreground"
+                onClick={() => setDetailOpen(true)}
+              >
+                <Expand className="size-3.5" />
+              </Button>
               <Button
                 size="sm"
                 className="h-6 gap-1 px-2 text-xs"
@@ -270,6 +288,17 @@ function ConnectionStateBanner({
         </div>
       </div>
     </div>
+    {/* Outside the collapsing grid (its overflow-hidden would clip the sheet mid-animation):
+        `fixed` positions it against the viewport regardless of where it mounts. */}
+    {shownTone === "red" && (
+      <StatusDetailSheet
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        title="Connection error"
+        message={view.copy}
+      />
+    )}
+    </>
   );
 }
 
