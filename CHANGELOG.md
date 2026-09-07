@@ -6,6 +6,27 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.38.0] - 2026-09-07
+
+The upstream 1.4.0–1.5.4 viewer round, ported fix-first (no pack, no staged updates, no mux
+switch, no i18n). The two operator features from that round — text attachments and launchers —
+ship in 0.39.0, below.
+
+### Fixed
+
+- A notification tap opens the app again on Android after the 1.x service-worker rewrite regressed it (c34004c, upstream ecee7c2)
+- Release tag reads stay on HTTPS when git rewrites them to SSH: `update`'s version check uses an `https::` transport prefix for GitHub remotes (48f6bd3, upstream b3bd127)
+- The new-tab and new-Space controls show they heard you, and a second tap is refused while the first create is in flight (a4dc8fb, upstream d03ccd7)
+- An over-drag on the mirror list can no longer chain into the page behind it: the list contains its own overscroll (4fec3eb, upstream 7b77d7c list half)
+- A truncated connection error opens on a tap, with the whole message and a copy button (0bcb730, upstream 747afaa)
+- One classifier clips a labelled terminal rule whatever harness drew it, and codex's submitted rows stop reading as black bars on a phone (d406962, upstream 0104d27 + d980f37)
+
+### Changed
+
+- Tables in the mirror pan as one unit inside the wrap, keeping find and link coordinates (3792b68, upstream 8d079ff)
+- The Switch-pane sheet rises from the handle and follows the thumb, with a haptic tick past the dismiss line (a6d2248, upstream 5bfa631 sheet half)
+- The pane and history screens sit in a centred column above phone width — 768px for the 80-column mirror — instead of stretching full-bleed (858f0c8, upstream 28255ae + 3870c1c)
+
 ## [0.37.0] - 2026-09-03
 
 Ported from upstream 1.x (fix-first; no pack/HA, no ASR, no new front door).
