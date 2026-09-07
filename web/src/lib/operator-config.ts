@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 
 import { fetchConfig } from "@/lib/api";
 import type {
+  Launcher,
   OperatorCommand,
   OperatorKeyRow,
   OperatorQuickReplyRow,
@@ -36,6 +37,11 @@ let currentReplies: readonly OperatorQuickReplyRow[] = [];
 // on purpose: both mean "nothing said otherwise", and lib/attachments.ts answers both with the
 // contract that shipped before attachments existed — 10 MB, images only.
 let currentUpload: UploadCapability | null = null;
+// The operator's own launcher rows, and the home dir their cwds shorten against. Empty-string home
+// until a read succeeds AND on every bridge older than the field — both mean "no fact yet", and
+// lib/shorten-home.ts answers both by leaving paths whole.
+let currentLaunchers: readonly Launcher[] = [];
+let currentLaunchersHome = "";
 let inflight: Promise<void> | null = null;
 let loaded = false;
 const listeners = new Set<() => void>();
@@ -54,6 +60,8 @@ export function loadOperatorCommands(): Promise<void> {
       currentKeys = cfg.operatorKeys ?? [];
       currentReplies = cfg.operatorQuickReplies ?? [];
       currentUpload = cfg.upload ?? null;
+      currentLaunchers = cfg.launchers ?? [];
+      currentLaunchersHome = cfg.launchersHome ?? "";
       loaded = true;
       emit();
     })
@@ -131,12 +139,46 @@ export function useOperatorQuickReplies(): readonly OperatorQuickReplyRow[] {
   );
 }
 
+/**
+ * The operator's launcher rows. Empty until a read succeeds and on a bridge with no
+ * `launchers.toml` — both mean the same thing to the surfaces that read it: draw nothing.
+ */
+export function getLaunchers(): readonly Launcher[] {
+  return currentLaunchers;
+}
+
+/**
+ * The home dir launcher cwds shorten against. Empty when no read has succeeded or the bridge is
+ * older than the field — lib/shorten-home.ts leaves paths whole on empty.
+ */
+export function getLaunchersHome(): string {
+  return currentLaunchersHome;
+}
+
+/** Reactive read of the launcher rows. Same one-shot fetch, same contract. */
+export function useLaunchers(): readonly Launcher[] {
+  useEffect(() => {
+    void loadOperatorCommands();
+  }, []);
+  return useSyncExternalStore(subscribeOperatorConfig, getLaunchers, getLaunchers);
+}
+
+/** Reactive read of the launcher home dir. Same one-shot fetch, same contract. */
+export function useLaunchersHome(): string {
+  useEffect(() => {
+    void loadOperatorCommands();
+  }, []);
+  return useSyncExternalStore(subscribeOperatorConfig, getLaunchersHome, getLaunchersHome);
+}
+
 /** Test helper — reset module state between cases. */
 export function __resetOperatorCommands(): void {
   current = [];
   currentKeys = [];
   currentReplies = [];
   currentUpload = null;
+  currentLaunchers = [];
+  currentLaunchersHome = "";
   inflight = null;
   loaded = false;
   listeners.clear();

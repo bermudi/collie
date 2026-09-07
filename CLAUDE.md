@@ -143,6 +143,11 @@ the unit name; the Herdr action runs from anywhere.
   dock's shipped phrases on the panes they address (ADR 0018 once more), shell panes included when
   a row is scoped to them. Same reader, same scope ladder: the three files differ in grammar and
   never in posture, so teach all three or none.
+- **`launchers.toml` is the fourth file on that reader, and the only one whose rows CREATE a pane**
+  — its rows are the allowlist `POST /api/launch` matches exactly, so the client names a row and
+  never supplies a command line. Same reader, same mtime liveness; no scope ladder, because a row
+  that makes its own pane has nothing to address. Do not add a second allowlist and do not let the
+  client supply a command line.
 - **PWA** via `vite-plugin-pwa` (`web/vite.config.ts`): manifest + `sw.js`, registered manually
   from `virtual:pwa-register` in `main.tsx` (bundled = CSP-safe). Install/SW need a **secure
   context** — over plain HTTP they no-op silently (Chrome insecure-origin flag, or HTTPS, to test).

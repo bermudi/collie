@@ -30,6 +30,7 @@ describe("coerceDashPrefs", () => {
     expect(coerceDashPrefs({})).toEqual({
       spacesOpen: null,
       shellsOpen: null,
+      launchOpen: null,
       recentOpen: true,
       recentDir: "newest",
     });
@@ -40,10 +41,17 @@ describe("coerceDashPrefs", () => {
       coerceDashPrefs({
         spacesOpen: false,
         shellsOpen: true,
+        launchOpen: true,
         recentOpen: false,
         recentDir: "oldest",
       }),
-    ).toEqual({ spacesOpen: false, shellsOpen: true, recentOpen: false, recentDir: "oldest" });
+    ).toEqual({
+      spacesOpen: false,
+      shellsOpen: true,
+      launchOpen: true,
+      recentOpen: false,
+      recentDir: "oldest",
+    });
   });
 
   it("rejects a bogus direction rather than trusting it", () => {
@@ -65,6 +73,7 @@ describe("useDashPrefs", () => {
     expect(result.current.prefs).toEqual({
       spacesOpen: null,
       shellsOpen: null,
+      launchOpen: null,
       recentOpen: true,
       recentDir: "newest",
     });
@@ -74,6 +83,7 @@ describe("useDashPrefs", () => {
     const first = renderHook(() => useDashPrefs());
     act(() => first.result.current.setSpacesOpen(true));
     act(() => first.result.current.setShellsOpen(true));
+    act(() => first.result.current.setLaunchOpen(true));
     act(() => first.result.current.setRecentOpen(false));
     act(() => first.result.current.setRecentDir("oldest"));
 
@@ -81,6 +91,7 @@ describe("useDashPrefs", () => {
     expect(second.result.current.prefs).toEqual({
       spacesOpen: true,
       shellsOpen: true,
+      launchOpen: true,
       recentOpen: false,
       recentDir: "oldest",
     });

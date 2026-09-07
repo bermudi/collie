@@ -186,9 +186,10 @@ app. Closing this needs the server-side blocking-message capture described above
   rebuild. On a pane they address they **replace** the shipped catalog rather than merging into it —
   [ADR 0018](./.adr/0018-operator-command-rows-replace-the-catalog.md). Their **Keys-tray presets**
   ride the same request on the same terms, from `keys.toml` (`bridge/operator-keys.ts`), and their
-  **Quick-dock groups** from `quick-replies.toml` (`bridge/operator-quick-replies.ts`); the three
-  files share one reader (`bridge/operator-file.ts`) and one scope ladder
-  (`web/src/lib/operator-scope.ts`).
+  **Quick-dock groups** from `quick-replies.toml` (`bridge/operator-quick-replies.ts`), and their
+  **launcher rows** from `launchers.toml` (`bridge/operator-launchers.ts`); the four files share one
+  reader (`bridge/operator-file.ts`), and the first three share one scope ladder
+  (`web/src/lib/operator-scope.ts`). A launcher row creates its own pane, so it carries no scope.
 
 ## 6. Security model
 

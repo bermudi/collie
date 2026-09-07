@@ -113,4 +113,38 @@ describe("useSpaceActions — one create in flight at a time", () => {
     await waitFor(() => expect(result.current.creatingSpace).toBe(false));
     expect(posts).toBe(1);
   });
+
+  it("ignores a second tap on the same launcher while its launch is in flight", async () => {
+    const posts: string[] = [];
+    let release: (() => void) | undefined;
+    server.use(
+      http.post("/api/launch", async ({ request }) => {
+        const body = (await request.json()) as { command: string };
+        posts.push(body.command);
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return HttpResponse.json({
+          ok: true,
+          pane: {
+            paneId: "w9:p1",
+            workspaceId: "w9",
+            workspaceLabel: "run",
+            tabId: "w9:t1",
+            cwd: "/home/you",
+          },
+        });
+      }),
+    );
+    const result = renderActions();
+
+    void result.current.launch("rumen-peek");
+    void result.current.launch("rumen-peek");
+    await waitFor(() => expect(posts).toEqual(["rumen-peek"]));
+    expect(result.current.launching.has("rumen-peek")).toBe(true);
+
+    release?.();
+    await waitFor(() => expect(result.current.launching.has("rumen-peek")).toBe(false));
+    expect(posts).toEqual(["rumen-peek"]); // never a second launch
+  });
 });

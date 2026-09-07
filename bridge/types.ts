@@ -352,6 +352,21 @@ export interface OperatorQuickReplyRow {
   items: string[];
 }
 
+/**
+ * One operator-declared launcher row (`launchers.toml`). A phone tap creates a new herdr workspace
+ * (a Space) labelled with the row's label, running in the row's cwd, and types the command into its
+ * fresh shell — the whole security story of `POST /api/launch` is that the bridge matches the client's
+ * `command` string EXACTLY against this list and 400s anything else before herdr is touched.
+ */
+export interface Launcher {
+  /** The shell line typed into the new Space's shell, verbatim. Also the allowlist key /api/launch matches. */
+  command: string;
+  /** Button label. Defaults to the command's first whitespace-separated token. */
+  label: string;
+  /** Absolute directory the new Space opens in. */
+  cwd: string;
+}
+
 /** GET /api/config — bridge capabilities and the build id (push setup + stale-cache detection). */
 export interface BridgeConfig {
   push: boolean;
@@ -364,6 +379,13 @@ export interface BridgeConfig {
   operatorKeys?: OperatorKeyRow[];
   /** The operator's own Quick-dock groups. Absent/empty when there is no `quick-replies.toml`. */
   operatorQuickReplies?: OperatorQuickReplyRow[];
+  /** The operator's own launcher rows. Absent/empty when there is no `launchers.toml`. */
+  launchers?: Launcher[];
+  /**
+   * The operator's home dir on this host, for shortening launcher cwds to `~`. Sent exactly when
+   * launchers are — shorten-home.ts leaves paths whole when it's absent (an older bridge).
+   */
+  launchersHome?: string;
   /**
    * What this host accepts as an attachment. Mirrors `UploadCapability` in web's types.ts — the
    * phone reads this to decide what the picker offers. Always present here (it is this host's own

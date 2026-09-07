@@ -10,6 +10,7 @@ import type { NotifyPrefs, NotifyPrefsStore } from "./notify-prefs.ts";
 import { createOperatorCommands } from "./operator-commands.ts";
 import { createOperatorKeys } from "./operator-keys.ts";
 import { createOperatorQuickReplies } from "./operator-quick-replies.ts";
+import { createOperatorLaunchers } from "./operator-launchers.ts";
 import {
   DEFAULT_PROMPT_TAIL_LINES,
   verifyExpectedPrompt,
@@ -31,6 +32,7 @@ import type {
   BridgeConfig,
   CreateResponse,
   DeviceAuth,
+  Launcher,
   PaneHistoryResponse,
   PaneReadResponse,
   SnapshotResponse,
@@ -174,6 +176,8 @@ export function startServer(opts: {
   const operatorKeys = createOperatorKeys(cfg.keysFile);
   // The third on that contract: the Quick dock's groups, quick-replies.toml off the hot path.
   const operatorQuickReplies = createOperatorQuickReplies(cfg.quickRepliesFile);
+  // The fourth on that contract: the operator's own launcher rows, launchers.toml off the hot path.
+  const operatorLaunchers = createOperatorLaunchers(cfg.launchersFile);
   const journals = cfg.transcript ? buildJournalRegistry(cfg.journalRoots) : null;
   const transcripts = cfg.transcript ? new TranscriptStore() : null;
   /** Does this agent have a journal at all — the snapshot's History-affordance gate. */
@@ -260,6 +264,15 @@ export function startServer(opts: {
         if (!rt) return unknownSession();
         return createWorkspace(rt.herdr, req, audit, deviceAuth(req, cfg).device, rt.name);
       }
+      // A launch is a pre-declared workspace create: the client names a row in launchers.toml and
+      // the bridge, never the client, supplies the command line.
+      if (pathname === "/api/launch" && req.method === "POST") {
+        const denied = guard(req, cfg, "write");
+        if (denied) return denied;
+        const rt = registry.get(sessionName);
+        if (!rt) return unknownSession();
+        return launch(rt.herdr, req, audit, deviceAuth(req, cfg).device, rt.name, operatorLaunchers);
+      }
 
       // ── Tab actions: rename (set its label) / close (kill it + every pane in it) ──
       const tabMatch = pathname.match(TAB_ACTION_ROUTE);
@@ -332,6 +345,9 @@ export function startServer(opts: {
         const mine = await operatorCommands();
         const myKeys = await operatorKeys();
         const myReplies = await operatorQuickReplies();
+        // Same mtime-checked re-read once more: a row added to launchers.toml is on the phone at
+        // its next page load, with no restart.
+        const myLaunchers = await operatorLaunchers();
         return json({
           push: push.enabled,
           vapidPublicKey: push.publicKey,
@@ -343,6 +359,10 @@ export function startServer(opts: {
           ...(myKeys.length > 0 ? { operatorKeys: myKeys } : {}),
           // And once more for quick-replies.toml.
           ...(myReplies.length > 0 ? { operatorQuickReplies: myReplies } : {}),
+          // And once more for launchers.toml.
+          ...(myLaunchers.length > 0
+            ? { launchers: myLaunchers, launchersHome: homedir() }
+            : {}),
           // What this host accepts as an attachment — the phone's picker offers exactly this, and
           // refuses before it sends. Read from cfg on every request like everything else here.
           upload: {
@@ -1112,6 +1132,88 @@ async function createWorkspace(
       session,
       device,
       detail: { label: body.label, cwd },
+    });
+    return json({
+      ok: true,
+      pane: {
+        paneId: created.paneId,
+        workspaceId: created.workspaceId,
+        workspaceLabel: created.workspaceLabel ?? created.workspaceId,
+        tabId: created.tabId,
+        cwd: created.cwd,
+      },
+    } satisfies CreateResponse, ae);
+  } catch (err) {
+    return json({ ok: false, error: (err as Error).message } satisfies CreateResponse, ae);
+  }
+}
+
+// Launch one allowlisted command in a new throwaway Space. The configured list doubles as the
+// allowlist POST /api/launch matches: the client names a row by its `command` string and the bridge
+// checks for exact equality against the current rows before herdr is touched at all — the client
+// never supplies a command line. That is the whole security story of the route, and why `command`
+// is an identity and not a free-text argument. `createWorkspace` allocates the Space (herdr deletes
+// a space whose last tab closes, so a self-closing pane leaves nothing behind); `sendReplySteps`
+// types the line and sends Enter into its fresh shell.
+// `["Enter"]` is literal here, NOT cfg.submitKeys: COLLIE_SUBMIT_KEYS is the agent-dependent submit
+// sequence for a TUI composer; this is a bare shell prompt where Enter is the only key that means
+// "run it".
+export async function launch(
+  herdr: HerdrClient,
+  req: Request,
+  audit: AuditLog,
+  device: string | null,
+  session: string,
+  getLaunchers: () => Promise<Launcher[]>,
+): Promise<Response> {
+  let body: { command?: unknown };
+  try {
+    body = (await req.json()) as typeof body;
+  } catch {
+    return text("bad body", 400);
+  }
+  const command = typeof body.command === "string" ? body.command.trim() : "";
+  if (!command) return text("bad body", 400);
+  const ae = req.headers.get("accept-encoding");
+  // Live read, behind the same mtime cache the other operator files use — a new row in
+  // launchers.toml is launchable without a restart.
+  const rows = await getLaunchers();
+  const row = rows.find((r) => r.command === command);
+  if (!row) {
+    return json({ ok: false, error: "not a declared launcher" } satisfies CreateResponse, ae, 400);
+  }
+  // resolvePaneCwd re-checks existence loudly: a row pointing at a deleted project dir fails here
+  // instead of opening a shell in the wrong place (the parse already expanded a leading ~).
+  let cwd: string;
+  try {
+    cwd = await resolvePaneCwd(row.cwd);
+  } catch (err) {
+    return json({ ok: false, error: (err as Error).message } satisfies CreateResponse, ae);
+  }
+  try {
+    const created = await herdr.createWorkspace({ cwd, label: row.label });
+    const sent = await sendReplySteps(herdr, created.paneId, row.command, true, ["Enter"]);
+    if (!sent.ok) {
+      // Best-effort rollback: a half-born Space whose command did not fully start must not linger
+      // as an empty shell nobody asked for. The rollback's own failure is swallowed because the
+      // original send error is the useful result.
+      try {
+        await herdr.closePane(created.paneId);
+      } catch {
+        // Swallowed: the failed send is the result the client needs.
+      }
+      return json({ ok: false, error: sent.error } satisfies CreateResponse, ae);
+    }
+    // `command` is deliberately NOT added to METADATA_KEYS in audit.ts: under
+    // COLLIE_AUDIT_CONTENT=none it therefore redacts like every other content-bearing detail, and
+    // the line still answers who started something, in which pane and Space, when. Which shell line
+    // ran is recoverable from launchers.toml in a way a reply's text never is.
+    audit.record({
+      action: "workspace.launch",
+      paneId: created.paneId,
+      session,
+      device,
+      detail: { command: row.command, label: row.label, cwd },
     });
     return json({
       ok: true,

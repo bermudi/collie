@@ -63,6 +63,7 @@ function cfg(overrides: Partial<Config> = {}): Config {
     commandsFile: "/nope/commands.toml",
     keysFile: "/nope/keys.toml",
     quickRepliesFile: "/nope/quick-replies.toml",
+    launchersFile: "/nope/launchers.toml",
     trustedUser: "",
     trustedUserOptional: false,
     auditContent: "preview",

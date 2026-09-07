@@ -321,6 +321,20 @@ export interface OperatorQuickReplyRow {
   items: string[];
 }
 
+/**
+ * One operator-declared launcher row (`launchers.toml`). Mirrors Launcher in bridge/types.ts. A
+ * phone tap creates a new herdr workspace (a Space) labelled with the row's label, running in the
+ * row's cwd, and types the command into its fresh shell.
+ */
+export interface Launcher {
+  /** The shell line typed into the new Space's shell, verbatim. Also the allowlist key /api/launch matches. */
+  command: string;
+  /** Button label. Defaults to the command's first whitespace-separated token. */
+  label: string;
+  /** Absolute directory the new Space opens in. */
+  cwd: string;
+}
+
 export interface BridgeConfig {
   push: boolean;
   vapidPublicKey: string;
@@ -332,6 +346,13 @@ export interface BridgeConfig {
   operatorKeys?: OperatorKeyRow[];
   /** The operator's own Quick-dock groups. Absent when there is no `quick-replies.toml`. */
   operatorQuickReplies?: OperatorQuickReplyRow[];
+  /** The operator's own launcher rows. Absent/empty when there is no `launchers.toml`. */
+  launchers?: Launcher[];
+  /**
+   * The operator's home dir on the host, for shortening launcher cwds to `~`. Absent on a bridge
+   * older than the field — lib/shorten-home.ts then leaves paths whole.
+   */
+  launchersHome?: string;
   /**
    * What this host accepts as an attachment. Mirrors `UploadCapability` in bridge/types.ts.
    *

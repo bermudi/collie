@@ -47,7 +47,8 @@ public access, Collie isn't built for it. Read the
 - [First run — what you'll see](#first-run--what-youll-see)
 - [Configure](#configure) · [Your own slash commands](#your-own-slash-commands) ·
   [Your own key presets](#your-own-key-presets) ·
-  [Your own quick replies](#your-own-quick-replies) · [Multi-session](#multi-session)
+  [Your own quick replies](#your-own-quick-replies) · [Your own launchers](#your-own-launchers) ·
+  [Multi-session](#multi-session)
 - [Dark mode / light mode](#dark-mode--light-mode)
 - [Commands](#commands)
 - [Manage & update](#manage--update)
@@ -363,6 +364,30 @@ English (`yes`, `commit and push`); this is the way to work in another language,
 harness that wants `approve` the word it wants. `scope = "shell"` reaches a plain shell pane, which
 otherwise gets only `y`/`n`. No restart — edits are live. Verify: open a pane, tap **Quick**, your
 groups are there. Rejected row? `journalctl --user -u collie -n 20` names it and why.
+
+### Your own launchers
+
+One tap opens a new Space and runs a command you declared, in `launchers.toml` next to the others:
+
+```bash
+cp launchers.toml.example "$(herdr plugin config-dir herdr.collie)/launchers.toml"
+```
+
+```toml
+[[launchers]]
+command = "htop"             # required; the shell line, typed verbatim into the new Space
+label = "Top"                # optional; defaults to the first word of command
+# cwd = "~/dev/collie"       # optional; defaults to your home directory, ~ expanded
+```
+
+A tap creates a Space named after the row, in its `cwd`, types the `command` and sends Enter. The
+command owns its own lifetime: a command that closes itself takes the Space with it, and `htop`
+stays until you quit it. This file is the allowlist — `POST /api/launch` accepts only a command
+that matches a row here exactly, so a phone can start nothing that is not in the file. No restart
+— edits are live. Your rows appear twice: as a **Launch** section on the dashboard, which folds
+like Spaces and Recent, and behind the rocket button in the Space and pane headers, which opens
+them as a sheet with each command printed under its label. Declare no rows and neither surface
+appears. Rejected row? `journalctl --user -u collie -n 20` names it and why.
 
 ### Multi-session
 

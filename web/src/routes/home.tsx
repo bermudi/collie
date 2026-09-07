@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useNavigate, useRouteLoaderData } from "react-router";
 
 import { AppHeader, SettingsGear } from "@/components/app-header";
+import { LaunchTrigger } from "@/components/launch-trigger";
 import { SessionSwitcher } from "@/components/session-switcher";
 import { ReadOnlyBanner } from "@/components/read-only-banner";
 import { AgentList } from "@/components/agent-list";
+import { LaunchStrip } from "@/components/launch-strip";
 import { SpaceOverview } from "@/components/space-overview";
 import { NewSpaceSheet } from "@/components/new-space-sheet";
 import { StatusArea } from "@/components/status-area";
@@ -14,12 +16,15 @@ import { useDashPrefs, openForCount } from "@/hooks/use-dash-prefs";
 import { useLoadingStalled } from "@/hooks/use-loading-stalled";
 import { useSpaceActions } from "@/hooks/use-spaces";
 import { ROOT_ROUTE_ID, type HomeData } from "@/lib/loaders";
+import { isReadOnly } from "@/lib/types";
 import { panePath, spacePath } from "@/lib/nav";
 
 // Dashboard home screen. Everything you might ACT on comes first — Needs you → Ready · unseen →
 // Working → Recent (see lib/triage.ts) — and the Spaces navigator sits last, under the thing it
 // navigates to. Recent and Spaces fold; fold both and the page is the triaged herd and nothing else.
-// Tapping an agent opens its pane; tapping a space drills into /space/:id.
+// Launchers sit directly above Spaces: they are one-tap act-on-able actions like the herd above
+// them (and like it, they fold), while Spaces is the navigator below. Tapping an agent opens its
+// pane; tapping a space drills into /space/:id.
 export function HomeRoute() {
   // SAFETY: ROOT_ROUTE_ID names the route whose `loader` is rootLoader (router.tsx pairs the two),
   // and this route is one of its children — so it only ever renders under a settled run of that
@@ -32,7 +37,7 @@ export function HomeRoute() {
   const navigate = useNavigate();
   const { newSpace, creatingSpace } = useSpaceActions();
   const [newSpaceOpen, setNewSpaceOpen] = useState(false);
-  const { prefs, setSpacesOpen, setRecentOpen, setRecentDir } = useDashPrefs();
+  const { prefs, setSpacesOpen, setLaunchOpen, setRecentOpen, setRecentDir } = useDashPrefs();
   // No stored choice yet? The space count decides — a two-space install shouldn't be handed a
   // mystery collapsed header, and a forty-space one shouldn't be handed a wall.
   const spacesOpen = openForCount(prefs.spacesOpen, data.workspaces.length);
@@ -50,7 +55,12 @@ export function HomeRoute() {
         stalled={stalled}
         wordmark
         rightLead={<SessionSwitcher sessions={data.sessions ?? []} current={data.session} />}
-        rightTrail={<SettingsGear session={data.session} />}
+        rightTrail={
+          <>
+            <LaunchTrigger readOnly={isReadOnly(data.device)} />
+            <SettingsGear session={data.session} />
+          </>
+        }
       />
 
       {/* Content region below the header: a viewport-clipped internal scroller.
@@ -75,6 +85,7 @@ export function HomeRoute() {
             error={data.error}
             lastSeenAt={data.lastSeenAt}
           />
+          <LaunchStrip open={prefs.launchOpen} onOpenChange={setLaunchOpen} />
           <SpaceOverview
             workspaces={data.workspaces}
             agents={data.agents}

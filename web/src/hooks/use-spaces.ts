@@ -104,5 +104,28 @@ export function useSpaceActions() {
     [open],
   );
 
-  return { newTab, newSpace, creatingTab, creatingSpace };
+  // ONE launch per row at a time, and per-row: a launch takes a moment (the bridge waits for the
+  // new shell to draw before typing), so the row shows a spinner and refuses a second tap while
+  // its neighbours stay live — another launcher is another intention.
+  const [launching, setLaunching] = useState<ReadonlySet<string>>(() => new Set());
+  const launchingRef = useRef<Set<string>>(new Set());
+  const launch = useCallback(
+    async (command: string) => {
+      if (readOnlyRef.current) return setStatus("Read-only — device not authorised", "error");
+      if (launchingRef.current.has(command)) return;
+      launchingRef.current.add(command);
+      setLaunching(new Set(launchingRef.current));
+      try {
+        open(await api.launch(command, sessionRef.current), "space");
+      } catch (e) {
+        setStatus(e instanceof Error ? e.message : String(e), "error");
+      } finally {
+        launchingRef.current.delete(command);
+        setLaunching(new Set(launchingRef.current));
+      }
+    },
+    [open],
+  );
+
+  return { newTab, newSpace, creatingTab, creatingSpace, launch, launching };
 }

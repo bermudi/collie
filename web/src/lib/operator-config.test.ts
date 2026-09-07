@@ -9,8 +9,12 @@ import { fetchConfig } from "@/lib/api";
 import type { BridgeConfig } from "@/lib/types";
 import {
   __resetOperatorCommands,
+  getLaunchers,
+  getLaunchersHome,
   getOperatorCommands,
   loadOperatorCommands,
+  useLaunchers,
+  useLaunchersHome,
   useOperatorCommands,
   useOperatorKeys,
   useOperatorQuickReplies,
@@ -125,5 +129,27 @@ describe("the Quick-dock groups ride the same one read", () => {
     const dock = renderHook(() => useOperatorQuickReplies());
     await waitFor(() => expect(asked).toHaveBeenCalled());
     expect(dock.result.current).toEqual([]);
+  });
+});
+
+describe("the launcher rows ride the same one read", () => {
+  const peek = { command: "rumen-peek", label: "Runs & quota", cwd: "/home/op" };
+
+  it("one fetch answers the strip and the home too", async () => {
+    asked.mockResolvedValue({ ...config([forkIn]), launchers: [peek], launchersHome: "/home/op" });
+
+    const strip = renderHook(() => useLaunchers());
+    const home = renderHook(() => useLaunchersHome());
+    await waitFor(() => expect(strip.result.current).toEqual([peek]));
+    expect(home.result.current).toBe("/home/op");
+    // The two hooks are two views of ONE /api/config call — never a second channel.
+    expect(asked).toHaveBeenCalledTimes(1);
+  });
+
+  it("a bridge that sends no launchers.toml rows leaves the list empty and home blank", async () => {
+    asked.mockResolvedValue(config());
+    await loadOperatorCommands();
+    expect(getLaunchers()).toEqual([]);
+    expect(getLaunchersHome()).toBe("");
   });
 });
