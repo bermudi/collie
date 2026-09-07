@@ -822,6 +822,20 @@ version_gt() {
     }'
 }
 
+# Public GitHub tag reads must not depend on the operator's SSH config: a `url.<ssh>.insteadOf`
+# rule rewrites an https GitHub URL back to an SSH the invocation may have no key for (upstream's
+# b3bd127). Git's explicit `<transport>::<address>` syntax selects the HTTPS helper by name,
+# skipping insteadOf prefix matching; the helper still sees the ordinary https URL, so HTTP proxy
+# and TLS config apply. A non-GitHub remote (a mirror, a local test origin) yields nothing and the
+# caller keeps using `origin` by name, which keeps its configured settings.
+anonymous_tag_url() {
+  printf '%s' "$1" | awk -F'github.com[:/]+' '
+    $2 ~ /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(\.git)?\/?$/ {
+      sub(/\/+$/, "", $2); sub(/\.git$/, "", $2)
+      printf "https::https://github.com/%s.git", $2
+    }'
+}
+
 # Strict release tags out of `git ls-remote --tags origin` (read on STDIN), one per line as
 # "<major> <minor> <patch> <tag> <commit>".
 #
@@ -908,8 +922,9 @@ detach_onto() {
 # IS the gate: a detached checkout has nothing to keep.
 # $1 = the installed version (may be empty); $2 = 1 when --major was given.
 update_managed() {
-  local installed="$1" cross="$2" ls tags major best higher head
-  if ! ls="$(git -C "$PLUGIN_ROOT" ls-remote --tags origin 2>/dev/null)"; then
+  local installed="$1" cross="$2" ls tags major best higher head tag_url
+  tag_url="$(anonymous_tag_url "$(git -C "$PLUGIN_ROOT" remote get-url origin 2>/dev/null || true)")"
+  if ! ls="$(git -C "$PLUGIN_ROOT" ls-remote --tags "${tag_url:-origin}" 2>/dev/null)"; then
     echo "error: could not list the upstream release tags — is the remote reachable?" >&2
     return 1
   fi

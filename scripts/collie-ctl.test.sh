@@ -1032,6 +1032,28 @@ stage_managed_at() {
 # The #63 regression: a Herdr-managed checkout must advance — even with a tracked file dirtied by the
 # build (`bun install` can rewrite the committed lockfiles), which a plain checkout would refuse on,
 # re-breaking update permanently. It must stay detached and stay shallow.
+# Public GitHub tag reads bypass insteadOf with the `https::` transport prefix (upstream b3bd127).
+# Pure parser coverage: every GitHub URL shape maps to the transport-qualified anonymous URL;
+# anything else (a mirror path, an empty string) maps to nothing, which the caller turns back into
+# `origin` by name.
+test_anonymous_tag_url_parses_github_remotes() {
+  local harness="${CASE_DIR}/anon-url-harness.sh" out
+  cat > "$harness" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+source "$CTL"
+anonymous_tag_url "$1"
+EOF
+  out="$(CTL="$CTL" bash "$harness" 'git@github.com:bermudi/collie.git')"
+  assert_eq "$out" "https::https://github.com/bermudi/collie.git" "ssh remote must map to transport-qualified https"
+  out="$(CTL="$CTL" bash "$harness" 'https://github.com/bermudi/collie')"
+  assert_eq "$out" "https::https://github.com/bermudi/collie.git" "https remote must map to the same URL"
+  out="$(CTL="$CTL" bash "$harness" 'ssh://git@github.com/AltanS/collie.git/')"
+  assert_eq "$out" "https::https://github.com/AltanS/collie.git" "ssh:// remote with trailing slash must map"
+  out="$(CTL="$CTL" bash "$harness" '/tmp/some/origin')"
+  assert_eq "$out" "" "a non-GitHub remote must fall back to origin by name"
+}
+
 test_update_advances_a_herdr_managed_checkout() {
   setup_case update-managed
   stage_origin
@@ -1613,6 +1635,7 @@ test_launchd_bootstrap_retries
 test_bun_resolution
 test_non_absolute_bun_never_reaches_path
 test_missing_bun_still_reports
+test_anonymous_tag_url_parses_github_remotes
 test_update_advances_a_herdr_managed_checkout
 test_update_fast_forwards_a_linked_clone
 test_update_reports_a_non_git_checkout
