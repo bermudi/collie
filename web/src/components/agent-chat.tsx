@@ -2,7 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useNavigate, useRevalidator } from "react-router";
 import { ArrowUpToLine, Loader2, ScrollText, Search, TerminalSquare } from "lucide-react";
-import { useSwipeUp } from "@/hooks/use-swipe";
+import { useSheetPull } from "@/hooks/use-sheet-pull";
+import { buzz } from "@/lib/haptics";
 import { useSpaceActions } from "@/hooks/use-spaces";
 import { useDashPrefs, openForCount } from "@/hooks/use-dash-prefs";
 import { useDisplayPrefs } from "@/hooks/use-display-prefs";
@@ -134,10 +135,30 @@ export function AgentChat({
 
   const gone = !agent;
 
-  // Swipe up (or just tap) the handle above the composer to bring up the pane switcher. A lowish
-  // threshold + a taller hit area (below) make the gesture easy to land with a thumb; tapping is the
-  // reliable fallback. "Up" naturally reveals a bottom sheet without fighting the mirror's scroll.
-  const swipe = useSwipeUp(() => setDrawer("switcher"), 24);
+  // A native-feel drag reveal on the switcher handle: the sheet peeks up under the thumb rather
+  // than appearing on release. Tapping is still the reliable fallback (the button's own onClick
+  // below). `pull` is the live upward travel in px, fed straight to the switcher BottomSheet's
+  // `pull` prop; a release past the open threshold buzzes and opens for real, a release short of
+  // it snaps back to 0. `pullFrom` is the handle's own distance from the viewport bottom, measured
+  // once per gesture (useSheetPull's `onAnchor`) — the handle sits above the composer, so without
+  // it the peek would rise from the screen's bottom edge with the composer sandwiched between the
+  // panel and the thumb dragging it.
+  const [pull, setPull] = useState(0);
+  const [pullFrom, setPullFrom] = useState(0);
+  const sheetPull = useSheetPull({
+    onPull: setPull,
+    onAnchor: setPullFrom,
+    onOpen: () => {
+      buzz();
+      setDrawer("switcher");
+      setPull(0);
+      setPullFrom(0);
+    },
+    onCancel: () => {
+      setPull(0);
+      setPullFrom(0);
+    },
+  });
   // Fold state for the "Switch pane" sheet's two long tails, shared with the dashboard so one
   // "hide the long tail" preference means the same thing in both places.
   const dash = useDashPrefs();
@@ -820,7 +841,7 @@ export function AgentChat({
             <button
               type="button"
               aria-label="Switch pane"
-              {...swipe}
+              {...sheetPull}
               onClick={() => setDrawer("switcher")}
               className="flex w-full touch-none items-center justify-center py-3.5 transition-colors active:bg-muted/50"
             >
@@ -893,7 +914,7 @@ export function AgentChat({
 
       {/* Swipe-up quick switcher — just the panes (agents + shells), reached by the thumb gesture.
           Switch-only: pane closing lives in the pane pill's long-press sheet, not here. */}
-      <BottomSheet open={drawer === "switcher"} onClose={closeDrawer} title="Switch pane">
+      <BottomSheet open={drawer === "switcher"} onClose={closeDrawer} title="Switch pane" pull={pull} pullFrom={pullFrom}>
         <ThreadSidebar
           agents={agents}
           shellPanes={shellPanes}
