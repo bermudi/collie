@@ -48,7 +48,7 @@ const ChatMessageList = React.forwardRef<ChatMessageListHandle, ChatMessageListP
           ref={scrollRef}
           onScroll={onScroll}
           className={cn(
-            "h-full min-w-0 w-full overflow-y-auto overflow-x-hidden px-3 py-4",
+            "h-full min-w-0 w-full overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-4",
             className,
           )}
           {...props}
