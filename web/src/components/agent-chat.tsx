@@ -587,7 +587,15 @@ export function AgentChat({
   }
 
   return (
-    <div className="flex min-h-0 w-full min-w-0 max-w-[100dvw] flex-1 flex-col overflow-x-hidden">
+    <>
+    {/* `max-w-[100dvw]` is the phone bound and it stays: a mirror line wider than the screen used
+        to blow the viewport out sideways and let the whole page pan. `md:max-w-screen-md` caps the
+        same box at 768px from that breakpoint up — 768px and not the 640px every other route uses
+        because a 640px column minus its gutters clips an 80-column mirror; the mirror can never be
+        wider than the mux pane it mirrors, so it stops growing here. `mx-auto` then centres what
+        is left. `overflow-x-hidden`, `min-w-0` and `w-full` are all still doing the phone's job
+        underneath. */}
+    <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-[100dvw] flex-1 flex-col overflow-x-hidden md:max-w-screen-md">
       {/* Header — the SAME AppHeader shell the dashboard and space mount, so the Collie mark is
           identical on every screen (no hand-rolled bar to drift). The pane's own bits ride in via
           slots: the `space › tab` breadcrumb as the center, the agent StatusBadge as the right-cluster
@@ -930,5 +938,6 @@ export function AgentChat({
         />
       </BottomSheet>
     </div>
+    </>
   );
 }

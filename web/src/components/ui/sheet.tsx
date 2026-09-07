@@ -198,7 +198,11 @@ export function BottomSheet({ open, onClose, title, children, className, pull = 
         tabIndex={peeking ? undefined : -1}
         style={panelStyle}
         className={cn(
-          "relative z-10 max-h-[82dvh] w-full overflow-y-auto overscroll-contain rounded-t-2xl border-t border-border bg-background shadow-2xl",
+          // `mx-auto w-full max-w-screen-sm`: the panel is content, not chrome, so it stops at the
+          // same 640px column every route's body uses. The backdrop above stays `absolute inset-0`
+          // — the dim is the whole screen or it is not a dim. Without this the panel spanned the
+          // whole viewport, 1366px on a landscape iPad, for rows that were drawn for a phone.
+          "relative z-10 mx-auto max-h-[82dvh] w-full max-w-screen-sm overflow-y-auto overscroll-contain rounded-t-2xl border-t border-border bg-background shadow-2xl",
           // The slide-in entrance plays on a fresh open only. A peek has no entrance (it's tracking
           // the finger, not animating), and a drag that continues into an open gets its own 180ms
           // transform transition above rather than restarting from the keyframe's own 100%.
