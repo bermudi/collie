@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 
 import { Chip } from "@/components/ui/chip";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -15,6 +15,10 @@ interface TabStripProps {
   selected: string | null;
   onSelect: (tabId: string | null) => void;
   onNewTab: (workspaceId: string) => void;
+  /** True while this Space's own "+" create is in flight — disables the button and swaps its icon
+   *  for a spinner, so a second tap during the round trip is refused rather than silently ignored
+   *  (the hook already ignores it; this is the feedback that stops the operator tapping twice). */
+  creatingTab?: boolean;
   /** Show the leading "All" chip (home space view); off for the in-pane tab bar. */
   allowAll?: boolean;
   /** Session scope for the long-press tab actions (rename/close); undefined = primary. */
@@ -41,6 +45,7 @@ export function TabStrip({
   selected,
   onSelect,
   onNewTab,
+  creatingTab = false,
   allowAll = true,
   session,
   readOnly,
@@ -80,10 +85,18 @@ export function TabStrip({
         <button
           type="button"
           onClick={() => onNewTab(workspaceId)}
+          disabled={creatingTab}
           aria-label="New tab"
-          className="flex size-8 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground transition-colors hover:bg-accent active:scale-95"
+          aria-busy={creatingTab}
+          className="flex size-8 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground transition-colors hover:bg-accent active:scale-95 disabled:opacity-100"
         >
-          <Plus className="size-4" />
+          {/* Same box, same icon size, swapped in place — the button never resizes between its
+              idle and busy shapes. */}
+          {creatingTab ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+          ) : (
+            <Plus className="size-4" />
+          )}
         </button>
       </div>
 

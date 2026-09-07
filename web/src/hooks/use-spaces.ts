@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useNavigate, useRevalidator, useRouteLoaderData } from "react-router";
 
 import * as api from "@/lib/api";
@@ -57,29 +57,52 @@ export function useSpaceActions() {
     [navigate],
   );
 
+  // ONE create per Space's "+" at a time: a create is a round trip, an impatient second tap on a
+  // phone is normal, and every tap that gets through makes another throwaway tab the operator then
+  // has to close. Keyed by workspaceId, not global, so a different Space's "+" stays live while
+  // this one is in flight. A ref for the guard itself (it must hold between render and tap) plus
+  // state for the spinner, the same shape the launch guard uses upstream.
+  const [creatingTab, setCreatingTab] = useState<ReadonlySet<string>>(() => new Set());
+  const creatingTabRef = useRef<Set<string>>(new Set());
   const newTab = useCallback(
     async (workspaceId: string) => {
       if (readOnlyRef.current) return setStatus("Read-only — device not authorised", "error");
+      if (creatingTabRef.current.has(workspaceId)) return;
+      creatingTabRef.current.add(workspaceId);
+      setCreatingTab(new Set(creatingTabRef.current));
       try {
         open(await api.createTab(workspaceId, {}, sessionRef.current), "tab");
       } catch (e) {
         setStatus(e instanceof Error ? e.message : String(e), "error");
+      } finally {
+        creatingTabRef.current.delete(workspaceId);
+        setCreatingTab(new Set(creatingTabRef.current));
       }
     },
     [open],
   );
 
+  // ONE Space create in flight at a time, globally — there is only ever one "+" for a new Space
+  // on screen (the dashboard's, or the drill-in's), unlike tabs where each Space has its own.
+  const [creatingSpace, setCreatingSpace] = useState(false);
+  const creatingSpaceRef = useRef(false);
   const newSpace = useCallback(
     async (opts: { label?: string; cwd?: string } = {}) => {
       if (readOnlyRef.current) return setStatus("Read-only — device not authorised", "error");
+      if (creatingSpaceRef.current) return;
+      creatingSpaceRef.current = true;
+      setCreatingSpace(true);
       try {
         open(await api.createWorkspace(opts, sessionRef.current), "space");
       } catch (e) {
         setStatus(e instanceof Error ? e.message : String(e), "error");
+      } finally {
+        creatingSpaceRef.current = false;
+        setCreatingSpace(false);
       }
     },
     [open],
   );
 
-  return { newTab, newSpace };
+  return { newTab, newSpace, creatingTab, creatingSpace };
 }

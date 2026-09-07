@@ -114,7 +114,7 @@ export function AgentChat({
   // the Collie mark + pill; here we use it to dim the StatusBadge, so the badge stops presenting the
   // last snapshot's status as current while we're reconnecting/lost, and restores instantly on recovery.
   const connecting = isConnecting({ bridge, error, stalled });
-  const { newTab } = useSpaceActions();
+  const { newTab, creatingTab } = useSpaceActions();
   // Single display-prefs instance: the View controls (in <Composer>) write it, the mirror reads it.
   const { prefs, setWrap, stepFontSize, setRawTerminal, setTapToFocus } = useDisplayPrefs();
   // Raw-terminal escape hatch: when on, every Claude grammar is bypassed and the plain mirror shows,
@@ -699,6 +699,7 @@ export function AgentChat({
             selected={agent.tabId}
             onSelect={(id) => id && goToTab(id)}
             onNewTab={newTab}
+            creatingTab={creatingTab.has(agent.workspaceId)}
             allowAll={false}
             session={session}
             readOnly={readOnly}

@@ -1,4 +1,4 @@
-import { ChevronLeft, Plus } from "lucide-react";
+import { ChevronLeft, Loader2, Plus } from "lucide-react";
 
 import { Chip } from "@/components/ui/chip";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -12,6 +12,9 @@ interface SpaceStripProps {
   selected: string | null;
   onSelect: (workspaceId: string | null) => void;
   onNewSpace: () => void;
+  /** True while a Space create is in flight — disables the "+" and swaps its icon for a spinner,
+   *  the same feedback the tab strip's own "+" gives. */
+  creatingSpace?: boolean;
   /** When set (the drill-in view), lead with an explicit "‹ Back" button to the dashboard instead
    *  of the "All" chip — so the way back is obvious, not reliant on the header wordmark. */
   onBack?: () => void;
@@ -27,6 +30,7 @@ export function SpaceStrip({
   selected,
   onSelect,
   onNewSpace,
+  creatingSpace = false,
   onBack,
 }: SpaceStripProps) {
   // shrink-0: this strip is a child of the space route's `flex-1 flex-col` scroller, so without it
@@ -63,10 +67,16 @@ export function SpaceStrip({
       <button
         type="button"
         onClick={onNewSpace}
+        disabled={creatingSpace}
         aria-label="New space"
-        className="flex size-8 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground transition-colors hover:bg-accent active:scale-95"
+        aria-busy={creatingSpace}
+        className="flex size-8 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground transition-colors hover:bg-accent active:scale-95 disabled:opacity-100"
       >
-        <Plus className="size-4" />
+        {creatingSpace ? (
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+        ) : (
+          <Plus className="size-4" />
+        )}
       </button>
     </div>
   );

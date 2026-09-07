@@ -30,7 +30,7 @@ export function HomeRoute() {
   // though the tap otherwise shows no visual change until its loader finally settles or times out.
   const stalled = useLoadingStalled();
   const navigate = useNavigate();
-  const { newSpace } = useSpaceActions();
+  const { newSpace, creatingSpace } = useSpaceActions();
   const [newSpaceOpen, setNewSpaceOpen] = useState(false);
   const { prefs, setSpacesOpen, setRecentOpen, setRecentDir } = useDashPrefs();
   // No stored choice yet? The space count decides — a two-space install shouldn't be handed a
@@ -81,6 +81,7 @@ export function HomeRoute() {
             shellPanes={data.shellPanes}
             onOpen={drillInto}
             onNewSpace={() => setNewSpaceOpen(true)}
+            creatingSpace={creatingSpace}
             open={spacesOpen}
             onOpenChange={setSpacesOpen}
           />

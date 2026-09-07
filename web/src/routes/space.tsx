@@ -26,7 +26,7 @@ export function SpaceRoute() {
   const stalled = useLoadingStalled();
   const navigate = useNavigate();
   const revalidator = useRevalidator();
-  const { newTab, newSpace } = useSpaceActions();
+  const { newTab, newSpace, creatingTab, creatingSpace } = useSpaceActions();
   const [newSpaceOpen, setNewSpaceOpen] = useState(false);
 
   // Tab selection is ephemeral view state (no deep-link need). Reset it when the space changes:
@@ -89,6 +89,7 @@ export function SpaceRoute() {
               selected={spaceId}
               onSelect={(id) => (id === null ? toDashboard() : switchSpace(id))}
               onNewSpace={() => setNewSpaceOpen(true)}
+              creatingSpace={creatingSpace}
               onBack={toDashboard}
             />
             <TabStrip
@@ -97,6 +98,7 @@ export function SpaceRoute() {
               agents={data.agents}
               selected={tab}
               onSelect={switchTab}
+              creatingTab={creatingTab.has(selectedWs.workspaceId)}
               onNewTab={newTab}
               session={data.session}
               readOnly={isReadOnly(data.device)}

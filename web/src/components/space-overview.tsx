@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FolderPlus, LayoutGrid, Search } from "lucide-react";
+import { FolderPlus, LayoutGrid, Loader2, Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { SectionHeader } from "@/components/section-header";
@@ -17,6 +17,8 @@ interface SpaceOverviewProps {
   shellPanes?: AgentView[];
   onOpen: (workspaceId: string) => void;
   onNewSpace: () => void;
+  /** True while a Space create is in flight — see `space-strip.tsx`'s prop of the same name. */
+  creatingSpace?: boolean;
   /** Fold state, owned by the dashboard so it can be persisted. */
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -31,6 +33,7 @@ export function SpaceOverview({
   shellPanes = [],
   onOpen,
   onNewSpace,
+  creatingSpace = false,
   open,
   onOpenChange,
 }: SpaceOverviewProps) {
@@ -72,10 +75,16 @@ export function SpaceOverview({
             <button
               type="button"
               onClick={onNewSpace}
+              disabled={creatingSpace}
               aria-label="New space"
-              className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:scale-95"
+              aria-busy={creatingSpace}
+              className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:scale-95 disabled:opacity-100"
             >
-              <FolderPlus className="size-4" />
+              {creatingSpace ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <FolderPlus className="size-4" />
+              )}
             </button>
           </>
         }
