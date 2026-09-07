@@ -21,12 +21,8 @@
 // (find covers the raw mirror only).
 
 import type { AnsiSegment } from "./ansi";
-import {
-  CLAUDE_RULE_GLYPH_CLASS,
-  FRAME_EDGE_GLYPH_CLASS,
-  PURE_HORIZONTAL_RULE_GLYPH_CLASS,
-} from "./rule-glyphs";
-import { displayWidth } from "./text-width";import type { PromptModel } from "./harness/prompt-model";
+import { FRAME_EDGE_GLYPH_CLASS, PURE_HORIZONTAL_RULE_GLYPH_CLASS } from "./rule-glyphs";
+import type { PromptModel } from "./harness/prompt-model";
 import type { WizardModel } from "./harness/wizard-model";
 import type { PreviewSelectModel } from "./harness/preview-model";
 import type { MultiSelectModel } from "./harness/multi-select-model";
@@ -59,7 +55,7 @@ export type { AutocompleteModel, AutocompleteEntry } from "./harness/autocomplet
 /** One visual line: the styled segments that make it up, with the line-terminating "\n" removed. */
 export interface StyledLine {
   segments: AnsiSegment[];
-  /** Keep this known terminal-width border on one visual row when the mirror wraps. */
+  /** Shared structural-clipping marker: keep this terminal-width row on one visual row only while wrapping. */
   noWrap?: true;
 }
 
@@ -217,26 +213,83 @@ const PURE_HORIZONTAL_BORDER = new RegExp(
   `^([${PURE_HORIZONTAL_RULE_GLYPH_CLASS}])\\1{${MIN_NO_WRAP_BORDER_LENGTH - 1},}$`,
 );
 
-// A labelled border: same horizontal glyph on both flanks with a real label in the middle,
-// e.g. "──── (bypass permissions on) ────" or "──── collie upgrades ────".
-// This is the shape that makes the bottom of an input box wrap on a narrow phone while the
-// pure top stays clipped — the two must behave the same or the box looks broken.
-// Flanks may be different lengths but must be the same glyph; total display width must still
-// clear the 20-cell floor so a short prose line like "─ hello ─" never clips.
-const LABELED_HORIZONTAL_BORDER = new RegExp(
-  `^([${PURE_HORIZONTAL_RULE_GLYPH_CLASS}])\\1*\\s+(.+)\\s+\\1+$`,
+// A LABELLED TERMINAL RULE: a short rule, one label, then a rule that runs to the row's end. It
+// falls through the bare-border test because the label interrupts its repetition. The complete row
+// shape is the guard: clipping hides a row's right edge, and only its captured rule runs are
+// decorative, so a table, code, diff, prose, or a label carrying a rule glyph keeps ordinary
+// wrapping and untouched segment presentation.
+//
+// The leading run is deliberately short; the trailing run is long enough that it would wrap on the
+// narrowest mirror. Leading and trailing glyphs are captured separately, so they may differ.
+const MAX_LEADING_RULE_RUN = 4;
+const MIN_TRAILING_RULE_RUN = 20;
+const RULE = PURE_HORIZONTAL_RULE_GLYPH_CLASS;
+const LABELLED_RULE_ROW = new RegExp(
+  `^\\s*(([${RULE}])\\2{0,${MAX_LEADING_RULE_RUN - 1}}) +` + // a short leading rule
+    `[^${RULE}\\s](?:[^${RULE}]*[^${RULE}\\s])? +` + // the label: no rule glyph, no edge space
+    `(([${RULE}])\\4{${MIN_TRAILING_RULE_RUN - 1},})\\s*$`, // a rule to the row's end
 );
-const RULE_OR_SPACE_ONLY = new RegExp(`^[${CLAUDE_RULE_GLYPH_CLASS}\\s]*$`);
 
-function isLabelledNoWrapBorder(text: string): boolean {
-  const trimmed = text.trim();
-  if (displayWidth(trimmed) < MIN_NO_WRAP_BORDER_LENGTH) return false;
-  const m = LABELED_HORIZONTAL_BORDER.exec(trimmed);
-  if (m === null) return false;
-  const label = m[2]!;
-  // Label must contain something other than rule glyphs / whitespace — otherwise
-  // "── ─ ──" or "──   ──" would count as a labelled border.
-  return label.trim().length > 0 && !RULE_OR_SPACE_ONLY.test(label);
+interface TextRange {
+  start: number;
+  end: number;
+}
+
+interface LabelledRuleRow {
+  leading: TextRange;
+  trailing: TextRange;
+}
+
+/** The one strict classifier owns both labelled-row clipping and its decorative rule ranges. */
+function labelledRuleRow(text: string): LabelledRuleRow | null {
+  const match = LABELLED_RULE_ROW.exec(text);
+  if (!match) return null;
+
+  const leading = match[1]!;
+  const trailing = match[3]!;
+  // The expression anchors the whole line; before the leading capture is whitespace only, and the
+  // label cannot contain a rule glyph, so these locate the exact captured runs without a second
+  // predicate or a looser scan.
+  const leadingStart = match[0].indexOf(leading);
+  const trailingStart = match[0].lastIndexOf(trailing);
+  return {
+    leading: { start: leadingStart, end: leadingStart + leading.length },
+    trailing: { start: trailingStart, end: trailingStart + trailing.length },
+  };
+}
+
+function segmentPiece(segment: AnsiSegment, start: number, end: number, muted: boolean): AnsiSegment {
+  if (start === 0 && end === segment.text.length && muted === segment.muted) return segment;
+  return { ...segment, text: segment.text.slice(start, end), muted };
+}
+
+/** Split only at labelled-rule boundaries, retaining every original style field and untouched identity. */
+function muteRanges(segments: AnsiSegment[], ranges: readonly TextRange[]): AnsiSegment[] {
+  const refined: AnsiSegment[] = [];
+  let changed = false;
+  let offset = 0;
+
+  for (const segment of segments) {
+    const segmentStart = offset;
+    const segmentEnd = segmentStart + segment.text.length;
+    offset = segmentEnd;
+    const firstPiece = refined.length;
+    let at = segmentStart;
+
+    for (const range of ranges) {
+      const start = Math.max(at, range.start);
+      const end = Math.min(segmentEnd, range.end);
+      if (start >= end) continue;
+      if (at < start) refined.push(segmentPiece(segment, at - segmentStart, start - segmentStart, false));
+      refined.push(segmentPiece(segment, start - segmentStart, end - segmentStart, true));
+      at = end;
+    }
+    if (at < segmentEnd) refined.push(segmentPiece(segment, at - segmentStart, segment.text.length, false));
+
+    if (refined.length !== firstPiece + 1 || refined[firstPiece] !== segment) changed = true;
+  }
+
+  return changed ? refined : segments;
 }
 
 // A FRAMED ROW: the first and the last non-space glyph are both frame edges (a boxed TUI menu row, a
@@ -250,12 +303,11 @@ const FRAME_ROW = new RegExp(`^\\s*[${FRAME_EDGE_GLYPH_CLASS}].*[${FRAME_EDGE_GL
 
 function styledLine(segments: AnsiSegment[]): StyledLine {
   const text = segments.map((segment) => segment.text).join("");
-  const trimmed = text.trim();
-  const noWrap =
-    PURE_HORIZONTAL_BORDER.test(trimmed) ||
-    isLabelledNoWrapBorder(trimmed) ||
-    FRAME_ROW.test(text);
-  return noWrap ? { segments, noWrap: true } : { segments };
+  const labelled = labelledRuleRow(text);
+  if (PURE_HORIZONTAL_BORDER.test(text.trim()) || labelled || FRAME_ROW.test(text)) {
+    return { segments: labelled ? muteRanges(segments, [labelled.leading, labelled.trailing]) : segments, noWrap: true };
+  }
+  return { segments };
 }
 
 // The two generic StyledLine probes. They live HERE, in the core AST module that imports nothing
