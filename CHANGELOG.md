@@ -6,6 +6,23 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.39.0] - 2026-09-07
+
+The two operator features from the upstream 1.4.0–1.5.4 round, fork-shaped (single host, no
+pack, no i18n). Both are off until the operator declares them — an install with neither file is
+byte-for-byte the dashboard and headers it had.
+
+### Added
+
+- Text-file attachments: the composer paperclip takes `.md`/`.txt`/`.json`/`.yaml`/`.toml` as
+  well as images, within `COLLIE_MAX_UPLOAD_MB` (default 10) and `COLLIE_UPLOAD_EXTRA_TYPES`
+  (8c8845d, upstream e1493f4 + 9833ba3)
+- Your own launchers, declared in `launchers.toml`: one tap opens a new Space, types the row's
+  command into its fresh shell and sends Enter. The file is the allowlist — `POST /api/launch`
+  matches the command string exactly before herdr is touched, and a failed send rolls the
+  half-born Space back. Rows appear as a folding Launch section on the dashboard and behind the
+  rocket button in the Space and pane headers (see README → Your own launchers)
+
 ## [0.38.0] - 2026-09-07
 
 The upstream 1.4.0–1.5.4 viewer round, ported fix-first (no pack, no staged updates, no mux
