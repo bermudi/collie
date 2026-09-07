@@ -1,7 +1,12 @@
 import { useEffect, useSyncExternalStore } from "react";
 
 import { fetchConfig } from "@/lib/api";
-import type { OperatorCommand, OperatorKeyRow, OperatorQuickReplyRow } from "@/lib/types";
+import type {
+  OperatorCommand,
+  OperatorKeyRow,
+  OperatorQuickReplyRow,
+  UploadCapability,
+} from "@/lib/types";
 
 // The operator's own rows — their `commands.toml` palette, their `keys.toml` tray presets AND their
 // `quick-replies.toml` dock groups — read from ONE /api/config call and held in module state. All
@@ -27,6 +32,10 @@ import type { OperatorCommand, OperatorKeyRow, OperatorQuickReplyRow } from "@/l
 let current: readonly OperatorCommand[] = [];
 let currentKeys: readonly OperatorKeyRow[] = [];
 let currentReplies: readonly OperatorQuickReplyRow[] = [];
+// `null` until a read succeeds AND on every bridge older than the field. The two are the same value
+// on purpose: both mean "nothing said otherwise", and lib/attachments.ts answers both with the
+// contract that shipped before attachments existed — 10 MB, images only.
+let currentUpload: UploadCapability | null = null;
 let inflight: Promise<void> | null = null;
 let loaded = false;
 const listeners = new Set<() => void>();
@@ -44,6 +53,7 @@ export function loadOperatorCommands(): Promise<void> {
       current = cfg.operatorCommands ?? [];
       currentKeys = cfg.operatorKeys ?? [];
       currentReplies = cfg.operatorQuickReplies ?? [];
+      currentUpload = cfg.upload ?? null;
       loaded = true;
       emit();
     })
@@ -66,6 +76,15 @@ export function getOperatorKeys(): readonly OperatorKeyRow[] {
 
 export function getOperatorQuickReplies(): readonly OperatorQuickReplyRow[] {
   return currentReplies;
+}
+
+/**
+ * What this collie accepts as an attachment, or `null` when nothing has said otherwise (no read yet,
+ * a failed read, or a bridge older than the field). Consumers go through lib/attachments.ts, which
+ * is where `null` becomes an answer.
+ */
+export function getUploadCapability(): UploadCapability | null {
+  return currentUpload;
 }
 
 export function subscribeOperatorConfig(cb: () => void): () => void {
@@ -92,6 +111,14 @@ export function useOperatorKeys(): readonly OperatorKeyRow[] {
   return useSyncExternalStore(subscribeOperatorConfig, getOperatorKeys, getOperatorKeys);
 }
 
+/** Reactive read of the attachment limits. Same one-shot fetch, same contract. */
+export function useUploadCapability(): UploadCapability | null {
+  useEffect(() => {
+    void loadOperatorCommands();
+  }, []);
+  return useSyncExternalStore(subscribeOperatorConfig, getUploadCapability, getUploadCapability);
+}
+
 /** Reactive read of the Quick-dock groups. Same one-shot fetch, same contract. */
 export function useOperatorQuickReplies(): readonly OperatorQuickReplyRow[] {
   useEffect(() => {
@@ -109,6 +136,7 @@ export function __resetOperatorCommands(): void {
   current = [];
   currentKeys = [];
   currentReplies = [];
+  currentUpload = null;
   inflight = null;
   loaded = false;
   listeners.clear();

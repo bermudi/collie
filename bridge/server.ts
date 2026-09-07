@@ -18,7 +18,7 @@ import {
 import type { Push, PushSubscription } from "./push.ts";
 import { herdTagFor, type SessionRegistry } from "./sessions.ts";
 import type { Snooze } from "./snooze.ts";
-import { imageExtFromBytes, SNIFF_BYTES } from "./uploads.ts";
+import { IMAGE_EXTS, TEXT_EXTS, TEXT_SNIFF_BYTES, uploadExt, uploadTooLarge } from "./uploads.ts";
 import type { UpdateMonitor } from "./update.ts";
 import type { StateEngine } from "./state-engine.ts";
 import { adapterFor, buildJournalRegistry } from "./journal/registry.ts";
@@ -37,22 +37,28 @@ import type {
   UploadResponse,
 } from "./types.ts";
 
-// Image upload limits. Herdr's socket only carries text/keys, so we can't paste an image into the
-// terminal — instead we save it to a host file and the client references its path in the message
-// (the agent reads images by path). See uploadPane().
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
-// Multipart wraps the file in a boundary + part headers, so a legitimately-sized image arrives a
-// little over MAX_UPLOAD_BYTES on the wire. Allow a small slack for the Content-Length pre-check.
-const MAX_UPLOAD_OVERHEAD = 64 * 1024; // 64 KB
-// Hard cap the runtime enforces on ANY request body (Bun.serve maxRequestBodySize). Bigger than the
-// upload cap + overhead so the handler's own 413 fires first for honest clients; this cuts off a
-// chunked or lying client that never sends an accurate Content-Length.
-const MAX_REQUEST_BODY_BYTES = 12 * 1024 * 1024; // 12 MB
+// Upload limits live in bridge/uploads.ts (the operator's number, resolved in config); the runtime's
+// own body cap keeps headroom above them so the handler's own 413 fires first for honest clients.
+// A chunked or lying client that never sends an accurate Content-Length is cut off here instead.
+// Derived from the cap rather than fixed, because the cap is now the operator's number and a
+// constant here would silently veto a larger one.
+const REQUEST_BODY_HEADROOM = 2 * 1024 * 1024; // 2 MB, well clear of uploads.ts's multipart overhead
+
+/**
+ * The runtime's body cap for EVERY route, not just `/upload` — Bun applies it to the whole listener.
+ * So it is the largest body any handler is willing to read, plus the headroom above.
+ * Each handler still enforces its own precise number; this only decides where the runtime stops
+ * reading.
+ */
+export function requestBodyCap(cfg: Config): number {
+  return cfg.maxUploadBytes + REQUEST_BODY_HEADROOM;
+}
 // Upper bound on the pane-read `lines` param — don't trust the client (or Herdr) to cap it.
 const MAX_READ_LINES = 10_000;
 const MAX_EXPECTED_PROMPT_CHARS = 8192;
 const PROMPT_BINDING_BLANK_LINE_HEADROOM = 6;
-// Image type is sniffed from magic bytes in uploadPane — never from the client-supplied MIME.
+// An attachment's type is decided by `uploadExt` in uploadPane — bytes for an image, name plus a
+// binary veto for a text file — never from the client-supplied MIME.
 
 // The built PWA lives in web/dist (Vite output). If it's missing, the bridge still runs the API
 // — only the static UI 503s with a hint to build.
@@ -181,7 +187,7 @@ export function startServer(opts: {
     port: cfg.port,
     // Runtime cap on any request body — a chunked/lying client is cut off here even if its
     // Content-Length is absent or false. The upload handler still does its own precise check.
-    maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
+    maxRequestBodySize: requestBodyCap(cfg),
 
     async fetch(req) {
       if (!cfg.allowNonLoopbackBind && !isLoopbackPeer(server.requestIP(req)?.address)) {
@@ -337,6 +343,13 @@ export function startServer(opts: {
           ...(myKeys.length > 0 ? { operatorKeys: myKeys } : {}),
           // And once more for quick-replies.toml.
           ...(myReplies.length > 0 ? { operatorQuickReplies: myReplies } : {}),
+          // What this host accepts as an attachment — the phone's picker offers exactly this, and
+          // refuses before it sends. Read from cfg on every request like everything else here.
+          upload: {
+            maxBytes: cfg.maxUploadBytes,
+            imageTypes: [...IMAGE_EXTS],
+            textTypes: [...TEXT_EXTS, ...cfg.uploadExtraTypes],
+          },
         } satisfies BridgeConfig, req.headers.get("accept-encoding"));
       }
       if (pathname === "/api/subscribe" && req.method === "POST") {
@@ -1117,7 +1130,8 @@ async function createWorkspace(
 
 // Save an uploaded image to a host file and return its absolute path. The client then references
 // that path in a message; Claude Code / Codex read images by path (the terminal can't take a
-// pasted image over the socket). Validated by MIME and size; the filename is server-generated.
+// pasted image over the socket). Validated by `uploadExt`'s decision and size; the filename is
+// server-generated.
 async function uploadPane(
   cfg: Config,
   paneId: string,
@@ -1130,13 +1144,12 @@ async function uploadPane(
   // Reject an oversize upload by its declared Content-Length BEFORE buffering — req.formData()
   // reads the whole body into memory first, so a 100 MB "image" would be materialised just to fail
   // the size check below. Multipart adds a boundary + part headers, so allow a small slack.
-  const declared = Number(req.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > MAX_UPLOAD_BYTES + MAX_UPLOAD_OVERHEAD) {
+  if (uploadTooLarge(req.headers.get("content-length"), cfg.maxUploadBytes)) {
     return secure(
       new Response(
         JSON.stringify({
           ok: false,
-          error: "image too large (max 10 MB)",
+          error: `attachment too large (max ${Math.round(cfg.maxUploadBytes / (1024 * 1024))} MB)`,
         } satisfies UploadResponse),
         { status: 413, headers: { "content-type": "application/json; charset=utf-8" } },
       ),
@@ -1152,13 +1165,17 @@ async function uploadPane(
   if (!(file instanceof File)) {
     return json({ ok: false, error: "no file" } satisfies UploadResponse, ae);
   }
-  const head = new Uint8Array(await file.slice(0, SNIFF_BYTES).arrayBuffer());
-  const ext = imageExtFromBytes(head);
+  // Read the text-decision's window: the image signatures all sit inside its first bytes too.
+  const head = new Uint8Array(await file.slice(0, TEXT_SNIFF_BYTES).arrayBuffer());
+  const ext = uploadExt(file.name, head, cfg.uploadExtraTypes);
   if (!ext) {
     return json({ ok: false, error: "unsupported type" } satisfies UploadResponse, ae);
   }
-  if (file.size > MAX_UPLOAD_BYTES) {
-    return json({ ok: false, error: "image too large (max 10 MB)" } satisfies UploadResponse, ae);
+  if (file.size > cfg.maxUploadBytes) {
+    return json(
+      { ok: false, error: `attachment too large (max ${Math.round(cfg.maxUploadBytes / (1024 * 1024))} MB)` } satisfies UploadResponse,
+      ae,
+    );
   }
   try {
     const dir = join(cfg.stateDir, "uploads");

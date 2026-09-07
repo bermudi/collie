@@ -90,7 +90,7 @@ describe("api wiring — mutations tracked, reads not", () => {
       ),
     );
     const file = new File([new Uint8Array([1, 2, 3])], "x.png", { type: "image/png" });
-    const up = api.uploadImage("w1:p1", file);
+    const up = api.uploadFile("w1:p1", file);
     expect(isBusy()).toBe(true);
     await up;
     expect(isBusy()).toBe(false);

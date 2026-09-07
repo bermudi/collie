@@ -18,6 +18,7 @@ import {
   normalizeTabLabel,
   paneReadResponse,
   replyPane,
+  requestBodyCap,
   resolvePaneCwd,
   resolveStaticPath,
   sendReplySteps,
@@ -26,6 +27,7 @@ import {
   type ReplySender,
 } from "./server.ts";
 import { AuditLog } from "./audit.ts";
+import { DEFAULT_MAX_UPLOAD_BYTES } from "./uploads.ts";
 import type { Config } from "./config.ts";
 import { PartialKeySendError, type HerdrClient, type PaneRead } from "./herdr-client.ts";
 
@@ -79,9 +81,27 @@ function cfg(overrides: Partial<Config> = {}): Config {
     stateDir: "/tmp/state",
     multiSession: true,
     skipServe: false,
+    maxUploadBytes: DEFAULT_MAX_UPLOAD_BYTES,
+    uploadExtraTypes: [],
     ...overrides,
   };
 }
+
+describe("requestBodyCap", () => {
+  test("is the upload cap plus headroom at the default", () => {
+    expect(requestBodyCap(cfg())).toBe(DEFAULT_MAX_UPLOAD_BYTES + 2 * 1024 * 1024);
+  });
+
+  test("follows the operator's number up when raised", () => {
+    expect(requestBodyCap(cfg({ maxUploadBytes: 64 * 1024 * 1024 }))).toBe(
+      64 * 1024 * 1024 + 2 * 1024 * 1024,
+    );
+  });
+
+  test("follows the operator's number down when lowered", () => {
+    expect(requestBodyCap(cfg({ maxUploadBytes: 1024 * 1024 }))).toBe(3 * 1024 * 1024);
+  });
+});
 
 describe("checkAccess — same-origin / CSRF gate", () => {
   test("allows a request with no Origin header (same-origin GET)", () => {

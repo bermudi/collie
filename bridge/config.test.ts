@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { defaultSocketPath, isLoopbackBindHost, loadConfig } from "./config.ts";
+import { DEFAULT_MAX_UPLOAD_BYTES } from "./uploads.ts";
 
 // loadConfig is the deployment contract — env vars in, a resolved Config out. Pure (just reads
 // process.env + homedir), so we drive it by mutating the environment and restoring it after.
@@ -42,6 +43,8 @@ const KEYS = [
   "COLLIE_STATE_DIR",
   "COLLIE_MULTI_SESSION",
   "COLLIE_SKIP_SERVE",
+  "COLLIE_MAX_UPLOAD_MB",
+  "COLLIE_UPLOAD_EXTRA_TYPES",
   "HERDR_SOCKET_PATH",
   "HERDR_PLUGIN_STATE_DIR",
   "HERDR_PLUGIN_CONFIG_DIR",
@@ -264,6 +267,26 @@ describe("loadConfig", () => {
     expect(loadConfig().pollIdleMs).toBe(30_000);
     process.env.COLLIE_NOTIFY_DELAY_MS = "0";
     expect(loadConfig().notifyDelayMs).toBe(0);
+  });
+
+  test("uses the default upload cap when unset, and resolves COLLIE_MAX_UPLOAD_MB to bytes", () => {
+    expect(loadConfig().maxUploadBytes).toBe(DEFAULT_MAX_UPLOAD_BYTES);
+    process.env.COLLIE_MAX_UPLOAD_MB = "5";
+    expect(loadConfig().maxUploadBytes).toBe(5 * 1024 * 1024);
+  });
+
+  test("an out-of-range or non-integer COLLIE_MAX_UPLOAD_MB falls back to the default", () => {
+    process.env.COLLIE_MAX_UPLOAD_MB = "0";
+    expect(loadConfig().maxUploadBytes).toBe(DEFAULT_MAX_UPLOAD_BYTES);
+    process.env.COLLIE_MAX_UPLOAD_MB = "9999";
+    expect(loadConfig().maxUploadBytes).toBe(DEFAULT_MAX_UPLOAD_BYTES);
+    process.env.COLLIE_MAX_UPLOAD_MB = "not-a-number";
+    expect(loadConfig().maxUploadBytes).toBe(DEFAULT_MAX_UPLOAD_BYTES);
+  });
+
+  test("COLLIE_UPLOAD_EXTRA_TYPES normalises entries: lowercased, leading dot forgiven, invalid dropped, deduped", () => {
+    process.env.COLLIE_UPLOAD_EXTRA_TYPES = " .RB, ex ,bad name,rb";
+    expect(loadConfig().uploadExtraTypes).toEqual(["rb", "ex"]);
   });
 
   test("reads the public-hosts allowlist, trimming and dropping blanks", () => {

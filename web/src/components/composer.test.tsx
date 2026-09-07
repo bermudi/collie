@@ -6,6 +6,7 @@ import { http, HttpResponse } from "msw";
 import { createMemoryRouter, RouterProvider } from "react-router";
 
 import { clearStatus, useStatus } from "@/lib/status";
+import { __resetOperatorCommands } from "@/lib/operator-config";
 import { isReloadHeld, __resetReloadGuard } from "@/lib/reload-guard";
 import { loadDraft } from "@/lib/drafts";
 import { server } from "@/test/setup";
@@ -1653,7 +1654,7 @@ describe("Composer — reload-guard hold (no-SW self-update safety gate)", () =>
   });
 });
 
-describe("Composer — quick keys / image attach", () => {
+describe("Composer — quick keys / file attach", () => {
   it("shows the attach button on the reply-input row without the quick-key strip being visible", async () => {
     const user = userEvent.setup();
     renderComposer();
@@ -1664,7 +1665,7 @@ describe("Composer — quick keys / image attach", () => {
     expect(screen.queryByRole("button", { name: "Tab" })).not.toBeInTheDocument();
 
     // The attach button now lives on the always-visible reply-input row instead of the strip.
-    const attach = screen.getByRole("button", { name: "Attach image" });
+    const attach = screen.getByRole("button", { name: "Attach file" });
     expect(attach).toBeEnabled();
     await user.click(attach); // clickable without throwing (opens the hidden file input)
   });
@@ -1700,7 +1701,7 @@ describe("Composer — clipboard image paste", () => {
     fireEvent.paste(box, { clipboardData: { items: [item] } });
 
     expect(box).toHaveValue("");
-    expect(screen.queryByText(/Image added/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/attached/i)).not.toBeInTheDocument();
   });
 });
 
@@ -2126,5 +2127,90 @@ describe("Composer — draft persistence", () => {
 
     mount();
     expect(screen.getByPlaceholderText(/type a reply/i)).toHaveValue("");
+  });
+});
+
+// The picker's own refusal (lib/attachments.ts), driven by what THIS bridge published on
+// /api/config's `upload` block — never the pre-attachment fallback, since every case here publishes
+// one. The store (lib/operator-config.ts) caches its one read for the life of a "page", so each case
+// resets it and republishes its own /api/config before rendering, and waits for the file input's
+// `accept` to reflect the published block before touching the picker — otherwise the assertion could
+// run against the LEGACY fallback the composer renders on its very first tick.
+describe("Composer — attachment limits published by this bridge", () => {
+  beforeEach(() => __resetOperatorCommands());
+  afterEach(() => __resetOperatorCommands());
+
+  function publishUpload(upload: { maxBytes: number; imageTypes: string[]; textTypes: string[] }) {
+    server.use(
+      http.get("/api/config", () => HttpResponse.json({ push: false, vapidPublicKey: "", upload })),
+    );
+  }
+
+  async function waitForPublishedAccept(accept: string) {
+    await waitFor(() =>
+      expect(document.querySelector('input[type="file"]')).toHaveAttribute("accept", accept),
+    );
+  }
+
+  it("refuses a file larger than the published cap and never calls the upload API", async () => {
+    publishUpload({ maxBytes: 1 * 1024 * 1024, imageTypes: ["png"], textTypes: [] });
+    let uploadCalls = 0;
+    server.use(
+      http.post(/\/api\/pane\/[^/]+\/upload$/, () => {
+        uploadCalls++;
+        return HttpResponse.json({ ok: true, path: "/tmp/should-not-happen" });
+      }),
+    );
+    renderComposerWithStatus();
+    await waitForPublishedAccept("image/*,.png");
+
+    const file = new File(["x".repeat(2 * 1024 * 1024)], "shot.png", { type: "image/png" });
+    // SAFETY: the composer renders exactly one `input[type=file]` (its upload trigger), and
+    // `querySelector` is typed `Element | null` for an arbitrary selector string.
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent(/takes 1 MB/));
+    expect(uploadCalls).toBe(0);
+  });
+
+  it("uploads a .md file when the bridge published md in textTypes", async () => {
+    publishUpload({ maxBytes: 10 * 1024 * 1024, imageTypes: ["png"], textTypes: ["md"] });
+    server.use(
+      http.post(/\/api\/pane\/[^/]+\/upload$/, () => HttpResponse.json({ ok: true, path: "/tmp/notes.md" })),
+    );
+    renderComposer();
+    await waitForPublishedAccept("image/*,.png,.md");
+
+    const file = new File(["# hi"], "notes.md", { type: "text/markdown" });
+    // SAFETY: the composer renders exactly one `input[type=file]` (its upload trigger), and
+    // `querySelector` is typed `Element | null` for an arbitrary selector string.
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    const box = screen.getByPlaceholderText(/type a reply/i);
+    await waitFor(() => expect(box).toHaveValue("/tmp/notes.md"));
+  });
+
+  it("refuses a .rb file the bridge did not publish and never calls the upload API", async () => {
+    publishUpload({ maxBytes: 10 * 1024 * 1024, imageTypes: ["png"], textTypes: ["md"] });
+    let uploadCalls = 0;
+    server.use(
+      http.post(/\/api\/pane\/[^/]+\/upload$/, () => {
+        uploadCalls++;
+        return HttpResponse.json({ ok: true, path: "/tmp/should-not-happen" });
+      }),
+    );
+    renderComposerWithStatus();
+    await waitForPublishedAccept("image/*,.png,.md");
+
+    const file = new File(["puts 1"], "app.rb", { type: "text/x-ruby" });
+    // SAFETY: the composer renders exactly one `input[type=file]` (its upload trigger), and
+    // `querySelector` is typed `Element | null` for an arbitrary selector string.
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent(/doesn't take that type/));
+    expect(uploadCalls).toBe(0);
   });
 });

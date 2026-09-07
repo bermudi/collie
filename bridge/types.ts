@@ -364,6 +364,24 @@ export interface BridgeConfig {
   operatorKeys?: OperatorKeyRow[];
   /** The operator's own Quick-dock groups. Absent/empty when there is no `quick-replies.toml`. */
   operatorQuickReplies?: OperatorQuickReplyRow[];
+  /**
+   * What this host accepts as an attachment. Mirrors `UploadCapability` in web's types.ts — the
+   * phone reads this to decide what the picker offers. Always present here (it is this host's own
+   * number); the web side treats an absent key as an older bridge.
+   */
+  upload: UploadCapability;
+}
+
+/**
+ * What `/api/config` says about attachments — the facts the picker needs before it opens.
+ */
+export interface UploadCapability {
+  /** Largest attachment accepted, decoded, in bytes. */
+  maxBytes: number;
+  /** Image extensions accepted, bare and lowercase. The bridge sniffs these from the bytes. */
+  imageTypes: string[];
+  /** Text extensions accepted, bare and lowercase. The bridge takes these from the name. */
+  textTypes: string[];
 }
 
 /** Rank for triage ordering — lower sorts first ("NEEDS YOU" at the top). */
