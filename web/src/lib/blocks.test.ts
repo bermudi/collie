@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { parseAnsi, type AnsiSegment } from "./ansi";
-import { lineText, liftBoxTables, splitLines, type StyledLine } from "./blocks";
+import { lineText, splitLines, type StyledLine } from "./blocks";
 import { buildBlocks } from "./harness";
 import { isBoxBorder, isHorizontalRule } from "./harness/claude/markers";
 
@@ -245,63 +245,9 @@ describe("buildBlocks", () => {
   });
 });
 
-// Box-drawing tables lift out of the raw mirror so the renderer can pan them instead of letting
-// phone-width wrapping shred the grid. The recognition rule is deliberately narrow: a run must OPEN
-// with a ┌ border and hold at least one │ row — a stray │ or a lone ┌ box stays raw.
-describe("liftBoxTables", () => {
-  const lift = (text: string) => liftBoxTables([{ kind: "raw", lines: splitLines(parseAnsi(text)) }]);
-
-  it("lifts a Devin-style summary table between its surrounding prose", () => {
-    const text = [
-      "Summary",
-      "",
-      "┌──────┬─────┐",
-      "│ Package │ Fixed in │",
-      "├──────┼─────┤",
-      "│ urllib3 │ ≥2.7.0 │",
-      "└──────┴─────┘",
-      "",
-      "Done.",
-    ].join("\n");
-    const blocks = lift(text);
-    expect(blocks.map((b) => b.kind)).toEqual(["raw", "table", "raw"]);
-    // The lifted region is verbatim — styles and glyphs untouched, only the WRAPPING changes.
-    expect(blockText((blocks[1] as { lines: StyledLine[] }).lines)).toBe(
-      text.split("\n").slice(2, 7).join("\n"),
-    );
-  });
-
-  it("splits one raw block into raw/table/raw, preserving the find-haystack text", () => {
-    // Concatenating the surviving raw lines must still reproduce every NON-table line in order,
-    // so the raw coordinate space stays contiguous for find (table regions drop out as a unit).
-    const text = ["before", "┌──┬──┐", "│ a │ b │", "└──┴──┘", "after"].join("\n");
-    const blocks = lift(text);
-    expect(blocks.map((b) => b.kind)).toEqual(["raw", "table", "raw"]);
-    expect(blockText((blocks[0] as { lines: StyledLine[] }).lines)).toBe("before");
-    expect(blockText((blocks[2] as { lines: StyledLine[] }).lines)).toBe("after");
-  });
-
-  it("keeps a stray │ line raw — it keeps ordinary wrapping", () => {
-    // A │ with no ┌ above it never opens a run; prose with box glyphs mid-line never does either.
-    expect(lift("│ just a glyph\nprose").map((b) => b.kind)).toEqual(["raw"]);
-    expect(lift("see ┌──┐ below\n│ a │").map((b) => b.kind)).toEqual(["raw"]);
-  });
-
-  it("lifts a border + row run even when the └ closer never arrives (truncated mirror)", () => {
-    expect(lift("┌──┐\n│ x │\nprose").map((b) => b.kind)).toEqual(["table", "raw"]);
-  });
-
-  it("refuses a run that opens with something other than a ┌ border", () => {
-    // Prose that merely contains box glyphs mid-line never opens a run.
-    expect(lift("see ┌──┐ below\n│ a │").map((b) => b.kind)).toEqual(["raw"]);
-  });
-
-  it("passes table-free blocks through with identity intact", () => {
-    const block = { kind: "raw" as const, lines: splitLines(parseAnsi("a\nb")) };
-    expect(liftBoxTables([block])).toEqual([block]);
-    expect(liftBoxTables([block])[0]).toBe(block);
-  });
-});
+// (Box-drawing tables used to be lifted into a `table` block here; lib/table-run.ts now detects
+// them — plus the markdown and `+---+` dialects — at render time, inside the raw block, and
+// components/ansi-output.tsx pans each run in its own scroller. See table-run.test.ts.)
 
 describe("buildBlocks — Claude grammars (ctx.agent === 'claude')", () => {
   it("splits a tail menu into [raw before, prompt-select], keeping the question above the buttons", () => {

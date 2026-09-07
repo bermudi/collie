@@ -129,18 +129,6 @@ export interface MenuBlock {
 
 /**
 /**
- * A run of box-drawing table lines (┌─┬┐ / │ / ├─┼┤ / └─┴┘) — the TUI table dialect every agent
- * emits — lifted out of the raw mirror so the renderer can keep it on one line per row and pan
- * horizontally, even in wrap mode. Phone-width wrapping shreds these grids: each ~100-column row
- * breaks mid-`─` and the cell columns shuffle into noise. `lines` IS rendered verbatim (styles
- * preserved) but, like every lifted region, is NOT part of the find haystack.
- */
-export interface TableBlock {
-  kind: "table";
-  lines: StyledLine[];
-}
-
-/**
  * The agent's own COMPLETION POPUP while the operator types into its input box (Claude's slash-command
  * menu). Unlike every other non-`raw` kind this one is PRESENTATIONAL: it emits no keystrokes and has
  * no row in harness/dialog-contract.ts, because nothing on that screen owns the keyboard — the input
@@ -165,7 +153,6 @@ export type Block =
   | PreviewSelectBlock
   | MultiSelectBlock
   | MenuBlock
-  | TableBlock
   | AutocompleteBlock;
 
 /**
@@ -296,56 +283,7 @@ export function trimTrailingBlank(lines: StyledLine[]): StyledLine[] {
   return end === lines.length ? lines : lines.slice(0, end);
 }
 
-// Box-drawing table lines. A table OPENS with a ┌ top border — nothing in prose starts a line with
-// ┌ — and its body is │ rows plus ├/└ borders. A stray │ or a box run with no rows stays raw (and
-// keeps ordinary wrapping), so diagrams and single glyphs are never reflowed by this.
-const BOX_TOP = /^\s*┌[─┬]*┐\s*$/;
-const BOX_SEP = /^\s*├[─┼]*┤\s*$/;
-const BOX_BOTTOM = /^\s*└[─┴]*┘\s*$/;
-const BOX_ROW = /^\s*│/;
-
-const isBoxTableLine = (text: string): boolean =>
-  BOX_TOP.test(text) || BOX_SEP.test(text) || BOX_BOTTOM.test(text) || BOX_ROW.test(text);
-
-/** Split raw blocks on box-drawing table runs, lifting each run into a `table` block. Runs over
- *  RAW blocks only — dialog regions were already claimed by their grammars and are never touched.
- *  Pure; runs once per unique mirror text (memoised upstream), off the polling hot path. */
-export function liftBoxTables(blocks: Block[]): Block[] {
-  return blocks.flatMap((block) => {
-    if (block.kind !== "raw") return [block];
-    const out: Block[] = [];
-    let raw: StyledLine[] = [];
-    let lifted = false;
-    const flush = () => {
-      if (raw.length > 0) out.push({ kind: "raw", lines: raw });
-      raw = [];
-    };
-    let i = 0;
-    while (i < block.lines.length) {
-      if (!BOX_TOP.test(lineText(block.lines[i]!))) {
-        raw.push(block.lines[i++]!);
-        continue;
-      }
-      // Candidate run: ┌ border, then consecutive box lines. Only a run holding at least one │
-      // row is a table; a lone ┌ box (or ┌ followed by prose) stays raw.
-      let end = i;
-      let rows = 0;
-      while (end < block.lines.length && isBoxTableLine(lineText(block.lines[end]!))) {
-        if (BOX_ROW.test(lineText(block.lines[end]!))) rows++;
-        end++;
-      }
-      if (rows > 0) {
-        flush();
-        out.push({ kind: "table", lines: block.lines.slice(i, end) });
-        lifted = true;
-      } else {
-        for (let k = i; k < end; k++) raw.push(block.lines[k]!);
-      }
-      i = end;
-    }
-    flush();
-    // Nothing lifted → return the ORIGINAL block, identity intact (callers may rely on the same
-    // lines array passing through when the pass is a no-op).
-    return lifted ? out : [block];
-  });
-}
+// (Box-drawing tables are no longer lifted here: lib/table-run.ts detects them — plus the markdown
+// and `+---+` dialects — at RENDER time, and components/ansi-output.tsx pans each run inside its own
+// scroller while the mirror around it keeps wrapping. That keeps table text in the find haystack,
+// which the old `table` block lift gave up.)
