@@ -417,6 +417,7 @@ describe("StateEngine — session name enrichment", () => {
     herdr.texts.set("w1:p1", named("kept"));
     await poll(); // learns it
     herdr.texts.set("w1:p1", "● Working…\n  ⎿  no input box in view"); // extractor → undefined
+    herdr.panes = [{ ...pane("w1:p1", "w1", "working", "claude"), revision: 1 }]; // moved → re-read
     await poll();
     expect(agent("w1:p1").sessionName).toBe("kept");
   });
@@ -440,9 +441,26 @@ describe("StateEngine — session name enrichment", () => {
     herdr.texts.set("w1:p1", named("safe"));
     await poll();
     herdr.readPane = () => Promise.reject(new Error("read down"));
+    herdr.panes = [{ ...pane("w1:p1", "w1", "working", "claude"), revision: 1 }]; // moved → re-read → fails
     await poll();
     expect(agent("w1:p1").sessionName).toBe("safe"); // last-known kept
     expect(engine.current().bridge).toBe("connected"); // the poll itself still succeeded
+  });
+
+  test("an unchanged revision skips the pane read; a moved one re-reads", async () => {
+    const { herdr, poll, agent } = makeNameEngine();
+    herdr.panes = [pane("w1:p1", "w1", "idle", "claude")];
+    herdr.texts.set("w1:p1", named("skip-me"));
+    await poll();
+    expect(herdr.reads.length).toBe(1);
+    await poll(); // same revision → no second read
+    expect(herdr.reads.length).toBe(1);
+    expect(agent("w1:p1").sessionName).toBe("skip-me"); // cached name still applied
+    herdr.panes = [{ ...pane("w1:p1", "w1", "working", "claude"), revision: 7 }];
+    herdr.texts.set("w1:p1", named("moved"));
+    await poll(); // moved revision → re-read
+    expect(herdr.reads.length).toBe(2);
+    expect(agent("w1:p1").sessionName).toBe("moved");
   });
 });
 

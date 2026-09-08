@@ -94,7 +94,11 @@ install_fake_tailscale() {
 #!/usr/bin/env bash
 set -euo pipefail
 if [ "\${1:-}" = status ] && [ "\${2:-}" = --json ]; then
-  echo '{"Self":{"DNSName":"host.example."}}'
+  if [ "\${TS_NO_CERTS:-}" = 1 ]; then
+    echo '{"Self":{"DNSName":"host.example."}}'
+  else
+    echo '{"Self":{"DNSName":"host.example."},"CertDomains":["host.example"]}'
+  fi
   exit 0
 fi
 if [ "\${1:-}" = serve ] && [ "\${2:-}" = status ] && [ "\${3:-}" = --json ]; then
@@ -421,6 +425,37 @@ EOF
   assert_contains "$out" 'COLLIE_SERVE_PORT'
   assert_contains "$out" 'COLLIE_SERVE_MODE=http'
   assert_eq "$(cat "${CONFIG_DIR}/tailscale-managed-handler")" "$published_state"
+}
+
+# A tailnet with no HTTPS (empty CertDomains) makes `tailscale serve` print an enablement URL and
+# wait on a prompt nobody sees. The https door refuses before teardown: nothing published, nothing
+# recorded, and the door that is already up stays up.
+test_serve_refuses_a_tailnet_without_https() {
+  setup_case serve-no-https
+  install_fake_tailscale
+  cat > "${CONFIG_DIR}/.env" <<'EOF'
+COLLIE_PORT=8787
+EOF
+  run_ctl serve > "${CASE_DIR}/published.out" || fail "serve failed while staging the fixture"
+  local published_state; published_state="$(cat "${CONFIG_DIR}/tailscale-managed-handler")"
+  : > "$TS_CALLS"
+
+  local out
+  if out="$(TS_NO_CERTS=1 run_ctl serve 2>&1)"; then
+    fail "serve published an https door on a tailnet with no CertDomains"
+  fi
+  assert_contains "$out" 'no HTTPS'
+  assert_contains "$out" 'COLLIE_SERVE_MODE=http'
+  [ ! -s "$TS_CALLS" ] || fail "refused serve still called tailscale serve"
+  assert_eq "$(cat "${CONFIG_DIR}/tailscale-managed-handler")" "$published_state"
+
+  # Plain-HTTP mode needs no certs and still publishes on the same tailnet.
+  cat > "${CONFIG_DIR}/.env" <<'EOF'
+COLLIE_SERVE_MODE=http
+COLLIE_PORT=8787
+EOF
+  TS_NO_CERTS=1 run_ctl serve > "${CASE_DIR}/http.out" || fail "http serve needs no CertDomains"
+  assert_contains "$(cat "$TS_CALLS")" '--http=8787'
 }
 
 # A failed front door must not abort `start` — the bridge is up on loopback and the banner still has
@@ -1625,6 +1660,7 @@ test_state_delete_failures
 test_adopts_preexisting_collie_mount
 test_serve_port_publishes_a_chosen_https_listener
 test_serve_port_is_validated_and_https_only
+test_serve_refuses_a_tailnet_without_https
 test_serve_failure_does_not_abort_start
 test_launchd_agent_lifecycle
 test_launchd_status_line

@@ -86,6 +86,9 @@ export class StateEngine {
   // when a pane momentarily hides its input box (a dialog / working spinner) — only cleared when the
   // pane itself vanishes (see the removal loop). Enriched from pane text each poll (see enrichSessionNames).
   private readonly sessionNames = new Map<string, string>();
+  private readonly enrichedAt = new Map<string, number>();
+  // Revision at which each pane was last enriched. enrichSessionNames skips the readPane call for
+  // any pane whose revision hasn't moved — O(claude_panes) reads per poll becomes O(changed).
   private readonly transitionListeners = new Set<TransitionListener>();
   private readonly removeListeners = new Set<RemoveListener>();
   private readonly updateListeners = new Set<UpdateListener>();
@@ -325,12 +328,16 @@ export class StateEngine {
         if (live.has(id)) continue;
         this.prevStatus.delete(id);
         this.sessionNames.delete(id); // drop the cached name so a reused pane id starts clean
+        this.enrichedAt.delete(id);
         for (const fn of this.removeListeners) fn(id);
       }
 
       // Enrich claude panes with their own `/rename` session name (read from pane text). Best-effort:
-      // a failed read keeps the last-known name and never fails the poll.
-      await this.enrichSessionNames(agents);
+      // a failed read keeps the last-known name and never fails the poll. The revision map lets
+      // unchanged panes skip their read entirely.
+      const revisions = new Map<string, number>();
+      for (const p of panes) revisions.set(p.pane_id, p.revision);
+      await this.enrichSessionNames(agents, revisions);
 
       this.agents = agents;
       this.shellPanes = shellPanes;
@@ -365,12 +372,17 @@ export class StateEngine {
    * name (sticky cache) and never fails the poll. Claude-only; other harnesses never set it. A
    * herdr client without `readPane` (the unit-test fake) short-circuits, so it's a no-op there.
    */
-  private async enrichSessionNames(agents: AgentView[]): Promise<void> {
+  private async enrichSessionNames(agents: AgentView[], revisions: Map<string, number>): Promise<void> {
     if (typeof this.herdr.readPane !== "function") return;
     const claude = agents.filter((a) => a.agent === "claude");
     if (claude.length === 0) return;
     await Promise.all(
       claude.map(async (a) => {
+        const rev = revisions.get(a.paneId);
+        if (rev !== undefined) {
+          const prev = this.enrichedAt.get(a.paneId);
+          if (prev !== undefined && prev === rev) return;
+        }
         try {
           // `visible` — never `recent`; see SESSION_NAME_READ_LINES for what a `recent` read does
           // to the operator's screen. The visible grid is also strictly safer to parse: `recent`
@@ -379,6 +391,7 @@ export class StateEngine {
           const read = await this.herdr.readPane(a.paneId, "visible", SESSION_NAME_READ_LINES, "text");
           const name = extractClaudeSessionName(read.text);
           if (name) this.sessionNames.set(a.paneId, name);
+          if (rev !== undefined) this.enrichedAt.set(a.paneId, rev);
         } catch {
           // Keep whatever's cached (if anything) — a transient read failure must not blank the name.
         }

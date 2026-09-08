@@ -1322,16 +1322,31 @@ cmd_serve() {
          return 1
        } ;;
   esac
-  stop_tailscale_serve || return 1
   command -v tailscale >/dev/null || {
     echo "error: tailscale not found; cannot publish the tailnet front door" >&2
     return 1
   }
+  # CertDomains is what says this tailnet HAS https at all. Without it `tailscale serve` prints
+  # an enablement URL and waits on a prompt nobody sees (serve.out only surfaces after the command
+  # returns), so the https door refuses BEFORE teardown — a refusal must not cost the door that is
+  # currently up. Plain-HTTP mode needs no certs and skips this.
+  if [ "$SERVE_MODE" != "http" ]; then
+    _serve_certs="$(tailscale status --json 2>/dev/null | bun -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const c=(JSON.parse(d).CertDomains||[]);if(c.length)process.stdout.write('yes')}catch{}})" 2>/dev/null || true)"
+    if [ "${_serve_certs:-}" != "yes" ]; then
+      echo "error: this tailnet has no HTTPS (no CertDomains) — approve it in the Tailscale admin console, or serve plain HTTP with COLLIE_SERVE_MODE=http" >&2
+      unset _serve_certs
+      return 1
+    fi
+    unset _serve_certs
+  fi
   local tailscale_host; tailscale_host="$(self_dnsname)"
   if [ -z "$tailscale_host" ]; then
     echo "error: cannot determine Tailscale hostname; refusing to publish an untrackable root mount" >&2
     return 1
   fi
+  # Teardown runs after every refusal above: a failed pre-check must not cost the door that is
+  # currently up.
+  stop_tailscale_serve || return 1
   local expected_proxy="http://127.0.0.1:${PORT}"
   local out="${CONFIG_DIR}/serve.out"
   if [ "$SERVE_MODE" = "http" ]; then
