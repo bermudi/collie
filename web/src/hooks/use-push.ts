@@ -50,16 +50,18 @@ export function usePushControl() {
     async (enabled: boolean): Promise<EnableResult> => {
       setBusy(true);
       try {
-        if (enabled) {
-          const res = await enablePush();
-          await refresh();
-          return res;
-        }
+        if (enabled) return await enablePush();
         await disablePush();
-        await refresh();
         return { ok: true };
       } finally {
-        setBusy(false);
+        // Refresh even when setup threw: the state read is what releases a stale spinner and
+        // tells Settings the retry is armed. Without it a failed enable left the switch busy
+        // forever with no way back but a reload.
+        try {
+          await refresh();
+        } finally {
+          setBusy(false);
+        }
       }
     },
     [refresh],

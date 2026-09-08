@@ -46,13 +46,18 @@ export function SettingsRoute() {
   // "On" = the user hasn't disabled it AND a live subscription exists on this device.
   const on = Boolean(state && !state.userDisabled && state.subscribed);
   const blocked = Boolean(state && state.availability !== "ready");
-  // When blocked we can still allow turning OFF a lingering subscription, but never turning ON.
-  const toggleDisabled = busy || !state || (blocked && !on);
+  // Capability/permission refusals block enabling; a failed config read must remain retryable.
+  const toggleDisabled =
+    busy || !state || (blocked && !on && state.availability !== "unavailable");
 
   async function toggle(next: boolean) {
     setError(null);
-    const res = await setEnabled(next);
-    if (next && !res.ok) setError(reasonText(res.reason));
+    try {
+      const res = await setEnabled(next);
+      if (next && !res.ok) setError(reasonText(res.reason));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   return (
@@ -113,7 +118,10 @@ export function SettingsRoute() {
             </p>
           )}
           {error && (
-            <p className="border-t border-border/60 px-4 py-2.5 text-xs text-status-blocked">
+            <p
+              role="alert"
+              className="border-t border-border/60 px-4 py-2.5 text-xs text-status-blocked"
+            >
               {error}
             </p>
           )}
@@ -152,6 +160,8 @@ function reasonText(reason: PushAvailability | undefined): string {
       return "Push needs an HTTPS connection.";
     case "server-off":
       return "Push isn't configured on the bridge (no VAPID keys).";
+    case "unavailable":
+      return "Couldn't reach the bridge to check push — try again.";
     case "denied":
       return "Notifications are blocked — enable them in your browser settings.";
     case "unsupported":
@@ -167,6 +177,8 @@ function availabilityNote(a: PushAvailability): string {
       return "Unavailable over plain HTTP — serve Collie over HTTPS to enable push.";
     case "server-off":
       return "The bridge has no VAPID keys configured, so push is disabled server-side.";
+    case "unavailable":
+      return "Couldn't reach the bridge — retrying the check may clear this.";
     case "denied":
       return "Notifications are blocked for this site. Re-enable them in your browser settings.";
     case "unsupported":

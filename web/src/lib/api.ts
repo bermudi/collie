@@ -4,6 +4,7 @@
 import { trackBusy } from "./busy";
 import { markLive } from "./connection-health";
 import { observeServerBuild, SERVER_BUILD_HEADER } from "./server-build";
+import type { SubscribeBody } from "./push";
 import type {
   ActionResponse,
   BridgeConfig,
@@ -436,6 +437,11 @@ export function launch(command: string, session?: string): Promise<CreateRespons
 
 export function fetchConfig(): Promise<BridgeConfig> {
   return req<BridgeConfig>("/api/config");
+}
+
+/** Register push through the same timeout, authentication and error handling as the other APIs. */
+export function registerPushSubscription(body: SubscribeBody): Promise<void> {
+  return req<void>("/api/subscribe", { method: "POST", body: JSON.stringify(body) });
 }
 
 /**
