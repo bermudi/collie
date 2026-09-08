@@ -33,7 +33,7 @@ public access, Collie isn't built for it. Read the
 - **Quick actions and slash commands** per agent — tap, don't type
 - **Special-keys pad** — `Esc`, `Ctrl+C`, arrows, combinable modifiers
 - **Find in output**, and **conversation history** the terminal can't scroll back to
-- **Send an image** from your camera roll
+- **Send an image** from your camera roll, or a markdown / text / code file — capped and typed in `.env`
 - **Switch between Herdr sessions** without touching the host
 - **Installs to your home screen** (PWA) and runs entirely on your own machine — loopback bind, no
   cloud, no account
@@ -695,7 +695,9 @@ survive.
 right below the note. Usual causes: your user isn't the Tailscale operator
 (`sudo tailscale set --operator=$USER`), the node is logged out (`tailscale up`), or — on
 Headscale / `.internal` tailnet domains — HTTPS certs aren't available, which is exactly what
-`COLLIE_SERVE_MODE=http` is for: set it in `.env`, then `scripts/collie-ctl.sh restart`. Verify with
+`COLLIE_SERVE_MODE=http` is for: set it in `.env`, then `scripts/collie-ctl.sh restart`. A tailnet
+with no HTTPS at all is refused up front instead (`serve` prints `this tailnet has no HTTPS`) —
+approve certs in the Tailscale admin console, or switch to http mode. Verify with
 `tailscale serve status`.
 
 **Banner shows `⚠ Collie isn't answering on :8787 yet`** (service won't start, connection
