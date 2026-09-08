@@ -21,7 +21,7 @@ const paneWithDialog = "Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc t
 
 /** Record every reply POST, and let the fake pane's screen be swapped per test. */
 function harness(screen: () => string) {
-  const calls: Array<{ text: string; submit: boolean }> = [];
+  const calls: Array<{ text: string; submit: boolean; expected_prompt?: string }> = [];
   server.use(
     http.get(/\/api\/pane\/[^/]+$/, () =>
       HttpResponse.json({ paneId: "w1:p1", text: screen(), truncated: false, revision: 1 }),
@@ -203,7 +203,7 @@ describe("sendGuardedReply", () => {
     expect(out).toEqual({ status: "sent" });
     expect(calls).toEqual([
       { text: "continue the release checklist", submit: false },
-      { text: "", submit: true },
+      { text: "", submit: true, expected_prompt: "› continue the release checklist" },
     ]);
   });
   it("types, verifies the text on the input line, then submits", async () => {
@@ -247,7 +247,56 @@ describe("sendGuardedReply", () => {
     expect(out).toEqual({ status: "sent" });
     expect(calls).toEqual([
       { text: "ship it please", submit: false },
-      { text: "", submit: true },
+      { text: "", submit: true, expected_prompt: "╰─ ship it please to the deploy host    ─╯" },
+    ]);
+  });
+
+  it("binds submit to the verified region and preserves text when the prompt changes", async () => {
+    const suggestion = "\x1b[38;2;111;115;119m to the deploy host\x1b[0m";
+    const initial =
+      `some output\n\x1b[38;2;74;80;88m╭── statusline ───╮\x1b[0m\n` +
+      `\x1b[38;2;74;80;88m╰─ \x1b[0mship it please${suggestion}   \x1b[38;2;74;80;88m ─╯\x1b[0m`;
+    const expectedPrompt = "╰─ ship it please to the deploy host    ─╯";
+    const calls: Array<{ text: string; submit: boolean; expected_prompt?: string }> = [];
+    let reads = 0;
+    let promptChanged = false;
+    server.use(
+      http.get(/\/api\/pane\/[^/]+$/, () => {
+        reads++;
+        // The second read is the successful post-type verification. The dialog appears immediately
+        // after that read, before the submit request reaches the bridge.
+        if (reads === 2) promptChanged = true;
+        return HttpResponse.json({ paneId: "w1:p1", text: initial, truncated: false, revision: 1 });
+      }),
+      http.post<never, { text: string; submit: boolean; expected_prompt?: string }>(
+        /\/api\/pane\/[^/]+\/reply$/,
+        async ({ request }) => {
+          const body = await request.json();
+          calls.push(body);
+          if (body.submit && promptChanged) {
+            // A real bridge binding check returns this before its adapter sends any submit keys.
+            return HttpResponse.json(
+              { ok: false, error: "prompt changed", code: "prompt_changed" },
+              { status: 409 },
+            );
+          }
+          return HttpResponse.json({ ok: true });
+        },
+      ),
+    );
+
+    const out = await sendGuardedReply({
+      paneId: "w1:p1",
+      text: "ship it please",
+      agent: "omp",
+      ...instant,
+    });
+
+    expect(out).toMatchObject({ status: "error", textDelivered: true });
+    expect(out).toHaveProperty("error", expect.stringMatching(/screen changed/i));
+    expect(calls).toEqual([
+      { text: "ship it please", submit: false },
+      { text: "", submit: true, expected_prompt: expectedPrompt },
     ]);
   });
 
