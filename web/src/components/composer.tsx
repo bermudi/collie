@@ -1,13 +1,15 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { ChangeEvent, ClipboardEvent, ReactNode } from "react";
 import { useRevalidator } from "react-router";
-import { Check, Paperclip, Keyboard, Loader2, Send, Settings2, Slash, Terminal, X, Zap } from "lucide-react";
+import { Check, FileText, Image, Paperclip, Keyboard, Loader2, Send, Settings2, Slash, Terminal, X, Zap } from "lucide-react";
 
 import type { DisplayPrefs } from "@/hooks/use-display-prefs";
 import { usePendingConfirm } from "@/hooks/use-pending-confirm";
 import { useDirectTyping } from "@/hooks/use-direct-typing";
 import { setStatus } from "@/lib/status";
+import { buzz } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { BottomSheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ChatInput } from "@/components/ui/chat/chat-input";
 import { NavTray } from "@/components/nav-tray";
@@ -18,7 +20,7 @@ import { SectionLabel } from "@/components/ui/section-label";
 import * as api from "@/lib/api";
 import { commandsFor } from "@/lib/agent-commands";
 import { useOperatorCommands, useOperatorKeys, useUploadCapability } from "@/lib/operator-config";
-import { acceptAttribute, limitMb, rejectAttachment, uploadLimits } from "@/lib/attachments";
+import { acceptAttribute, limitMb, offersFiles, PHOTO_ACCEPT, rejectAttachment, uploadLimits } from "@/lib/attachments";
 import { ctrlPresetsFor } from "@/lib/operator-keys";
 import { isDestructiveInput } from "@/lib/destructive";
 import { clearDraft, fitsDraftStore, loadDraft, saveDraft } from "@/lib/drafts";
@@ -289,6 +291,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // The camera-roll half of the picker. See the two inputs below.
+  const photoRef = useRef<HTMLInputElement>(null);
   const direct = useDirectTyping({
     paneKey: `${session ?? ""}\0${paneId}`,
     inputRef,
@@ -437,6 +441,31 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   // never dead and never offers what this host would refuse.
   const limits = uploadLimits(useUploadCapability());
   const accept = acceptAttribute(limits);
+  // Whether the attach button ASKS. On a host that takes images and nothing else there is one
+  // answer, so it opens the camera roll and no sheet is drawn.
+  const asksWhich = offersFiles(limits);
+  const [picking, setPicking] = useState(false);
+  // The attach button's own press echo. Every other control on this row acknowledges a tap by
+  // changing what is on screen at once; attach hands the tap to a sheet 240ms away, or to a
+  // native picker whose delay belongs to the phone and not to this app — so for that beat the
+  // tap looked lost. The buzz lands under the thumb before any pixel can, and the tone speaks
+  // the same "your press landed" language the quick replies already use.
+  const [pressed, setPressed] = useState(false);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (pressTimer.current !== null) clearTimeout(pressTimer.current);
+    };
+  }, []);
+
+  function echoAttachPress() {
+    buzz();
+    setPressed(true);
+    if (pressTimer.current !== null) clearTimeout(pressTimer.current);
+    // Just under the sheet's own entrance, so the flash hands over to the sheet rather than
+    // lingering behind it.
+    pressTimer.current = setTimeout(() => setPressed(false), 220);
+  }
   // The Keys tray's preset row, resolved the same way from the same one-shot read of /api/config.
   const keyPresets = ctrlPresetsFor(agent, useOperatorKeys());
 
@@ -768,7 +797,44 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             callback survives the keyboard collapsing. Attach-image fires it from the reply-input row
             below (always visible, not gated behind the keyboard-open quick keys); structural commands
             (New tab/space, Kill) and Stop (Esc, in the Keys dock) live elsewhere. */}
-        <input ref={fileRef} type="file" accept={accept} hidden onChange={onPickFile} />
+        {/* TWO inputs, because a phone's picker cannot be asked both questions at once. The
+            camera roll is offered only when EVERY entry in `accept` maps to a gallery, so the
+            extension list that makes a `.md` pickable is the very thing that hid the gallery on
+            both Android and iOS — the attach button opened the file browser and nothing else.
+            `PHOTO_ACCEPT` is the first input's whole answer; the second keeps the full list. Which
+            one fires is the sheet's question, and both land in the same `onPickFile`. */}
+        <input ref={photoRef} data-testid="attach-photos" type="file" accept={PHOTO_ACCEPT} hidden onChange={onPickFile} />
+        <input ref={fileRef} data-testid="attach-files" type="file" accept={accept} hidden onChange={onPickFile} />
+        {/* The picker's own sheet. Two rows, no confirm — each one opens a native picker, which is
+            its own decision point. It closes BEFORE the click so the sheet is not left standing
+            behind the system UI, and the click still counts as the user gesture the browser
+            requires because both happen inside this handler. */}
+        <BottomSheet open={picking} onClose={() => setPicking(false)} title="Attach">
+          <div className="flex flex-col">
+            <button
+              type="button"
+              onClick={() => {
+                setPicking(false);
+                photoRef.current?.click();
+              }}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-accent active:bg-muted"
+            >
+              <Image className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="text-sm font-medium">Photos</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPicking(false);
+                fileRef.current?.click();
+              }}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-accent active:bg-muted"
+            >
+              <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="text-sm font-medium">Files</span>
+            </button>
+          </div>
+        </BottomSheet>
         {/* Keys / Quick / Display dock — a single in-flow site ABOVE the Controls row (so the toggle
             you tapped stays put and the panel grows over the mirror, not the input). Whichever of the
             mutually exclusive drawers is active renders here via the shared ComposerDock chrome. Keys
@@ -1018,10 +1084,19 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               // bottom-1, not centred: the field grows upward as the draft wraps, and a vertically
               // centred button would drift up with it, away from the thumb and away from the send
               // button it pairs with. Pinned to the bottom it stays put at any height.
-              className="absolute bottom-1 right-1 size-9 rounded-full text-muted-foreground"
+              className={cn(
+                "absolute bottom-1 right-1 size-9 rounded-full text-muted-foreground",
+                // The press echo: a tone for the beat before the sheet (or the native picker)
+                // arrives. `transition-all` is already in the button base, so it eases, not snaps.
+                pressed && "scale-95 bg-accent text-accent-foreground",
+              )}
               disabled={uploading || locked || direct.active}
               onPointerDown={(e) => e.preventDefault()}
-              onClick={() => fileRef.current?.click()}
+              onClick={() => {
+                echoAttachPress();
+                if (asksWhich) setPicking(true);
+                else photoRef.current?.click();
+              }}
               aria-label="Attach file"
             >
               {uploading ? (
