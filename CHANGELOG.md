@@ -6,6 +6,32 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.41.0] - 2026-09-08
+
+Three upstream viewer changes ported fix-first, plus a durable porting ledger. Declined with
+reasons: the rename tab/pane sheet keyboard-folding fix (93373ce) patches a strips-auto-fold-on-
+keyboard subsystem Pup never adopted, so the bug cannot manifest here. See `PORTING.md` for the
+full porting record.
+
+### Added
+
+- Adaptive mirror polling (upstream d2cb8a3): the poll cadence is now resolved from what the
+  operator is doing, not what the herd is doing — a 300ms burst after a send, 1.5s while following
+  a moving pane, 4s on a busy home screen, 6s when nothing is being watched. A tap reads as
+  immediate, and a quiet pane nobody is looking at backs off. The burst bookkeeping lives in a
+  new `lib/poll-intent.ts` (pure, tested in isolation); send stamps land in the composer's Send,
+  `pressKeys`, and the prompt-option handler, and the pane loader reports whether the mirror
+  changed. The `changed` verdict is pane-scoped so a poll from pane B can't leak into pane A's
+  cadence.
+- The omp (oh-my-pi) π mark (upstream 17386ef): omp now renders its official three-stop gradient
+  on a `#0F0A14` tile instead of falling back to a generic initials chip. Per-mounted SVG
+  gradient IDs via `useId()` keep a dashboard column of tiles from colliding.
+
+### Changed
+
+- The fresh-install mirror font default is 10px, down from 12px (upstream 4b005aa), for phone
+  readability. Existing devices keep their saved preference — the storage key is unchanged.
+
 ## [0.40.0] - 2026-09-07
 
 The upstream 1.5.5–1.6.0 round, ported fix-first (no pack, no packaging, no new surfaces of

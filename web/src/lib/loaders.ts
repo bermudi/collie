@@ -14,6 +14,7 @@
 // even while a poll's doomed fetch is still hanging.
 
 import { fetchHistory, fetchPane, fetchSnapshot, isApiErrorStatus } from "@/lib/api";
+import { markPollResult } from "@/lib/poll-intent";
 import { parseAnsi } from "@/lib/ansi";
 import { splitLines } from "@/lib/blocks";
 import { isLostLatched } from "@/lib/connection-health";
@@ -392,6 +393,22 @@ export async function paneLoader({
     // branch) so the connection bar doesn't flicker on an unchanged poll.
     const read: PaneReadResponse = await fetchPane(paneId, lines, session, request?.signal);
     const text = read.text || lastPaneText.get(key) || "";
+    // THE "IS THE SCREEN STILL MOVING" SIGNAL, taken at the one place that can honestly answer it.
+    //
+    // A 304 is the bridge saying the mirror is byte-identical, which is exactly "unchanged". The
+    // text compare behind it is not redundant: a bridge that serves no ETag would otherwise report
+    // every poll as a change and the burst would never end. Read BEFORE the write-through below,
+    // since `rememberPaneText` is what makes this text the previous one.
+    //
+    // Runs on NAVIGATION loads too, not just revalidation polls — a fresh navigation to a pane
+    // whose `lastPaneText` is empty reports `changed=true` for one poll. That is desirable: you
+    // just opened a live pane, so a hot gap is the right first beat. It self-corrects on the next
+    // poll (which fires immediately on navigation).
+    //
+    // The cadence consumes it (hooks/use-polling.ts): a mirror that keeps moving is one the operator
+    // is watching move. Pane-scoped via `paneId` so a poll from pane B can't leak into pane A's
+    // cadence — see lib/poll-intent.ts.
+    markPollResult(paneId, read.notModified !== true && text !== lastPaneText.get(key));
     rememberPaneText(key, text);
     // Write-through, EXCEPT while the pane is asking for a secret — see holdsNoEchoPrompt (ADR 0017).
     if (holdsNoEchoPrompt(text)) dropLastPaneText(session, paneId);

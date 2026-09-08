@@ -10,7 +10,7 @@ export interface DisplayPrefs {
    *  INSIDE the wrap (lib/table-run.ts), so no-wrap is now only for output whose columns matter
    *  everywhere, such as a full-screen TUI. */
   wrap: boolean;
-  /** Font size in px for the mirror pre (default: 12, range: 9–16). */
+  /** Font size in px for the mirror pre (default: 10, range: 9–16). */
   fontSize: number;
   /**
    * Raw-terminal escape hatch (default: false). When on, the mirror renders the PLAIN terminal —
@@ -39,7 +39,7 @@ export interface DisplayPrefs {
 const STORAGE_KEY = "collie:display-prefs:v4";
 export const FONT_MIN = 9;
 export const FONT_MAX = 16;
-const DEFAULTS: DisplayPrefs = { wrap: true, fontSize: 12, rawTerminal: false, tapToFocus: true };
+const DEFAULTS: DisplayPrefs = { wrap: true, fontSize: 10, rawTerminal: false, tapToFocus: true };
 
 function clampFont(n: number): number {
   return Math.max(FONT_MIN, Math.min(FONT_MAX, Math.round(n)));

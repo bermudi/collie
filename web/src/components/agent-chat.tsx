@@ -10,6 +10,7 @@ import { useDisplayPrefs } from "@/hooks/use-display-prefs";
 import { useStableTerminalDraft } from "@/hooks/use-terminal-draft";
 import { isConnecting } from "@/lib/connection";
 import { setStatus } from "@/lib/status";
+import { setFollowing as publishFollowing, stampSend } from "@/lib/poll-intent";
 import { ChatMessageList, type ChatMessageListHandle } from "@/components/ui/chat/chat-message-list";
 import { BottomSheet } from "@/components/ui/sheet";
 import { AppHeader } from "@/components/app-header";
@@ -174,6 +175,17 @@ export function AgentChat({
   // against it would blind the guard to drift that happened before the freeze (live-vs-live always
   // matches). While following, the frozen pair IS the live pair by definition.
   const [following, setFollowing] = useState(true);
+  // The same intent, mirrored out to lib/poll-intent so the POLLER can see it: it is mounted at the
+  // data root, above this subtree, and a mirror the operator has scrolled away from is not one to
+  // keep re-reading quickly (hooks/use-polling.ts). Published from an effect on the value rather
+  // than from each of the eight call sites that set it, so the store can never learn about a change
+  // that the mirror itself did not take.
+  useEffect(() => {
+    publishFollowing(following);
+  }, [following]);
+  // Leaving the pane hands the flag back to its "nothing is open" value. Without this, closing a
+  // pane you had scrolled up in would leave the poller believing nobody is following anything.
+  useEffect(() => () => publishFollowing(true), []);
   const [shown, setShown] = useState({ text, revision });
   useEffect(() => {
     if (!following) return;
@@ -352,6 +364,9 @@ export function AgentChat({
         setStatus("Read-only — device not authorised", "error");
         return false;
       }
+      // A prompt button is a send too — the same "watch this land" moment as the composer's Send,
+      // just with the keys chosen for you.
+      stampSend(paneId);
       const base = {
         paneId,
         session,

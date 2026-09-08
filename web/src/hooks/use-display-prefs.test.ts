@@ -9,7 +9,7 @@ describe("useDisplayPrefs", () => {
 
   it("returns defaults when localStorage is empty", () => {
     const { result } = renderHook(() => useDisplayPrefs());
-    expect(result.current.prefs).toEqual({ wrap: true, fontSize: 12, rawTerminal: false, tapToFocus: true });
+    expect(result.current.prefs).toEqual({ wrap: true, fontSize: 10, rawTerminal: false, tapToFocus: true });
   });
 
   it("persists wrap=true and reloads it on mount", () => {
@@ -73,31 +73,31 @@ describe("useDisplayPrefs", () => {
 
   it("stepFontSize increments within range", () => {
     const { result } = renderHook(() => useDisplayPrefs());
-    act(() => result.current.stepFontSize(2)); // 12 + 2 = 14
-    expect(result.current.prefs.fontSize).toBe(14);
+    act(() => result.current.stepFontSize(2)); // 10 + 2 = 12
+    expect(result.current.prefs.fontSize).toBe(12);
   });
 
   it("stepFontSize does not exceed max", () => {
     const { result } = renderHook(() => useDisplayPrefs());
-    act(() => result.current.stepFontSize(10)); // 12 + 10 = 22 → clamp to 16
+    act(() => result.current.stepFontSize(10)); // 10 + 10 = 20 → clamp to 16
     expect(result.current.prefs.fontSize).toBe(16);
   });
 
   it("stepFontSize does not go below min", () => {
     const { result } = renderHook(() => useDisplayPrefs());
-    act(() => result.current.stepFontSize(-10)); // 12 - 10 = 2 → clamp to 9
+    act(() => result.current.stepFontSize(-10)); // 10 - 10 = 0 → clamp to 9
     expect(result.current.prefs.fontSize).toBe(9);
   });
 
   it("falls back to defaults on malformed JSON", () => {
     localStorage.setItem(STORAGE_KEY, "not-json{{{");
     const { result } = renderHook(() => useDisplayPrefs());
-    expect(result.current.prefs).toEqual({ wrap: true, fontSize: 12, rawTerminal: false, tapToFocus: true });
+    expect(result.current.prefs).toEqual({ wrap: true, fontSize: 10, rawTerminal: false, tapToFocus: true });
   });
 
   it("falls back to defaults when stored value is not an object", () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(42));
     const { result } = renderHook(() => useDisplayPrefs());
-    expect(result.current.prefs).toEqual({ wrap: true, fontSize: 12, rawTerminal: false, tapToFocus: true });
+    expect(result.current.prefs).toEqual({ wrap: true, fontSize: 10, rawTerminal: false, tapToFocus: true });
   });
 });
