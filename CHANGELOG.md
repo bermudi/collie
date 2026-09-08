@@ -6,6 +6,37 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.40.0] - 2026-09-07
+
+The upstream 1.5.5–1.6.0 round, ported fix-first (no pack, no packaging, no new surfaces of
+theirs). Declined with reasons: the exe-replacement check (this fork runs Bun from source, so
+the source-stamp staleness witness already answers it), the multi-instance plugin-id fix (no
+instances here), the dismissed-version memory, and the zen / latest-reply / AnchoredMenu /
+Collapse / update-card subsystems the fork never had.
+
+### Added
+
+- The attach button asks Photos or Files behind a two-row sheet: one `accept` cannot carry
+  `image/*` and the text extensions at once, or both Android and iOS drop the camera roll. A
+  photos-only host opens the roll directly, and every tap gets a buzz plus a pressed tone
+  (9fa55a7; the AnchoredMenu refinement has nothing to anchor to here)
+
+### Fixed
+
+- Codex's inline queue/context footer reads as a live composer again, so the guarded reply stops
+  stalling there (0ad4f2f)
+- OMP 18.1.6's borderless rule composer is recognized by its own tail-choreography scanner, so
+  replies, drafts and the statusline survive the new shape (72fbfec + 67b72e3)
+- The guarded submit carries the verified prompt region, so a dialog that takes focus between
+  typing and Enter is refused instead of answered (e7c1c78; the bridge binding already existed)
+- A failed notification setup refreshes and releases the switch instead of wedging it busy, with
+  the error beside the switch and a retry; plus a 30s cap on stalled phone operations,
+  registration through the API client, and an unreachable config reading as retryable (6fa2694)
+- The https door refuses before teardown on a tailnet with no HTTPS, naming the admin console or
+  plain-HTTP mode, instead of hanging on a hidden prompt (da8afeb)
+- The session-name scrape skips panes whose content revision hasn't moved: O(claude_panes) pane
+  reads per poll becomes O(changed) (198fe20)
+
 ## [0.39.0] - 2026-09-07
 
 The two operator features from the upstream 1.4.0–1.5.4 round, fork-shaped (single host, no
