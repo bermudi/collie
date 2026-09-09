@@ -23,6 +23,7 @@ import { IMAGE_EXTS, TEXT_EXTS, TEXT_SNIFF_BYTES, uploadExt, uploadTooLarge } fr
 import type { UpdateMonitor } from "./update.ts";
 import type { StateEngine } from "./state-engine.ts";
 import { adapterFor, buildJournalRegistry } from "./journal/registry.ts";
+import { isBlobHash, resolveBlobPath } from "./journal/pi.ts";
 import { TranscriptStore } from "./journal/store.ts";
 import type { JournalAdapter } from "./journal/types.ts";
 import { toPaneWire } from "./types.ts";
@@ -125,6 +126,17 @@ const MAX_HISTORY_LIMIT = 5000;
 const TAB_ACTION_ROUTE = /^\/api\/tab\/([^/]+)\/(rename|close)$/;
 
 /**
+ * `GET /api/blobs/<hash>` — one content-addressed image out of a pi/omp journal's blob store.
+ *
+ * The hash is matched as an opaque segment here and validated by {@link isBlobHash} in the handler,
+ * exactly as `PANE_ROUTE` matches a pane id and `decodeURIComponent` interprets it: a route grammar
+ * says where a request goes, never whether its argument is well formed. The bytes live in the
+ * `blobs/` directory sibling to each configured pi/omp `sessions/` root, so the file an agent's own
+ * log named is served back to the phone that is reading that log.
+ */
+const BLOB_ROUTE = /^\/api\/blobs\/([^/]+)$/;
+
+/**
  * Header the web app sets on its own pane reads, and the ONLY thing that lets a read mark a pane
  * seen. See {@link marksPaneSeen} for why a header, of all things, is the check.
  */
@@ -207,6 +219,24 @@ export function startServer(opts: {
       const sessionName = url.searchParams.get("session") ?? undefined;
       const unknownSession = () =>
         jsonError(`unknown session: ${sessionName ?? ""}`, 404, req.headers.get("accept-encoding"));
+
+      // ── Journal image blobs: one content-addressed picture an agent put in its own log ──
+      // A READ, and gated as one: it hands back a picture an agent already put in its own log, so
+      // it is served under the same access gate as the pane text that mentions it. Carries no
+      // session — the blob store is global on this host — but the `?session=` param our own client
+      // appends is simply ignored, the same way every global route below ignores it.
+      const blobMatch = pathname.match(BLOB_ROUTE);
+      if (blobMatch && req.method === "GET") {
+        const denied = guard(req, cfg, "read");
+        if (denied) return denied;
+        let hash: string;
+        try {
+          hash = decodeURIComponent(blobMatch[1]!);
+        } catch {
+          return text("malformed URL", 400);
+        }
+        return blobRoute(hash, cfg.journalRoots.pi, req.headers.get("if-none-match"));
+      }
 
       // ── Live state (polled by the client) ────────────────────────────────
       if (pathname === "/api/snapshot") {
@@ -583,6 +613,93 @@ async function readPane(
  */
 export function paneReadResponse(paneId: string, read: PaneRead): PaneReadResponse {
   return { paneId, text: read.text, truncated: read.truncated, revision: read.revision };
+}
+
+/**
+ * The ceiling on one blob the bridge will serve: 16 MiB.
+ *
+ * A blob is a screenshot an agent took, and a phone on a cellular link is the reader — so the number
+ * is the point at which sending it costs more than it is worth, not a disk limit. It is also a bound
+ * on what a single request can pull off this machine: the store is content-addressed, so a caller
+ * who has a hash can ask for those bytes, and nothing else caps the size of a file an agent wrote
+ * there. Above it the answer is a 413, which says "too big" rather than timing out mid-stream.
+ */
+export const BLOB_MAX_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Magic bytes → content type, as a table.
+ *
+ * **`Bun.file(path).type` is useless here and that is not a Bun fault:** a blob's name IS its
+ * sha-256 digest, so the file has no extension, and every extension-driven guess lands on
+ * `application/octet-stream`. The bytes are the only evidence there is, so they are what is read.
+ *
+ * `offset` exists for the one format whose marker is not at the start: WebP writes `RIFF` at 0 and
+ * `WEBP` at 8. An unmatched header stays `application/octet-stream` — the browser then declines to
+ * render it, which is the right answer for a file that is not a picture.
+ */
+const BLOB_MAGIC: readonly { readonly type: string; readonly offset: number; readonly bytes: readonly number[] }[] = [
+  { type: "image/png", offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47] },
+  { type: "image/jpeg", offset: 0, bytes: [0xff, 0xd8, 0xff] },
+  { type: "image/gif", offset: 0, bytes: [0x47, 0x49, 0x46] },
+  { type: "image/webp", offset: 0, bytes: [0x52, 0x49, 0x46, 0x46] },
+  { type: "image/webp", offset: 8, bytes: [0x57, 0x45, 0x42, 0x50] },
+];
+
+/** How many leading bytes {@link sniffBlobType} needs — the longest marker's end. */
+const BLOB_SNIFF_BYTES = 12;
+
+/** The content type of a blob, read off its leading bytes. Pure + exported so the table is tested. */
+export function sniffBlobType(head: Uint8Array): string {
+  const matches = (m: { offset: number; bytes: readonly number[] }): boolean =>
+    m.bytes.every((b, i) => head[m.offset + i] === b);
+  // WebP needs BOTH of its rows, so it is asked for as a pair rather than by the first row alone.
+  if (BLOB_MAGIC.filter((m) => m.type === "image/webp").every(matches)) return "image/webp";
+  const hit = BLOB_MAGIC.find((m) => m.type !== "image/webp" && matches(m));
+  return hit?.type ?? "application/octet-stream";
+}
+
+/**
+ * `GET /api/blobs/<hash>` — the bytes a pi/omp journal named, served back to the phone.
+ *
+ * Exported and taking its roots as an argument so every branch below is exercised under `bun test`
+ * without standing up Bun.serve (CLAUDE.md): a refused hash, a hash nothing holds, a file over the
+ * cap, and the content type of a png and a jpeg.
+ *
+ * **The ETag IS the hash.** The store is content-addressed, so the name of the file already is a
+ * strong validator of its bytes; re-hashing them with `computeEtag` would read the whole file to
+ * learn something the URL said. That is also why the body is `Bun.file(real)` rather than
+ * `await file.bytes()` — the runtime streams it, and a 16 MiB screenshot is never held whole in this
+ * process.
+ */
+export async function blobRoute(
+  hash: string,
+  sessionRoots: readonly string[],
+  ifNoneMatch: string | null,
+): Promise<Response> {
+  if (!isBlobHash(hash)) return text("invalid blob hash", 400);
+  const real = await resolveBlobPath(hash, sessionRoots);
+  if (real === null) return text("blob not found", 404);
+  let meta: Awaited<ReturnType<typeof stat>>;
+  try {
+    meta = await stat(real);
+  } catch {
+    return text("blob not found", 404); // vanished between resolve and stat
+  }
+  if (meta.size > BLOB_MAX_BYTES) {
+    return text(`blob too large (max ${String(Math.round(BLOB_MAX_BYTES / (1024 * 1024)))} MB)`, 413);
+  }
+  const etag = `"${hash}"`;
+  const headers: Record<string, string> = {
+    "content-type": "application/octet-stream",
+    "cache-control": "public, max-age=31536000, immutable",
+    etag,
+  };
+  if (notModified(ifNoneMatch, etag)) return secure(new Response(null, { status: 304, headers }));
+  const file = Bun.file(real);
+  headers["content-type"] = sniffBlobType(
+    new Uint8Array(await file.slice(0, BLOB_SNIFF_BYTES).arrayBuffer()),
+  );
+  return secure(new Response(file, { headers }));
 }
 
 /**

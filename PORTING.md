@@ -16,6 +16,45 @@ ASR, or other large subsystems. The categories below distinguish:
 
 ## Ported in this round
 
+### Images in the mirror — upstream `fd28d018`, `fbae4cf6`, `8e8cf78a`, `ba8e19a0`, `797318d6` (v1.8.0)
+
+**Status:** Ported (final design, not the interim commits).
+
+**What it does.** A Kitty-protocol image is not in the rendered grid — the terminal painted the
+pixels and left a rectangle of U+10EEEE placeholder cells, which is why the mirror used to show a
+black box. The final upstream design keeps the poll path clean: `AnsiOutput` parses placeholder
+clusters out of the mirror text and reports their count; the pane view (`useMirrorImages`) reads
+ONE page of the existing history route when the count grows; images are matched to clusters BY
+ORDER from the end (the Kitty diacritics encode an image id no journal maps to a blob — an
+approximation the card admits in its caption); and a new `GET /api/blobs/<hash>` route serves the
+content-addressed bytes (16 MiB cap, magic-byte sniffing, hash-as-ETag, immutable cache,
+containment-checked). Journal image refs are only ever this bridge's blob path or inline
+`data:image/` — http(s) is refused bridge-side (`resolveImageUrl`) AND web-side (`imageSrc`).
+
+**Why it fits Pup.** The phone is exactly where a screenshot matters — the desktop terminal shows
+it, the phone showed a black box.
+
+**Pup differences from upstream.**
+- No pack forwarding (`bridge/pack/forward.ts`, `?host=`): Pup's blob route serves its own disk
+  directly, gated as a read like `history`.
+- `session` instead of pack `Scope`; the session rides blob URLs as a query param (an `<img>` can
+  carry a query, not a header).
+- No i18n — the four new strings are inline English, same wording as upstream's `en` dictionary.
+- No `cli/` and no `web/src/lib/journal-agents.ts`: Pup's bridge is the single decision site
+  (`toPaneWire` consults the registry and strips the answer to `hasSession`), so the frontend
+  mirror test was replaced by a note — there is no browser-side list to drift.
+- `AGENT_ALIASES = { omp: "pi" }` in the registry (an alias, not a sixth adapter); pi's default
+  journal roots cover both `~/.omp/agent/sessions` and `~/.pi/agent/sessions`.
+- CSP needed no change — `img-src 'self' data:` already admits both shapes.
+
+**Files.** `web/src/lib/mirror-images.ts` (+test), `web/src/hooks/use-mirror-images.ts` (+test),
+`web/src/components/ansi-output.tsx` (clusters, cards, badges, offset fixes),
+`web/src/components/agent-chat.tsx` (wiring + tests), `web/src/components/transcript-view.tsx`
+(JournalImage), `web/src/lib/api.ts` (`imageSrc`), `web/src/lib/types.ts`,
+`web/src/lib/transcript-search.ts`, `bridge/journal/pi.ts` (blob resolve/refuse, image parts),
+`bridge/journal/types.ts`, `bridge/journal/registry.ts` (alias), `bridge/config.ts` (two pi roots),
+`bridge/server.ts` (`BLOB_ROUTE`, `blobRoute`, sniffing) + tests, `.env.example`.
+
 ### omp pi-shaped composer + verified paste transport — upstream `47369fb4` (v1.8.0)
 
 **Status:** Ported.

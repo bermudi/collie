@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { adapterFor, buildJournalRegistry, journalAgents } from "./registry.ts";
+import { adapterFor, AGENT_ALIASES, buildJournalRegistry, journalAgents } from "./registry.ts";
 
 // The registry is the SINGLE decision site for "which agents have a journal". These tests pin the
 // two properties that keep it from rotting: keys come from the adapters themselves, and a hostile
@@ -46,3 +46,27 @@ describe("adapterFor", () => {
     },
   );
 });
+
+// ── Aliases: a second NAME for one adapter, never a sixth adapter ────────────────────────────
+
+describe("adapterFor — aliases", () => {
+  const registry = buildJournalRegistry(roots);
+
+  // An alias is a second NAME for one adapter, never a sixth adapter — derived from the map so a
+  // new pair is covered the day it is added.
+  test.each(Object.entries(AGENT_ALIASES))("resolves the %s alias to %s", (alias, canonical) => {
+    expect(adapterFor(registry, alias)?.agent).toBe(canonical);
+  });
+
+  test("an alias is not itself an adapter key", () => {
+    expect(journalAgents(buildJournalRegistry(roots))).not.toContain("omp");
+  });
+});
+
+// ── The frontend's mirror of this list ───────────────────────────────────────────────────────
+//
+// Upstream also keeps a hand-mirrored agent list in `web/src/lib/journal-agents.ts` (its doctor
+// hints need it); Pup never ported that list, and doesn't need to — Pup's bridge is the single
+// decision site: `toPaneWire` consults this registry and strips the answer to a `hasSession`
+// presence flag on the wire, so the browser cannot drift from the adapters because it never
+// names them. An alias added here reaches the phone with the next snapshot, nothing to mirror.

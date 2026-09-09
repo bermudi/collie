@@ -107,6 +107,23 @@ function withSession(path: string, session?: string): string {
   return `${path}${sep}session=${encodeURIComponent(s)}`;
 }
 
+/**
+ * A journal image reference as a URL this phone may load, or `null` when it is not one.
+ *
+ * A blob path served by this bridge (`/api/blobs/<64 hex>`) and an inline `data:image/*` payload.
+ * The bridge already refuses everything else (`bridge/journal/pi.ts` § resolveImageUrl), and this is
+ * the second check on the side that would do the fetching — a <img src> set from a string is a load
+ * the operator never explicitly chose, so the spelling is checked twice. Anything unrecognised
+ * answers null and renders as no image. The session rides as a query param, which an <img> can
+ * carry — a header could not.
+ */
+const BLOB_REF = /^\/api\/blobs\/[0-9a-f]{64}$/i;
+
+export function imageSrc(ref: string, session?: string): string | null {
+  if (BLOB_REF.test(ref)) return withSession(ref, session);
+  return ref.startsWith("data:image/") ? ref : null;
+}
+
 // Best-effort human-readable failure detail: the response body if present, else the status text.
 async function errorDetail(res: Response): Promise<string> {
   try {

@@ -285,6 +285,7 @@ export function HistoryRoute() {
                 agent={agent?.agent}
                 query={query}
                 focusedUuid={focusedUuid}
+                session={session}
               />
             </>
           )}

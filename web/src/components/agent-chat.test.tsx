@@ -677,3 +677,51 @@ describe("AgentChat — full latest reply", () => {
     expect(card()).toBeNull();
   });
 });
+
+// The pane view's half of the images story: the mirror reports its placeholder clusters, the pane
+// view reads the journal once for them, and the picture lands IN the mirror. The hook's own cadence
+// (one fetch per new image, no fetch on the poll) is pinned in use-mirror-images.test.ts; this pins
+// the wiring between AgentChat, AnsiOutput and the hook.
+describe("AgentChat — terminal graphics placeholders", () => {
+  const BLOB = "/api/blobs/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+  const PLACEHOLDER = "\u{10EEEE}\u{10EEEE}\u{10EEEE}";
+  const agent = () => ({ ...fixtureAgents[0]!, hasSession: true });
+
+  it("renders the journal's image inside the mirror when a placeholder is on screen", async () => {
+    server.use(
+      http.get(/\/api\/pane\/[^/]+\/history/, () =>
+        HttpResponse.json({
+          paneId: "w1:p1",
+          available: true,
+          entries: [
+            {
+              uuid: "img-1",
+              ts: "2026-09-09T06:00:00.000Z",
+              role: "assistant",
+              parts: [{ kind: "image", url: BLOB }],
+            },
+          ],
+          hasMore: false,
+          total: 1,
+          fileTruncated: false,
+        }),
+      ),
+    );
+    renderChat({ agent: agent(), agents: [agent()], text: `before\n${PLACEHOLDER}\nafter` });
+    const img = await waitFor(() => {
+      const el = screen.getByRole("img", { name: "Terminal graphics" });
+      expect(el.getAttribute("src")).toContain(BLOB);
+      return el;
+    });
+    expect(img).toBeInTheDocument();
+    // …and the placeholder glyphs themselves are gone from the mirror.
+    expect(document.querySelector("pre")?.textContent).not.toContain("\u{10EEEE}");
+  });
+
+  it("renders the badge when the pane has no journal behind it", async () => {
+    renderChat({ text: `before\n${PLACEHOLDER}\nafter` }); // default fixture has no hasSession
+    await waitFor(() => expect(screen.getByText("[Image]")).toBeInTheDocument());
+    // No journal image INSIDE the mirror (the app's own logo is an <img> elsewhere on the page).
+    expect(document.querySelector("pre")?.querySelector("img")).toBeNull();
+  });
+});

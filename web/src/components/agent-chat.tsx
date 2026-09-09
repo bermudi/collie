@@ -25,6 +25,7 @@ import { FindBar } from "@/components/find-bar";
 import { LatestReply } from "@/components/latest-reply";
 import { locateReply } from "@/lib/latest-reply";
 import { useLatestReply } from "@/hooks/use-latest-reply";
+import { useMirrorImages } from "@/hooks/use-mirror-images";
 import { LaunchTrigger } from "@/components/launch-trigger";
 import { Composer, type ComposerHandle } from "@/components/composer";
 import { ThreadSidebar } from "@/components/agent-sidebar";
@@ -327,6 +328,18 @@ export function AgentChat({
   const [collapsedReply, setCollapsedReply] = useState<string | null>(null);
   const replyOpen = clippedReply !== null && collapsedReply !== clippedReply.uuid;
   const hiddenMirrorLines = replyOpen && placement ? placement.endLine + 1 : 0;
+
+  // The pictures behind the terminal-graphics placeholders, read from the pane's own journal when
+  // the mirror shows a placeholder cluster it cannot account for. The pane read carries no image
+  // field and the bridge does no journal work on the poll path — only a cluster count that GREW
+  // costs a journal read. See hooks/use-mirror-images.ts for the whole cadence.
+  const [imageClusterCount, setImageClusterCount] = useState(0);
+  const mirrorImages = useMirrorImages({
+    paneId,
+    session,
+    enabled: historyAvailable && imageClusterCount > 0,
+    clusterCount: imageClusterCount,
+  });
   const moreScrollback =
     agent?.readableLines !== undefined &&
     requestedLines < agent.readableLines &&
@@ -883,6 +896,7 @@ export function AgentChat({
                   <LatestReply
                     entry={clippedReply}
                     agent={agent?.agent}
+                    session={session}
                     open={replyOpen}
                     onToggle={() => setCollapsedReply(replyOpen ? clippedReply.uuid : null)}
                   />
@@ -902,6 +916,8 @@ export function AgentChat({
                   onMenuAction={handleMenuAction}
                   promptDisabled={readOnly || gone}
                   hideLeadingLines={hiddenMirrorLines}
+                  images={mirrorImages}
+                  onImageClusterCount={setImageClusterCount}
                 />
               </>
             ) : (

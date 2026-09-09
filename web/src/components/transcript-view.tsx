@@ -3,6 +3,7 @@ import { ChevronRight, Info, TriangleAlert, User, Wrench } from "lucide-react";
 
 import { AgentIcon } from "@/components/agent-icon";
 import { MarkdownText } from "@/components/markdown-text";
+import { imageSrc } from "@/lib/api";
 import { splitHighlight } from "@/lib/transcript-search";
 import type { TranscriptEntry, TranscriptPart } from "@/lib/types";
 
@@ -57,7 +58,41 @@ function Highlight({ text, query }: { text: string; query: string }) {
  * thread is mostly tool traffic (705 of 914 turns in a real session) and expanding it all would bury
  * the prose you opened the history to read.
  */
-function ToolPart({ part, query }: { part: Extract<TranscriptPart, { kind: "tool" }>; query: string }) {
+/**
+ * One image out of the journal: a picture an agent attached, spoke, or a tool returned.
+ *
+ * It is an ANCHOR to the bytes, not a bare `<img>`. That is what makes it keyboard reachable and
+ * long-pressable — the same affordance the mirror's image card has — and it is the only way to see
+ * a screenshot at full size on a phone.
+ *
+ * `imageSrc` decides whether the reference is loadable AT ALL (`lib/api.ts`): a blob path this
+ * bridge serves, or inline bytes, and nothing else. A journal is an agent's own output, so a
+ * reference it refuses renders nothing rather than a broken image.
+ */
+function JournalImage({ ref_, alt, session }: { ref_: string; alt: string; session?: string }) {
+  const src = imageSrc(ref_, session);
+  if (src === null) return null;
+  return (
+    <a href={src} target="_blank" rel="noopener noreferrer" className="inline-block cursor-zoom-in">
+      <img
+        src={src}
+        alt={alt}
+        className="max-h-96 w-auto max-w-full rounded border object-contain shadow-xs"
+        loading="lazy"
+      />
+    </a>
+  );
+}
+
+function ToolPart({
+  part,
+  query,
+  session,
+}: {
+  part: Extract<TranscriptPart, { kind: "tool" }>;
+  query: string;
+  session?: string;
+}) {
   const [open, setOpen] = useState(false);
   const result = part.result;
   const isError = result?.isError === true;
@@ -90,18 +125,34 @@ function ToolPart({ part, query }: { part: Extract<TranscriptPart, { kind: "tool
         )}
       </button>
       {open && result && (
-        <pre className="overflow-x-auto border-t px-2 py-1.5 font-mono text-[11px] leading-snug whitespace-pre-wrap">
-          {result.text}
-          {result.truncated && <span className="text-muted-foreground">{"\n… output truncated"}</span>}
-        </pre>
+        <div className="border-t">
+          {result.imageUrl && (
+            <div className="border-b bg-background/50 p-2">
+              <JournalImage ref_={result.imageUrl} alt="Tool output" session={session} />
+            </div>
+          )}
+          {result.text && (
+            <pre className="overflow-x-auto px-2 py-1.5 font-mono text-[11px] leading-snug whitespace-pre-wrap">
+              {result.text}
+              {result.truncated && <span className="text-muted-foreground">{"\n… output truncated"}</span>}
+            </pre>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-function Part({ part, query }: { part: TranscriptPart; query: string }) {
+function Part({ part, query, session }: { part: TranscriptPart; query: string; session?: string }) {
   // Tool output is COMMAND output, not prose — it stays verbatim in a monospace block (see ToolPart).
-  if (part.kind === "tool") return <ToolPart part={part} query={query} />;
+  if (part.kind === "tool") return <ToolPart part={part} query={query} session={session} />;
+  if (part.kind === "image") {
+    return (
+      <div className="my-1.5">
+        <JournalImage ref_={part.url} alt="Attachment" session={session} />
+      </div>
+    );
+  }
   // Prose is Markdown, so it renders formatted. MarkdownText emits React elements only — never
   // markup — so this keeps the same XSS boundary the raw text node had.
   return (
@@ -121,12 +172,14 @@ function Turn({
   agent,
   showHeader,
   query,
+  session,
 }: {
   entry: TranscriptEntry;
   agent?: string;
   /** False for a turn continuing the same speaker's run — see the grouping note in TranscriptView. */
   showHeader: boolean;
   query: string;
+  session?: string;
 }) {
   const time = clockTime(entry.ts);
 
@@ -141,7 +194,7 @@ function Turn({
           {time && ` · ${time}`}
         </div>
         {entry.parts.map((part, i) => (
-          <Part key={i} part={part} query={query} />
+          <Part key={i} part={part} query={query} session={session} />
         ))}
       </div>
     );
@@ -165,7 +218,7 @@ function Turn({
       )}
       <div className="space-y-1.5">
         {entry.parts.map((part, i) => (
-          <Part key={i} part={part} query={query} />
+          <Part key={i} part={part} query={query} session={session} />
         ))}
       </div>
     </div>
@@ -177,6 +230,7 @@ export function TranscriptView({
   agent,
   query = "",
   focusedUuid,
+  session,
 }: {
   entries: TranscriptEntry[];
   /** The pane's agent name, for the per-turn brand icon. */
@@ -185,6 +239,8 @@ export function TranscriptView({
   query?: string;
   /** The turn a find/jump landed on; ringed so you can see where you were sent. */
   focusedUuid?: string;
+  /** The session the pane lives in — scopes the blob URLs journal images load. */
+  session?: string;
 }) {
   // Consecutive turns from the same speaker are GROUPED — only the first of a run carries the
   // role/time header. A real thread is overwhelmingly long runs of assistant turns (892 of 914 in a
@@ -217,7 +273,7 @@ export function TranscriptView({
                 <div className="h-px flex-1 bg-border" />
               </div>
             )}
-            <Turn entry={entry} agent={agent} showHeader={showHeader} query={query} />
+            <Turn entry={entry} agent={agent} showHeader={showHeader} query={query} session={session} />
           </div>
         );
       })}

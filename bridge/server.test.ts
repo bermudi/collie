@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+import { mkdir, mkdtemp, rm, truncate, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 
 import {
+  BLOB_MAX_BYTES,
+  blobRoute,
   BUILD_HEADER,
   cacheControlFor,
   checkAccess,
@@ -18,6 +22,7 @@ import {
   normalizeTabLabel,
   paneReadResponse,
   replyPane,
+  sniffBlobType,
   requestBodyCap,
   resolvePaneCwd,
   resolveStaticPath,
@@ -1107,5 +1112,111 @@ describe("resolvePaneCwd — tilde expansion + loud failures for new-pane direct
   test("relative paths are rejected — the bridge won't guess a base", async () => {
     await expect(resolvePaneCwd("build")).rejects.toThrow(/absolute/);
     await expect(resolvePaneCwd("./build")).rejects.toThrow(/absolute/);
+  });
+});
+
+// ── GET /api/blobs/<hash> ────────────────────────────────────────────────────────────────────
+// The route in full, against a real blob store on disk: every branch a phone can reach. It takes
+// its roots as an argument for exactly this reason — `Bun.serve` cannot be stood up under
+// `bun test` (CLAUDE.md), so the handler is what is exercised rather than a re-implementation.
+
+const PNG_HEAD = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const JPEG_HEAD = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+
+/** A pi-shaped `sessions/` root with a sibling `blobs/`, which is where a blob is looked for. */
+async function blobStore(): Promise<{ sessions: string; blobs: string; base: string }> {
+  const base = await mkdtemp(join(tmpdir(), "collie-blob-route-"));
+  const sessions = join(base, "sessions");
+  const blobs = join(base, "blobs");
+  await mkdir(sessions, { recursive: true });
+  await mkdir(blobs, { recursive: true });
+  return { sessions, blobs, base };
+}
+
+describe("GET /api/blobs/<hash> — one content-addressed image, off the disk that holds it", () => {
+  const hash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+  test("a name that is not a 64-hex digest is refused before any path exists", async () => {
+    const { sessions, base } = await blobStore();
+    for (const bad of ["not-a-hash", "1234", "../../etc/passwd", `${hash}x`]) {
+      const res = await blobRoute(bad, [sessions], null);
+      expect(res.status).toBe(400);
+    }
+    await rm(base, { recursive: true, force: true });
+  });
+
+  test("a well-formed hash nothing holds is a 404 — the same answer containment failure gives", async () => {
+    const { sessions, base } = await blobStore();
+    const res = await blobRoute(hash, [sessions], null);
+    expect(res.status).toBe(404);
+    await rm(base, { recursive: true, force: true });
+  });
+
+  test("a blob over BLOB_MAX_BYTES is a 413, not a stalled download", async () => {
+    const { sessions, blobs, base } = await blobStore();
+    const path = join(blobs, hash);
+    await writeFile(path, "");
+    // Sparse, so the test costs no 16 MiB of bytes to prove the cap is on the SIZE.
+    await truncate(path, BLOB_MAX_BYTES + 1);
+    const res = await blobRoute(hash, [sessions], null);
+    expect(res.status).toBe(413);
+    expect(await res.text()).toContain("too large");
+    await rm(base, { recursive: true, force: true });
+  });
+
+  test("a png answers 200 with its sniffed type, an immutable cache header, and the hash as ETag", async () => {
+    const { sessions, blobs, base } = await blobStore();
+    await Bun.write(join(blobs, hash), PNG_HEAD);
+    const res = await blobRoute(hash, [sessions], null);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    // The ETag IS the hash: the store is content-addressed, so nothing is re-hashed to learn it.
+    expect(res.headers.get("etag")).toBe(`"${hash}"`);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(PNG_HEAD);
+    await rm(base, { recursive: true, force: true });
+  });
+
+  test("a jpeg is sniffed from its own bytes — the file has no extension to guess from", async () => {
+    const { sessions, blobs, base } = await blobStore();
+    await Bun.write(join(blobs, hash), JPEG_HEAD);
+    const res = await blobRoute(hash, [sessions], null);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    await rm(base, { recursive: true, force: true });
+  });
+
+  test("if-none-match on the hash is a 304 with no body", async () => {
+    const { sessions, blobs, base } = await blobStore();
+    await Bun.write(join(blobs, hash), PNG_HEAD);
+    const res = await blobRoute(hash, [sessions], `"${hash}"`);
+    expect(res.status).toBe(304);
+    expect(res.headers.get("etag")).toBe(`"${hash}"`);
+    expect(await res.text()).toBe("");
+    await rm(base, { recursive: true, force: true });
+  });
+
+  test("the magic table names what it knows and guesses at nothing else", () => {
+    expect(sniffBlobType(PNG_HEAD)).toBe("image/png");
+    expect(sniffBlobType(JPEG_HEAD)).toBe("image/jpeg");
+    expect(sniffBlobType(new Uint8Array([0x47, 0x49, 0x46, 0x38]))).toBe("image/gif");
+    const webp = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]);
+    expect(sniffBlobType(webp)).toBe("image/webp");
+    // RIFF without WEBP at offset 8 is some other RIFF container, not a picture.
+    const riff = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x41, 0x56, 0x49, 0x20]);
+    expect(sniffBlobType(riff)).toBe("application/octet-stream");
+    expect(sniffBlobType(new Uint8Array([1, 2, 3, 4]))).toBe("application/octet-stream");
+  });
+
+  // THE GATE, pinned at the registration site. A blob is a picture the pane text already refers to,
+  // so it is a READ: it is served under the same access gate as the pane text and `history`.
+  // `guard`'s own read/write behaviour is asserted elsewhere; what this pins is that the route asks
+  // for the read tier.
+  test("the route is gated as a READ", () => {
+    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
+    const start = src.indexOf("const blobMatch = pathname.match(BLOB_ROUTE);");
+    expect(start).toBeGreaterThan(0);
+    const block = src.slice(start, src.indexOf("\n      }", start));
+    expect(block).toContain('guard(req, cfg, "read")');
+    expect(block).not.toContain('guard(req, cfg, "write")');
   });
 });

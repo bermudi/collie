@@ -57,7 +57,28 @@ export function buildJournalRegistry(roots: JournalRoots): Record<string, Journa
 }
 
 /**
- * The adapter for `agent`, or undefined when the agent has no journal.
+ * Agent names that are a SECOND NAME for a registered adapter, not an adapter of their own.
+ *
+ * Oh My Pi ships as `omp` and reports itself that way, and its session log is pi's log in pi's
+ * format — one adapter, two names an agent may answer to. It is a map rather than a branch in
+ * {@link adapterFor} because both sides need to read it: the registry resolves a name through it,
+ * and `web/src/lib/journal-agents.ts` mirrors the same pairs so the browser knows an `omp` pane
+ * COULD have a transcript (registry.test.ts fails when the two drift).
+ */
+export const AGENT_ALIASES = { omp: "pi" } as const;
+
+/**
+ * The same pairs as a Map, which is how {@link adapterFor} asks.
+ *
+ * A Map rather than a property read because the key is an agent name that ORIGINATES in an agent's
+ * own report: `Map.get` cannot be answered by `Object.prototype`, so there is no inherited key to
+ * guard against and no assertion to write.
+ */
+const ALIAS_LOOKUP: ReadonlyMap<string, string> = new Map(Object.entries(AGENT_ALIASES));
+
+/**
+ * The adapter for `agent`, or undefined when the agent has no journal. An agent name that is an
+ * alias (`omp`) resolves to the adapter it names (`pi`) — one log format, two names on the wire.
  *
  * `Object.hasOwn` rather than a truthy lookup, so an inherited Object.prototype key ("toString",
  * "constructor", "__proto__", …) arriving as an agent name can't resolve to a non-adapter and crash
@@ -67,7 +88,9 @@ export function adapterFor(
   registry: Record<string, JournalAdapter>,
   agent: string | undefined,
 ): JournalAdapter | undefined {
-  return agent !== undefined && Object.hasOwn(registry, agent) ? registry[agent] : undefined;
+  if (agent === undefined) return undefined;
+  const name = ALIAS_LOOKUP.get(agent) ?? agent;
+  return Object.hasOwn(registry, name) ? registry[name] : undefined;
 }
 
 /** The agents this build can serve a journal for — used by the probe script and by tests. */

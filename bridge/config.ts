@@ -71,9 +71,10 @@ function normaliseUploadTypes(raw: string[]): string[] {
  * things on the two platforms this bridge supports. One path stays one path, so an existing value
  * parses to exactly what it always meant.
  */
-function envRoots(name: string, fallback: string): string[] {
+function envRoots(name: string, fallback: string | string[]): string[] {
   const list = envList(name);
-  return list.length > 0 ? list : [fallback];
+  const fallbacks = Array.isArray(fallback) ? fallback : [fallback];
+  return list.length > 0 ? list : fallbacks;
 }
 
 /**
@@ -369,7 +370,9 @@ export function loadConfig(): Config {
       ),
       pi: envRoots(
         "COLLIE_PI_ROOT",
-        join(process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"), "sessions"),
+        process.env.PI_CODING_AGENT_DIR
+          ? join(process.env.PI_CODING_AGENT_DIR, "sessions")
+          : [join(homedir(), ".omp", "agent", "sessions"), join(homedir(), ".pi", "agent", "sessions")],
       ),
       // OpenCode keeps one SQLite database at the top of its XDG data dir, not per-session files.
       opencode: envRoots(

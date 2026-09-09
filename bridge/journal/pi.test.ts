@@ -1,8 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, realpath, rm, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { isPiSessionId, parsePiTranscript, PiTranscriptSource } from "./pi.ts";
+import {
+  isBlobHash,
+  isPiSessionId,
+  parsePiTranscript,
+  PiTranscriptSource,
+  resolveBlobPath,
+  resolveImageUrl,
+} from "./pi.ts";
 
 // Row builders mirroring the verified on-disk shape (pi session logs, session format v3, 2026-07-29).
 // Every row carries its own `id`, so unlike Codex there is nothing to synthesise for paging.
@@ -266,6 +274,128 @@ describe("PiTranscriptSource — several sessions roots", () => {
   test("the id fallback scans every root", async () => {
     const { base, first, second, logB } = await fixture();
     expect(await new PiTranscriptSource([first, second]).resolve({ kind: "id", value: B })).toBe(logB);
+    await rm(base, { recursive: true, force: true });
+  });
+});
+
+// ── Image blocks: a picture in pi's log becomes a URL this collie will serve ──────────────────
+
+describe("parsePiTranscript — image blocks", () => {
+  test("an image block in turn content renders as an image part", () => {
+    const entries = parsePiTranscript(
+      row("a", {
+        role: "assistant",
+        content: [
+          { type: "image", data: "abcd1234", mimeType: "image/png" },
+        ],
+      }),
+    );
+    expect(entries[0]!.parts).toEqual([
+      { kind: "image", url: "data:image/png;base64,abcd1234", mimeType: "image/png" },
+    ]);
+  });
+
+  test("a toolResult with image content maps to imageUrl on the tool part", () => {
+    const entries = parsePiTranscript(
+      [
+        row("a", {
+          role: "assistant",
+          content: [{ type: "toolCall", id: "call_img", name: "screenshot", arguments: {} }],
+        }),
+        row("b", {
+          role: "toolResult",
+          toolCallId: "call_img",
+          toolName: "screenshot",
+          content: [{ type: "image", data: "base64data", mimeType: "image/webp" }],
+        }),
+      ].join("\n"),
+    );
+    expect(entries[0]!.parts[0]).toMatchObject({
+      kind: "tool",
+      result: { imageUrl: "data:image/webp;base64,base64data" },
+    });
+  });
+
+  test("a toolResult with blob:sha256: content maps to /api/blobs/<hash>", () => {
+    const hash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const entries = parsePiTranscript(
+      [
+        row("a", {
+          role: "assistant",
+          content: [{ type: "toolCall", id: "call_blob", name: "view", arguments: {} }],
+        }),
+        row("b", {
+          role: "toolResult",
+          toolCallId: "call_blob",
+          toolName: "view",
+          content: [{ type: "image", data: `blob:sha256:${hash}`, mimeType: "image/png" }],
+        }),
+      ].join("\n"),
+    );
+    expect(entries[0]!.parts[0]).toMatchObject({
+      kind: "tool",
+      result: { imageUrl: `/api/blobs/${hash}` },
+    });
+  });
+});
+
+describe("resolveImageUrl — only this collie's own blobs and inline images", () => {
+  const hash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+  test("a blob:sha256: reference maps onto this collie's own blob route", () => {
+    expect(resolveImageUrl(`blob:sha256:${hash}`)).toBe(`/api/blobs/${hash}`);
+    // Only a real digest maps — a malformed hash is dropped, not repaired.
+    expect(resolveImageUrl("blob:sha256:not-a-hash")).toBeNull();
+  });
+
+  test("inline base64 data is wrapped into a data: URL only when the mime type says image", () => {
+    expect(resolveImageUrl("abcd1234", "image/png")).toBe("data:image/png;base64,abcd1234");
+    expect(resolveImageUrl("abcd1234", "text/plain")).toBeNull();
+    expect(resolveImageUrl("abcd1234")).toBeNull();
+  });
+
+  test("a data: URL passes only when it is an image one", () => {
+    expect(resolveImageUrl("data:image/png;base64,abcd")).toBe("data:image/png;base64,abcd");
+    expect(resolveImageUrl("data:text/html;base64,PHNjcmlwdD4=")).toBeNull();
+  });
+
+  test("an http(s) URL is dropped — the agent's log never chooses what the phone fetches", () => {
+    expect(resolveImageUrl("http://evil.example/x.png", "image/png")).toBeNull();
+    expect(resolveImageUrl("https://evil.example/x.png", "image/png")).toBeNull();
+    // And the http case cannot sneak back in through the bare-base64 branch either.
+    expect(resolveImageUrl("http://evil.example/x.png?padding==", "image/png")).toBeNull();
+  });
+});
+
+describe("resolveBlobPath", () => {
+  const hash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+  test("refuses non-hex or wrong length hashes", async () => {
+    expect(isBlobHash("not-a-hash")).toBe(false);
+    expect(isBlobHash("1234")).toBe(false);
+    expect(isBlobHash(hash)).toBe(true);
+    expect(await resolveBlobPath("not-a-hash", ["/tmp"])).toBeNull();
+  });
+
+  test("resolves candidate contained in sibling blobs directory", async () => {
+    const base = await mkdtemp(join(tmpdir(), "collie-pi-blob-"));
+    const sessionsDir = join(base, "sessions");
+    const blobsDir = join(base, "blobs");
+    await mkdir(sessionsDir, { recursive: true });
+    await mkdir(blobsDir, { recursive: true });
+    const blobFile = join(blobsDir, hash);
+    await Bun.write(blobFile, "pretend image data");
+
+    const resolved = await resolveBlobPath(hash, [sessionsDir]);
+    expect(resolved).toBe(blobFile);
+    await rm(base, { recursive: true, force: true });
+  });
+
+  test("returns null when no blob is found in any root", async () => {
+    const base = await mkdtemp(join(tmpdir(), "collie-pi-blob-"));
+    const sessionsDir = join(base, "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    expect(await resolveBlobPath(hash, [sessionsDir])).toBeNull();
     await rm(base, { recursive: true, force: true });
   });
 });

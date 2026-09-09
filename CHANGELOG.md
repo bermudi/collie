@@ -6,6 +6,27 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.43.0] - 2026-09-09
+
+### Added
+
+- Images in the mirror: an agent's terminal graphics (screenshots it took or was shown, drawn with
+  the Kitty protocol on a capable terminal) now render in the pane in place of the placeholder
+  block. Read from the agent's own session log, on demand — never on the poll. Matched by order
+  from the end; a cluster with no match gets an "[Image]" badge, a failed load falls back to it,
+  and every card says the match is by order (upstream fd28d018, fbae4cf6, 8e8cf78a, ba8e19a0,
+  797318d6).
+- `GET /api/blobs/<hash>` serves the content-addressed image bytes out of pi/omp's blob store:
+  16 MiB cap, magic-byte content sniffing (the digest filename carries no extension), the hash as
+  ETag, immutable caching, and containment-checked paths. A journal image reference is only ever
+  this bridge's blob path or inline `data:image/` bytes — an `http(s)` URL in an agent's log is
+  refused on both the bridge and the web side.
+- omp panes have journal history: omp writes pi's own session format under
+  `~/.omp/agent/sessions`, so the pi adapter reads it (an alias, not a sixth adapter), and pi's
+  default roots now cover both homes.
+- History and the Full-reply card render journal images — attachments, spoken pictures, and
+  tool-output screenshots — as anchors with alt text.
+
 ## [0.42.0] - 2026-09-09
 
 ### Added

@@ -21,11 +21,14 @@ import type { TranscriptEntry } from "@/lib/types";
 export function LatestReply({
   entry,
   agent,
+  session,
   open,
   onToggle,
 }: {
   entry: TranscriptEntry;
   agent?: string;
+  /** The session the pane lives in — scopes the blob URLs journal images load. */
+  session?: string;
   /** Expanded shows the message and the mirror rows below it stay hidden; collapsed does the reverse. */
   open: boolean;
   onToggle: () => void;
@@ -55,7 +58,7 @@ export function LatestReply({
       </button>
       {open && (
         <div className="border-t px-2.5 py-2">
-          <TranscriptView entries={[entry]} agent={agent} />
+          <TranscriptView entries={[entry]} agent={agent} session={session} />
         </div>
       )}
     </div>
