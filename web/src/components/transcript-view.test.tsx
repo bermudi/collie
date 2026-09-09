@@ -293,3 +293,59 @@ describe("TranscriptView — system notes", () => {
     expect(screen.getByText(/System/)).toBeInTheDocument();
   });
 });
+
+// Journal images: a picture the agent attached, spoke, or a tool returned. Two pins — the anchor
+// affordance (full-size on tap), and the refusal: a reference imageSrc won't load renders nothing,
+// never a broken <img> or a fetch of an arbitrary host.
+describe("TranscriptView — journal images", () => {
+  const BLOB = "/api/blobs/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+  it("renders an image part as an anchor around the picture", () => {
+    const entries: TranscriptEntry[] = [
+      turn({
+        uuid: "t1",
+        role: "assistant",
+        parts: [{ kind: "image", url: BLOB }],
+      }),
+    ];
+    const { container } = render(<TranscriptView entries={entries} agent="pi" />);
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("src")).toBe(BLOB);
+    // The anchor is what makes it keyboard reachable and long-pressable.
+    expect(img?.closest("a")?.getAttribute("href")).toBe(BLOB);
+  });
+
+  it("renders a tool result's screenshot above its text output", async () => {
+    const entries: TranscriptEntry[] = [
+      turn({
+        uuid: "t2",
+        role: "assistant",
+        parts: [
+          {
+            kind: "tool",
+            name: "screenshot",
+            summary: "capture",
+            result: { text: "done", imageUrl: BLOB },
+          },
+        ],
+      }),
+    ];
+    const user = userEvent.setup();
+    const { container } = render(<TranscriptView entries={entries} agent="pi" />);
+    await user.click(screen.getByRole("button"));
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(BLOB);
+  });
+
+  it("renders nothing at all for a reference the phone must not load", () => {
+    const entries: TranscriptEntry[] = [
+      turn({
+        uuid: "t3",
+        role: "assistant",
+        parts: [{ kind: "image", url: "https://evil.example/x.png" }],
+      }),
+    ];
+    const { container } = render(<TranscriptView entries={entries} agent="pi" />);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("a[href]")).toBeNull();
+  });
+});

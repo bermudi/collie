@@ -8,6 +8,7 @@ import {
   createTab,
   fetchPane,
   fetchSnapshot,
+  imageSrc,
   sendKeys,
   sendReply,
   uploadFile,
@@ -319,5 +320,32 @@ describe("api client — identity proxy refusals", () => {
     Object.defineProperty(response, "type", { value: "opaqueredirect" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
     await expect(fetchSnapshot()).rejects.toThrow(/401.*requires sign-in/);
+  });
+});
+
+// imageSrc is the WEB-SIDE half of the image-refusal contract (the bridge's resolveImageUrl is the
+// other): a journal is an agent's output, and a reference it supplies may only ever become a load
+// of this bridge's own blob route or inline image bytes — never a fetch of an arbitrary host on the
+// agent's word. Both sides check independently, so both need their own pin.
+describe("imageSrc — what a journal image reference may load", () => {
+  const BLOB = "/api/blobs/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+  it("accepts this bridge's own blob path, with the session riding as a query param", () => {
+    expect(imageSrc(BLOB)).toBe(BLOB);
+    // A query param, not a header — an <img> can carry one and not the other.
+    expect(imageSrc(BLOB, "night")).toBe(`${BLOB}?session=night`);
+  });
+
+  it("accepts an inline image payload and nothing else that spells data:", () => {
+    expect(imageSrc("data:image/png;base64,abcd")).toBe("data:image/png;base64,abcd");
+    expect(imageSrc("data:text/html;base64,PHNjcmlwdD4=")).toBeNull();
+  });
+
+  it("refuses remote URLs, malformed blob refs, and anything else outright", () => {
+    expect(imageSrc("http://evil.example/x.png")).toBeNull();
+    expect(imageSrc("https://evil.example/x.png")).toBeNull();
+    expect(imageSrc("/api/blobs/not-a-hash")).toBeNull();
+    expect(imageSrc("/api/pane/w1:p1")).toBeNull();
+    expect(imageSrc("javascript:alert(1)")).toBeNull();
   });
 });

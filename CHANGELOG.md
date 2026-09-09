@@ -6,6 +6,18 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.43.1] - 2026-09-09
+
+### Fixed
+
+- Review hardening of the 0.42.0/0.43.0 port round: the pi-shaped omp editor's prompt region is
+  bounded to its trailing rows (an unbounded ~101-row region on a wide pane would exceed the
+  bridge's 8192-char `expected_prompt` cap and fail-closed the submit of a long reply — upstream
+  carries the same latent bug); `imageSrc`'s refusal of remote/malformed image references now has
+  its own test, as do transcript journal images (anchor affordance + refused-ref-renders-nothing);
+  `resolveBlobPath` uses the single-root containment spelling files.ts documents for paths built
+  from a root; and the registry's alias doc no longer claims a frontend mirror list Pup never had.
+
 ## [0.43.0] - 2026-09-09
 
 ### Added

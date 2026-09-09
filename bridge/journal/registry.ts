@@ -61,9 +61,11 @@ export function buildJournalRegistry(roots: JournalRoots): Record<string, Journa
  *
  * Oh My Pi ships as `omp` and reports itself that way, and its session log is pi's log in pi's
  * format — one adapter, two names an agent may answer to. It is a map rather than a branch in
- * {@link adapterFor} because both sides need to read it: the registry resolves a name through it,
- * and `web/src/lib/journal-agents.ts` mirrors the same pairs so the browser knows an `omp` pane
- * COULD have a transcript (registry.test.ts fails when the two drift).
+ * {@link adapterFor} so the pair is spelled once, read by the resolver, and trivially testable.
+ *
+ * Pup has no browser-side agent list to keep in sync — `toPaneWire` consults this registry and
+ * strips the answer to a `hasSession` presence flag on the wire, so the bridge is the single
+ * decision site and an alias added here reaches the phone with the next snapshot.
  */
 export const AGENT_ALIASES = { omp: "pi" } as const;
 

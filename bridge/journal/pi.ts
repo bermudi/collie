@@ -332,7 +332,9 @@ export async function resolveBlobPath(
   for (const blobDir of blobRoots) {
     const candidate = join(blobDir, hash);
     if (!(await exists(candidate))) continue;
-    const real = await containedRealpathIn(candidate, [blobDir]);
+    // `containedRealpath` (one root), not `containedRealpathIn` (a list): this path WAS built from
+    // the root, which is exactly the case files.ts reserves the single-root spelling for.
+    const real = await containedRealpath(candidate, blobDir);
     if (real !== null) return real;
   }
   return null;
