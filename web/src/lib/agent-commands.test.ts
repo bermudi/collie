@@ -37,6 +37,18 @@ describe("commandsFor", () => {
     expect(cmds.find((c) => c.command === "/smart")?.dangerous).toBe(true);
     expect(cmds.find((c) => c.command === "/bypass")?.dangerous).toBe(true);
     expect(cmds.find((c) => c.command === "/model")?.takesArg).toBe(true);
+    // /thinking is NOT a Devin command — Devin's docs have no such slash command (the thinking
+    // trace is Ctrl+O, a keybinding). The row exists in opencode's and (since 0.41.1) pi's
+    // catalogs; a future sync must not cargo-cult it into Devin's from theirs.
+    expect(cmds.some((c) => c.command === "/thinking")).toBe(false);
+    // /handoff fell off the current reference table (docs.devin.ai/cli/reference/commands) but the
+    // CLI changelog still ships changes to it — the changelog vouches, so the row stays.
+    expect(cmds.find((c) => c.command === "/handoff")?.common).toBe(true);
+    // The 2026-09 sync: /fork//steps//revert landed, and /revert rewrites files AND the
+    // conversation — it earns the same two-tap confirm as /bypass.
+    expect(cmds.some((c) => c.command === "/fork")).toBe(true);
+    expect(cmds.some((c) => c.command === "/revert")).toBe(true);
+    expect(cmds.find((c) => c.command === "/revert")?.dangerous).toBe(true);
   });
 
   it("returns the opencode catalog for 'opencode'", () => {

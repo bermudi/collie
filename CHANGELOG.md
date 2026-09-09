@@ -13,6 +13,15 @@ All notable changes to Collie are recorded here. The format follows
 - The pi command palette was missing `/thinking` — pi's built-in command list has 23 entries, the
   shipped catalog had 22, and the one gap was the thinking-level switch. Now surfaced as a common
   row (one tap opens pi's fuzzy picker), next to `/model`.
+- The Devin catalog drifted behind the current docs (docs.devin.ai/cli/reference/commands): 20
+  newer commands were absent (`/fast`, `/fork`, `/steps`, `/revert`, `/title`, `/btw`, `/mcp`,
+  `/context`, `/usage`, `/session-stats`, `/theme`, `/autonomous`, `/shortcuts`, `/config`,
+  `/org`, `/copy`, `/feedback`, `/mouse`, `/login-status`, `/cloud-sessions`). All added; `/fast`
+  joins the common set, `/revert` gets the two-tap confirm (it rewrites files and the
+  conversation). Deliberately still out: `/rm-session` (irreversible) and pure aliases
+  (`/rename-session`, `/remove-dir`, `/stats`, `/yolo`…). `/thinking` stays out too — Devin has
+  no such command (the thinking trace is Ctrl+O, a keybinding). `/handoff` stays in: it fell off
+  the docs' reference table, but the CLI changelog still ships changes to it.
 
 ## [0.41.0] - 2026-09-08
 
