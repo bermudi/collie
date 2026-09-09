@@ -125,6 +125,7 @@ const PI: readonly AgentCommand[] = [
   { command: "/compact", description: "Manually compact context, optionally with instructions", takesArg: true, argHint: "[instructions]", common: true, dangerous: false },
   { command: "/new", description: "Start a new session, clearing the current context", takesArg: false, argHint: "", common: true, dangerous: true },
   { command: "/model", description: "Switch the active model", takesArg: false, argHint: "", common: true, dangerous: false },
+  { command: "/thinking", description: "Set the session thinking level (picker; off…max)", takesArg: false, argHint: "", common: true, dangerous: false },
   { command: "/resume", description: "Pick a previous session to resume", takesArg: false, argHint: "", common: true, dangerous: false },
   { command: "/session", description: "Show session file, id, messages, tokens, and cost", takesArg: false, argHint: "", common: true, dangerous: false },
   { command: "/tree", description: "Jump to any earlier point in the session and continue", takesArg: false, argHint: "", common: true, dangerous: false },

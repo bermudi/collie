@@ -19,6 +19,12 @@ describe("commandsFor", () => {
     expect(cmds.length).toBeGreaterThan(0);
     expect(cmds.some((c) => c.command === "/tree")).toBe(true); // Pi-specific command
     expect(cmds.some((c) => c.command === "/branch")).toBe(false); // in Claude's and omp's, not here
+    // /thinking is a pi built-in (docs/quickstart.md; BUILTIN_SLASH_COMMANDS in pi 0.85.1) the
+    // catalog once missed — the phone palette had no row for it at all. Common, like /model: its
+    // no-arg form opens pi's fuzzy picker, so one tap is the whole interaction.
+    const thinking = cmds.find((c) => c.command === "/thinking");
+    expect(thinking?.common).toBe(true);
+    expect(thinking?.takesArg).toBe(false);
   });
 
   it("returns the Devin CLI catalog for 'devin'", () => {

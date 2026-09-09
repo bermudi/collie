@@ -6,6 +6,14 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.41.1] - 2026-09-09
+
+### Fixed
+
+- The pi command palette was missing `/thinking` — pi's built-in command list has 23 entries, the
+  shipped catalog had 22, and the one gap was the thinking-level switch. Now surfaced as a common
+  row (one tap opens pi's fuzzy picker), next to `/model`.
+
 ## [0.41.0] - 2026-09-08
 
 Three upstream viewer changes ported fix-first, plus a durable porting ledger. Declined with
