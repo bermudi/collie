@@ -168,9 +168,16 @@ const GRAPHEMES =
     ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
     : null;
 
-function clusters(text: string): string[] {
+/** Grapheme clusters of `text`, one per element — code points on engines without
+ *  `Intl.Segmenter`. Exported for callers that must walk characters a reader sees (paste
+ *  transport sizing), not just measure them. */
+export function graphemes(text: string): string[] {
   if (GRAPHEMES === null) return [...text];
   return [...GRAPHEMES.segment(text)].map((s) => s.segment);
+}
+
+function clusters(text: string): string[] {
+  return graphemes(text);
 }
 
 // A cluster's width is its BASE code point's width — a combining mark riding along in the same

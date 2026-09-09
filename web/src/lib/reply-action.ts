@@ -170,6 +170,13 @@ export function draftCarriesSend(sent: string, draft: string | null): boolean {
   return false;
 }
 
+// A cumulative prefix alone can match a stale screen after a later paste was
+// dropped. Multipart sends must also show the end that was just delivered.
+function carriesReplyTail(sent: string, draft: string | null): boolean {
+  const tail = Array.from(sent.replace(/\s/g, "")).slice(-32).join("");
+  return tail.length > 0 && draft !== null && draft.replace(/\s/g, "").endsWith(tail);
+}
+
 export interface GuardedReplyArgs {
   paneId: string;
   text: string;
@@ -275,9 +282,67 @@ export async function sendGuardedReply(args: GuardedReplyArgs): Promise<ReplyOut
   const aborted = await runPreType?.();
   if (aborted) return aborted;
 
+  // MULTIPART TRANSPORT. An adapter whose harness collapses large pastes into opaque chips
+  // (omp's `📄 #N` / `[Paste #N …]`) can plan a lossless route instead: several small pastes, each
+  // still literally echoed and each verified on screen before the next goes out. Only the complete
+  // reply — every chunk delivered, tail included — can authorise the submit key; a cumulative
+  // prefix alone would match a stale screen after a later paste was dropped, hence
+  // carriesReplyTail. Harnesses without the hook keep the single-paste path, byte-identical.
+  const chunks = adapter.replyChunks?.(args.text) ?? [args.text];
+  if (chunks.length === 0 || chunks.join("") !== args.text) {
+    return { status: "error", error: "Couldn't plan a verified send for this message — nothing was typed." };
+  }
+  let delivered = "";
+  let previousDraft: string | null = null;
+  if (chunks.length > 1) {
+    // Baseline the box BEFORE the first chunk so the per-chunk loop can demand a screen that
+    // CHANGED — the same anti-stale rule the tail check carries, for the whole draft.
+    try {
+      const fresh = await fetchPane(args.paneId, args.requestedLines, args.session);
+      const lines = splitLines(parseAnsi(fresh.text));
+      if (!adapter.composerReady?.(lines)) return { status: "blocked", error: NO_BOX };
+      previousDraft = adapter.extractInputDraft(lines);
+    } catch (e) {
+      return { status: "error", error: message(e) };
+    }
+  }
+  for (let i = 0; i < chunks.length - 1; i++) {
+    let part;
+    try {
+      part = await sendReply(args.paneId, chunks[i]!, false, args.session);
+    } catch (e) {
+      return { status: "error", error: message(e) };
+    }
+    if (!part.ok) return { status: "error", error: part.error };
+    delivered += chunks[i]!;
+    let verified = false;
+    for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
+      if (attempt > 0) await (args.sleep ?? defaultSleep)(POLL_DELAY_MS);
+      try {
+        const fresh = await fetchPane(args.paneId, args.requestedLines, args.session);
+        const lines = splitLines(parseAnsi(fresh.text));
+        const draft = adapter.extractInputDraft(lines);
+        if (draft !== previousDraft && adapter.composerReady?.(lines) && draftCarriesSend(delivered, draft) && carriesReplyTail(delivered, draft)) {
+          verified = true;
+          previousDraft = draft;
+          break;
+        }
+      } catch {
+        // Retry the read only. Never repeat an acknowledged paste.
+      }
+    }
+    if (!verified) {
+      return {
+        status: "stalled",
+        error:
+          "Message didn't reach the input box whole — a paste segment wasn't echoed back, so nothing was submitted. What arrived is in the pane; check it before resending.",
+      };
+    }
+  }
+
   let typed;
   try {
-    typed = await sendReply(args.paneId, args.text, false, args.session);
+    typed = await sendReply(args.paneId, chunks[chunks.length - 1]!, false, args.session);
   } catch (e) {
     return { status: "error", error: message(e) };
   }
@@ -315,7 +380,12 @@ export async function sendGuardedReply(args: GuardedReplyArgs): Promise<ReplyOut
     } catch {
       continue; // transient read failure — the bounded loop is the timeout
     }
-    if (draftCarriesSend(args.text, draft)) return submitOnly(args, verifiedPrompt);
+    // Multipart sends demand more than the generic prefix match here: the screen must have CHANGED
+    // since the last verified chunk (a dropped final chunk leaves the screen exactly as the last
+    // successful verification saw it), and the END of the complete text must be visible — a draft
+    // holding everything but the final chunk still passes the substring match above. Single-paste
+    // sends (every adapter without `replyChunks`) keep the exact behaviour they always had.
+    if (draftCarriesSend(args.text, draft) && (chunks.length === 1 || (draft !== previousDraft && carriesReplyTail(args.text, draft)))) return submitOnly(args, verifiedPrompt);
     // The adapter gets a second look, and only a second look: a harness can SWALLOW what we typed and
     // paint a token of its own instead (Claude collapses anything past its paste threshold into
     // `[Pasted text #N +M lines]`), so the box never holds our words and the match above structurally

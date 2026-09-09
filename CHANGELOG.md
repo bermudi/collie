@@ -6,6 +6,28 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.42.0] - 2026-09-09
+
+### Added
+
+- The pane shows the agent's newest reply in full when the terminal clipped its opening: read from
+  the agent's own session log, rendered in place of the rows it covers (everything below — tool
+  calls, dialogs, the cursor — untouched), collapsible per message, off via "Full latest reply" in
+  the ⚙ View dock (upstream 46d2fe6).
+
+### Fixed
+
+- omp panes drawn with `composer.shape=pi` (OMP 18.1.13) verify again: the pi-shaped editor is
+  recognised for drafts, status and prompt binding, Korean and multiline drafts extract correctly,
+  and an unaccepted inline completion stays out of the live draft (upstream 47369fb).
+- Long omp replies travel as small verified pastes instead of one opaque chip: omp collapses big
+  pastes into `📄 #N` chips that carry no content evidence, so the reply guard now plans ≤512-char /
+  4-line chunks, verifies each on screen before the next goes out, and only the complete reply can
+  authorise Enter — a dropped final chunk stalls, never submits (upstream 47369fb).
+- A link inside a clipped terminal row (a labelled rule carrying a URL) no longer re-wraps that row
+  on Firefox: the clip span now outranks the link style's `break-all` (residue of upstream PR #168,
+  4b995f8).
+
 ## [0.41.1] - 2026-09-09
 
 ### Fixed

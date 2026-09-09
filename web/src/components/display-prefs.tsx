@@ -24,6 +24,7 @@ interface DisplayPrefsContentProps {
   stepFontSize: (delta: number) => void;
   setRawTerminal: (raw: boolean) => void;
   setTapToFocus: (tapToFocus: boolean) => void;
+  setExpandClippedReply: (expandClippedReply: boolean) => void;
 }
 
 // One settings row: name (+ optional explanation) on the left, control on the right. Module-level so
@@ -58,6 +59,7 @@ export function DisplayPrefsContent({
   stepFontSize,
   setRawTerminal,
   setTapToFocus,
+  setExpandClippedReply,
 }: DisplayPrefsContentProps) {
   return (
     <div className="divide-y divide-border/60 border-t border-border/60 bg-muted/30 px-3 py-1">
@@ -84,6 +86,19 @@ export function DisplayPrefsContent({
             checked={prefs.tapToFocus}
             onCheckedChange={setTapToFocus}
             aria-label="Tap to type"
+          />
+        }
+      />
+      <Row
+        label="Full latest reply"
+        hint="An agent's terminal keeps no scrollback, so a long answer loses its start. On, that reply is shown in full from the agent's own log, in place of the rows it covers."
+        htmlFor="pref-expand-clipped-reply"
+        control={
+          <Switch
+            id="pref-expand-clipped-reply"
+            checked={prefs.expandClippedReply}
+            onCheckedChange={setExpandClippedReply}
+            aria-label="Full latest reply"
           />
         }
       />

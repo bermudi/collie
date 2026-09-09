@@ -106,6 +106,10 @@ describe("mirror line wrapping", () => {
     expect(clipped.className).toContain("whitespace-pre");
     expect(clipped.className).not.toContain("whitespace-nowrap");
     expect(clipped.className).toContain("break-normal");
+    // A link inside a clipped row (a labelled rule carrying a URL — pi's `─ Working https://… ──`)
+    // must not re-wrap the row the clip is holding to one visual line: LINK_CLASS's `break-all`
+    // would do exactly that on Firefox, and this arbitrary-variant class is what outranks it there.
+    expect(clipped.className).toContain("[&_a]:break-normal");
     expect(clipped.textContent).toBe(border);
     expect(clipped.children).toHaveLength(2);
     expect((clipped.children[0] as HTMLElement).style.backgroundColor).toBe("var(--ansi-1)");

@@ -16,6 +16,71 @@ ASR, or other large subsystems. The categories below distinguish:
 
 ## Ported in this round
 
+### omp pi-shaped composer + verified paste transport — upstream `47369fb4` (v1.8.0)
+
+**Status:** Ported.
+
+**What it does.** OMP 18.1.13's `composer.shape=pi` editor brackets its draft with two
+same-coloured rules and a status footer BELOW the editor. A third omp scanner (`pi-shape.ts`)
+recognises that shape for every chrome probe (draft, status, strip, prompt binding, composerReady),
+with Korean/multiline draft extraction and ghost (unaccepted inline completion) exclusion. Alongside
+it, `replyChunks` plans long replies as small transport pastes (≤512 UTF-16 units / 4 newlines,
+grapheme-safe, never starting a chunk with `/ ~ .` which omp would space-separate) — because omp
+collapses big pastes into opaque `📄 #N` chips that carry no content evidence.
+
+**Why it fits Pup.** Keystroke fidelity is Pup's heart: before this, a pi-shaped omp pane could
+not verify a send at all (the guard never saw its composer) and a long reply collapsed into a chip
+the guard must refuse.
+
+**Pup differences from upstream.**
+- The grapheme walker is Pup's own `graphemes()` export from `lib/text-width.ts` (Pup has no
+  `lib/env.ts`; upstream's helper was moved there in a lint round we don't carry).
+- Guard error strings are Pup's plain English (upstream routes through its i18n `t()`).
+- Multipart tail checks (`carriesReplyTail`, `draft !== previousDraft`) ported as-is, including the
+  tightened final verification that a dropped-final-chunk cannot satisfy.
+
+**Files.** `web/src/lib/harness/omp/pi-shape.ts` (new), `web/src/lib/harness/omp/reply-chunks.ts`
+(new), `web/src/lib/harness/omp/index.ts`, `web/src/lib/harness/types.ts` (`replyChunks?` hook),
+`web/src/lib/reply-action.ts` (multipart transport), `web/src/lib/text-width.ts` (`graphemes`
+export), fixtures `web/src/fixtures/omp-pi-shape/*`, tests alongside each.
+
+### Clipped-row link class — residue of upstream `4b995f8` (PR #168)
+
+**Status:** Ported (one attribute).
+
+Pup already carried PR #168's substance as `d406962b` (labelled-rule clipping + rule-run muting,
+upstream `0104d27` + `d980f37`). This round adds the one hunk that port missed: `[&_a]:break-normal`
+on the clipped-row span, which stops Firefox from letting the mirror's link style (`break-all`)
+re-wrap a row the clip is holding to one visual line — a labelled rule carrying a URL is the live
+ case (pi's `─ Working https://… ──`).
+
+### Full latest reply in place of the clipped mirror rows — upstream `46d2fe6a` (v1.2.0)
+
+**Status:** Ported.
+
+**What it does.** An agent's TUI runs on the alternate screen, which keeps no scrollback, so a
+reply longer than the pane is tall reaches the mirror with its opening gone. The pane view now reads
+the newest turn from the agent's own journal and, when `locateReply` proves that turn IS the message
+on screen and its start is missing, renders it in full IN PLACE OF the rows it covers
+(`AnsiOutput.hideLeadingLines` → `dropLeadingLines`, render-only, after every grammar has run).
+Everything below the reply is untouched. Collapsible per message; new `Full latest reply` pref
+(default on) in the ⚙ View dock; find stands the card down while open.
+
+**Why it fits Pup.** Pure viewer: the phone pane is exactly where a long clipped answer hurts most,
+and the alternative was leaving the pane for the history route.
+
+**Pup differences from upstream.**
+- `useLatestReply` keys the pane address on `${session}:${paneId}` — Pup has no pack `Scope`/
+  `paneScopeKey`; `fetchHistory` carries `session`.
+- Strings are plain English (Pup carries no i18n dictionary); the STT composer test hunk is
+  dropped with the subsystem.
+
+**Files.** `web/src/lib/latest-reply.ts` (new) + test, `web/src/hooks/use-latest-reply.ts` (new) +
+test, `web/src/components/latest-reply.tsx` (new), `web/src/lib/blocks.ts` (`dropLeadingLines`),
+`web/src/components/ansi-output.tsx` (`hideLeadingLines`), `web/src/components/agent-chat.tsx`,
+`web/src/components/composer.tsx`, `web/src/components/display-prefs.tsx`,
+`web/src/hooks/use-display-prefs.ts` (`expandClippedReply`, storage key stays v4).
+
 ### Adaptive mirror polling — upstream `d2cb8a3` (v1.3.0)
 
 **Status:** Ported.
@@ -79,6 +144,18 @@ readability. Existing devices with a saved preference are untouched — the loca
 ---
 
 ## Declined in this round
+
+### Statusline strip scroll containment — upstream `7b77d7ce` (v1.2.0)
+
+**Status:** Declined — the subsystem it patches does not exist in Pup.
+
+Upstream's strip is a scrollport (`max-h-[18dvh] overflow-y-auto`) and the fix adds
+`overscroll-contain` so an over-drag can't chain into the document and drag the composer away.
+Pup's strip is a different design: bounded rows (`MAX_STATUS_LINES`), no scrollport at all, so the
+hazard cannot manifest. Both halves of the containment posture are already in force here — the
+mirror's message list has `overscroll-contain`, and Pup's own `html`/`body`/`#root` `overflow:
+hidden` (the fork's original double-scroll fix) covers the root half stronger than upstream's
+`overflow-hidden` on the layout div.
 
 ### Rename tab/pane sheet keyboard-folding fix — upstream `93373ce` (v1.2.0)
 

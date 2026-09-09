@@ -22,6 +22,9 @@ import { splitLines } from "@/lib/blocks";
 import { adapterFor } from "@/lib/harness";
 import { blockOwnsKeyboard } from "@/lib/harness/dialog-contract";
 import { FindBar } from "@/components/find-bar";
+import { LatestReply } from "@/components/latest-reply";
+import { locateReply } from "@/lib/latest-reply";
+import { useLatestReply } from "@/hooks/use-latest-reply";
 import { LaunchTrigger } from "@/components/launch-trigger";
 import { Composer, type ComposerHandle } from "@/components/composer";
 import { ThreadSidebar } from "@/components/agent-sidebar";
@@ -119,7 +122,7 @@ export function AgentChat({
   const connecting = isConnecting({ bridge, error, stalled });
   const { newTab, creatingTab } = useSpaceActions();
   // Single display-prefs instance: the View controls (in <Composer>) write it, the mirror reads it.
-  const { prefs, setWrap, stepFontSize, setRawTerminal, setTapToFocus } = useDisplayPrefs();
+  const { prefs, setWrap, stepFontSize, setRawTerminal, setTapToFocus, setExpandClippedReply } = useDisplayPrefs();
   // Raw-terminal escape hatch: when on, every Claude grammar is bypassed and the plain mirror shows,
   // so a mis-detected/mis-rendered dialog can always be driven by hand with the keys pad.
   const grammarsOn = !prefs.rawTerminal;
@@ -289,6 +292,41 @@ export function AgentChat({
   // AND we're under the cap Herdr's own read clamp imposes. `readableLines` is undefined on an older
   // bridge/Herdr; treat that as "no idea" and stay hidden rather than offer a tap that fetches nothing.
   const historyAvailable = Boolean(agent?.hasSession);
+
+  // The newest reply, REPLACING the mirror rows that could only hold its end.
+  //
+  // The mirror IS the viewport for an agent pane (alternate screen, no scrollback ring), so a reply
+  // longer than the pane is tall has lost its opening by the time you read it, and getting it back
+  // used to mean leaving for the history route. The journal has it; `locateReply` decides whether this
+  // particular turn is the one on screen and whether its start is missing — and answers "not this
+  // message" for a stale/streaming/clamped read, which is the case that must render nothing rather
+  // than pass an older reply off as the current one (lib/latest-reply.ts).
+  //
+  // It also returns where those rows END, and the card takes their place rather than sitting on top of
+  // them: rendering the message in full above its own last few terminal rows printed the same text
+  // twice. Everything BELOW the reply — tool calls, a dialog, the cursor — is untouched, so the mirror
+  // still reads as the live screen, just starting where the message finished.
+  //
+  // locateReply is memoised on the DISPLAYED text: it folds a whole screenful, and it runs beside the
+  // grammar passes on every poll.
+  const latestReply = useLatestReply({
+    paneId,
+    session,
+    enabled: historyAvailable && prefs.expandClippedReply,
+    mirrorText: display,
+  });
+  const placement = useMemo(
+    () => (latestReply ? locateReply(display, latestReply) : null),
+    [latestReply, display],
+  );
+  // Find searches the mirror, so while it is open the mirror is WHOLE and the card stands down —
+  // otherwise a hit inside the reply would be unfindable in the one surface find can highlight.
+  const clippedReply = placement?.fit === "clipped" && !findOpen ? latestReply : null;
+  // Collapsing the card is a judgement about ONE message ("show me the raw rows instead"), so it is
+  // remembered by uuid: a new reply arrives expanded without an effect to reset anything.
+  const [collapsedReply, setCollapsedReply] = useState<string | null>(null);
+  const replyOpen = clippedReply !== null && collapsedReply !== clippedReply.uuid;
+  const hiddenMirrorLines = replyOpen && placement ? placement.endLine + 1 : 0;
   const moreScrollback =
     agent?.readableLines !== undefined &&
     requestedLines < agent.readableLines &&
@@ -837,6 +875,18 @@ export function AgentChat({
                     {loadingOlder ? "Loading…" : "Load older"}
                   </button>
                 ) : null}
+                {/* The newest reply in full, standing IN PLACE OF the rows it covers (the mirror
+                    below starts after it — see hideLeadingLines). It appears above a bottom-pinned
+                    scroller, which ChatMessageList's child-list observer re-pins, so the live tail
+                    never moves. */}
+                {clippedReply && (
+                  <LatestReply
+                    entry={clippedReply}
+                    agent={agent?.agent}
+                    open={replyOpen}
+                    onToggle={() => setCollapsedReply(replyOpen ? clippedReply.uuid : null)}
+                  />
+                )}
                 <AnsiOutput
                   text={display}
                   wrap={prefs.wrap}
@@ -851,6 +901,7 @@ export function AgentChat({
                   onMultiSelectAction={handleMultiSelectAction}
                   onMenuAction={handleMenuAction}
                   promptDisabled={readOnly || gone}
+                  hideLeadingLines={hiddenMirrorLines}
                 />
               </>
             ) : (
@@ -939,6 +990,7 @@ export function AgentChat({
             stepFontSize={stepFontSize}
             setRawTerminal={setRawTerminal}
             setTapToFocus={setTapToFocus}
+            setExpandClippedReply={setExpandClippedReply}
             onSent={onSent}
           />
         </div>
