@@ -6,6 +6,19 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.43.2] - 2026-09-10
+
+### Fixed
+
+- Multi-select attach: the picker's two inputs now declare `multiple` and the composer uploads the
+  whole batch — one POST per file (the bridge's existing contract), each landed path appended to
+  the draft in picker order — so attaching six images is one gallery trip instead of six. A mixed
+  batch attaches the good files and names the refused ones in one status line (identical refusal
+  phrases collapse; the error tone persists until tapped). Pasting several files at once rides the
+  same path. This was never a PWA/Firefox/Android limitation: the phone's pickers have offered
+  multi-select all along — the page just never asked (`multiple` absent, and the change handler
+  read `files[0]` and dropped the rest).
+
 ## [0.43.1] - 2026-09-09
 
 ### Fixed

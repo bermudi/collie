@@ -2221,6 +2221,84 @@ describe("Composer — attachment limits published by this bridge", () => {
   });
 });
 
+// The picker takes a BATCH: both halves of the attach flow declare `multiple`, and the change
+// handler walks the whole FileList — it used to read `files[0]` and quietly drop the rest, so a
+// six-image attach was six gallery trips. One POST per file (the bridge's contract), each landed
+// path appended in picker order, one status sentence for the whole batch.
+describe("Composer — multi-file attach", () => {
+  beforeEach(() => __resetOperatorCommands());
+  afterEach(() => __resetOperatorCommands());
+
+  function publishUpload(upload: { maxBytes: number; imageTypes: string[]; textTypes: string[] }) {
+    server.use(
+      http.get("/api/config", () => HttpResponse.json({ push: false, vapidPublicKey: "", upload })),
+    );
+  }
+
+  async function waitForPublishedAccept(accept: string) {
+    await waitFor(() =>
+      expect(screen.getByTestId("attach-files")).toHaveAttribute("accept", accept),
+    );
+  }
+
+  // An upload handler that lands the Nth POST at /tmp/shotN.png, recording how many arrived —
+  // the draft must carry the paths in PICKER order, which is provable by position because the
+  // batch is sequential. (The wire body can't echo the real filename in tests: undici serializes
+  // a jsdom File as `filename="blob"`, which is why the older upload tests never parse the body.)
+  function orderEchoingUpload(posts: number[]) {
+    return http.post(/\/api\/pane\/[^/]+\/upload$/, () => {
+      posts.push(1); // a tick per POST — only the count and its ordering matter
+      return HttpResponse.json({ ok: true, path: `/tmp/shot${posts.length}.png` });
+    });
+  }
+
+  it("declares multiple on both inputs, so the phone's picker offers multi-select", async () => {
+    publishUpload({ maxBytes: 10 * 1024 * 1024, imageTypes: ["png"], textTypes: ["md"] });
+    renderComposer();
+    await waitForPublishedAccept("image/*,.png,.md");
+    expect(screen.getByTestId("attach-photos")).toHaveAttribute("multiple");
+    expect(screen.getByTestId("attach-files")).toHaveAttribute("multiple");
+  });
+
+  it("uploads every picked file and appends every path in picker order", async () => {
+    publishUpload({ maxBytes: 10 * 1024 * 1024, imageTypes: ["png"], textTypes: [] });
+    const posts: number[] = [];
+    server.use(orderEchoingUpload(posts));
+    renderComposerWithStatus();
+    await waitForPublishedAccept("image/*,.png");
+
+    const files = [1, 2, 3].map((n) => new File(["x"], `shot${n}.png`, { type: "image/png" }));
+    fireEvent.change(screen.getByTestId("attach-photos"), { target: { files } });
+
+    const box = screen.getByPlaceholderText(/type a reply/i);
+    await waitFor(() =>
+      expect(box).toHaveValue("/tmp/shot1.png /tmp/shot2.png /tmp/shot3.png"),
+    );
+    expect(posts.length).toBe(3); // one POST per file — the bridge takes a file per request
+    expect(screen.getByTestId("status")).toHaveTextContent("3 files attached");
+  });
+
+  it("attaches the good files and names the refused one when a batch is mixed", async () => {
+    publishUpload({ maxBytes: 1 * 1024 * 1024, imageTypes: ["png"], textTypes: [] });
+    const posts: number[] = [];
+    server.use(orderEchoingUpload(posts));
+    renderComposerWithStatus();
+    await waitForPublishedAccept("image/*,.png");
+
+    const good = new File(["x"], "shot.png", { type: "image/png" });
+    const huge = new File(["x".repeat(2 * 1024 * 1024)], "huge.png", { type: "image/png" });
+    fireEvent.change(screen.getByTestId("attach-photos"), { target: { files: [good, huge] } });
+
+    const box = screen.getByPlaceholderText(/type a reply/i);
+    await waitFor(() => expect(box).toHaveValue("/tmp/shot1.png"));
+    await waitFor(() =>
+      expect(screen.getByTestId("status")).toHaveTextContent(/Attached 1 of 2 .* too large/),
+    );
+    // The oversize file never spent the uplink — refused locally before its POST.
+    expect(posts.length).toBe(1);
+  });
+});
+
 // The attach button asks Photos or Files: one `accept` cannot carry `image/*` and the text
 // extensions at once, or both Android and iOS drop the gallery and open the file browser alone.
 describe("Composer — the attach picker offers photos as well as files", () => {

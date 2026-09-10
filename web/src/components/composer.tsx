@@ -725,51 +725,81 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     focusInputEnd();
   }
 
-  // Upload an attachment; on success append its host path to the composer so the user can add
-  // context. Shared by the file picker and clipboard paste.
+  // Upload a BATCH of attachments — one POST per file (the bridge's contract: it takes a file per
+  // request and gives each a unique name), appending each landed path to the composer as it
+  // arrives so the user can add context around them. Shared by the file picker (which hands over a
+  // whole multi-select in one change event) and clipboard paste. The batch is SEQUENTIAL: the
+  // phone's uplink is the scarce thing, and order in the draft stays the picker's order. A refusal
+  // in the middle stops nothing — the good files attach, and every refusal is named in ONE status
+  // at the end (identical phrases collapse: six oversize files are one fact, not six).
   //
-  // The two local refusals below are an ECONOMY, never a gate: the bridge asks the same two
-  // questions again on arrival, and its answer is the one that counts (it can read the bytes, which
-  // is the only way to catch a binary wearing a `.md` name). Spending a phone's uplink on 40 MB to
-  // be told 10 is the limit is the thing worth not doing.
-  async function uploadFile(file: File) {
-    if (locked) return;
-    const refusal = rejectAttachment(file, limits);
-    if (refusal === "tooLarge") {
-      setStatus(`File too large — this host takes ${limitMb(limits)} MB`, "error");
-      return;
-    }
-    if (refusal === "badType") {
-      setStatus(`Can't attach "${file.name}" — this host doesn't take that type`, "error");
-      return;
-    }
+  // The two local refusals are an ECONOMY, never a gate: the bridge asks the same two questions
+  // again on arrival, and its answer is the one that counts (it can read the bytes, which is the
+  // only way to catch a binary wearing a `.md` name). Spending a phone's uplink on 40 MB to be
+  // told 10 is the limit is the thing worth not doing.
+  async function uploadFiles(files: File[]) {
+    if (locked || files.length === 0) return;
     setUploading(true);
     try {
-      const res = await api.uploadFile(paneId, file, session);
-      if (res.ok) {
-        const path = res.path;
-        direct.deactivateSilently();
-        updateInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${path}` : path));
-        focusInputEnd();
-        setStatus("File attached — path in message", "success");
-      } else {
-        setStatus(res.error, "error");
+      let attached = 0;
+      const refused: string[] = [];
+      for (const file of files) {
+        const why = rejectAttachment(file, limits);
+        if (why === "tooLarge") {
+          refused.push(`File too large — this host takes ${limitMb(limits)} MB`);
+          continue;
+        }
+        if (why === "badType") {
+          refused.push(`Can't attach "${file.name}" — this host doesn't take that type`);
+          continue;
+        }
+        try {
+          const res = await api.uploadFile(paneId, file, session);
+          if (res.ok) {
+            const path = res.path;
+            direct.deactivateSilently();
+            updateInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${path}` : path));
+            attached++;
+          } else {
+            refused.push(res.error);
+          }
+        } catch (err) {
+          refused.push(err instanceof Error ? err.message : String(err));
+        }
       }
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : String(err), "error");
+      const detail = [...new Set(refused)].join("; ");
+      if (refused.length === 0) {
+        setStatus(
+          attached === 1
+            ? "File attached — path in message"
+            : `${attached} files attached — paths in message`,
+          "success",
+        );
+      } else if (attached > 0) {
+        // Error tone on purpose: it persists until tapped, which is the only status flavour that
+        // gives a mixed-batch sentence time to be read.
+        setStatus(`Attached ${attached} of ${files.length} — ${detail}`, "error");
+      } else if (files.length === 1) {
+        setStatus(detail, "error"); // a single refused pick keeps the plain single-file sentence
+      } else {
+        setStatus(`Nothing attached — ${detail}`, "error");
+      }
+      if (attached > 0) focusInputEnd();
     } finally {
       setUploading(false);
     }
   }
 
   async function onPickFile(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-picking the same file
-    if (!file) return;
-    await uploadFile(file);
+    // Snapshot BEFORE clearing the value: the FileList dies with it, and the batch outlives the event.
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // allow re-picking the same file(s)
+    await uploadFiles(files);
   }
 
-  // Paste a file straight from the clipboard (e.g. a screenshot) the same way the picker does.
+  // Paste files straight from the clipboard (e.g. a screenshot) the same way the picker does —
+  // ALL file items when the clipboard carries several (a multi-file copy from a file manager),
+  // one batch, one status.
   //
   // A PLAIN TEXT PASTE STILL FALLS THROUGH UNTOUCHED, and that stays true now that text files are
   // attachable: the branch turns on `item.kind === "file"`, so pasted PROSE is prose and only a
@@ -778,16 +808,18 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   function onPasteFile(e: ClipboardEvent<HTMLTextAreaElement>) {
     if (locked || direct.active) return;
     const items = e.clipboardData.items;
+    const files: File[] = [];
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (item.kind !== "file") continue;
       const file = item.getAsFile();
       if (!file) continue;
       if (rejectAttachment(file, limits) === "badType") continue;
-      e.preventDefault();
-      void uploadFile(file);
-      return;
+      files.push(file);
     }
+    if (files.length === 0) return;
+    e.preventDefault();
+    void uploadFiles(files);
   }
 
   return (
@@ -813,9 +845,13 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             extension list that makes a `.md` pickable is the very thing that hid the gallery on
             both Android and iOS — the attach button opened the file browser and nothing else.
             `PHOTO_ACCEPT` is the first input's whole answer; the second keeps the full list. Which
-            one fires is the sheet's question, and both land in the same `onPickFile`. */}
-        <input ref={photoRef} data-testid="attach-photos" type="file" accept={PHOTO_ACCEPT} hidden onChange={onPickFile} />
-        <input ref={fileRef} data-testid="attach-files" type="file" accept={accept} hidden onChange={onPickFile} />
+            one fires is the sheet's question, and both land in the same `onPickFile`.
+            Both declare `multiple`: the phone's pickers (Firefox hands the tap to Android's
+            document/photo picker, which long-presses into multi-select) only OFFER multi-select
+            when the page asks — without the attribute the picker is single-shot no matter what,
+            and the composer used to drop everything past the first file anyway. */}
+        <input ref={photoRef} data-testid="attach-photos" type="file" accept={PHOTO_ACCEPT} multiple hidden onChange={onPickFile} />
+        <input ref={fileRef} data-testid="attach-files" type="file" accept={accept} multiple hidden onChange={onPickFile} />
         {/* The picker's own sheet. Two rows, no confirm — each one opens a native picker, which is
             its own decision point. It closes BEFORE the click so the sheet is not left standing
             behind the system UI, and the click still counts as the user gesture the browser
