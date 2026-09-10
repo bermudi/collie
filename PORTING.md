@@ -77,6 +77,11 @@ the guard must refuse.
 - Guard error strings are Pup's plain English (upstream routes through its i18n `t()`).
 - Multipart tail checks (`carriesReplyTail`, `draft !== previousDraft`) ported as-is, including the
   tightened final verification that a dropped-final-chunk cannot satisfy.
+- `composerPrompt`'s pi region is bounded to its TRAILING rows (≤6000 chars): the bridge's
+  `expected_prompt` cap is 8192, and an unbounded ~101-row region on a wide pane would fail-closed
+  the submit of a long reply — the exact case the transport exists for. **Upstream carries the same
+  latent bug** (found in Pup review, 0.43.1); report it upstream and drop the bound if they fix it
+  there.
 
 **Files.** `web/src/lib/harness/omp/pi-shape.ts` (new), `web/src/lib/harness/omp/reply-chunks.ts`
 (new), `web/src/lib/harness/omp/index.ts`, `web/src/lib/harness/types.ts` (`replyChunks?` hook),

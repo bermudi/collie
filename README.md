@@ -33,6 +33,8 @@ public access, Collie isn't built for it. Read the
 - **Quick actions and slash commands** per agent — tap, don't type
 - **Special-keys pad** — `Esc`, `Ctrl+C`, arrows, combinable modifiers
 - **Find in output**, and **conversation history** the terminal can't scroll back to
+- **See what the agent sees** — screenshots it takes or is shown render right in the pane, read
+  from its own log
 - **Send an image** from your camera roll, or a markdown / text / code file — capped and typed in `.env`
 - **Switch between Herdr sessions** without touching the host
 - **Installs to your home screen** (PWA) and runs entirely on your own machine — loopback bind, no

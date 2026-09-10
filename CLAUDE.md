@@ -211,11 +211,16 @@ the unit name; the Herdr action runs from anywhere.
 
 ## The journal (scrollback the mirror can't give you)
 
-`bridge/journal/` reads the agent's own session log off disk, per harness (`claude` / `codex` / `pi`,
-registered in `registry.ts`). It is the **only** thing in the bridge that touches the filesystem, so
-the containment rule in [`files.ts`](./bridge/journal/files.ts) is absolute: **every** path an
-adapter is about to read goes through `containedRealpath` — after symlink resolution, on the real
-paths, including paths derived from one already checked. The client never supplies a path. Run
+`bridge/journal/` reads the agent's own session log off disk, per harness (`claude`, `codex`,
+`grok`, `opencode`, `pi` — and `omp`, an alias: omp writes pi's own format, so one adapter reads
+both, resolved through `AGENT_ALIASES` in `registry.ts`). It is the **only** thing in the bridge
+that reads the agent's files, so the containment rule in [`files.ts`](./bridge/journal/files.ts) is
+absolute: **every** path an adapter is about to read goes through `containedRealpath` — after
+symlink resolution, on the real paths, including paths derived from one already checked. The client
+never supplies a path. That includes pictures: a journal image reference may only be this bridge's
+own `/api/blobs/<hash>` route or inline `data:image/` bytes, never a remote URL — decided
+bridge-side (`pi.ts` § `resolveImageUrl`) and re-checked web-side (`api.ts` § `imageSrc`)
+([ADR 0040](./.adr/0040-a-journal-image-reference-is-never-a-remote-url.md)). Run
 `bun scripts/journal-probe.ts` against real logs after touching an adapter; unit tests pin the
 grammar, the probe catches on-disk format drift.
 

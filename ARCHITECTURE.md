@@ -159,7 +159,14 @@ app. Closing this needs the server-side blocking-message capture described above
   routinely holds more than one agent home (`CLAUDE_CONFIG_DIR` per Claude profile), so each
   `COLLIE_*_ROOT` takes a comma-separated list, searched in order until a root holds the session id;
   ids are globally unique, so that's a lookup, not a preference. Containment is checked **per root**,
-  never against their union. The client fetches the whole conversation in one request
+  never against their union. Pictures ride the same source, and the same containment: an image the
+  agent attached, spoke, or a tool returned is served by `/api/blobs/<hash>` (or inline bytes) and
+  rendered in the mirror in place of the terminal's Kitty-graphics placeholder block — matched by
+  order, from the end, because the placeholder encodes an image id no journal records. And when the
+  terminal has clipped a reply's opening, the pane re-renders that newest turn in full IN PLACE of
+  the rows it covers — a render-only subtraction applied after every grammar has run, so no
+  detector, guard or draft probe ever sees a trimmed screen. The client fetches the whole
+  conversation in one request
   and renders a window that grows upward, which is what lets find-in-history and jump-to-user-turn
   work across turns you haven't scrolled to. Rationale and the measured numbers are commented at the
   top of `web/src/routes/history.tsx`.
