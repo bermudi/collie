@@ -64,8 +64,9 @@ parameterized SQL only, `withDb` closes in `finally`.
   read as "no history" forever). **Report this upstream.**
 - `resolve` stays tolerant per root (an unreadable `sessions` table disqualifies the root, not the
   request); `stat`/`load` propagate query errors — the history route answers an error instead of an
-  empty page. The read-only open is pinned twice in tests (no-create on a missing root; a 0444
-  database still reads).
+  empty page. The read-only open is pinned by the stale-key test (resolve, database vanishes,
+  stat → null and nothing recreated — verified by mutation to fail with the flag removed; the
+  0444 and no-create cases ride on bun's silent downgrade and the containment pre-guard).
 - `scripts/journal-probe.ts` learned the hermes branch (mirroring opencode's) — without it the
   mandated drift check could not see the sixth adapter, which is exactly how the schema bug
   shipped. Live probe result on this host: `hermes ✓ 2 turns` off the real `state.db`.
