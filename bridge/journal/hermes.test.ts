@@ -429,7 +429,13 @@ describe("HermesTranscriptSource — the live-verified v6 schema", () => {
     db.close();
     const src = new HermesTranscriptSource(root);
     const key = (await src.resolve({ kind: "id", value: SID }))!;
-    expect(src.load(key!)).rejects.toThrow();
+    // Awaited explicitly, with the failure named: an unawaited rejects expectation can pass under
+    // bun's forgiving runner, and "some error" is weaker than the drift we mean.
+    const outcome = await src.load(key!).then(
+      () => "resolved",
+      (e: unknown) => `${e}`,
+    );
+    expect(outcome).toContain("no such column");
     await rm(base, { recursive: true, force: true });
   });
 });
@@ -461,6 +467,29 @@ describe("HermesTranscriptSource — the read-only open", () => {
     expect(key).not.toBeNull();
     const loaded = await src.load(key!);
     expect(parseHermesTranscript(loaded.text)[0]?.parts[0]).toEqual({ kind: "text", text: "still readable" });
+    await rm(base, { recursive: true, force: true });
+  });
+
+  // The one test that pins the FLAG itself. The two above are carried by other machinery: the
+  // no-create test is enforced by the containment pre-guard (a missing file never reaches
+  // withDb), and bun silently downgrades a read-write open of a 0444 file to read-only — the
+  // 0444 test stays green with the flag removed. This one does not: after resolve, the database
+  // vanishes; a READ-ONLY open answers null ("gone") and creates nothing, while a read-write
+  // open would resurrect an empty state.db on the operator's disk and then throw on it.
+  test("a stale key whose database vanished does not resurrect it", async () => {
+    const base = await realpath(await mkdtemp(join(tmpdir(), "collie-hermes-gone-")));
+    const root = join(base, "data");
+    await mkdir(root, { recursive: true });
+    const db = new Database(join(root, "state.db"));
+    createTables(db);
+    db.run("insert into sessions values (?, 'tui', 1, null)", [SID]);
+    db.close();
+    const src = new HermesTranscriptSource(root);
+    const key = (await src.resolve({ kind: "id", value: SID }))!;
+    await rm(join(root, "state.db"));
+    expect(await src.stat(key)).toBeNull();
+    const stillThere = await stat(join(root, "state.db")).then(() => true, () => false);
+    expect(stillThere).toBe(false);
     await rm(base, { recursive: true, force: true });
   });
 });
