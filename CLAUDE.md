@@ -212,9 +212,11 @@ the unit name; the Herdr action runs from anywhere.
 ## The journal (scrollback the mirror can't give you)
 
 `bridge/journal/` reads the agent's own session log off disk, per harness (`claude`, `codex`,
-`grok`, `opencode`, `pi` — and `omp`, an alias: omp writes pi's own format, so one adapter reads
-both, resolved through `AGENT_ALIASES` in `registry.ts` — and `hermes`, the sixth adapter, which
-reads one SQLite SessionDB (`state.db`) read-only instead of per-session files). It is the **only** thing in the bridge
+`grok`, `opencode`, `pi`, `hermes` — plus `omp`, an alias: omp writes pi's own format, so one
+adapter reads both, resolved through `AGENT_ALIASES` in `registry.ts`). Hermes is the sixth
+adapter and the second SQLite one: it reads one `state.db` per root, opened read-only, and
+builds its SELECT from `pragma table_info` so both observed on-disk schemas read (see the module
+header in `hermes.ts`).. It is the **only** thing in the bridge
 that reads the agent's files, so the containment rule in [`files.ts`](./bridge/journal/files.ts) is
 absolute: **every** path an adapter is about to read goes through `containedRealpath` — after
 symlink resolution, on the real paths, including paths derived from one already checked. The client

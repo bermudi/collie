@@ -55,19 +55,32 @@ bounded recursive CTE (depth < 32) and ordered parents-first; rows are JSON line
 existing `MAX_TRANSCRIPT_BYTES`. Read-only open, fixed filename confined via `containedRealpath`,
 parameterized SQL only, `withDb` closes in `finally`.
 
-**Pup differences from upstream.**
+**Pup differences from upstream (found in review, live-verified on this host).**
+- Upstream's SELECT names four `messages` columns (`reasoning_content`, `active`, `compacted`,
+  `display_kind`) that do not exist in the real SessionDB here (13-column schema, 2026-04 data) —
+  and upstream's own fixture builds its table from the adapter's SELECT, so the drift is invisible
+  to their tests too. Pup builds the SELECT from `pragma table_info` per database: both shapes
+  read, and a schema that is neither fails LOUDLY out of `load` (a swallowed SqliteError used to
+  read as "no history" forever). **Report this upstream.**
+- `resolve` stays tolerant per root (an unreadable `sessions` table disqualifies the root, not the
+  request); `stat`/`load` propagate query errors — the history route answers an error instead of an
+  empty page. The read-only open is pinned twice in tests (no-create on a missing root; a 0444
+  database still reads).
+- `scripts/journal-probe.ts` learned the hermes branch (mirroring opencode's) — without it the
+  mandated drift check could not see the sixth adapter, which is exactly how the schema bug
+  shipped. Live probe result on this host: `hermes ✓ 2 turns` off the real `state.db`.
 - Dropped upstream hunks for files Pup does not carry: `web/src/lib/journal-agents.ts` (the
   bridge is the single decision site — see the images round), `bridge/solo-baseline.test.ts`,
   `bridge/beacon-journal.test.ts`, `cli/doctor.test.ts`, `cli/history.test.ts`.
 - `bridge/json.ts` is new beyond upstream's file list: the `JsonValue`/`JsonObject` boundary type
   hermes.ts needs to keep `JSON.parse` results honest without `any`.
 - Tests are upstream's cases in Pup's journal idiom (real-SQLite fixtures per `opencode.test.ts`),
-  plus containment/multi-root/lineage coverage upstream's file lacked.
+  plus a v6-schema fixture (the live-verified column set), drift-throws, and read-only pins.
 - `.env.example` gains `COLLIE_HERMES_ROOT` (upstream never documented theirs).
 
 **Files.** `bridge/journal/hermes.ts` (+test), `bridge/json.ts` (new), `bridge/journal/registry.ts`
 (+test: six adapters, omp still an alias), `bridge/config.ts` (+test), `bridge/server.test.ts`,
-`.env.example`, `CLAUDE.md` (adapter list).
+`scripts/journal-probe.ts` (hermes branch), `.env.example`, `CLAUDE.md` (adapter list).
 
 ### The serve door says "can't tell", never "no HTTPS" — upstream `0062b91` (v1.6.0)
 
@@ -110,7 +123,7 @@ comment paragraph pinning the never-on-manual-scroll stance (Pup's single-scroll
 discipline). Playground hunks dropped (no playground dir).
 
 **Files.** `web/src/hooks/use-reveal-active.ts` (+test, new), `web/src/components/tab-strip.tsx`,
-`pane-strip.tsx`, `space-strip.tsx` (+tests each: reveals on change, still when visible).
+`pane-strip.tsx`, `space-strip.tsx` (+tests each: reveals on change, stays still when visible).
 
 ### The build stamp skips a known build — upstream `e3c7816e` (v1.8.0+)
 

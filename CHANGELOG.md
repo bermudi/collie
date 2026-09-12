@@ -6,6 +6,23 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.44.1] - 2026-09-12
+
+### Fixed
+
+- **Review hardening of the 0.44.0 port round: the Hermes adapter reads the schema that is
+  actually on disk.** A real `~/.hermes/state.db` on this host carries a `messages` table with
+  none of the four optional columns upstream's SELECT names (`reasoning_content`, `active`,
+  `compacted`, `display_kind` — upstream's own fixture builds its table from the adapter's
+  SELECT, so their tests cannot see the drift either; report pending). The SELECT is now built
+  from the database's own column list, both observed schemas read, and an unknown schema throws
+  out of `load` — the history route answers an error instead of an empty page that looks like
+  "no history". `resolve` stays tolerant per root (an unreadable `sessions` table disqualifies
+  the root, not the request). The read-only open is pinned twice in tests (no-create on an empty
+  root; a 0444 database still reads), and `scripts/journal-probe.ts` learned the hermes branch —
+  without it the mandated drift check could not see the sixth adapter, which is exactly how the
+  drift shipped. Live probe on this host: `hermes ✓ 2 turns` off the real database.
+
 ## [0.44.0] - 2026-09-12
 
 ### Added
@@ -14,8 +31,11 @@ All notable changes to Collie are recorded here. The format follows
   SessionDB (`~/.hermes/state.db`, `COLLIE_HERMES_ROOT` to relocate) through the exact Herdr
   session id — never the newest row — including compressed parent sessions, walked depth-first
   and capped at 32 generations. The database is opened read-only and the fixed filename is
-  confined to the configured root before opening; Collie never writes Hermes state. `omp` stays
-  an alias of pi, not an adapter. (upstream 85e0da5e, 33f54224, 801f879a)
+  confined to the configured root before opening; Collie never writes Hermes state. The SELECT is
+  built from the database's own column list, so both observed on-disk schemas read
+  (live-verified against the real thing), and an unknown schema fails loudly instead of serving
+  an empty history page. `omp` stays an alias of pi, not an adapter. (upstream 85e0da5e,
+  33f54224, 801f879a, with a review fix for a schema drift upstream's tests cannot see)
 
 ### Fixed
 

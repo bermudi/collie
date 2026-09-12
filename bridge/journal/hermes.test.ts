@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, realpath, rm, stat, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -28,6 +28,18 @@ const createTables = (db: Database): void => {
   );
   db.run(
     "create table messages (id integer primary key, session_id text, role text, content text, tool_call_id text, tool_calls text, tool_name text, timestamp real, reasoning text, reasoning_content text, active integer default 1, compacted integer default 0, display_kind text)",
+  );
+};
+
+// The schema live-verified on this host (2026-04 data): 13 columns, none of the four optional
+// ones. This fixture is why the review finding could never happen again — the adapter must read
+// THIS shape, not just the one its own SELECT describes.
+const createTablesV6 = (db: Database): void => {
+  db.run(
+    "create table sessions (id text primary key, source text, started_at real, parent_session_id text)",
+  );
+  db.run(
+    "create table messages (id integer primary key autoincrement, session_id text not null, role text not null, content text, tool_call_id text, tool_calls text, tool_name text, timestamp real, token_count integer, finish_reason text, reasoning text, reasoning_details text, codex_reasoning_items text)",
   );
 };
 
@@ -316,8 +328,7 @@ describe("HermesTranscriptSource — compressed parent sessions", () => {
 // One root per Hermes home; several are searched in order and the first holding the session wins
 // (the multi-home case of issue #92). The virtual key already carries the database path, so
 // stat/load need no change — only resolve had to learn to ask more than one database.
-describe("HermesTranscriptSource — several roots", () => {
-  async function fixture() {
+describe("HermesTranscriptSource — several roots", () => {  async function fixture() {
     const base = await realpath(await mkdtemp(join(tmpdir(), "collie-hermes-roots-")));
     const first = join(base, "first");
     const second = join(base, "second");
@@ -354,6 +365,102 @@ describe("HermesTranscriptSource — several roots", () => {
     const { base, first } = await fixture();
     const src = new HermesTranscriptSource(first);
     expect(await src.resolve({ kind: "id", value: OTHER })).toBeNull();
+    await rm(base, { recursive: true, force: true });
+  });
+});
+
+// The review round found a real ~/.hermes/state.db whose `messages` table carries NONE of the
+// four optional columns — and the adapter's fixed SELECT failed inside a swallowed catch, reading
+// as "no history" forever. These pins hold the adapter to both observed shapes and to failing
+// LOUDLY on a shape it does not know.
+describe("HermesTranscriptSource — the live-verified v6 schema", () => {
+  async function v6Fixture() {
+    const base = await realpath(await mkdtemp(join(tmpdir(), "collie-hermes-v6-")));
+    const root = join(base, "data");
+    await mkdir(root, { recursive: true });
+    const db = new Database(join(root, "state.db"));
+    createTablesV6(db);
+    db.run("insert into sessions values (?, 'tui', 1, null)", [PARENT]);
+    db.run("insert into sessions values (?, 'tui', 2, ?)", [SID, PARENT]);
+    db.run("insert into messages (session_id, role, content, timestamp) values (?, 'user', 'the real question', 10)", [PARENT]);
+    db.run("insert into messages (session_id, role, content, timestamp, tool_name) values (?, 'tool', 'the real result', 20, 'terminal')", [PARENT]);
+    db.run("insert into messages (session_id, role, content, timestamp, reasoning) values (?, 'assistant', 'the real answer', 30, 'reasoned here')", [SID]);
+    db.close();
+    return { base, root };
+  }
+
+  test("reads a database whose messages table has none of the optional columns", async () => {
+    const { base, root } = await v6Fixture();
+    const src = new HermesTranscriptSource(root);
+    const key = await src.resolve({ kind: "id", value: SID });
+    expect(key).toBe(`${join(root, "state.db")}#${SID}`);
+    const { text, complete } = await src.load(key!);
+    expect(complete).toBe(true);
+    const entries = parseHermesTranscript(text);
+    expect(entries.map((e) => e.uuid)).toEqual(["1", "2", "3"]); // lineage: parent rows first
+    expect(entries[0]!.parts[0]).toEqual({ kind: "text", text: "the real question" });
+    expect(entries[2]!.parts).toEqual([
+      { kind: "thinking", text: "reasoned here" },
+      { kind: "text", text: "the real answer" },
+    ]);
+    await rm(base, { recursive: true, force: true });
+  });
+
+  test("v6 stat counts the session's own rows", async () => {
+    const { base, root } = await v6Fixture();
+    const src = new HermesTranscriptSource(root);
+    const key = (await src.resolve({ kind: "id", value: SID }))!;
+    expect(await src.stat(key)).toEqual({ size: 1, mtimeMs: 30 });
+    await rm(base, { recursive: true, force: true });
+  });
+
+  test("schema drift in load surfaces as an error, never as an empty page", async () => {
+    const base = await realpath(await mkdtemp(join(tmpdir(), "collie-hermes-drift-")));
+    const root = join(base, "data");
+    await mkdir(root, { recursive: true });
+    const db = new Database(join(root, "state.db"));
+    db.run("create table sessions (id text primary key, source text, started_at real, parent_session_id text)");
+    // A `messages` table the adapter cannot know: base column `role` renamed. resolve still works
+    // (sessions is intact); load must THROW — the swallowed version of this read as "no history".
+    db.run(
+      "create table messages (id integer primary key, session_id text, kind text, content text, timestamp real)",
+    );
+    db.run("insert into sessions values (?, 'tui', 1, null)", [SID]);
+    db.close();
+    const src = new HermesTranscriptSource(root);
+    const key = (await src.resolve({ kind: "id", value: SID }))!;
+    expect(src.load(key!)).rejects.toThrow();
+    await rm(base, { recursive: true, force: true });
+  });
+});
+
+// The read-only promise is a red line of this adapter (it reads another agent's database), so it
+// is pinned twice: a resolve against a root with no database must not CREATE one (a read-write
+// open of a missing file creates it), and a database the process cannot write must still read.
+describe("HermesTranscriptSource — the read-only open", () => {
+  test("resolve on a root with no database creates nothing", async () => {
+    const base = await realpath(await mkdtemp(join(tmpdir(), "collie-hermes-roc-")));
+    await mkdir(join(base, "data"), { recursive: true });
+    expect(await new HermesTranscriptSource(join(base, "data")).resolve({ kind: "id", value: SID })).toBeNull();
+    expect(await stat(join(base, "data", "state.db")).then(() => true, () => false)).toBe(false);
+    await rm(base, { recursive: true, force: true });
+  });
+
+  test("a database chmodded 0444 still resolves and loads — the open is readonly", async () => {
+    const base = await realpath(await mkdtemp(join(tmpdir(), "collie-hermes-0444-")));
+    const root = join(base, "data");
+    await mkdir(root, { recursive: true });
+    const db = new Database(join(root, "state.db"));
+    createTables(db);
+    db.run("insert into sessions values (?, 'tui', 1, null)", [SID]);
+    db.run("insert into messages (id, session_id, role, content, timestamp) values (1, ?, 'user', 'still readable', 1)", [SID]);
+    db.close();
+    await chmod(join(root, "state.db"), 0o444);
+    const src = new HermesTranscriptSource(root);
+    const key = await src.resolve({ kind: "id", value: SID });
+    expect(key).not.toBeNull();
+    const loaded = await src.load(key!);
+    expect(parseHermesTranscript(loaded.text)[0]?.parts[0]).toEqual({ kind: "text", text: "still readable" });
     await rm(base, { recursive: true, force: true });
   });
 });
