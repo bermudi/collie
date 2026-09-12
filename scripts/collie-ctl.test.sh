@@ -94,7 +94,19 @@ install_fake_tailscale() {
 #!/usr/bin/env bash
 set -euo pipefail
 if [ "\${1:-}" = status ] && [ "\${2:-}" = --json ]; then
-  if [ "\${TS_NO_CERTS:-}" = 1 ]; then
+  # Staged shapes for the serve pre-check: a status this build cannot read must be distinguishable
+  # from a readable one whose CertDomains is genuinely empty (upstream 0062b91).
+  if [ "\${TS_STATUS_DEAD:-}" = 1 ]; then exit 1; fi
+  if [ "\${TS_STATUS_FLAKY:-}" = 1 ]; then
+    n=\$(cat "${CASE_DIR}/status.calls" 2>/dev/null || echo 0)
+    n=\$((n + 1)); echo "\$n" > "${CASE_DIR}/status.calls"
+    [ "\$n" -gt 1 ] || exit 1   # only the first read (the one the CertDomains check makes) fails
+  fi
+  if [ "\${TS_CERTS_STRING:-}" = 1 ]; then
+    echo '{"Self":{"DNSName":"host.example."},"CertDomains":"host.example"}'
+  elif [ "\${TS_CERTS_EMPTY:-}" = 1 ]; then
+    echo '{"Self":{"DNSName":"host.example."},"CertDomains":[]}'
+  elif [ "\${TS_NO_CERTS:-}" = 1 ]; then
     echo '{"Self":{"DNSName":"host.example."}}'
   else
     echo '{"Self":{"DNSName":"host.example."},"CertDomains":["host.example"]}'
@@ -456,6 +468,80 @@ COLLIE_PORT=8787
 EOF
   TS_NO_CERTS=1 run_ctl serve > "${CASE_DIR}/http.out" || fail "http serve needs no CertDomains"
   assert_contains "$(cat "$TS_CALLS")" '--http=8787'
+}
+
+# Upstream 0062b91, on top of the refusal above: a `tailscale status --json` this build cannot read
+# means "can't tell", never "no HTTPS". The unreadable case warns (naming the admin console, in case
+# the publish stops and waits anyway) and publishes; only a READABLE status with no CertDomains
+# refuses. A status that stays unreadable is still stopped by the hostname gate — "publish anyway"
+# never means publishing an untrackable root mount.
+test_serve_warns_and_publishes_on_an_unreadable_https_status() {
+  setup_case serve-unreadable-status
+  install_fake_tailscale
+  cat > "${CONFIG_DIR}/.env" <<'EOF'
+COLLIE_PORT=8787
+EOF
+
+  # Readable document, CertDomains not an array (a shape change): unreadable, not empty. The DNSName
+  # the ownership record needs is still present, so the publish lands.
+  local out
+  out="$(TS_CERTS_STRING=1 run_ctl serve 2>&1)" ||
+    fail "an unreadable HTTPS status refused a publish that works"
+  assert_contains "$out" "could not read this tailnet's HTTPS status"
+  assert_contains "$out" "Tailscale admin console"
+  case "$out" in
+    *"error: this tailnet has no HTTPS"*) fail "an unreadable status was refused as no-HTTPS" ;;
+  esac
+  assert_contains "$(cat "$TS_CALLS")" '--set-path=/ 8787'
+  assert_eq "$(cat "${CONFIG_DIR}/tailscale-managed-handler")" \
+    'https:443|host.example:443|http://127.0.0.1:8787'
+
+  # The other unreadable shape: `tailscale status` itself failing on the read the cert check makes.
+  # The next read (the hostname) answers, so the warning prints and the publish still lands.
+  setup_case serve-flaky-status
+  install_fake_tailscale
+  rm -f "${CASE_DIR}/status.calls"
+  cat > "${CONFIG_DIR}/.env" <<'EOF'
+COLLIE_PORT=8787
+EOF
+  out="$(TS_STATUS_FLAKY=1 run_ctl serve 2>&1)" ||
+    fail "a transiently unreadable status cost the publish"
+  assert_contains "$out" "could not read this tailnet's HTTPS status"
+  assert_contains "$(cat "$TS_CALLS")" '--set-path=/ 8787'
+  assert_eq "$(cat "${CONFIG_DIR}/tailscale-managed-handler")" \
+    'https:443|host.example:443|http://127.0.0.1:8787'
+
+  # Readable-but-empty stays a refusal — both shapes a tailnet without HTTPS answers with — and the
+  # can't-tell warning must stay off that path.
+  setup_case serve-readable-empty
+  install_fake_tailscale
+  cat > "${CONFIG_DIR}/.env" <<'EOF'
+COLLIE_PORT=8787
+EOF
+  if out="$(TS_CERTS_EMPTY=1 run_ctl serve 2>&1)"; then
+    fail "serve published an https door on an empty CertDomains array"
+  fi
+  assert_contains "$out" "no HTTPS"
+  assert_contains "$out" "COLLIE_SERVE_MODE=http"
+  case "$out" in
+    *"could not read this tailnet's HTTPS status"*) fail "a readable empty CertDomains warned as unreadable" ;;
+  esac
+  [ ! -s "$TS_CALLS" ] || fail "refused serve still called tailscale serve"
+
+  # A permanently dead status: the warning still prints, then the hostname gate refuses with its own
+  # error, and nothing is published or recorded.
+  setup_case serve-dead-status
+  install_fake_tailscale
+  cat > "${CONFIG_DIR}/.env" <<'EOF'
+COLLIE_PORT=8787
+EOF
+  if out="$(TS_STATUS_DEAD=1 run_ctl serve 2>&1)"; then
+    fail "a permanently unreadable status published an untrackable root mount"
+  fi
+  assert_contains "$out" "could not read this tailnet's HTTPS status"
+  assert_contains "$out" "cannot determine Tailscale hostname"
+  [ ! -s "$TS_CALLS" ] || fail "publish reached tailscale serve without a hostname"
+  [ ! -e "${CONFIG_DIR}/tailscale-managed-handler" ] || fail "dead status created ownership state"
 }
 
 # A failed front door must not abort `start` — the bridge is up on loopback and the banner still has
@@ -1661,6 +1747,7 @@ test_adopts_preexisting_collie_mount
 test_serve_port_publishes_a_chosen_https_listener
 test_serve_port_is_validated_and_https_only
 test_serve_refuses_a_tailnet_without_https
+test_serve_warns_and_publishes_on_an_unreadable_https_status
 test_serve_failure_does_not_abort_start
 test_launchd_agent_lifecycle
 test_launchd_status_line

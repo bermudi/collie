@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { TerminalSquare } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -6,6 +6,7 @@ import { SectionLabel } from "@/components/ui/section-label";
 import { StatusDot } from "@/components/status-badge";
 import { PaneActionsSheet } from "@/components/pane-actions-sheet";
 import { useLongPress } from "@/hooks/use-long-press";
+import { useRevealActive } from "@/hooks/use-reveal-active";
 import { paneDisplayName } from "@/lib/types";
 import type { AgentView } from "@/lib/types";
 
@@ -42,12 +43,19 @@ export function PaneStrip({
   // Actions need both callbacks wired (revalidate on rename, navigate on close); without them the
   // pills stay plain tap-to-switch — long-press is inert.
   const actionsEnabled = !!onRenamed && !!onClosed;
+  // Unconditional, BEFORE the `panes.length < 2` early return — hooks can't be conditional; when
+  // the strip renders nothing the ref simply never attaches and the reveal finds no scroller.
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  useRevealActive(scrollerRef, currentPaneId);
 
   if (panes.length < 2) return null;
 
   return (
     <>
-      <div className="flex items-center gap-2 overflow-x-auto border-t border-border/40 bg-muted/20 px-3 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={scrollerRef}
+        className="flex items-center gap-2 overflow-x-auto border-t border-border/40 bg-muted/20 px-3 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         <SectionLabel>Panes</SectionLabel>
         {panes.map((p) => (
           <PanePill

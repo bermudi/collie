@@ -6,6 +6,40 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.44.0] - 2026-09-12
+
+### Added
+
+- **Hermes panes get transcript history.** The sixth journal adapter reads Hermes' one SQLite
+  SessionDB (`~/.hermes/state.db`, `COLLIE_HERMES_ROOT` to relocate) through the exact Herdr
+  session id — never the newest row — including compressed parent sessions, walked depth-first
+  and capped at 32 generations. The database is opened read-only and the fixed filename is
+  confined to the configured root before opening; Collie never writes Hermes state. `omp` stays
+  an alias of pi, not an adapter. (upstream 85e0da5e, 33f54224, 801f879a)
+
+### Fixed
+
+- **A second tap escapes the update that keeps coming back stale.** When the eight-second guard
+  behind "new build — tap to update" reloads the page and the phone comes back on the same old
+  bundle, the next tap now unregisters the service worker and reloads from the bridge instead of
+  repeating the identical cycle. The caches go first and nothing waits on the worker (unregister
+  queues behind the very job that is stuck); the escape fires only while the page is provably
+  stale and the bridge answered within the last 20 s, so an offline install keeps its precache
+  and its stale bundle rather than landing on an error page. (upstream bb095e3a, web side only —
+  the Playwright suite stays behind)
+- **`collie serve` no longer refuses to publish when it cannot read the HTTPS status.** A
+  `tailscale status --json` that fails or does not parse is "can't tell", never "no HTTPS": the
+  publish proceeds with a warning naming the admin console. A readable status with no CertDomains
+  still refuses, exactly as before. (upstream 0062b91, adapted to the shell door)
+- **A long strip reveals its active tab.** The tab, pane, and space strips are hidden-scrollbar
+  scrollers; the active chip could sit scrolled out of view with no affordance. All three now
+  scroll the active chip to the nearest edge on selection change — never on a manual scroll, and
+  `auto` (not `smooth`) under reduced motion. (upstream 8a774cc4; the `labelled-strip` hunk has
+  no target in Pup — Pup's strips own their scroller directly)
+- **The footer build stamp stops re-fetching `/api/config` on every dashboard open.** The mount
+  effect now checks whether the build is already known before fetching; a known build needs no
+  second look. (upstream e3c7816e)
+
 ## [0.43.2] - 2026-09-10
 
 ### Fixed

@@ -1,8 +1,10 @@
+import { useRef } from "react";
 import { ChevronLeft, Loader2, Plus } from "lucide-react";
 
 import { Chip } from "@/components/ui/chip";
 import { SectionLabel } from "@/components/ui/section-label";
 import { worstTriage } from "@/lib/triage";
+import { useRevealActive } from "@/hooks/use-reveal-active";
 import type { AgentView, WorkspaceView } from "@/lib/types";
 
 interface SpaceStripProps {
@@ -36,8 +38,17 @@ export function SpaceStrip({
   // shrink-0: this strip is a child of the space route's `flex-1 flex-col` scroller, so without it
   // the strip flex-shrinks to 16px while its 32px chips overflow — the tab row below then paints
   // straight over the chips.
+  // Keyed on `selected`: on a switch the newly active chip may sit scrolled out of a long row. In
+  // the drill-in (`onBack` set) "Back" leads the row, but it's navigation rather than a space — not
+  // a chip, never `aria-current` — so the hook simply reveals whichever chip (if any) carries the
+  // active mark, and does nothing when none does.
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  useRevealActive(scrollerRef, selected);
   return (
-    <div className="flex shrink-0 items-center gap-2 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div
+      ref={scrollerRef}
+      className="flex shrink-0 items-center gap-2 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       {onBack ? (
         <button
           type="button"

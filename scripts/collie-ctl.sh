@@ -335,8 +335,12 @@ ensure_push_keys() {
 }
 
 self_dnsname() {
+  # `|| true` for the same reason self_hosts below carries it: this script runs under
+  # `set -o pipefail`, and `tailscale status` fails on CI and logged-out hosts. Without it a
+  # failed read kills the caller under `set -e` before its own refusal can print. Empty output
+  # is the failure signal — both callers (bridge_url, cmd_serve's hostname gate) handle it.
   tailscale status --json 2>/dev/null | bun -e \
-    "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{process.stdout.write(JSON.parse(d).Self.DNSName.replace(/\.\$/,''))}catch{}})"
+    "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{process.stdout.write(JSON.parse(d).Self.DNSName.replace(/\.\$/,''))}catch{}})" || true
 }
 
 # MagicDNS name plus Self TailscaleIPs, comma-joined for COLLIE_TAILSCALE_HOSTS so the bridge's
@@ -1330,12 +1334,25 @@ cmd_serve() {
   # an enablement URL and waits on a prompt nobody sees (serve.out only surfaces after the command
   # returns), so the https door refuses BEFORE teardown — a refusal must not cost the door that is
   # currently up. Plain-HTTP mode needs no certs and skips this.
+  #
+  # The status is captured BEFORE parsing so "empty" stays two different answers. A readable status
+  # whose CertDomains is absent or empty is a real "no HTTPS" and still refuses, exactly as before.
+  # A status that failed or doesn't parse is "can't tell", never "no HTTPS" — the refusal must not
+  # fire on it. That case publishes anyway with a warning naming the admin console, because the
+  # hang this check exists to prevent is the one outcome it cannot rule out from here.
   if [ "$SERVE_MODE" != "http" ]; then
-    _serve_certs="$(tailscale status --json 2>/dev/null | bun -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const c=(JSON.parse(d).CertDomains||[]);if(c.length)process.stdout.write('yes')}catch{}})" 2>/dev/null || true)"
-    if [ "${_serve_certs:-}" != "yes" ]; then
+    local _serve_status
+    _serve_status="$(tailscale status --json 2>/dev/null)" || true
+    _serve_certs="$(printf '%s' "${_serve_status:-}" | bun -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{let j;try{j=JSON.parse(d)}catch{process.stdout.write('unreadable');return}if(!j||typeof j!=='object'){process.stdout.write('unreadable');return}const c=j.CertDomains;if(c===undefined||c===null){process.stdout.write('no');return}if(!Array.isArray(c)){process.stdout.write('unreadable');return}process.stdout.write(c.length?'yes':'no')})" 2>/dev/null || true)"
+    if [ "${_serve_certs:-}" = "no" ]; then
       echo "error: this tailnet has no HTTPS (no CertDomains) — approve it in the Tailscale admin console, or serve plain HTTP with COLLIE_SERVE_MODE=http" >&2
       unset _serve_certs
       return 1
+    fi
+    if [ "${_serve_certs:-}" != "yes" ]; then
+      # 'unreadable' — or empty, when the parser itself was missing. Can't tell: say why a hang
+      # would still be possible, then publish.
+      echo "warn: could not read this tailnet's HTTPS status from 'tailscale status --json' — publishing anyway. If the publish stops and waits, HTTPS is off: approve it in the Tailscale admin console, or serve plain HTTP with COLLIE_SERVE_MODE=http" >&2
     fi
     unset _serve_certs
   fi

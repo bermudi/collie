@@ -21,6 +21,7 @@ const KEYS = [
   "COLLIE_PI_ROOT",
   "COLLIE_OPENCODE_ROOT",
   "COLLIE_GROK_ROOT",
+  "COLLIE_HERMES_ROOT",
   // Each harness's own home var participates in journal-root resolution, so the suite must own them
   // too — otherwise a developer with CODEX_HOME set gets different results than CI.
   "CODEX_HOME",
@@ -85,6 +86,8 @@ describe("loadConfig", () => {
     // OpenCode keeps ONE sqlite database at the top of its XDG data dir — no per-session files.
     expect(cfg.journalRoots.opencode).toEqual([join(homedir(), ".local", "share", "opencode")]);
     expect(cfg.journalRoots.grok).toEqual([join(homedir(), ".grok", "sessions")]);
+    // Hermes keeps ONE sqlite SessionDB at the top of `~/.hermes`.
+    expect(cfg.journalRoots.hermes).toEqual([join(homedir(), ".hermes")]);
     expect(cfg.submitKeys).toEqual(["Enter"]);
     expect(cfg.trustedUser).toBe("");
     expect(cfg.trustedUserOptional).toBe(false);
@@ -188,11 +191,13 @@ describe("loadConfig", () => {
     process.env.COLLIE_PI_ROOT = "/c/sessions,/d/sessions";
     process.env.COLLIE_OPENCODE_ROOT = "/e/opencode,/f/opencode";
     process.env.COLLIE_GROK_ROOT = "/g/sessions,/h/sessions";
+    process.env.COLLIE_HERMES_ROOT = "/i/hermes,/j/hermes";
     const cfg = loadConfig();
     expect(cfg.journalRoots.codex).toEqual(["/a/sessions", "/b/sessions"]);
     expect(cfg.journalRoots.pi).toEqual(["/c/sessions", "/d/sessions"]);
     expect(cfg.journalRoots.opencode).toEqual(["/e/opencode", "/f/opencode"]);
     expect(cfg.journalRoots.grok).toEqual(["/g/sessions", "/h/sessions"]);
+    expect(cfg.journalRoots.hermes).toEqual(["/i/hermes", "/j/hermes"]);
   });
 
   test("each harness's own home var relocates its journal root", () => {
@@ -211,6 +216,11 @@ describe("loadConfig", () => {
     process.env.CODEX_HOME = "/srv/codex";
     process.env.COLLIE_CODEX_ROOT = "/elsewhere/rollouts";
     expect(loadConfig().journalRoots.codex).toEqual(["/elsewhere/rollouts"]);
+  });
+
+  test("COLLIE_HERMES_ROOT relocates Hermes state.db", () => {
+    process.env.COLLIE_HERMES_ROOT = "/srv/hermes";
+    expect(loadConfig().journalRoots.hermes).toEqual(["/srv/hermes"]);
   });
 
   // The operator's rows sit beside their .env, and the launcher hands us that dir precisely so the

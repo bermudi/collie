@@ -16,6 +16,112 @@ ASR, or other large subsystems. The categories below distinguish:
 
 ## Ported in this round
 
+### The second tap escapes a stuck update — upstream `bb095e3a` (v1.8.0)
+
+**Status:** Ported (web side only).
+
+**What it does.** The stuck guard behind "new build — tap to update" reloads from the ACTIVE
+worker, so when activation is what is wedged, the reload lands on the very bundle the operator is
+trying to leave and the next tap starts the identical cycle (upstream measured ~3 minutes of taps
+on the release lane). The fix: the guard's reload leaves a `sessionStorage` note, spent on the next
+`checkForUpdate` whatever it finds; if the page is STILL provably stale (`isStaleBuild` off the
+bridge's own build header) and the bridge answered within 20 s (`subscribeServerBuild` freshness —
+unregistering offline strands the PWA), that tap takes the escape: delete every CacheStorage cache
+FIRST (no SW job needed; workbox falls through to network), start `unregister()` WITHOUT awaiting
+it (it queues on the same per-scope job queue as the wedged update), reload. The escape sits above
+the `!registration` check because `register()` queues behind the wedged job too.
+
+**Pup differences from upstream.**
+- Pup carries neither upstream's two-lane `ReloadLane`/`spent`/`navigating` machinery (an earlier
+  upstream fix, M20/05, "a tap never swallowed by an auto-reload that didn't leave the page" —
+  see Declined below) nor its i18n; the note's guard maps to Pup's single `reloaded` latch with
+  the same "only when the timer is really about to reload" semantics.
+- Upstream pinned the missing-registration ordering only in the Playwright suite; Pup's port adds
+  a unit case (`pwa.test.ts`) so the lean port loses no coverage. The Playwright tier itself stays
+  behind — Pup's gates are typecheck + Vitest + the ctl suite.
+- `web/src/lib/pwa.test.ts` is NEW here (Pup had no pwa unit tests); 7 cases pin the cycle, the
+  offline safety, the ordering, and the note's write/spend rules.
+
+**Files.** `web/src/lib/pwa.ts`, `web/src/lib/pwa.test.ts` (new).
+
+### Hermes transcript history — upstream `85e0da5e`, `33f54224`, `801f879a` (v1.8.0)
+
+**Status:** Ported (final form).
+
+**What it does.** Sixth journal adapter. Hermes keeps one SQLite SessionDB (`state.db`) at the top
+of its root; the pane supplies the exact session id and the adapter resolves it in whichever root
+holds it (`COLLIE_HERMES_ROOT`, default `~/.hermes`). Compressed parent sessions are walked with a
+bounded recursive CTE (depth < 32) and ordered parents-first; rows are JSON lines clipped to the
+existing `MAX_TRANSCRIPT_BYTES`. Read-only open, fixed filename confined via `containedRealpath`,
+parameterized SQL only, `withDb` closes in `finally`.
+
+**Pup differences from upstream.**
+- Dropped upstream hunks for files Pup does not carry: `web/src/lib/journal-agents.ts` (the
+  bridge is the single decision site — see the images round), `bridge/solo-baseline.test.ts`,
+  `bridge/beacon-journal.test.ts`, `cli/doctor.test.ts`, `cli/history.test.ts`.
+- `bridge/json.ts` is new beyond upstream's file list: the `JsonValue`/`JsonObject` boundary type
+  hermes.ts needs to keep `JSON.parse` results honest without `any`.
+- Tests are upstream's cases in Pup's journal idiom (real-SQLite fixtures per `opencode.test.ts`),
+  plus containment/multi-root/lineage coverage upstream's file lacked.
+- `.env.example` gains `COLLIE_HERMES_ROOT` (upstream never documented theirs).
+
+**Files.** `bridge/journal/hermes.ts` (+test), `bridge/json.ts` (new), `bridge/journal/registry.ts`
+(+test: six adapters, omp still an alias), `bridge/config.ts` (+test), `bridge/server.test.ts`,
+`.env.example`, `CLAUDE.md` (adapter list).
+
+### The serve door says "can't tell", never "no HTTPS" — upstream `0062b91` (v1.6.0)
+
+**Status:** Ported (adapted to the shell door).
+
+**What it does.** Pup's `cmd_serve` pre-check conflated an unreadable `tailscale status --json`
+(binary missing, logged out, parse failure) with a readable status whose `CertDomains` is empty —
+both refused to publish with "no HTTPS". Now three answers: `yes` (publish), `no` (readable,
+really no certs — the same refusal as before, admin-console remedy), `unreadable` (warn naming the
+admin console in case the publish stops to wait anyway, and PUBLISH anyway — the hang this check
+exists to prevent is the one outcome "can't tell" cannot rule out). `self_dnsname` gains the `||
+true` its callers always assumed under `set -o pipefail`.
+
+**Pup differences from upstream.** Upstream's fix lives in its TS cli; Pup's door is
+`scripts/collie-ctl.sh`, so the three-state parse is a `bun -e` classifier over a captured status
+string. `CertDomains: [""]` (only-empty-strings) still counts as present, as before — not visible
+to real tailscale output; smallest diff. The host-allowlist readers (`self_hosts`, ~:350) keep
+their deliberate fail-closed posture — see their comments; noted, not changed.
+
+**Files.** `scripts/collie-ctl.sh`, `scripts/collie-ctl.test.sh` (new cases: unreadable → warn +
+publish; readable-empty still refuses; the existing no-HTTPS case keeps covering refusal).
+
+### A long strip reveals its active tab — upstream `8a774cc4` (v1.8.0+)
+
+**Status:** Ported.
+
+**What it does.** `useRevealActive(scrollerRef, activeKey)` scrolls the strip's
+`[aria-current="true"]` chip to the nearest edge when the selection changes — never on a manual
+scroll (the effect runs on mount/key change only), `auto` on first reveal and under reduced motion,
+`smooth` on later changes, no-ops at `clientWidth === 0`. Pup's three strips (`tab`, `pane`,
+`space`) are hidden-scrollbar `overflow-x-auto` rows, so the active chip could sit out of view
+with no affordance — pick a pane on the dashboard, come back, wrong end of the strip.
+
+**Pup differences from upstream.** Pup's strips already mark the active chip `aria-current`
+(`Chip`, `PanePill`), so the hook's query works unchanged; each strip owns its scroller div
+inline — no `LabelledStrip` wrapper (declined architecture), so that upstream hunk has no target.
+PaneStrip calls the hook unconditionally before its `< 2` panes early return; SpaceStrip's
+comment differs because Pup's drill-in still renders sibling chips. The hook carries one added
+comment paragraph pinning the never-on-manual-scroll stance (Pup's single-scroll-container
+discipline). Playground hunks dropped (no playground dir).
+
+**Files.** `web/src/hooks/use-reveal-active.ts` (+test, new), `web/src/components/tab-strip.tsx`,
+`pane-strip.tsx`, `space-strip.tsx` (+tests each: reveals on change, still when visible).
+
+### The build stamp skips a known build — upstream `e3c7816e` (v1.8.0+)
+
+**Status:** Ported (near-verbatim).
+
+The mount effect checks `getServerBuild() !== undefined` BEFORE `fetchConfig()` — the dashboard
+remounts on every pane→dashboard move, and a known build needs no second look. Pup's component
+was the exact pre-fix code; two new MSW cases pin one-fetch-when-unseeded, zero-when-seeded.
+
+**Files.** `web/src/components/build-stamp.tsx` (+test).
+
 ### Images in the mirror — upstream `fd28d018`, `fbae4cf6`, `8e8cf78a`, `ba8e19a0`, `797318d6` (v1.8.0)
 
 **Status:** Ported (final design, not the interim commits).
@@ -188,6 +294,41 @@ readability. Existing devices with a saved preference are untouched — the loca
 ---
 
 ## Declined in this round
+
+### Crew wire v2, warrants, crew rename — upstream 1.7.0/1.8.0 wave
+
+**Status:** Declined — pack/HA, per ADR 0020 and the out-of-scope list. Noted here because the
+rename (`bridge/pack/` → `bridge/crew/`, `X-Pack-*` → `X-Crew-*`, protocol v2) will make future
+cherry-picks from shared files conflict more. Continue porting final designs, not interim
+commits (the pattern the images round set).
+
+### The swallowed-tap two-lane reload guard — upstream M20/05 (pre-image of `bb095e3a`)
+
+**Status:** Declined this round, deferred. Upstream's pwa.ts carries a two-lane guard
+(`ReloadLane`/`spent`/`navigating`) so a manual tap is never swallowed by an automatic reload
+that already ran but did not actually leave the page (it gives the tap back after 3 s). Pup's
+single `reloaded` latch predates it and the stuck-guard port above maps cleanly without it. The
+bug it fixes is real but narrow (reload that fails to navigate); if a Pup update ever hangs on a
+spent latch, port M20/05 next — this note is the trailhead.
+
+### iPhone notch / strip-band header fixes — upstream `59c77fc3`, `1b3939cf`, `93a4ecc2`, `15bd0bbd`
+
+**Status:** Declined — they patch the `notice.tsx`/`strip-host.tsx`/`update-ribbon` top-band
+architecture Pup never adopted (upstream 13af1fe3/ff4bf255, declined with i18n). Pup's single
+header shell already reserves `env(safe-area-inset-top)` (app-header.tsx) and its update banner
+is its own (watching this fork's tags).
+
+### Screen-slide transition, seven-column Keys tray, dev/playground icon rounds — upstream `d24a4d73`, `e12b4334`, `c7c4cc9e`/`9429bd61`, `ee3338a2`
+
+**Status:** Declined — features and dev UX, not fixes; Pup is fix-first. The Keys tray redesign
+in particular rewrites nav-tray into a shape Pup has no complaints about; the dev-icon rounds
+ride on upstream's playground, which Pup does not carry.
+
+### 1.7.0 update-run machinery — upstream `90fc363a`, `c7191904`
+
+**Status:** Declined — upstream's staged update orchestration for pack runs and its runner
+handoff; Pup's update path is its own (ADR 0006) and single-host. The genuinely phone-facing
+hazard that wave produced is covered by the stuck-guard escape ported above.
 
 ### Statusline strip scroll containment — upstream `7b77d7ce` (v1.2.0)
 

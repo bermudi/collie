@@ -383,6 +383,8 @@ export function loadConfig(): Config {
         "COLLIE_GROK_ROOT",
         join(process.env.GROK_HOME ?? join(homedir(), ".grok"), "sessions"),
       ),
+      // Hermes keeps one SQLite SessionDB at the top of `~/.hermes` — no per-session files.
+      hermes: envRoots("COLLIE_HERMES_ROOT", join(homedir(), ".hermes")),
     },
     submitKeys: submitKeys.length ? submitKeys : ["Enter"],
     commandsFile: join(configDir, "commands.toml"),

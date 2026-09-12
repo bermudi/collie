@@ -161,3 +161,64 @@ describe("PaneStrip", () => {
     expect(onSelect).toHaveBeenCalledExactlyOnceWith("w1:p1");
   });
 });
+
+// Wiring pin for `useRevealActive`: with a stubbed layout, switching to a pane whose pill sits
+// scrolled out of the strip carries it into view; a pill already on screen never triggers a scroll.
+// (The hook's own geometry math is pinned in `use-reveal-active.test.tsx` — jsdom lays nothing out,
+// so only these stubbed cases can prove the strip actually passes its scroller and selection.)
+describe("PaneStrip — reveal the active pill", () => {
+  function stubRect(el: HTMLElement, rect: { left: number; right: number }): void {
+    el.getBoundingClientRect = (): DOMRect => ({
+      ...rect,
+      top: 0,
+      bottom: 0,
+      width: rect.right - rect.left,
+      height: 0,
+      x: rect.left,
+      y: 0,
+      toJSON: () => ({}),
+    });
+  }
+
+  const twoPanes = [pane("w1:p1", "claude"), pane("w1:p2", "codex")];
+
+  it("scrolls the newly current pane's pill into view on a selection change", () => {
+    const { container, rerender } = render(
+      <PaneStrip panes={twoPanes} currentPaneId="w1:p1" onSelect={vi.fn()} />,
+    );
+    // SAFETY: PaneStrip renders the scroller as the fragment's first <div> (the strip's own
+    // overflow-x-auto row); without the actions wired nothing renders beside it.
+    const scroller = container.querySelector<HTMLDivElement>(":scope > div")!;
+    Object.defineProperty(scroller, "clientWidth", { value: 100, configurable: true });
+    scroller.scrollLeft = 0;
+    stubRect(scroller, { left: 0, right: 100 });
+    const scrollTo = vi.fn();
+    scroller.scrollTo = scrollTo;
+    const newlyActive = screen.getByRole("button", { name: /codex/ });
+    stubRect(newlyActive, { left: 300, right: 360 }); // well past the scroller's right edge
+
+    rerender(<PaneStrip panes={twoPanes} currentPaneId="w1:p2" onSelect={vi.fn()} />);
+
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo.mock.calls[0]![0].left).toBeGreaterThan(0);
+  });
+
+  it("does not scroll when the newly current pane's pill is already on screen", () => {
+    const { container, rerender } = render(
+      <PaneStrip panes={twoPanes} currentPaneId="w1:p1" onSelect={vi.fn()} />,
+    );
+    // SAFETY: as above — the scroller is the fragment's first (and only) <div>.
+    const scroller = container.querySelector<HTMLDivElement>(":scope > div")!;
+    Object.defineProperty(scroller, "clientWidth", { value: 100, configurable: true });
+    scroller.scrollLeft = 0;
+    stubRect(scroller, { left: 0, right: 100 });
+    const scrollTo = vi.fn();
+    scroller.scrollTo = scrollTo;
+    const newlyActive = screen.getByRole("button", { name: /codex/ });
+    stubRect(newlyActive, { left: 20, right: 80 }); // comfortably inside the visible range
+
+    rerender(<PaneStrip panes={twoPanes} currentPaneId="w1:p2" onSelect={vi.fn()} />);
+
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+});

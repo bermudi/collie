@@ -13,6 +13,7 @@
 import { claudeJournal } from "./claude.ts";
 import { codexJournal } from "./codex.ts";
 import { grokJournal } from "./grok.ts";
+import { hermesJournal } from "./hermes.ts";
 import { opencodeJournal } from "./opencode.ts";
 import { piJournal } from "./pi.ts";
 import type { JournalAdapter } from "./types.ts";
@@ -37,6 +38,8 @@ export interface JournalRoots {
   opencode: readonly string[];
   /** Grok Build's `$GROK_HOME/sessions`. */
   grok: readonly string[];
+  /** Hermes' SessionDB directory — `state.db` lives at its top level. */
+  hermes: readonly string[];
 }
 
 /**
@@ -52,6 +55,7 @@ export function buildJournalRegistry(roots: JournalRoots): Record<string, Journa
     piJournal(roots.pi),
     opencodeJournal(roots.opencode),
     grokJournal(roots.grok),
+    hermesJournal(roots.hermes),
   ];
   return Object.fromEntries(adapters.map((a) => [a.agent, a]));
 }

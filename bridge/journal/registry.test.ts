@@ -6,14 +6,15 @@ import { adapterFor, AGENT_ALIASES, buildJournalRegistry, journalAgents } from "
 // two properties that keep it from rotting: keys come from the adapters themselves, and a hostile
 // agent name can't resolve to something that isn't an adapter.
 
-const roots = { claude: ["/c"], codex: ["/x"], pi: ["/p"], opencode: ["/o"], grok: ["/g"] };
+const roots = { claude: ["/c"], codex: ["/x"], pi: ["/p"], opencode: ["/o"], grok: ["/g"], hermes: ["/h"] };
 
 describe("buildJournalRegistry", () => {
-  test("serves the five verified harnesses", () => {
+  test("serves the six verified harnesses", () => {
     expect(journalAgents(buildJournalRegistry(roots))).toEqual([
       "claude",
       "codex",
       "grok",
+      "hermes",
       "opencode",
       "pi",
     ]);
@@ -28,7 +29,7 @@ describe("buildJournalRegistry", () => {
 describe("adapterFor", () => {
   const registry = buildJournalRegistry(roots);
 
-  test.each(["claude", "codex", "pi", "opencode", "grok"])("resolves %s", (agent) => {
+  test.each(["claude", "codex", "pi", "opencode", "grok", "hermes"])("resolves %s", (agent) => {
     expect(adapterFor(registry, agent)?.agent).toBe(agent);
   });
 
@@ -47,13 +48,13 @@ describe("adapterFor", () => {
   );
 });
 
-// ── Aliases: a second NAME for one adapter, never a sixth adapter ────────────────────────────
+// ── Aliases: a second NAME for one adapter, never an adapter of their own ────────────────────
 
 describe("adapterFor — aliases", () => {
   const registry = buildJournalRegistry(roots);
 
-  // An alias is a second NAME for one adapter, never a sixth adapter — derived from the map so a
-  // new pair is covered the day it is added.
+  // An alias is a second NAME for one adapter, never an adapter of its own — derived from the map
+  // so a new pair is covered the day it is added.
   test.each(Object.entries(AGENT_ALIASES))("resolves the %s alias to %s", (alias, canonical) => {
     expect(adapterFor(registry, alias)?.agent).toBe(canonical);
   });

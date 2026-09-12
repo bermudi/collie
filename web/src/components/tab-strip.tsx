@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 
 import { Chip } from "@/components/ui/chip";
 import { SectionLabel } from "@/components/ui/section-label";
 import { TabActionsSheet } from "@/components/tab-actions-sheet";
 import { worstTriage } from "@/lib/triage";
+import { useRevealActive } from "@/hooks/use-reveal-active";
 import type { AgentView, TabView } from "@/lib/types";
 
 interface TabStripProps {
@@ -56,6 +57,10 @@ export function TabStrip({
   // Actions need both callbacks wired (revalidate on rename, fall back on close); without them the
   // chips stay plain tap-to-switch — long-press is inert.
   const actionsEnabled = !!onRenamed && !!onClosed;
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  // Keyed on `selected` (not `workspaceId`): a many-tab strip must reveal the active tab on mount
+  // AND every time the operator switches tabs, and `selected` is the value that changes on a switch.
+  useRevealActive(scrollerRef, selected);
 
   const wsTabs = tabs.filter((t) => t.workspaceId === workspaceId);
   if (wsTabs.length === 0) return null;
@@ -63,7 +68,10 @@ export function TabStrip({
   return (
     <>
       {/* shrink-0 for the same reason as SpaceStrip — see the note there. */}
-      <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-t border-border/40 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={scrollerRef}
+        className="flex shrink-0 items-center gap-2 overflow-x-auto border-t border-border/40 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         <SectionLabel>Tabs</SectionLabel>
         {allowAll && <Chip label="All" active={selected === null} onClick={() => onSelect(null)} />}
         {wsTabs.map((t) => (
