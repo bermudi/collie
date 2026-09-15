@@ -231,3 +231,58 @@ describe("createOperatorCommands", () => {
     expect(await read()).toEqual([]);
   });
 });
+
+describe("validateOperatorCommands — the bar flags (upstream fc8d1be9)", () => {
+  test("a bar row carries its flag and its label", () => {
+    const [row] = rows(`
+[[commands]]
+command = "/statusline"
+bar = true
+bar_label = "Status"
+`);
+    expect(row?.bar).toBe(true);
+    expect(row?.barLabel).toBe("Status");
+  });
+
+  test("a bar row with no label defaults to nothing — the web falls back to the command's word", () => {
+    const [row] = rows(`
+[[commands]]
+command = "/statusline"
+bar = true
+`);
+    expect(row?.bar).toBe(true);
+    expect(row?.barLabel).toBeUndefined();
+  });
+
+  test("a long bar_label is cut to twelve characters, ellipsis and all", () => {
+    const [row] = rows(`
+[[commands]]
+command = "/statusline"
+bar = true
+bar_label = "a very long label indeed"
+`);
+    expect(row?.barLabel).toBe("a very long…");
+  });
+
+  test("a palette-only row carries no bar at all", () => {
+    const [row] = rows(`
+[[commands]]
+command = "/statusline"
+`);
+    expect(row?.bar).toBeUndefined();
+  });
+
+  test("an unusable bar or bar_label drops the row, fail closed", () => {
+    expect(rows(`
+[[commands]]
+command = "/statusline"
+bar = "yes"
+`)).toEqual([]);
+    expect(rows(`
+[[commands]]
+command = "/statusline"
+bar = true
+bar_label = 7
+`)).toEqual([]);
+  });
+});

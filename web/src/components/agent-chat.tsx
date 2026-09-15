@@ -917,22 +917,13 @@ export function AgentChat({
             up-levelled prompt buttons) — it now lives as a slim row just below the header. */}
         <div className="relative">
 
-          {/* Swipe-up / tap handle for the quick pane switcher — the sheet that switches AND closes
-              panes (each row has a ✕). A tall, full-width hit area so the swipe is easy to land (and a
-              tap always works). Shown whenever a pane is open — even the last one, so it stays
-              closable now that the nav drawer is gone. `touch-none` so the gesture is ours, not a
-              browser scroll. */}
-          {agents.length + shellPanes.length > 0 && (
-            <button
-              type="button"
-              aria-label="Switch pane"
-              {...sheetPull}
-              onClick={() => setDrawer("switcher")}
-              className="flex w-full touch-none items-center justify-center py-3.5 transition-colors active:bg-muted/50"
-            >
-              <span className="h-1.5 w-12 rounded-full bg-muted-foreground/50" />
-            </button>
-          )}
+          {/* THE PANE SWITCHER lives on the ACTIONS BELT now — a bare Layers mark pinned at its
+              right end, above Send, behind a hairline (upstream 931f857a). The old 30px handle band
+              here is gone: a drag up from anywhere on the belt opens the same sheet, and the mark
+              costs the belt 0px of height. THE MARK AND THE DRAG are handed to the composer below,
+              which hands both to the belt — the belt owns the rule the mark is drawn on and the band
+              the drag runs over (`ref` to the band, `onClick` to the mark). The switcher sheet stays
+              reachable mid-sentence because the mark never stood down for the keyboard at all. */}
 
           {/* The agent's statusline, re-surfaced as app chrome (its branch/model/ctx/permission mode
               would otherwise vanish with the stripped input box). Sits directly above the composer,
@@ -981,6 +972,11 @@ export function AgentChat({
             session={session}
             agent={agent?.agent}
             isShell={isShell}
+            switcher={
+              agents.length + shellPanes.length > 0
+                ? { ref: sheetPull.ref, onClick: () => setDrawer("switcher"), label: "Switch pane" }
+                : undefined
+            }
             gone={gone}
             readOnly={readOnly}
             dialogPresent={dialogPresent}

@@ -294,6 +294,11 @@ export interface OperatorCommand {
   argHint: string;
   /** The operator marking their own row dangerous. Optional so an older bridge stays readable. */
   confirm?: boolean;
+  /** Also put this row on the harness bar above the keys (upstream fc8d1be9). Optional; absent
+   *  rows stay palette-only. */
+  bar?: boolean;
+  /** The bar button's text, when `bar` is set — twelve characters at most, bridge-side. */
+  barLabel?: string;
 }
 
 /**

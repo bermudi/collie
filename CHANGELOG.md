@@ -77,6 +77,29 @@ mux abstraction the redesign upstream rides on are **not** part of this port; se
   tap floor, scroller padding, above-label) and `ui/list-group.tsx` (the framed flat-row region)
   arrive with them, as upstream ships them. Pup drops upstream's per-tab agent tile on the strip.
 
+### Web — the actions belt
+
+- **One row of actions above the keyboard, with the running agent's own commands in it.** Keys,
+  Type, Quick, Agent and the display gear share a single scrolling belt with the harness's
+  commands, which sit in a segment tinted with that harness's brand colour (Claude's orange, omp's
+  purple; Codex and pi are monochrome by design and take the muted ground) and carry an icon each.
+  Every button sends its bare command and the harness paints its own picker in the mirror, so the
+  list of models or effort levels never lives in Collie. The old Controls row and the 30px
+  swipe-handle band are gone; a bare Layers mark pinned at the belt's right end opens the pane
+  switcher, a drag up from anywhere on the band opens the same sheet, and the composer keeps its
+  row back. Settings gains a per-device "Harness shortcuts" switch (on by default).
+  (upstream fc8d1be9, 9b530786, 5e7f626c, 63513aee, 931f857a, adaa1fb3 + the belt's follow-ups,
+  ported as the end state)
+- **Operators add or replace the segment with `bar = true` in `commands.toml`**, with an optional
+  `bar_label` (twelve characters kept whole). The replacement rule is per surface (ADR 0018's
+  posture, applied to the bar alone): bar rows never blank the Agent palette, and a shipped
+  dangerous command's two-tap confirm is inherited as a floor. (upstream fc8d1be9)
+- **Pup-shaped limits, stated:** the belt carries no host tag and no cache reading (no crew, no
+  cache subsystem); the composer's verified-paste transport, guarded submit, draft previews and
+  docks are untouched — only the row that held their toggles changed shape; omp's Tree button
+  stays off the bar until this repo holds an `omp--tree.txt` capture to vouch for it (upstream
+  cc38c2de's own rule, followed rather than shortcut).
+
 ## [0.45.0] - 2026-09-12
 
 ### Changed

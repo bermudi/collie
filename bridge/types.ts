@@ -323,6 +323,10 @@ export interface OperatorCommand {
    * command's confirm regardless (rule 3 in agent-commands.ts), and `false` cannot lift it.
    */
   confirm: boolean;
+  /** Also put this row on the harness bar above the keys (upstream fc8d1be9). Absent = palette-only. */
+  bar?: boolean;
+  /** The bar button's text, when `bar` is set — 12 characters at most, kept whole past that. */
+  barLabel?: string;
 }
 
 /**

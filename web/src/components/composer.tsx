@@ -12,6 +12,7 @@ import { buzz } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { BottomSheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { ActionsRow } from "@/components/actions-row";
 import { ChatInput } from "@/components/ui/chat/chat-input";
 import { NavTray } from "@/components/nav-tray";
 import { CommandPalette } from "@/components/command-palette";
@@ -46,6 +47,14 @@ interface ComposerProps {
   agent: string | undefined | null;
   /** True for a bare shell pane (tweaks the placeholder copy). */
   isShell: boolean;
+  /** THE PANE SWITCHER, PINNED AT THE ACTIONS BELT'S RIGHT END (upstream 931f857a): the drag
+   *  surface's ref, the Switch mark's tap, and its accessible name. Absent = no mark, and the
+   *  belt is not a drag surface. */
+  switcher?: {
+    ref: (node: HTMLElement | null) => void;
+    onClick: () => void;
+    label: string;
+  };
   /** Pane is gone (no agent) — locks the composer with a distinct placeholder. */
   gone: boolean;
   /** This device isn't authorised to type — locks the composer with a distinct placeholder. */
@@ -90,11 +99,8 @@ interface ComposerProps {
 // them). Find moved the other way — to the header, where its find bar already takes over the row.
 type ComposerDrawer = "quick" | "cmd" | "keys" | "display" | null;
 
-// The Controls row's "on" look, authored once so an open dock and an armed mode can never drift
-// apart. `hover:` is pinned to the same tint: without it, hovering an already-on control repaints it
-// with the ghost variant's hover background and it reads as switching off under the cursor.
-const CONTROL_ON = "bg-control-on text-control-on-foreground hover:bg-control-on";
-const CONTROL_OFF = "text-muted-foreground";
+// The belt (components/actions-row.tsx) owns the controls' "on" look now — CONTROL_ON/OFF moved
+// there with the row itself.
 
 // Pause after clearing a stranded terminal draft so the TUI settles before pane.send_text. Exported
 // so the test can pin the WAIT ITSELF (the reply never overtakes the sweep) against the constant
@@ -145,7 +151,7 @@ function ComposerDock({
 }
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { paneId, session, agent, isShell, gone, readOnly, dialogPresent, text, terminalDraft, rawTerminalDraft, prefs, setWrap, stepFontSize, setRawTerminal, setTapToFocus, setExpandClippedReply, onSent },
+  { paneId, session, agent, isShell, switcher, gone, readOnly, dialogPresent, text, terminalDraft, rawTerminalDraft, prefs, setWrap, stepFontSize, setRawTerminal, setTapToFocus, setExpandClippedReply, onSent },
   ref,
 ) {
   const revalidator = useRevalidator();
@@ -824,7 +830,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
   return (
     <>
-      <div className="border-t border-border/60 bg-muted px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.5rem)] pt-2.5">
+      <div className="border-t border-rule bg-chrome px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.5rem)] pt-0">
         {/* Pending-send preview: visible from send until the mirror echoes back (or 6s). Shows the
             user what landed so they don't double-tap while waiting for the terminal to update. */}
         {lastSent && (
@@ -921,103 +927,91 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             />
           </ComposerDock>
         )}
-        {/* The one action row: Keys · Quick · Agent · ⚙ (Agent only when the pane's agent has
-            commands). Display prefs used to sit on a second, permanent icon-only "View" row above
-            this one; folding them behind the ⚙ gives the mirror that row back. The gear is icon-only
-            and NOT flex-1 — it's a settings affordance, not a peer of the three action toggles, and
-            keeping it narrow leaves the labelled buttons their width on a 390px phone. */}
-        {/* The "Controls" tag is lifted OUT of the row's flex flow and floated just above it. In
-            flow it was a fixed ~60px of a 390px phone width spent on a word that never changes,
-            which is what squeezed the toggles; absolute costs nothing and the row gets the width
-            back. `pt-3` on the row reserves the space it occupies so it can't collide with whatever
-            sits above. */}
-        <div className="relative mb-2 flex items-center gap-2 pt-3">
-          <SectionLabel className="absolute left-0 top-0 text-[10px] leading-none opacity-80">
-            Controls
-          </SectionLabel>
-          {/* Keys and Quick are TOGGLES for the in-flow dock above (not overlays): tap to open, tap
-              again to close. aria-expanded ties each to the dock; secondary variant marks it pressed
-              while open. Both share the single-valued `drawer`, so opening one closes the other. */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn("h-8 flex-1 gap-1.5", drawer === "keys" ? CONTROL_ON : CONTROL_OFF)}
-            disabled={locked}
-            aria-expanded={drawer === "keys"}
-            onClick={() => requestDrawer(drawer === "keys" ? null : "keys")}
-          >
-            <Keyboard className="size-4" />
-            Keys
-          </Button>
-          {/* "Type into terminal" lives HERE, beside Keys, rather than on the Send button.
-              It is the same problem split in half: Keys exists because the phone keyboard cannot
-              send Esc/Tab/arrows/chords, this exists because it cannot send bare printable letters —
-              so someone who wants to press `b` looks in this row first. It is also used in bursts
-              (a picker, a y/n prompt) and then not for days, which is the wrong shape for a
-              permanent fixture on the app's most-used control: a split Send button cost a third of
-              the primary action's width every day to serve a mode used on a few of them.
-              Unlike its neighbours this toggles state instead of opening a dock — the armed strip
-              above the input is what makes that visible. Arming is still an explicit NAMED choice,
-              which is what keeps an accidental touch from quietly wiring the keyboard to a live
-              terminal; see use-direct-typing.ts for the rest of that argument. */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn("h-8 flex-1 gap-1.5", direct.active ? CONTROL_ON : CONTROL_OFF)}
-            disabled={locked || sending}
-            aria-pressed={direct.active}
-            aria-label="Type into terminal"
-            onClick={() => {
-              if (direct.active) {
-                direct.deactivate();
-                return;
-              }
-              // Close whatever dock is open first: the mode needs the phone keyboard, and a dock
-              // holding half the viewport is the thing in its way. Routed through requestDrawer so a
-              // staged key queue still gets its discard confirm (ADR 0005).
-              requestDrawer(null);
-              direct.activate();
-            }}
-          >
-            <Terminal className="size-4" />
-            Type
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn("h-8 flex-1 gap-1.5", drawer === "quick" ? CONTROL_ON : CONTROL_OFF)}
-            disabled={locked}
-            aria-expanded={drawer === "quick"}
-            onClick={() => requestDrawer(drawer === "quick" ? null : "quick")}
-          >
-            <Zap className="size-4" />
-            Quick
-          </Button>
-          {commands.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 flex-1 gap-1.5 text-muted-foreground"
-              disabled={locked}
-              onClick={() => requestDrawer("cmd")}
-            >
-              <Slash className="size-4" />
-              Agent
-            </Button>
-          )}
-          {/* Display prefs. Not gated on `locked`: wrap/font/raw-terminal are local view state, so a
-              read-only device or a gone pane can still make its mirror readable. */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn("size-8 shrink-0", drawer === "display" ? CONTROL_ON : CONTROL_OFF)}
-            aria-label="Display settings"
-            aria-expanded={drawer === "display"}
-            onClick={() => requestDrawer(drawer === "display" ? null : "display")}
-          >
-            <Settings2 className="size-4" />
-          </Button>
-        </div>
+        {/* THE ACTIONS BELT — one full-bleed scrolling band above the input (upstream fc8d1be9,
+            9b530786, 5e7f626c). Collie's own controls run first — Keys, Type, Quick, Agent, the
+            display gear — then the running harness's own commands in a section tinted with that
+            harness's brand, and the pane Switch mark pinned at the right end. It replaced the old
+            Controls row (and the separate harness bar upstream had): merged, the composer gets a
+            row back and the harness commands sit at the same height as the keys they were always
+            meant to live beside. The belt owns the "on" look and the drag surface; this file only
+            says what each control DOES — exactly the split the old row had. */}
+        <ActionsRow
+          general={[
+            // Keys and Quick are TOGGLES for the in-flow dock above (not overlays): tap to open,
+            // tap again to close. Both share the single-valued `drawer`, so opening one closes the
+            // other.
+            {
+              id: "keys",
+              icon: Keyboard,
+              label: "Keys",
+              on: drawer === "keys",
+              expanded: drawer === "keys",
+              disabled: locked,
+              onSelect: () => requestDrawer(drawer === "keys" ? null : "keys"),
+            },
+            // "Type into terminal" lives HERE, beside Keys, rather than on the Send button — the
+            // phone keyboard cannot send bare printable letters, so someone who wants to press `b`
+            // looks in this row first. Unlike its neighbours this toggles state instead of opening
+            // a dock. Arming is still an explicit NAMED choice, which is what keeps an accidental
+            // touch from quietly wiring the keyboard to a live terminal (use-direct-typing.ts).
+            {
+              id: "type",
+              icon: Terminal,
+              label: "Type into terminal",
+              word: "Type",
+              on: direct.active,
+              pressed: direct.active,
+              disabled: locked || sending,
+              onSelect: () => {
+                if (direct.active) {
+                  direct.deactivate();
+                  return;
+                }
+                // Close whatever dock is open first: the mode needs the phone keyboard, and a dock
+                // holding half the viewport is the thing in its way. Routed through requestDrawer
+                // so a staged key queue still gets its discard confirm (ADR 0005).
+                requestDrawer(null);
+                direct.activate();
+              },
+            },
+            {
+              id: "quick",
+              icon: Zap,
+              label: "Quick",
+              on: drawer === "quick",
+              expanded: drawer === "quick",
+              disabled: locked,
+              onSelect: () => requestDrawer(drawer === "quick" ? null : "quick"),
+            },
+            ...(commands.length > 0
+              ? [
+                  {
+                    id: "agent",
+                    icon: Slash,
+                    label: "Agent",
+                    disabled: locked,
+                    onSelect: () => requestDrawer("cmd"),
+                  },
+                ]
+              : []),
+            // Display prefs. Not gated on `locked`: wrap/font/raw-terminal are local view state, so
+            // a read-only device or a gone pane can still make its mirror readable.
+            {
+              id: "display",
+              icon: Settings2,
+              label: "Display settings",
+              word: "Display",
+              on: drawer === "display",
+              expanded: drawer === "display",
+              onSelect: () => requestDrawer(drawer === "display" ? null : "display"),
+            },
+          ]}
+          agent={agent}
+          mine={operatorCommands}
+          onRun={(t) => send(t, false)}
+          disabled={locked}
+          handle={switcher}
+        />
         {/* Terminal-draft preview: a read-only view of a stranded "❯"-line draft (a message queued
             then recalled on the HOST, which stripChrome hides from the mirror). It appears only after
             the draft stabilises (never a blip/self-echo), then its text tracks the live line — host
