@@ -6,6 +6,20 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [Unreleased]
+
+### Changed
+
+- **The mirror no longer guesses at terminal images; the black box is gone.** The Kitty
+  placeholder→journal-image cards only ever worked for harnesses that print placeholder characters
+  into the grid (omp does; pi paints a direct `a=T` placement that reaches the pane read as blank
+  rows). For pi that meant a tall black void and dead machinery; for omp it meant a picture matched
+  by order, never verified. The mirror now renders only what the read contains: runs of four or
+  more blank lines collapse to a single `[N blank lines]` row — which is exactly what a pi image
+  reservation looks like — and History keeps the exact journal images it always had
+  (.adr/0041). Deleted: `useMirrorImages`, `mirror-images`, the `images`/`onImageClusterCount`
+  props, the `[Image]` badge and cards.
+
 ## [0.44.1] - 2026-09-12
 
 ### Fixed

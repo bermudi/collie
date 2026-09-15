@@ -138,7 +138,12 @@ was the exact pre-fix code; two new MSW cases pin one-fetch-when-unseeded, zero-
 
 ### Images in the mirror — upstream `fd28d018`, `fbae4cf6`, `8e8cf78a`, `ba8e19a0`, `797318d6` (v1.8.0)
 
-**Status:** Ported (final design, not the interim commits).
+**Status:** Ported, then **the mirror half was reverted** ([.adr/0041](./.adr/0041-the-mirror-does-not-guess-images.md)).
+The cluster/card/badge machinery below only ever fired for harnesses that *print* Kitty unicode
+placeholders (omp does, pi does not — pi's direct `a=T` placement leaves only blank rows in the
+read). What survives: the journal half — History/transcript render exact image references — the
+`/api/blobs/<hash>` route, and both sides' refusal of remote refs. What replaced the mirror half:
+a run of ≥4 blank lines collapses to `[N blank lines]`.
 
 **What it does.** A Kitty-protocol image is not in the rendered grid — the terminal painted the
 pixels and left a rectangle of U+10EEEE placeholder cells, which is why the mirror used to show a
@@ -167,9 +172,9 @@ it, the phone showed a black box.
   journal roots cover both `~/.omp/agent/sessions` and `~/.pi/agent/sessions`.
 - CSP needed no change — `img-src 'self' data:` already admits both shapes.
 
-**Files.** `web/src/lib/mirror-images.ts` (+test), `web/src/hooks/use-mirror-images.ts` (+test),
-`web/src/components/ansi-output.tsx` (clusters, cards, badges, offset fixes),
-`web/src/components/agent-chat.tsx` (wiring + tests), `web/src/components/transcript-view.tsx`
+**Files.** ~~`web/src/lib/mirror-images.ts`~~, ~~`web/src/hooks/use-mirror-images.ts`~~ (deleted with
+the mirror half), `web/src/components/ansi-output.tsx` (blank-run collapse),
+`web/src/components/agent-chat.tsx`, `web/src/components/transcript-view.tsx`
 (JournalImage), `web/src/lib/api.ts` (`imageSrc`), `web/src/lib/types.ts`,
 `web/src/lib/transcript-search.ts`, `bridge/journal/pi.ts` (blob resolve/refuse, image parts),
 `bridge/journal/types.ts`, `bridge/journal/registry.ts` (alias), `bridge/config.ts` (two pi roots),

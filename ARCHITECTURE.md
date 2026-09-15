@@ -161,8 +161,9 @@ app. Closing this needs the server-side blocking-message capture described above
   ids are globally unique, so that's a lookup, not a preference. Containment is checked **per root**,
   never against their union. Pictures ride the same source, and the same containment: an image the
   agent attached, spoke, or a tool returned is served by `/api/blobs/<hash>` (or inline bytes) and
-  rendered in the mirror in place of the terminal's Kitty-graphics placeholder block — matched by
-  order, from the end, because the placeholder encodes an image id no journal records. And when the
+  rendered in History by exact reference. The mirror does not reconstruct terminal graphics — a
+  direct Kitty placement reaches the read as the blank rows it reserved, so runs of four or more
+  blank lines collapse to one labelled row instead of a black box (.adr/0041). And when the
   terminal has clipped a reply's opening, the pane re-renders that newest turn in full IN PLACE of
   the rows it covers — a render-only subtraction applied after every grammar has run, so no
   detector, guard or draft probe ever sees a trimmed screen. The client fetches the whole

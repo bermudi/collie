@@ -1,6 +1,8 @@
 # 0040 — A journal image reference is this bridge's blob path or inline bytes, never a remote URL
 
-Status: **Accepted** (2026-09-09)
+Status: **Accepted** (2026-09-09) — the mirror half is superseded by
+[0041](./0041-the-mirror-does-not-guess-images.md); everything this ADR says about journal
+references still stands for History/transcript.
 
 ## Context
 
