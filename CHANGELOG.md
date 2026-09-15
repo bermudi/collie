@@ -6,7 +6,7 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
-## [Unreleased]
+## [0.45.0] - 2026-09-12
 
 ### Changed
 
@@ -18,7 +18,7 @@ All notable changes to Collie are recorded here. The format follows
   more blank lines collapse to a single `[N blank lines]` row — which is exactly what a pi image
   reservation looks like — and History keeps the exact journal images it always had
   (.adr/0041). Deleted: `useMirrorImages`, `mirror-images`, the `images`/`onImageClusterCount`
-  props, the `[Image]` badge and cards.
+  props, the `[Image]` badge and cards. (c50fc562)
 
 ## [0.44.1] - 2026-09-12
 
