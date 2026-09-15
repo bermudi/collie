@@ -43,7 +43,7 @@ import type { PromptBlockAction } from "@/components/prompt-select-block";
 import type { PreviewBlockAction } from "@/components/preview-select-block";
 import type { MenuBlockAction } from "@/components/menu-block";
 import { canGrowRequestedLines, growRequestedLines } from "@/lib/loaders";
-import { shortCwd } from "@/lib/format";
+import { paneName, panePlaceParts } from "@/lib/pane-name";
 import { historyPath, spacePath } from "@/lib/nav";
 import { isReadOnly } from "@/lib/types";
 import type { AgentView, BridgeStatus, DeviceAuth, TabView } from "@/lib/types";
@@ -63,8 +63,6 @@ interface AgentChatProps {
   agents: AgentView[];
   shellPanes: AgentView[];
   tabs: TabView[];
-  /** Label of the pane's tab, shown in the header as "space › tab". */
-  tabLabel?: string;
   /** Pane output from the route loader (refreshed by polling/revalidation). */
   text: string;
   /** The scrollback window `text` was fetched with — tells a grown fetch from a stale in-flight poll. */
@@ -103,7 +101,6 @@ export function AgentChat({
   agents,
   shellPanes,
   tabs,
-  tabLabel,
   text,
   requestedLines = 0,
   revision = 0,
@@ -730,39 +727,42 @@ export function AgentChat({
           ) : undefined
         }
       >
-        {/* Title block: the space › tab leads, with the agent's brand logo to its left (the agent
-            name would just repeat the icon, so it's dropped), and the working directory on the
-            subline. Tapping it leaves the pane for the space overview (all its tabs + panes). */}
+        {/* Title block — LINE 1 IS THE NAME, LINE 2 IS THE PLACE (upstream 6e8eeafc, b14ffd49).
+            The one rule every other surface follows: the pane is called what it is CALLED
+            (lib/pane-name.ts), not `space › tab` — one pane, one name, on every screen. The
+            address moved down one line, where an address belongs, and says the WORKSPACE alone:
+            the tab strip directly below the header already names the open tab, so `space › tab`
+            here would say the same thing twice. The cwd left the header with it — it lives on the
+            dashboard's tab-scoped rows and in History, and a full path on line 2 was the least
+            readable fact the row had. Tapping the block leaves the pane for the space overview. */}
         {agent ? (
-          <button
-            type="button"
-            onClick={() => openSpace(agent.workspaceId)}
-            aria-label={`Open ${agent.workspaceLabel} overview`}
-            className="-mx-1 flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-0.5 text-left transition-colors active:bg-muted/60"
-          >
-            {isShell ? (
-              <div className="flex size-6 shrink-0 items-center justify-center rounded-full border bg-muted">
-                <TerminalSquare className="size-3 text-muted-foreground" />
+          <div className="relative -mx-1 flex min-h-11 min-w-0 flex-1 items-center rounded-lg px-1 text-left">
+            <button
+              type="button"
+              onClick={() => openSpace(agent.workspaceId)}
+              aria-label={`Open ${agent.workspaceLabel} overview`}
+              className="absolute inset-0 rounded-lg transition-colors active:bg-muted/60"
+            />
+            <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-1">
+              {/* Line 1: the agent's own mark ON the name — the way a favicon sits on a title —
+                  then the name. The mark is the pane's subject, not a second brand competing with
+                  Collie's for the header. */}
+              <div className="flex min-w-0 items-center gap-2">
+                {isShell ? (
+                  <div className="flex size-4 shrink-0 items-center justify-center rounded-sm border bg-muted">
+                    <TerminalSquare className="size-2.5 text-muted-foreground" />
+                  </div>
+                ) : (
+                  <AgentIcon agent={agent.agent} className="size-4" />
+                )}
+                <span className="truncate font-semibold leading-5">{paneName(agent)}</span>
               </div>
-            ) : (
-              // Deliberately smaller than the size-8 Collie mark beside it — the agent logo is the
-              // pane's subject, not a second brand competing with Collie's for the header.
-              <AgentIcon agent={agent.agent} className="size-6" />
-            )}
-            <div className="min-w-0 flex-1">
-              {/* A user-set pane label leads when present (the identifier they chose), then Claude's
-                  own /rename session name, otherwise the default space › tab. The cwd subline keeps
-                  context either way. */}
-              <div className="truncate font-semibold leading-tight">
-                {agent.paneLabel ??
-                  agent.sessionName ??
-                  `${agent.workspaceLabel}${tabLabel ? ` › ${tabLabel}` : ""}`}
-              </div>
-              <div className="truncate font-mono text-xs leading-tight text-muted-foreground">
-                {shortCwd(agent.cwd)}
-              </div>
+              {/* Line 2: the workspace alone, the same muted small line the path line always was. */}
+              <span className="truncate text-xs leading-3 text-muted-foreground">
+                {panePlaceParts(agent, tabs).space}
+              </span>
             </div>
-          </button>
+          </div>
         ) : (
           <div className="min-w-0 flex-1">
             <span className="truncate font-semibold">(agent gone)</span>

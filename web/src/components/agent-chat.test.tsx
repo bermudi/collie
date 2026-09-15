@@ -91,12 +91,12 @@ function SpaceOverviewSentinel() {
 }
 
 describe("AgentChat — header title block", () => {
-  it("leads with the space, puts the directory on the subline, and drops the redundant agent name", () => {
-    renderChat(); // claude @ /home/you/webapp → ~/webapp
-    expect(screen.getByText("webapp")).toBeInTheDocument(); // space leads
-    expect(screen.getByText("~/webapp")).toBeInTheDocument(); // directory on the subline
-    // The agent is conveyed by its icon (aria-label only), so its name isn't repeated as text.
-    expect(screen.queryByText(/claude/i)).toBeNull();
+  it("leads with the pane's NAME, puts the workspace on the subline, and drops the redundant agent word (upstream 6e8eeafc)", () => {
+    renderChat(); // claude @ /home/you/webapp — nothing hand-names it, so the agent word IS the name
+    expect(screen.getByText("claude")).toBeInTheDocument(); // the one name rule's last rung
+    expect(screen.getByText("webapp")).toBeInTheDocument(); // the workspace alone, line 2
+    // The cwd left the header: it lives on tab-scoped rows and in History, not here.
+    expect(screen.queryByText("~/webapp")).toBeNull();
     expect(screen.getByRole("button", { name: /open webapp overview/i })).toBeInTheDocument();
   });
 

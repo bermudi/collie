@@ -188,7 +188,7 @@ describe("PaneStrip — reveal the active pill", () => {
     );
     // SAFETY: PaneStrip renders the scroller as the fragment's first <div> (the strip's own
     // overflow-x-auto row); without the actions wired nothing renders beside it.
-    const scroller = container.querySelector<HTMLDivElement>(":scope > div")!;
+    const scroller = container.querySelector<HTMLDivElement>("[data-slot=\"strip-scroller\"]")!;
     Object.defineProperty(scroller, "clientWidth", { value: 100, configurable: true });
     scroller.scrollLeft = 0;
     stubRect(scroller, { left: 0, right: 100 });
@@ -208,7 +208,7 @@ describe("PaneStrip — reveal the active pill", () => {
       <PaneStrip panes={twoPanes} currentPaneId="w1:p1" onSelect={vi.fn()} />,
     );
     // SAFETY: as above — the scroller is the fragment's first (and only) <div>.
-    const scroller = container.querySelector<HTMLDivElement>(":scope > div")!;
+    const scroller = container.querySelector<HTMLDivElement>("[data-slot=\"strip-scroller\"]")!;
     Object.defineProperty(scroller, "clientWidth", { value: 100, configurable: true });
     scroller.scrollLeft = 0;
     stubRect(scroller, { left: 0, right: 100 });

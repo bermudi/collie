@@ -372,7 +372,7 @@ describe("TabStrip — reveal the active tab", () => {
     // SAFETY: TabStrip renders the scroller as the fragment's first <div> (the strip's own
     // overflow-x-auto row), and without the actions wired nothing renders beside it, so a render
     // never leaves this query unmatched.
-    const scroller = container.querySelector<HTMLDivElement>(":scope > div")!;
+    const scroller = container.querySelector<HTMLDivElement>("nav > div")!;
     Object.defineProperty(scroller, "clientWidth", { value: 100, configurable: true });
     scroller.scrollLeft = 0;
     stubRect(scroller, { left: 0, right: 100 });
@@ -408,7 +408,7 @@ describe("TabStrip — reveal the active tab", () => {
       />,
     );
     // SAFETY: as above — the scroller is the fragment's first (and only) <div>.
-    const scroller = container.querySelector<HTMLDivElement>(":scope > div")!;
+    const scroller = container.querySelector<HTMLDivElement>("nav > div")!;
     Object.defineProperty(scroller, "clientWidth", { value: 100, configurable: true });
     scroller.scrollLeft = 0;
     stubRect(scroller, { left: 0, right: 100 });

@@ -82,6 +82,14 @@
   /* Light --muted is a step BELOW --background so the header/composer chrome band still reads as a
      distinct surface now that the page is no longer white. */
   --muted: light-dark(oklch(0.94 0 0), oklch(0.269 0 0));
+  /* THE GROUND UNDER THE THUMB — the composer's chrome block, and nothing else (upstream 1.9.0).
+     Chrome is normally the page colour separated by a rule, and that rule holds everywhere the
+     chrome sits on the PAGE. It cannot hold where the block sits on the terminal mirror: in dark
+     --background IS the mirror's fill, so page-coloured chrome against it is invisible. One name
+     for one question — what does chrome stand on when it cannot stand on the page. Same value as
+     --card in dark (one raised-chrome surface, shared with the sheets) and --muted's value in
+     light, where --card is pure white. */
+  --chrome: light-dark(oklch(0.94 0 0), oklch(0.205 0 0));
   /* Light was oklch(0.556) — 4.74:1 on white, i.e. zero headroom, so every /70, /80 and opacity-60
      derivative in the app fell under 3:1 while its dark counterpart passed. Darkened to buy that
      headroom back; the alpha modifiers on small text were dropped as well, since no token value
@@ -171,6 +179,7 @@
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-chrome: var(--chrome);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);

@@ -57,6 +57,26 @@ mux abstraction the redesign upstream rides on are **not** part of this port; se
 - Pup-shaped omissions: no host or cache chips on the name line (no crew, no cache subsystem),
   and Pup has no i18n layer, so upstream's locale strings are the literals they rendered to.
 
+### Web — the compact strips and the pane header
+
+- **The tab row and the pane row get compact, one continuous band.** Tabs draw as 32px plain cells
+  (11px text) that still answer a 44px tap through a transparent hit-area extension; the open tab
+  is an outlined pill on the row's own ground, there is no horizontal rule and nothing under the
+  tab row, and the pane pills beneath shrink to 24px on the same band (`--chrome`, a new token for
+  the ground chrome stands on when it cannot stand on the page). A numbered tab reads `tab N` in
+  the lighter ink on the strip too. (upstream c2a16502, 02ac7a53, 0ded2d2e, 583e561d)
+- **The raw pane id is gone from every pill.** `p3` is Herdr's coordinate, not a name; a pill is
+  numbered only when a neighbour would otherwise read the same, and the number is its 1-based
+  place in the row — the thing the reader is actually looking at. (upstream 2eefd38e, new
+  `lib/pane-ordinal.ts`)
+- **The pane header follows the one name rule.** Line 1 is the pane's name with the agent's mark
+  on it; line 2 names the workspace alone (the tab strip below already names the open tab), and
+  the cwd left the header — it lives on the dashboard's tab-scoped rows and in History. The title
+  block keeps its 44px tap to the space overview. (upstream 6e8eeafc, b14ffd49)
+- New `ui/labelled-strip.tsx` / `ui/section-label.tsx` primitives (the strip row's shared recipe:
+  tap floor, scroller padding, above-label) and `ui/list-group.tsx` (the framed flat-row region)
+  arrive with them, as upstream ships them. Pup drops upstream's per-tab agent tile on the strip.
+
 ## [0.45.0] - 2026-09-12
 
 ### Changed
