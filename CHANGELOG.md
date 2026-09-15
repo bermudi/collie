@@ -125,6 +125,16 @@ mux abstraction the redesign upstream rides on are **not** part of this port; se
 - **omp's Tree bar button**: waits on an `omp--tree.txt` capture in this repo's corpus (the same
   rule upstream held it to before their capture existed).
 
+### Fixed
+
+- **Devin panes get their mark.** A devin pane rendered the generic "DE" initials tile on every
+  surface (dashboard row, pane header, switcher) — the brand table had no entry and the resolver
+  no rule, so it fell through to the fallback. Devin's own pinwheel mark now rides a black tile
+  with a white fill, monochrome like Codex's and pi's (no belt accent — its absence is a real
+  answer for a monochrome brand). Source: the SVG Logos collection (CC0), rescaled from its
+  256×294 viewBox to 24×24 and centred; verified rasterized at render time — ink box dead-centre,
+  53–61% tile coverage, no clipping. Tried from the phone on day one of the redesign trial.
+
 ## [0.45.0] - 2026-09-12
 
 ### Changed

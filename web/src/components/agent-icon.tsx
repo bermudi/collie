@@ -17,6 +17,7 @@ function brandKey(agent: string): string | undefined {
   // prefix, and the `pi` rule above must not claim it — oh-my-pi is not pi.dev.
   if (k.startsWith("omp")) return "omp";
   if (k === "agy" || k.startsWith("agy-") || k.startsWith("agy.") || k.startsWith("antigravity")) return "agy";
+  if (k === "devin" || k.startsWith("devin-")) return "devin";
   return undefined;
 }
 

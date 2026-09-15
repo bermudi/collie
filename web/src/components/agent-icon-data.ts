@@ -3,7 +3,9 @@
 // own favicon/site): Claude + Codex(OpenAI) via Simple Icons (CC0); pi via Simple Icons / pi.dev
 // favicon (#09090b tile); opencode via opencode.ai's site mark (#080808 tile, theme_color); agy
 // (Antigravity) via its Google-blue #1A73E8 tile, keyed under both "agy" and "antigravity"; omp via
-// omp.sh/favicon.svg (#0f0a14 tile, and the one mark whose official paint is a gradient — `grad`).
+// omp.sh/favicon.svg (#0f0a14 tile, and the one mark whose official paint is a gradient — `grad`);
+// devin via the SVG Logos collection (CC0), rescaled from its 256×294 viewBox to 24×24 and centred
+// — monochrome like Codex and pi, so no accent (its absence is a real answer, see `accent`).
 // To refresh: re-run the fetch in CHANGELOG and replace the `d` strings.
 
 export interface AgentBrand {
@@ -53,5 +55,11 @@ export const AGENT_BRANDS: Record<string, AgentBrand> = {
     mode: "fill",
     grad: ["#ED4ABF", "#9B4DFF", "#5AD8E6"],
     d: "M1.2 0h21.6v4.8h-6v19.2h-4.8V4.8H8.4v13.2H3.6V4.8H1.2z",
+  },
+  devin: {
+    bg: "#000000",
+    fg: "#FFFFFF",
+    mode: "fill",
+    d: "M1.551 8.047v-4.958a0.61 0.61 0 0 1 0.305-0.528L6.149 0.082a0.61 0.61 0 0 1 0.61 0l4.293 2.479a0.61 0.61 0 0 1 0.305 0.528v2.532c0.019 0.842 0.464 1.653 1.246 2.105c0.782 0.452 1.707 0.431 2.446 0.026l2.193-1.266a0.61 0.61 0 0 1 0.61 0l4.293 2.479a0.61 0.61 0 0 1 0.305 0.528v4.957a0.61 0.61 0 0 1-0.305 0.528l-4.293 2.479a0.61 0.61 0 0 1-0.61 0l-2.175-1.256c-0.741-0.414-1.675-0.439-2.463 0.017c-0.782 0.452-1.227 1.263-1.246 2.105v2.532a0.61 0.61 0 0 1-0.305 0.528L6.759 23.86a0.61 0.61 0 0 1-0.61 0L1.856 21.382A0.611 0.611 0 0 1 1.551 20.853V15.896a0.611 0.611 0 0 1 0.305-0.528l4.293-2.479a0.61 0.61 0 0 1 0.61 0l2.198 1.269c0.737 0.402 1.66 0.421 2.44-0.029c0.788-0.455 1.234-1.276 1.246-2.125c-0.019-0.841-0.464-1.74-1.246-2.192s-1.707-0.431-2.446-0.027l-2.203 1.279a0.61 0.61 0 0 1-0.613 0l-4.282-2.491A0.61 0.61 0 0 1 1.551 8.047",
   },
 };
