@@ -100,6 +100,16 @@ mux abstraction the redesign upstream rides on are **not** part of this port; se
   stays off the bar until this repo holds an `omp--tree.txt` capture to vouch for it (upstream
   cc38c2de's own rule, followed rather than shortcut).
 
+### Web — the keys tray
+
+- **A compact seven-column Keys pad.** One fixed grid, two rows — Esc/Tab/⇧/Ctrl/Alt/Up/⏎, then
+  Ctrl C / a 3-wide Space / ← ↓ → with Down under Up — replaces the Keys/123 segmented toggle and
+  the stacked rows. The digits, the Ctrl presets and F1–F12 fold behind one row of accordion
+  chips (123 / Presets / F keys, one panel open at a time). The tray's resting height drops from
+  ~275px to ~119px at 390px with every key still ≥36px tall; Enter and Shift draw glyphs with the
+  full word as the accessible name. A composed key queue still dies with its dock (ADR 0005) and
+  still survives switching to the digit grid mid-chord. (upstream e12b4334)
+
 ## [0.45.0] - 2026-09-12
 
 ### Changed

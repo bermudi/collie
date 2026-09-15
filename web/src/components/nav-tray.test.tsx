@@ -42,7 +42,7 @@ describe("NavTray", () => {
     expect(onSend.mock.calls).toEqual([[["1"]], [["5"]], [["9"]]]);
   });
 
-  it("keys tab: Esc leads row 1, Tab leads row 2 (physical-keyboard geometry)", () => {
+  it("the pad: Esc leads row 1, the inverted-T keeps its shape in one 7-column grid (upstream e12b4334)", () => {
     render(<NavTray onSend={vi.fn()} />);
 
     const esc = screen.getByRole("button", { name: "Esc" });
@@ -58,34 +58,34 @@ describe("NavTray", () => {
     const isBefore = (a: HTMLElement, b: HTMLElement) =>
       (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 
-    // Esc is the very first key button — top-left of row 1, before ↑ and ⏎ (row 1) and Tab (row 2).
+    // Row 1: Esc, Tab, ⇧, Ctrl, Alt, Up, Enter — Esc first, before ↑ and ⏎.
     expect(isBefore(esc, up)).toBe(true);
     expect(isBefore(esc, enter)).toBe(true);
-    expect(isBefore(esc, tab)).toBe(true);
+    expect(isBefore(tab, up)).toBe(true); // Tab is row 1 now, not a row of its own
 
-    // Tab begins row 2 — after all of row 1, before ← ↓ → which follow it in the same row.
-    expect(isBefore(enter, tab)).toBe(true);
-    expect(isBefore(tab, left)).toBe(true);
-    expect(isBefore(tab, down)).toBe(true);
-    expect(isBefore(tab, right)).toBe(true);
-
-    // Space sits below the two rows, on its own full-width row.
-    expect(isBefore(right, space)).toBe(true);
+    // Row 2: Ctrl C, Space (spanning the middle), then ← ↓ → — Down sits under Up's column.
+    expect(isBefore(enter, space)).toBe(true);
+    expect(isBefore(space, left)).toBe(true);
+    expect(isBefore(left, down)).toBe(true);
+    expect(isBefore(down, right)).toBe(true);
   });
 
-  it("a quick Ctrl+C button sits in the Esc/Up gap and fires ctrl+c immediately", async () => {
+  it("a quick Ctrl+C button leads row 2 and fires ctrl+c immediately", async () => {
     const user = userEvent.setup();
     const onSend = vi.fn();
     render(<NavTray onSend={onSend} />);
 
     const esc = screen.getByRole("button", { name: "Esc" });
     const ctrlC = screen.getByRole("button", { name: "Ctrl+C" });
-    const up = screen.getByRole("button", { name: "Up" });
+    const enter = screen.getByRole("button", { name: /Enter/ });
+    const left = screen.getByRole("button", { name: "Left" });
     const isBefore = (a: HTMLElement, b: HTMLElement) =>
       (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 
     expect(isBefore(esc, ctrlC)).toBe(true);
-    expect(isBefore(ctrlC, up)).toBe(true);
+    // Row 2's first cell — after all of row 1, before Space and the arrows of its own row.
+    expect(isBefore(enter, ctrlC)).toBe(true);
+    expect(isBefore(ctrlC, left)).toBe(true);
     // Reads the same as the Ctrl C preset it duplicates — one chord, one spelling, and not tmux's.
     expect(ctrlC).toHaveTextContent("Ctrl C");
 
@@ -216,7 +216,8 @@ describe("NavTray", () => {
 
   it("the Alt modifier renders alongside Shift and Ctrl", () => {
     render(<NavTray onSend={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "⇧ Shift" })).toBeInTheDocument();
+    // Shift draws its glyph with the full word as its accessible name (upstream e12b4334).
+    expect(screen.getByRole("button", { name: "Shift" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ctrl" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Alt" })).toBeInTheDocument();
   });
