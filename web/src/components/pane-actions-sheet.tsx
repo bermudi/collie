@@ -6,7 +6,7 @@ import { ActionRow, DestructiveActionRow, RenameView } from "@/components/action
 import { usePendingConfirm } from "@/hooks/use-pending-confirm";
 import * as api from "@/lib/api";
 import { setStatus } from "@/lib/status";
-import { paneDisplayName } from "@/lib/types";
+import { paneName } from "@/lib/pane-name";
 import type { AgentView } from "@/lib/types";
 
 interface PaneActionsSheetProps {
@@ -109,7 +109,7 @@ export function PaneActionsSheet({
   const confirming = !!pane && pending === pane.paneId;
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={pane ? paneDisplayName(pane) : "Pane"}>
+    <BottomSheet open={open} onClose={onClose} title={pane ? paneName(pane) : "Pane"}>
       {readOnly ? (
         <p className="py-2 text-sm text-muted-foreground">
           Read-only — this device isn't authorised to rename or close panes.

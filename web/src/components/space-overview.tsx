@@ -4,7 +4,7 @@ import { FolderPlus, LayoutGrid, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SectionHeader } from "@/components/section-header";
 import { StatusDot } from "@/components/status-badge";
-import { filterSpaces, sortSpacesByRecency, spaceLastSeenMap, spaceTriageMap } from "@/lib/spaces";
+import { filterSpaces, nestWorktrees, spaceLastSeenMap, spaceTriageMap } from "@/lib/spaces";
 import { TRIAGE_STATUS } from "@/lib/triage";
 import { timeAgo } from "@/lib/format";
 import { STATUS_LABEL } from "@/lib/types";
@@ -48,7 +48,13 @@ export function SpaceOverview({
   // chip can never mean different things by the same colour (lib/spaces.ts).
   const worstBySpace = spaceTriageMap(agents);
   const blockedSpaces = [...worstBySpace.values()].filter((b) => b === "needs").length;
-  const visible = filterSpaces(sortSpacesByRecency(workspaces, panes, lastSeen), query);
+  // The bridge's own space-number order — the same order the space strip runs in — kept, not
+  // re-sorted by recency (upstream 6e8eeafc): the list you learned is the list you keep, and it
+  // never disagrees with the strip above it. The row still SHOWS its last-used time.
+  const visible = filterSpaces(workspaces, query);
+  // A filtered list runs flat: nesting while filtered would drag a worktree's group apart and
+  // scatter its rows down the list (upstream 6e8eeafc's worktree half, via lib/spaces.ts).
+  const rows = query.trim() ? visible.map((space) => ({ space, depth: 0 as const })) : nestWorktrees(visible);
 
   return (
     <section className="flex flex-col gap-2 px-3 py-4">
@@ -118,7 +124,7 @@ export function SpaceOverview({
               No space matches “{query}”.
             </p>
           ) : (
-            visible.map((w) => {
+            rows.map(({ space: w, depth }) => {
               const bucket = worstBySpace.get(w.workspaceId);
               const status = bucket ? TRIAGE_STATUS[bucket] : null;
               const blocked = bucket === "needs";
@@ -144,6 +150,9 @@ export function SpaceOverview({
                     className={cn(
                       "flex flex-row items-center gap-3 px-2.5 py-2.5",
                       blocked && "rounded-lg border border-status-blocked/40 bg-status-blocked/5",
+                      // A worktree sits one step under the space holding its repo — indented, on
+                      // the same row form, never re-sorted out of its group.
+                      depth === 1 && "pl-5",
                     )}
                   >
                     {status ? (

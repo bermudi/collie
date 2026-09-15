@@ -57,6 +57,13 @@ export interface AgentView {
    */
   terminalTitle?: string;
   /**
+   * True when the title was printed by a program that has already exited. A rendering hint for the
+   * one name rule (pane-name.ts): such a title is a fact about the past and the pane falls back to
+   * its next rung. Never set by Pup's bridge (Herdr reports no foreground command); declared because
+   * the mirrored rule reads it and the shared fixtures exercise it.
+   */
+  terminalTitleStale?: boolean;
+  /**
    * Epoch ms of this agent's last status transition, as the bridge observed it. Absent on an older
    * bridge — which is exactly why triage degrades cleanly; see `triage()`.
    */
@@ -71,19 +78,10 @@ export interface AgentView {
 }
 
 /**
- * The name to show for a pane, in priority order: an explicit user label (herdr `pane.rename`) wins,
- * then Claude's own `/rename` session name, then the pane's terminal title, then the agent name (or
- * "shell"). The two hand-set names outrank the title because a name you chose should not be
- * overwritten by one the process is rewriting every turn; the title outranks the agent name because
- * "claude" tells you nothing when four rows say it. All three are rendered only as React text nodes
- * by callers — never markup — so they stay within the pane-output XSS boundary.
+ * The name to show for a pane lived here until the 1.9.0 names pass; the one rule now lives once in
+ * `lib/pane-name.ts` (`paneName()`), mirrored bridge-side so a push names a pane the way the
+ * screens do. `paneDisplayName` was that rule's pre-1.9.0 shape and is gone — no second copy.
  */
-export function paneDisplayName(pane: AgentView): string {
-  if (pane.paneLabel) return pane.paneLabel;
-  if (pane.sessionName) return pane.sessionName;
-  if (pane.terminalTitle) return pane.terminalTitle;
-  return pane.kind === "shell" ? "shell" : pane.agent;
-}
 
 /** A Herdr workspace ("space") — a project-scoped container of tabs. */
 export interface WorkspaceView {
@@ -94,6 +92,14 @@ export interface WorkspaceView {
   activeTabId: string;
   tabCount: number;
   paneCount: number;
+  /**
+   * The repo this workspace sits in, when Herdr reports one (`worktree.repo_root`) — omitted, never
+   * undefined-set, when there is none. With {@link isWorktree} it is what nests a worktree under the
+   * space holding its repo (lib/spaces.ts `nestWorktrees`).
+   */
+  repoRoot?: string;
+  /** Herdr's own word: false for the repo's checkout, true for every linked worktree of it. */
+  isWorktree?: boolean;
 }
 
 /** A tab within a workspace (holds one or more panes). */

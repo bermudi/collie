@@ -44,10 +44,24 @@ describe("ThreadSidebar", () => {
   it("marks the current pane with aria-current='page'", () => {
     render(<ThreadSidebar agents={fixtureAgents} currentPaneId="w2:p1" onSelect={vi.fn()} />);
     const current = screen.getByRole("button", { current: "page" });
-    // w2:p1 lives in the "collie" workspace. The row is titled by where the work IS, not by which
-    // agent is doing it — "codex" is carried by the avatar (see paneTitle).
+    // ONE NAME, ONE PLACE (upstream 6e8eeafc): line 1 is the pane's name — for this fixture pane,
+    // nothing hand-names it, so the name IS the agent word — and line 2 is the place, "collie".
+    // The agent's identity still lives in the avatar beside the name.
+    expect(current).toHaveTextContent("codex");
     expect(current).toHaveTextContent("collie");
-    expect(current).not.toHaveTextContent("codex");
+  });
+
+  it("prefers a hand-set name over the agent word, with the place beneath (upstream 6e8eeafc)", () => {
+    const named: AgentView = {
+      ...idleAgent,
+      paneLabel: "release notes",
+      tabLabel: "checks",
+    };
+    render(<ThreadSidebar agents={[named]} currentPaneId={named.paneId} onSelect={vi.fn()} />);
+    const row = screen.getByRole("button", { current: "page" });
+    expect(row).toHaveTextContent("release notes");
+    expect(row).toHaveTextContent("sandbox");
+    expect(row).toHaveTextContent("checks");
   });
 
   it("does not mark any pane current when the id matches nothing", () => {

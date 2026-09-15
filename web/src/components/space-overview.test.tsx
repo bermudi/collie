@@ -140,8 +140,8 @@ describe("SpaceOverview — filtering", () => {
   });
 });
 
-describe("SpaceOverview — recency", () => {
-  it("puts the space you used most recently first, whatever Herdr's order", () => {
+describe("SpaceOverview — the bridge's own order (upstream 6e8eeafc)", () => {
+  it("keeps Herdr's workspace order — the same order the space strip runs in — regardless of use", () => {
     const spaces = [ws("w1", "alpha", 1, 1), ws("w2", "beta", 1, 1)];
     render(
       view({
@@ -153,21 +153,21 @@ describe("SpaceOverview — recency", () => {
       }),
     );
     const labels = screen.getAllByRole("button", { name: /alpha|beta/ }).map((b) => b.textContent);
-    expect(labels[0]).toContain("beta");
-    expect(labels[1]).toContain("alpha");
+    expect(labels[0]).toContain("alpha");
+    expect(labels[1]).toContain("beta");
   });
 
-  it("counts a bare shell as having used the space", () => {
+  it("still dates a used space — the time moved onto the row, not out of the list", () => {
     const spaces = [ws("w1", "alpha", 1, 1), ws("w2", "beta", 1, 1)];
     render(
       view({
         workspaces: spaces,
-        agents: [pane({ paneId: "w1:p1", workspaceId: "w1", lastSeenAt: 100 })],
-        shellPanes: [pane({ paneId: "w2:p1", workspaceId: "w2", kind: "shell", lastSeenAt: 900 })],
+        agents: [pane({ paneId: "w1:p1", workspaceId: "w1", lastSeenAt: Date.now() - 60_000 })],
+        shellPanes: [pane({ paneId: "w2:p1", workspaceId: "w2", kind: "shell", lastSeenAt: Date.now() - 60_000 })],
       }),
     );
-    const labels = screen.getAllByRole("button", { name: /alpha|beta/ }).map((b) => b.textContent);
-    expect(labels[0]).toContain("beta");
+    // A bare shell counts as having used the space too: both rows are dated.
+    expect(screen.getAllByText(/ago|just now/i).length).toBe(2);
   });
 
   it("shows no timestamp for a space on a bridge that reports none", () => {

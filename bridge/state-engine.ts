@@ -318,6 +318,12 @@ export class StateEngine {
           activeTabId: w.active_tab_id,
           tabCount: w.tab_count,
           paneCount: w.pane_count,
+          // The repo this workspace sits in, when Herdr reports one. OMITTED, never set to undefined,
+          // when there is none — the pair is what lets the web nest a worktree under the space
+          // holding its repo without a second call. (upstream 6e8eeafc's worktree half)
+          ...(w.worktree?.repo_root !== undefined
+            ? { repoRoot: w.worktree.repo_root, isWorktree: w.worktree.is_linked_worktree === true }
+            : {}),
         }))
         .sort((a, b) => a.number - b.number);
 

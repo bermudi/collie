@@ -4,8 +4,7 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { ShellBadge, StatusBadge, StatusDot } from "@/components/status-badge";
 import { AgentIcon } from "@/components/agent-icon";
-import { timeAgoShort } from "@/lib/format";
-import { paneParts, paneTitleInTab } from "@/lib/pane-name";
+import { paneCwdLine, paneName, panePlaceParts } from "@/lib/pane-name";
 import { STATUS_LABEL } from "@/lib/types";
 import type { AgentView } from "@/lib/types";
 
@@ -13,17 +12,15 @@ interface AgentCardProps {
   agent: AgentView;
   onClick: () => void;
   /**
-   * Show "how long ago" on the second line, and which timestamp it means: "seen" for the Recent
-   * section (when you last opened it), "active" for Ready · unseen (when it finished). Omitted
-   * elsewhere — a blocked agent's age is noise next to the fact that it's blocked.
+   * Where the row is being shown. "herd" (default) is a flat list across every space, so line 2
+   * carries the place. "tab" is a list already grouped under its space and tab, so line 2 is the
+   * path alone. "place" is the dashboard's grouped list, where the heading above already says the
+   * WORKSPACE, so line 2 carries the tab alone — and carries nothing at all when that tab has no
+   * name of its own, in a slot that keeps its height either way. Line 1 is the pane's name in all
+   * three. (upstream 6e8eeafc, 64b6f499 — Pup carries no host/cache chips on the name line, so the
+   * name runs to the row's end.)
    */
-  age?: "seen" | "active";
-  /**
-   * Where the row is being shown. "herd" (default) is a flat list across every space, so the title
-   * carries `project · tab`. "tab" is a list already grouped under its space and tab — repeating
-   * them would say nothing, so the pane's own name leads instead.
-   */
-  scope?: "herd" | "tab";
+  scope?: "herd" | "tab" | "place";
   /**
    * How to show status. "badge" (default) spells it out. "dot" is for a list already GROUPED by
    * status — the section heading says "Working", so eighteen rows repeating it in a pill buys
@@ -40,39 +37,114 @@ interface AgentCardProps {
    * signal — see a card, something wants you; all flat, nothing does.
    */
   density?: "card" | "row";
+  /**
+   * A finished pane the operator hasn't opened yet — see `isUnseen()` (lib/triage.ts). Only the
+   * "Ready · unseen" section passes it; every other row leaves it at the default. Draws a small
+   * filled dot right after the name, on line 1, so a glance at a compact row still tells it apart
+   * from an ordinary finished pane sitting in its workspace group. (upstream 10cd0557, 458876bf)
+   */
+  unseen?: boolean;
 }
 
-/** The row's age, in the trailing slot of whichever line it sits on. Not mono — it's a footnote,
- *  not data; mono made it read like the path it replaced. */
-function Age({ at }: { at: number }) {
-  return <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{timeAgoShort(at)}</span>;
+/** The row's text: line 1's name, and line 2's two runs. */
+interface RowLines {
+  primary: string;
+  /** Line 2's first run — the space, in a herd row. Null when there is none. */
+  detailLead: string | null;
+  /** Line 2's second run, which takes the remaining width — the tab, in a herd row. */
+  detailTail: string | null;
+  /** The tail is a path (mono, data) rather than a tab or a space (app face). */
+  tailMono: boolean;
+  /** The tail is the tab's POSITION, not its name (`tabTitle`'s `positional`) — drawn a shade
+   *  lighter so it never reads as a name the operator chose. */
+  tailPositional: boolean;
 }
 
 // A pane row, used by the triage home and the space view. Usually an agent; for a bare shell pane
 // (kind:"shell") it shows a terminal glyph and a muted "shell" tag instead of a status badge.
 //
-// The title is `project · tab` — NOT the agent name, which every row would otherwise share. The two
-// parts render as separate spans on purpose: eight panes in one project all start `moonward_os · `,
-// so truncating the joined string would eat the tab and leave every row identical. The project
-// gives up width first; the tab, the only discriminator, survives.
+// ── THE ROW LEADS WITH THE PANE'S NAME, AND THE PLACE SITS BENEATH ───────────
+// Line 1 is the pane's NAME (lib/pane-name.ts), in the row's one bold run, taking the whole width.
+// Line 2 is its PLACE, `space › tab`, muted and small. The name is the only fact on the row that is
+// unique to it: the space repeats across every one of an eight-pane project's rows, and the tab name
+// repeats across projects. So the name gets the weight and the width, and the place goes beneath it
+// as context — you read what the work is, then where it lives. Every other surface answers the same
+// two questions the same way round.
+//
+// The tile shrank with the same argument. At `size-9` it was a 36px column on every row of a list
+// where every row is the same agent, so it carried no information and pushed both lines 44px right.
+// At `size-4` it rides inline on line 1 as a mark beside the title, and the row's text starts
+// where the row starts. That is the SAME size and the same shell tile the pane header wears
+// (`agent-chat.tsx`), which is the other place the agent's mark stands beside a name — one size for
+// one role, so the two surfaces cannot drift apart.
+//
+// The two parts of line 2 render as separate spans on purpose: at 390px a joined string truncates
+// from the right, which would eat the tab and leave every row of a project reading the same nine
+// characters of its space. The space gives up width first and the tab takes what is left.
 export function AgentCard({
   agent,
   onClick,
-  age,
   scope = "herd",
   statusStyle = "badge",
   density = "card",
+  unseen = false,
 }: AgentCardProps) {
   const isShell = agent.kind === "shell";
   const blocked = agent.status === "blocked";
   const inTab = scope === "tab";
+  // ── THE WORKSPACE-GROUPED ROW CARRIES ITS TAB, AT ONE HEIGHT ─────────────────
+  // Under a WORKSPACE heading (lib/pane-groups.ts) line 2 has one fact left worth saying: the tab.
+  // The workspace is the heading and the cwd is the same cwd down most of a project, but the tab is
+  // what tells two rows of one workspace apart — so line 2 is the tab's name, and when the
+  // multiplexer only numbered that tab (`isUnnamedTab`), it reads that number instead: `tab 2`, in
+  // the lighter ink. When the raw label carries no number at all, the slot is skipped outright and
+  // the row's own `items-center` puts the name in the middle of the 44px row instead.
+  //
+  // The slot is always 16px when it renders, and the row STATES its own height rather than letting
+  // its contents set it: `h-11`, 44px, the app's touch floor, holding a 20px line over a 16px slot
+  // with no vertical padding of its own. Every row of every group is that height whether its tab
+  // carries a name, a position, or neither, so nothing in the list can move (the no-shift rule).
+  const inPlace = scope === "place";
   const flat = density === "row";
-  const parts = paneParts(agent);
-  const tabTitle = paneTitleInTab(agent);
-  const stamp = age === "seen" ? agent.lastSeenAt : age === "active" ? agent.lastActiveAt : undefined;
-  const secondary = inTab ? tabTitle.secondary : parts.secondary;
-  // The dot rides the avatar's corner rather than the far right: at the right edge the eye read a
-  // title, then crossed 200px of empty card to a 10px mark describing it.
+  // ONE NAME, ONE PLACE (lib/pane-name.ts). Line 1 is what the pane is CALLED, on every row of
+  // every list; line 2 is WHERE it sits. In a tab-scoped list the place is already established by
+  // the space heading and the per-tab section above, so line 2 is the path instead — the one fact
+  // that still tells two panes in one tab apart.
+  const place = panePlaceParts(agent);
+  const lines: RowLines = inPlace
+    ? {
+        primary: paneName(agent),
+        detailLead: null,
+        detailTail: place.tab?.text ?? null,
+        tailMono: false,
+        tailPositional: place.tab?.positional ?? false,
+      }
+    : inTab
+      ? {
+          primary: paneName(agent),
+          detailLead: null,
+          detailTail: paneCwdLine(agent),
+          tailMono: true,
+          tailPositional: false,
+        }
+      : {
+          primary: paneName(agent),
+          detailLead: place.space,
+          detailTail: place.tab?.text ?? null,
+          tailMono: false,
+          tailPositional: place.tab?.positional ?? false,
+        };
+  const { primary, detailLead, detailTail } = lines;
+  // A workspace-grouped row whose tab has no name of its own reads its position instead — `tab 2` —
+  // via `tabTitle` (`lib/pane-name.ts`) — or, when the raw label carries no digit at all, nothing:
+  // the slot is then skipped outright.
+  const skipBlankSlot = inPlace && detailTail === null;
+  // The dot leads line 1, INLINE, ahead of the tile — not on the tile's corner. The corner was
+  // right at `size-9`: a 10px badge on a 36px tile is a badge. On a 16px tile it is most of the
+  // artwork, and shrinking it to fit kills the one glance cue the row has — the resting states are
+  // hollow rings drawn with a 1.5px border, which at 8px is nearly a solid disc and stops telling
+  // idle from working. Inline it keeps full size, still sits against its subject, and a list of rows
+  // lines its dots up in one column at the left edge, which is how the list is actually scanned.
   const cornerDot = statusStyle === "dot" && !isShell;
 
   const Shell = flat ? "div" : Card;
@@ -83,85 +155,123 @@ export function AgentCard({
       onClick={onClick}
       className={cn(
         "w-full text-left transition-transform active:scale-[0.99]",
-        // No radius on a flat row. These sit in a `divide-y` list, and a rounded hover fill under a
-        // full-width straight hairline reads as a rendering fault — the corners pull away from a
-        // line that doesn't follow them. A radius here would need a real border to belong to; the
-        // rows that DO have one (blocked) keep theirs below.
+        // No radius on a flat row, in ANY state. These sit in a `divide-y` list, and a rounded fill
+        // under a full-width straight hairline reads as a rendering fault — the corners pull away
+        // from a line that doesn't follow them. Corners belong to where the row sits, never to what
+        // it is doing, so a blocked flat row stays square too.
         flat && "transition-colors hover:bg-muted/50",
       )}
     >
       <Shell
         className={cn(
-          // The 15px inset matches the card's 14px padding + 1px border, so the avatar column runs
-          // straight down the page instead of stepping 5px sideways at each section boundary.
+          // 14px, the same as the card's own padding. A flat row now sits inside a 1px-bordered
+          // ListGroup, so its content lands on the same x as a card row's content BY CONSTRUCTION
+          // (14 + 1 on both sides).
           flat
-            ? "flex flex-row items-center gap-3 px-[0.9375rem] py-2.5"
+            ? "flex flex-row items-center gap-3 px-3.5 py-2.5"
             : "flex-row items-center gap-3 rounded-xl px-3.5 py-3 shadow-sm",
-          // The blocked tint survives both treatments — it's the one cue that reads at a glance.
-          blocked && "border-status-blocked/40 bg-status-blocked/5",
+          // Every flat row states its own pitch — `py-0` because the height IS the statement, and
+          // the flat row's own `py-2.5` around two lines would make it 56px and the number would
+          // stop being a number. Keyed on `flat` so an urgent row (`scope="herd"`, `density="row"`)
+          // gets the same 44px as a workspace-grouped one — the two are meant to read as the SAME
+          // kind of row (agent-list.tsx's urgent section).
+          flat && "h-11 py-0",
+          // The blocked TINT survives both treatments — it's the one cue that reads at a glance.
+          // A card sits in a gap list and already carries a border in every state, so it only
+          // recolours. A flat row sits in a divide-y list, where a four-sided edge would double the
+          // hairline: status on a flat row is carried by the dot (`cornerDot`) and this tint alone,
+          // nothing on the edge. (upstream 458876bf — no left rail.)
+          blocked && (flat ? "bg-status-blocked/5" : "border-status-blocked/40 bg-status-blocked/5"),
         )}
       >
-        <div className="relative shrink-0">
-          {isShell ? (
-            <div className="flex size-9 items-center justify-center rounded-full border bg-muted">
-              <TerminalSquare className="size-4 text-muted-foreground" />
-            </div>
-          ) : (
-            <AgentIcon agent={agent.agent} className="size-9" />
-          )}
-          {cornerDot && (
-            <StatusDot
-              status={agent.status}
-              // Filled and ringed in the surface it actually sits on — a card is white, a flat row
-              // is the page. Get this wrong and a hollow ring reads as a notch in the logo.
-              surface={flat ? "bg-background" : "bg-card"}
-              className={cn(
-                "absolute -bottom-0.5 -right-0.5 rounded-full ring-2",
-                flat ? "ring-background" : "ring-card",
-              )}
-            />
-          )}
-        </div>
-
         <div className="min-w-0 flex-1">
-          {inTab ? (
-            <div className="flex min-w-0 items-baseline gap-2">
-              <span className="min-w-0 flex-1 truncate font-medium">{tabTitle.primary}</span>
-            </div>
-          ) : (
-            <div className="flex min-w-0 items-baseline gap-1">
-              {/* With a tab present the project yields width first (capped, truncatable) and the
-                  tab — the discriminator — takes the rest. With NO tab the project IS the name, so
-                  it takes the width itself; leaving the fill on the tab span meant an unlabelled
-                  row had no filler at all and its age butted against the name, reading as part of
-                  it ("comm_cli 37m"). */}
+          {/* LINE 1 IS THE NAME. The dot and the tile stay centred on the row's own line box —
+              neither has a baseline worth chasing. (Upstream ends this line with a PaneMeta
+              address — host and cache chips — which Pup does not carry; the name simply runs to
+              the row's end.) */}
+          <div data-slot="agent-row-title" className="flex min-w-0 items-center gap-2">
+            {cornerDot && (
+              <StatusDot
+                status={agent.status}
+                // A hollow resting ring must be filled with the colour it actually sits on — a card
+                // is `--card`, a flat row is the page.
+                surface={flat ? "bg-background" : "bg-card"}
+              />
+            )}
+            {/* An avatar is a FRAME around someone else's artwork, not a shape that means
+                something, so this tile, the shell tile beside it and the same tile in
+                `agent-chat.tsx` are all framed at the house radius — a circle would crop the
+                artwork. Full-round stays RESERVED for things that are a circle in meaning: the
+                status dot above, the switch thumb, round icon buttons. */}
+            {isShell ? (
+              <div className="flex size-4 shrink-0 items-center justify-center rounded-sm border bg-muted">
+                <TerminalSquare className="size-2.5 text-muted-foreground" />
+              </div>
+            ) : (
+              <AgentIcon agent={agent.agent} className="size-4" />
+            )}
+            {/* No `flex-1`: that let the name claim the whole line, which pushed the unseen dot
+                all the way to the far end instead of beside the NAME. It sizes to its own text and
+                only `min-w-0` lets it truncate below that — the dot still sits right after
+                whatever survives the truncation. */}
+            <span className="min-w-0 truncate self-baseline font-medium">{primary}</span>
+            {unseen && (
+              // A finished pane you haven't opened yet (`isUnseen()`, lib/triage.ts). Right after
+              // the name, never before it — the name still leads the row — and `shrink-0` so a long
+              // name truncates before this ever does.
               <span
-                className={cn(
-                  "truncate text-muted-foreground",
-                  parts.tab ? "max-w-[45%] shrink" : "min-w-0 flex-1",
-                )}
-              >
-                {parts.project}
-              </span>
-              {parts.tab && (
+                role="img"
+                aria-label="unseen"
+                className="ml-1.5 size-1.5 shrink-0 self-center rounded-full bg-primary"
+              />
+            )}
+          </div>
+
+          {/* Only rendered when there's something to say — a pane with neither a tab nor a name of
+              its own is a one-line row. A workspace-grouped row is the exception: its slot is
+              always there, holding the tab's name or its position — UNLESS neither is available,
+              which skips the slot outright and centres the name in the 44px row instead. */}
+          {!skipBlankSlot && (inPlace || detailLead !== null || detailTail !== null) && (
+            <div
+              data-slot="agent-row-detail"
+              className={cn(
+                "flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground",
+                // 16px whatever is in it, which is the slot half of the stated height above —
+                // keyed on `flat` for the same reason the height above is.
+                flat && "h-4 items-center",
+              )}
+            >
+              {inPlace && lines.tailPositional && detailTail !== null ? (
+                // The unnamed tab's position, a shade lighter than an ordinary tab name so it never
+                // reads as one.
+                <span className="min-w-0 flex-1 truncate text-muted-foreground/70">{detailTail}</span>
+              ) : (
                 <>
-                  <span className="shrink-0 text-muted-foreground/60" aria-hidden>
-                    ·
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{parts.tab}</span>
+                  {/* Both runs of the address are plainly muted — line 2 is one fact in two parts,
+                      and weighting either half turns it back into a competition with line 1. The
+                      space gives up width first; the tab takes the rest. A positional tail (`tab
+                      2`) takes the same shade-lighter ink here as it does alone above. */}
+                  {detailLead !== null && <span className="min-w-0 shrink truncate">{detailLead}</span>}
+                  {detailLead !== null && detailTail !== null && (
+                    // The place's own separator, the same glyph the joined form uses (PLACE_SEP): a
+                    // crumb, because a space CONTAINS a tab. A middot would read as two peers.
+                    <span className="shrink-0 text-muted-foreground/60" aria-hidden>
+                      ›
+                    </span>
+                  )}
+                  {detailTail !== null && (
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate",
+                        lines.tailMono && "font-mono",
+                        lines.tailPositional && "text-muted-foreground/70",
+                      )}
+                    >
+                      {detailTail}
+                    </span>
+                  )}
                 </>
               )}
-              {/* The age rides the title row: alone on a line of its own it claimed the same
-                  vertical presence as the title, for a footnote. */}
-              {stamp !== undefined && <Age at={stamp} />}
-            </div>
-          )}
-
-          {/* Only rendered when there's something to say — most rows are one line now. */}
-          {secondary && (
-            <div className="flex min-w-0 items-baseline gap-2 text-xs text-muted-foreground">
-              <span className="min-w-0 flex-1 truncate font-mono">{secondary}</span>
-              {inTab && stamp !== undefined && <Age at={stamp} />}
             </div>
           )}
         </div>
@@ -169,7 +279,7 @@ export function AgentCard({
         {isShell ? (
           <ShellBadge />
         ) : cornerDot ? (
-          /* The dot itself is colour-only and lives on the avatar; give SR users the word. */
+          /* The dot itself is colour-only and lives on line 1; give SR users the word. */
           <span className="sr-only">{STATUS_LABEL[agent.status]}</span>
         ) : (
           <StatusBadge status={agent.status} />

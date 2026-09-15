@@ -3,7 +3,7 @@ import { TerminalSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/components/agent-icon";
 import { SectionHeader } from "@/components/section-header";
-import { paneParts } from "@/lib/pane-name";
+import { paneName, panePlaceParts } from "@/lib/pane-name";
 import { isAttention, sectionHeaderProps, triage } from "@/lib/triage";
 import type { AgentView } from "@/lib/types";
 
@@ -149,9 +149,11 @@ function PaneRow({
   onSelect: (paneId: string) => void;
 }) {
   const isShell = pane.kind === "shell";
-  // project · tab as separate spans so the TAB survives truncation — see paneParts. The agent's
-  // identity stays in the icon, which is why the title line is free to say where the work is.
-  const { project, tab, secondary } = paneParts(pane);
+  // ONE NAME, ONE PLACE (lib/pane-name.ts): line 1 is what the pane is CALLED, line 2 is where it
+  // sits — the same two lines every other surface answers with, so the switcher's row and the
+  // dashboard row it mirrors read alike. The agent's identity stays in the icon.
+  const name = paneName(pane);
+  const place = panePlaceParts(pane);
   return (
     <button
       type="button"
@@ -179,19 +181,30 @@ function PaneRow({
         <AgentIcon agent={pane.agent} className="size-5" />
       )}
       <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-baseline gap-1 text-sm">
-          <span className="max-w-[45%] shrink truncate text-muted-foreground">{project}</span>
-          {tab && (
-            <>
-              <span className="shrink-0 text-muted-foreground/60" aria-hidden>
-                ·
-              </span>
-              <span className="min-w-0 flex-1 truncate font-medium">{tab}</span>
-            </>
-          )}
+        <div className="flex min-w-0 items-baseline text-sm">
+          <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
         </div>
-        {secondary && (
-          <div className="truncate font-mono text-[11px] text-muted-foreground">{secondary}</div>
+        {/* The place in two runs, so the space gives up width first and the tab — the only
+            discriminator — survives truncation. A positional tail (`tab 2`) reads a shade lighter. */}
+        {(place.tab !== null || place.space !== "") && (
+          <div className="flex min-w-0 items-baseline gap-1 truncate text-[11px] text-muted-foreground">
+            <span className="min-w-0 shrink truncate">{place.space}</span>
+            {place.tab && (
+              <>
+                <span className="shrink-0 text-muted-foreground/60" aria-hidden>
+                  ›
+                </span>
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 truncate",
+                    place.tab.positional && "text-muted-foreground/70",
+                  )}
+                >
+                  {place.tab.text}
+                </span>
+              </>
+            )}
+          </div>
         )}
       </div>
     </button>

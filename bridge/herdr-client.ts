@@ -21,6 +21,13 @@ interface WireWorkspace {
   tab_count: number;
   active_tab_id: string;
   agent_status: AgentStatus;
+  /** Herdr carries the repo on the workspace itself (probed 2026-09-14 on this herd); absent when
+   *  the workspace sits in no repo. */
+  worktree?: {
+    repo_root: string;
+    /** Herdr's own word: false for the repo's checkout, true for every linked worktree of it. */
+    is_linked_worktree?: boolean;
+  };
 }
 
 /** Raw wire shape of a tab from `tab.list`. */

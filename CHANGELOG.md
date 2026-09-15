@@ -29,6 +29,33 @@ mux abstraction the redesign upstream rides on are **not** part of this port; se
 - `terminalTitleStale` is declared on the wire type for the mirrored rule to read; Herdr reports no
   foreground command, so on this bridge it is never set. Known limit: Claude `/rename` session
   names are already sniffed and ride the wire as before.
+- **Workspaces carry their repo.** Herdr's `workspace.list` already reports `worktree.repo_root`
+  and `is_linked_worktree` (live-probed on this herd: 11 spaces, 2 with repos); the wire type now
+  declares the pair and the snapshot carries it, so the web can nest a worktree under the space
+  holding its repo. (upstream 6e8eeafc's worktree half)
+
+### Web — the names pass and the dashboard's second axis
+
+- **One name and one place, on every screen.** A pane is called the same thing everywhere — your
+  label, else the session's `/rename` name, else the terminal title, else the agent word — and
+  `space › tab` sits beneath it as the second line, never as the first. The fork's project-first
+  row titles are superseded by this on the branch. A numbered tab reads `tab 2` in a lighter ink
+  everywhere it renders alone. `lib/pane-name.ts` carries the rule once; `paneDisplayName` is
+  gone. (upstream 6e8eeafc, 583e561d)
+- **Rows keep the multiplexer's arrangement.** Triage buckets no longer re-sort by activity — a
+  row moves only when it changes bucket, never while you reach for it. The space list keeps
+  Herdr's own workspace order (same as the strip), recency sort deleted; the row still shows its
+  time. Worktrees nest one step under the space holding their repo, a filtered list stays flat.
+  (upstream 6e8eeafc)
+- **The dashboard asks two questions, in order.** Needs-you and Ready·unseen stay pinned on top
+  by urgency; everything else sits under its WORKSPACE, one counted group per space, shells
+  joining their tab after its agents. An urgent pane is pulled out of its group, never copied.
+  Working/Recent headings, Recent's fold and its sort toggle are gone — no clock is left in the
+  order to reverse. Every row is the one 44px two-line form (name + dot and mark inline, place
+  beneath), urgent rows in the same framed list shape as workspace rows, and a finished-unseen
+  pane carries a small dot after its name. (upstream 64b6f499, 10cd0557, 458876bf, cd70aa30)
+- Pup-shaped omissions: no host or cache chips on the name line (no crew, no cache subsystem),
+  and Pup has no i18n layer, so upstream's locale strings are the literals they rendered to.
 
 ## [0.45.0] - 2026-09-12
 

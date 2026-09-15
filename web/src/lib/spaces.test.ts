@@ -1,7 +1,7 @@
 import {
   filterSpaces,
   groupPanesByTab,
-  sortSpacesByRecency,
+  nestWorktrees,
   spaceLastSeenMap,
   spaceTriageMap,
 } from "./spaces";
@@ -117,39 +117,51 @@ const ws = (workspaceId: string, label: string, number: number): WorkspaceView =
   paneCount: 1,
 });
 
-describe("sortSpacesByRecency", () => {
-  const spaces = [ws("w1", "alpha", 1), ws("w2", "beta", 2), ws("w3", "gamma", 3)];
+describe("nestWorktrees — the spaces list keeps its order and nests worktrees (upstream 6e8eeafc)", () => {
+  const wsp = (over: Partial<WorkspaceView> & { workspaceId: string }): WorkspaceView => ({
+    number: 1,
+    label: over.workspaceId,
+    focused: false,
+    activeTabId: "",
+    tabCount: 1,
+    paneCount: 1,
+    ...over,
+  });
 
-  it("floats the space you used most recently to the top", () => {
-    const panes = [
-      agent({ paneId: "w1:p1", workspaceId: "w1", tabId: "w1:t1", lastSeenAt: 100 }),
-      agent({ paneId: "w3:p1", workspaceId: "w3", tabId: "w3:t1", lastSeenAt: 900 }),
-    ];
-    expect(sortSpacesByRecency(spaces, panes).map((w) => w.workspaceId)).toEqual([
-      "w3",
-      "w1",
-      "w2",
+  it("nests a worktree under the space holding its repo, keeping the incoming order", () => {
+    const rows = nestWorktrees([
+      wsp({ workspaceId: "main", repoRoot: "/repo", isWorktree: false }),
+      wsp({ workspaceId: "wt1", repoRoot: "/repo", isWorktree: true }),
+      wsp({ workspaceId: "other" }),
+    ]);
+    expect(rows.map((r) => [r.space.workspaceId, r.depth])).toEqual([
+      ["main", 0],
+      ["wt1", 1],
+      ["other", 0],
     ]);
   });
 
-  it("leaves never-used spaces in Herdr's own order behind the used ones", () => {
-    const panes = [agent({ paneId: "w2:p1", workspaceId: "w2", tabId: "w2:t1", lastSeenAt: 5 })];
-    expect(sortSpacesByRecency(spaces, panes).map((w) => w.workspaceId)).toEqual([
-      "w2",
-      "w1",
-      "w3",
+  it("a group takes the position of its first member — a worktree sent first drags its parent up", () => {
+    const rows = nestWorktrees([
+      wsp({ workspaceId: "unrelated" }),
+      wsp({ workspaceId: "wt1", repoRoot: "/repo", isWorktree: true }),
+      wsp({ workspaceId: "main", repoRoot: "/repo", isWorktree: false }),
     ]);
+    // The group lands at wt1's own position (index 1), parent first — no row is moved past a row
+    // it was sent ahead of.
+    expect(rows.map((r) => r.space.workspaceId)).toEqual(["unrelated", "main", "wt1"]);
+    expect(rows.map((r) => r.depth)).toEqual([0, 0, 1]);
   });
 
-  it("changes nothing at all on a bridge that reports no timestamps", () => {
-    const panes = [agent({ paneId: "w1:p1", workspaceId: "w1", tabId: "w1:t1" })];
-    expect(sortSpacesByRecency(spaces, panes)).toEqual(spaces);
+  it("a worktree whose repo is not open stays at depth 0", () => {
+    const rows = nestWorktrees([wsp({ workspaceId: "orphan", repoRoot: "/gone", isWorktree: true })]);
+    expect(rows).toEqual([{ space: expect.objectContaining({ workspaceId: "orphan" }), depth: 0 }]);
   });
 
   it("does not mutate its input", () => {
-    const panes = [agent({ paneId: "w3:p1", workspaceId: "w3", tabId: "w3:t1", lastSeenAt: 9 })];
-    sortSpacesByRecency(spaces, panes);
-    expect(spaces.map((w) => w.workspaceId)).toEqual(["w1", "w2", "w3"]);
+    const spaces = [wsp({ workspaceId: "wt1", repoRoot: "/repo", isWorktree: true })];
+    nestWorktrees(spaces);
+    expect(spaces).toHaveLength(1);
   });
 });
 
@@ -187,11 +199,9 @@ describe("spaceLastSeenMap", () => {
     expect(spaceLastSeenMap([]).get("w1")).toBeUndefined();
   });
 
-  it("gives the same ordering whether or not the map is passed in", () => {
-    const spaces = [ws("w1", "alpha", 1), ws("w2", "beta", 2)];
+  it("agrees with a freshly built map, whichever way it is called", () => {
     const panes = [agent({ paneId: "w2:p1", workspaceId: "w2", tabId: "w2:t1", lastSeenAt: 900 })];
-    expect(sortSpacesByRecency(spaces, panes, spaceLastSeenMap(panes))).toEqual(
-      sortSpacesByRecency(spaces, panes),
-    );
+    expect(spaceLastSeenMap(panes).get("w2")).toBe(900);
+    expect(spaceLastSeenMap([]).size).toBe(0);
   });
 });

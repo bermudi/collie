@@ -129,6 +129,10 @@ export interface WorkspaceView {
   activeTabId: string;
   tabCount: number;
   paneCount: number;
+  /** The repo this workspace sits in, when Herdr reports one — omitted when there is none. */
+  repoRoot?: string;
+  /** Herdr's own word: false for the repo's checkout, true for every linked worktree of it. */
+  isWorktree?: boolean;
 }
 
 /** A tab within a workspace (a layout/view holding one or more panes). From `tab.list`. */

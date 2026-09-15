@@ -37,7 +37,7 @@ export function HomeRoute() {
   const navigate = useNavigate();
   const { newSpace, creatingSpace } = useSpaceActions();
   const [newSpaceOpen, setNewSpaceOpen] = useState(false);
-  const { prefs, setSpacesOpen, setLaunchOpen, setRecentOpen, setRecentDir } = useDashPrefs();
+  const { prefs, setSpacesOpen, setLaunchOpen } = useDashPrefs();
   // No stored choice yet? The space count decides — a two-space install shouldn't be handed a
   // mystery collapsed header, and a forty-space one shouldn't be handed a wall.
   const spacesOpen = openForCount(prefs.spacesOpen, data.workspaces.length);
@@ -76,12 +76,9 @@ export function HomeRoute() {
               straddle. */}
           <AgentList
             agents={data.agents}
+            shellPanes={data.shellPanes}
             bridge={data.bridge}
             onOpen={open}
-            recentDir={prefs.recentDir}
-            onRecentDirChange={setRecentDir}
-            recentOpen={prefs.recentOpen}
-            onRecentOpenChange={setRecentOpen}
             error={data.error}
             lastSeenAt={data.lastSeenAt}
           />

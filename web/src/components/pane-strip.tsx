@@ -7,7 +7,7 @@ import { StatusDot } from "@/components/status-badge";
 import { PaneActionsSheet } from "@/components/pane-actions-sheet";
 import { useLongPress } from "@/hooks/use-long-press";
 import { useRevealActive } from "@/hooks/use-reveal-active";
-import { paneDisplayName } from "@/lib/types";
+import { paneName } from "@/lib/pane-name";
 import type { AgentView } from "@/lib/types";
 
 interface PaneStripProps {
@@ -103,9 +103,9 @@ function PanePill({
   const isShell = pane.kind === "shell";
   // The "pN" suffix of the pane id disambiguates same-named panes (two claudes in one tab).
   const tag = pane.paneId.split(":").pop();
-  // A user label, then Claude's /rename session name, then the agent/shell name (see paneDisplayName)
+  // The pane's own name — label, else session name, else title, else agent word (lib/pane-name.ts)
   // — the icon still conveys which agent it is.
-  const name = paneDisplayName(pane);
+  const name = paneName(pane);
   const longPress = useLongPress(onLongPress);
 
   // A long-press already suppresses the ensuing click via longPress.onClickCapture (stops it before

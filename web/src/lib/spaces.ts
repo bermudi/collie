@@ -63,9 +63,10 @@ export function spaceTriageMap(agents: readonly AgentView[]): Map<string, Triage
 }
 
 /**
- * Last-used time for EVERY space in one pass over the panes. The dashboard needs this per space and
- * again per rendered row, and it re-renders on every poll; deriving it per space would be
- * spaces × panes each time (45 × 59 on a real herd, three times over). One pass, then map lookups.
+ * Last-used time for EVERY space in one pass over the panes. The dashboard SHOWS this on each row
+ * (it no longer sorts by it — the space list keeps the bridge's own order, the same order the space
+ * strip runs in) and re-renders on every poll; deriving it per space would be spaces × panes each
+ * time (45 × 59 on a real herd). One pass, then map lookups.
  */
 export function spaceLastSeenMap(panes: readonly AgentView[]): Map<string, number> {
   const seen = new Map<string, number>();
@@ -76,22 +77,10 @@ export function spaceLastSeenMap(panes: readonly AgentView[]): Map<string, numbe
   return seen;
 }
 
-/**
- * Most-recently-used spaces first. Never-used spaces (and every space on an older bridge) tie at 0
- * and therefore keep Herdr's own workspace order behind the ones you actually touch — `sort` is
- * stable, so no timestamps means no reordering at all.
- *
- * Pass a prebuilt {@link spaceLastSeenMap} when the caller already has one.
- */
-export function sortSpacesByRecency(
-  workspaces: readonly WorkspaceView[],
-  panes: readonly AgentView[],
-  seen: Map<string, number> = spaceLastSeenMap(panes),
-): WorkspaceView[] {
-  return [...workspaces].sort(
-    (a, b) => (seen.get(b.workspaceId) ?? 0) - (seen.get(a.workspaceId) ?? 0),
-  );
-}
+/* sortSpacesByRecency is GONE (upstream 6e8eeafc): the space list keeps the bridge's own
+ * space-number order — the same order the space strip runs in — instead of re-sorting by when you
+ * last touched each space, so the list you learned is the list you keep and it never disagrees with
+ * the strip above it. spaceLastSeenMap stays: the row still shows its time. */
 
 /**
  * Case-insensitive substring match on the space label. An empty/whitespace query returns the input
@@ -104,4 +93,85 @@ export function filterSpaces(
   const q = query.trim().toLowerCase();
   if (!q) return [...workspaces];
   return workspaces.filter((w) => w.label.toLowerCase().includes(q));
+}
+
+/**
+ * One row of the spaces list: a space, plus how deep it sits.
+ *
+ * `depth: 1` is a worktree shown under the space that holds its repo. It is a VIEW fact, computed
+ * per render, and deliberately not a field on the space: whether a worktree has a parent to sit
+ * under depends on what is open right now, which is not something a space can know about itself.
+ */
+export interface SpaceRow {
+  readonly space: WorkspaceView;
+  readonly depth: 0 | 1;
+}
+
+/**
+ * Nest each worktree under the space showing its repo, keeping the list's incoming order.
+ *
+ * THREE RULES, and each answers a case the flat list never had:
+ *
+ *  • **A group takes the position of its first member.** A worktree that sorts ahead of its parent
+ *    pulls the whole group up to where it sits, so no row is ever moved past a row it was sent
+ *    ahead of.
+ *  • **A worktree whose repo is not open stays at depth 0.** There is no row to indent under, and
+ *    indenting under nothing reads as a rendering bug.
+ *  • **Order within a group is the incoming order**: the parent first, then its worktrees as they
+ *    arrived.
+ *
+ * `ordered` must already be in the order the caller wants — the bridge's own space-number order, on
+ * every caller today; this function only regroups, never re-sorts. (upstream 6e8eeafc)
+ */
+export function nestWorktrees(ordered: readonly WorkspaceView[]): SpaceRow[] {
+  // Only a space that IS the repo's own checkout can be a parent (`isWorktree === false`).
+  const parentByRepo = new Map<string, WorkspaceView>();
+  for (const space of ordered) {
+    if (space.repoRoot !== undefined && space.isWorktree === false) {
+      parentByRepo.set(space.repoRoot, space);
+    }
+  }
+
+  const childrenByParent = new Map<string, WorkspaceView[]>();
+  for (const space of ordered) {
+    if (space.repoRoot === undefined || space.isWorktree !== true) continue;
+    const parent = parentByRepo.get(space.repoRoot);
+    if (parent === undefined) continue; // orphan — rendered flat, below
+    const kin = childrenByParent.get(parent.workspaceId) ?? [];
+    kin.push(space);
+    childrenByParent.set(parent.workspaceId, kin);
+  }
+
+  const rows: SpaceRow[] = [];
+  const placed = new Set<string>();
+  for (const space of ordered) {
+    if (placed.has(space.workspaceId)) continue;
+    const kin = childrenByParent.get(space.workspaceId);
+    // A parent reached through its own position, or dragged up here by a child that came first.
+    if (kin !== undefined) {
+      rows.push({ space, depth: 0 });
+      placed.add(space.workspaceId);
+      for (const child of kin) {
+        rows.push({ space: child, depth: 1 });
+        placed.add(child.workspaceId);
+      }
+      continue;
+    }
+    // A child met before its parent: emit the whole group HERE, at the child's (fresher) position.
+    if (space.repoRoot !== undefined && space.isWorktree === true) {
+      const parent = parentByRepo.get(space.repoRoot);
+      if (parent !== undefined && !placed.has(parent.workspaceId)) {
+        rows.push({ space: parent, depth: 0 });
+        placed.add(parent.workspaceId);
+        for (const child of childrenByParent.get(parent.workspaceId) ?? []) {
+          rows.push({ space: child, depth: 1 });
+          placed.add(child.workspaceId);
+        }
+        continue;
+      }
+    }
+    rows.push({ space, depth: 0 });
+    placed.add(space.workspaceId);
+  }
+  return rows;
 }

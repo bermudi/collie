@@ -1,11 +1,13 @@
 // The one ordering the whole app agrees on: what needs you, then what's newly ready, then what's
-// running, then everything else by when you last touched it. Used by the dashboard, the in-pane
-// sidebar and the command palette — kept in one place so those three can't drift apart (which is
-// the job the module this replaces, agent-groups.ts, was written to do).
+// running, then everything else. Used by the dashboard, the in-pane sidebar and the command palette
+// — kept in one place so those three can't drift apart (which is the job the module this replaces,
+// agent-groups.ts, was written to do).
 //
-// It runs on the two timestamps the bridge keeps per pane (bridge/activity.ts):
+// It puts each pane in a BUCKET and keeps the order the bridge sent inside it (see {@link triage}).
+// The two timestamps the bridge keeps per pane (bridge/activity.ts) still decide one bucket:
 //   lastActiveAt — when the agent last changed status
 //   lastSeenAt   — when you last opened or drove it through Collie
+// "done since you last looked" is `lastActiveAt > lastSeenAt`, which is the Ready·unseen bucket.
 import type { AgentStatus, AgentView } from "./types";
 
 /** Which way the Recent section runs. Attention sections never invert. */
@@ -75,11 +77,6 @@ export function worstTriage(agents: readonly AgentView[]): TriageKey | null {
   return best === null ? null : TRIAGE_ORDER[best]!;
 }
 
-/** Descending comparator over an optional timestamp; absent sorts last but ties, never throws. */
-function byDesc(key: (a: AgentView) => number | undefined) {
-  return (x: AgentView, y: AgentView) => (key(y) ?? 0) - (key(x) ?? 0);
-}
-
 const SECTION_META: Record<TriageKey, Omit<TriageSection, "agents">> = {
   needs: { key: "needs", label: "Needs you", accent: true, dot: "bg-status-blocked" },
   ready: { key: "ready", label: "Ready · unseen", dot: "bg-status-done" },
@@ -94,9 +91,18 @@ const SECTION_META: Record<TriageKey, Omit<TriageSection, "agents">> = {
  *
  * The first three sections are pinned: they never move and never invert. `dir` reaches Recent only.
  *
- * **The old-bridge path is free.** With no timestamps every comparator returns 0, and
- * `Array.prototype.sort` is stable, so each section preserves the order the bridge already sent
- * (`STATUS_RANK → workspaceNumber → paneId`). Ready·unseen is empty because `isUnseen` is false.
+ * ── A BUCKET KEEPS THE ORDER IT WAS SENT ─────────────────────────────────────
+ * This buckets and it no longer SORTS. Each section used to be re-sorted by `lastActiveAt` (and
+ * Recent by `lastSeenAt`), so a row moved under your thumb every time an agent took a turn: the pane
+ * you were reaching for was somewhere else by the time you got there, and the list you learned this
+ * morning was a different list this afternoon. The bridge already sends one stable order — status,
+ * then space, then tab, then the pane's position in its tab (bridge/state-engine.ts) — and that is
+ * the multiplexer's own arrangement, the one the operator made. Within a bucket, panes therefore
+ * keep their relative order, and a row moves only when it changes bucket. (upstream 6e8eeafc)
+ *
+ * "When did I last touch this" has not gone anywhere: it is on the row, as its time.
+ *
+ * **The old-bridge path is free.** With no timestamps `isUnseen` is false and Ready·unseen is empty.
  * No feature detection, no branch.
  */
 export function triage(agents: readonly AgentView[], dir: RecentDir = "newest"): TriageSection[] {
@@ -108,10 +114,6 @@ export function triage(agents: readonly AgentView[], dir: RecentDir = "newest"):
   const into = { needs, ready, working, recent };
   for (const a of agents) into[bucketOf(a)].push(a);
 
-  needs.sort(byDesc((a) => a.lastActiveAt));
-  ready.sort(byDesc((a) => a.lastActiveAt));
-  working.sort(byDesc((a) => a.lastActiveAt));
-  recent.sort(byDesc((a) => a.lastSeenAt));
   if (dir === "oldest") recent.reverse();
 
   return [

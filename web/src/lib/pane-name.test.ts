@@ -1,7 +1,17 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { paneParts, paneTitleInTab, TITLE_SEP } from "./pane-name";
-import type { AgentView } from "./types";
+import {
+  isUnnamedTab,
+  paneCwdLine,
+  paneName,
+  panePlace,
+  panePlaceParts,
+  PLACE_SEP,
+  tabTitle,
+} from "./pane-name";
+import type { AgentView, TabView } from "./types";
 
 function pane(over: Partial<AgentView> = {}): AgentView {
   return {
@@ -14,139 +24,160 @@ function pane(over: Partial<AgentView> = {}): AgentView {
     status: "idle",
     cwd: "/home/kon/dev/moonward",
     focused: false,
+    kind: "agent",
     ...over,
   };
 }
 
-/** What the row shows: the two spans are rendered side by side, so the assertions read them joined.
- *  They stay SEPARATE in the DOM on purpose — the project must be able to truncate before the tab
- *  does, which a single joined string cannot express. */
-const join = (p: { project: string; tab: string | null }) =>
-  p.tab ? `${p.project}${TITLE_SEP}${p.tab}` : p.project;
-const joined = (pane: AgentView) => join(paneParts(pane));
-
-describe("paneParts — the title line", () => {
-  it("is project · tab when the tab has a label", () => {
-    expect(joined(pane({ tabLabel: "fix-auth" }))).toBe("moonward_os · fix-auth");
-  });
-
-  it("falls back to the project alone when the bridge dropped the tab label", () => {
-    // An unlabelled tab in a single-tab space arrives with tabLabel absent (meaningfulTabLabel),
-    // so the row must not render a dangling separator.
-    expect(joined(pane())).toBe("moonward_os");
-  });
-
-  it("never says 'claude'", () => {
-    expect(joined(pane({ tabLabel: "fix-auth" }))).not.toContain("claude");
-    expect(joined(pane())).not.toContain("claude");
-  });
-
-  it("falls back to the workspace id if a space somehow has no label", () => {
-    expect(joined(pane({ workspaceLabel: "" }))).toBe("w0");
-  });
+const tab = (over: Partial<TabView> = {}): TabView => ({
+  tabId: "w0:t1",
+  workspaceId: "w0",
+  number: 1,
+  label: "fix-auth",
+  focused: false,
+  paneCount: 1,
+  ...over,
 });
 
-describe("paneParts — the second line", () => {
-  it("prefers a user-set pane label", () => {
-    const t = paneParts(pane({ paneLabel: "hand-named", sessionName: "auto-named" }));
-    expect(t.secondary).toBe("hand-named");
-  });
+// ── THE SHARED FIXTURES ──────────────────────────────────────────────────────
+// The rule is written twice — here and in bridge/pane-name.ts, because a push has to name a pane the
+// way the screens do and the two trees cannot import one another. `bridge/pane-name.fixtures.json` is
+// the one set of cases BOTH sides run (bridge/pane-name.test.ts is the other reader), so a rule
+// changed on one side alone turns one of the two red.
+interface Fixtures {
+  names: { case: string; pane: Partial<AgentView> & { agent: string }; name: string }[];
+  tabs: { label: string | null; unnamed: boolean }[];
+  places: { space: string; tab: string | null; place: string }[];
+}
+// SAFETY: the file is this repo's own, it is read at test time only, and its shape is asserted by
+// every case below — a field renamed there fails here as an undefined expectation rather than
+// passing silently. The bridge's own reader (bridge/pane-name.test.ts) imports the same file typed.
+const fixtures = JSON.parse(
+  readFileSync(resolve(import.meta.dirname, "../../../bridge/pane-name.fixtures.json"), "utf8"),
+) as Fixtures;
 
-  it("falls back to Claude's own /rename session name", () => {
-    expect(paneParts(pane({ sessionName: "oauth-refactor" })).secondary).toBe("oauth-refactor");
-  });
-
-  it("falls back to the terminal title — what the pane says it is doing", () => {
-    expect(paneParts(pane({ terminalTitle: "Reconcile the book lists" })).secondary).toBe(
-      "Reconcile the book lists",
-    );
-  });
-
-  it("lets a hand-set name outrank the terminal title", () => {
-    // A name you chose must not be overwritten by one the process rewrites every turn.
-    const over = { terminalTitle: "Reconcile the book lists" };
-    expect(paneParts(pane({ ...over, paneLabel: "hand-named" })).secondary).toBe("hand-named");
-    expect(paneParts(pane({ ...over, sessionName: "oauth-refactor" })).secondary).toBe(
-      "oauth-refactor",
-    );
-  });
-
-  it("falls back to a shortened cwd", () => {
-    expect(paneParts(pane()).secondary).toBe("~/dev/moonward");
-  });
-
-  it("prefers the terminal title over the cwd — a project's herd shares one cwd", () => {
-    expect(paneParts(pane({ terminalTitle: "Fixing the parser" })).secondary).toBe(
-      "Fixing the parser",
-    );
-  });
-
-  it("tells apart several agents sitting in ONE project and tab", () => {
-    // The herd this change exists for: same project, same cwd, no hand-set names. Before the title
-    // was read, all three rows rendered identically.
-    const rendered = [
-      "Custom UI for Collie",
-      "Read Notes From Underground",
-      "Reconcile book lists",
-    ].map((terminalTitle) => {
-      const p = paneParts(pane({ terminalTitle }));
-      return `${join(p)}|${p.secondary}`;
+describe("paneName — the one name rule, on the shared fixtures", () => {
+  for (const c of fixtures.names) {
+    it(c.case, () => {
+      expect(paneName(pane(c.pane))).toBe(c.name);
     });
-    expect(new Set(rendered).size).toBe(3);
-  });
+  }
 
-  it("is null when there is nothing to say", () => {
-    expect(paneParts(pane({ cwd: "" })).secondary).toBeNull();
-  });
-
-  it("keeps the pane's own name even when the tab is labelled — nothing is lost", () => {
-    const t = paneParts(pane({ tabLabel: "fix-auth", sessionName: "oauth-refactor" }));
-    expect(join(t)).toBe("moonward_os · fix-auth");
-    expect(t.secondary).toBe("oauth-refactor");
+  it("ignores the place entirely: a pane in a named tab still reads as itself", () => {
+    expect(paneName(pane({ tabLabel: "UI work", terminalTitle: "Reviewing the diff" }))).toBe(
+      "Reviewing the diff",
+    );
+    // …and a pane with nothing of its own reads as its agent, never as `space › tab`. The header used
+    // to answer this one with the address, which is what made one pane read two ways.
+    expect(paneName(pane({ tabLabel: "UI work" }))).toBe("claude");
   });
 });
 
-describe("paneParts — shell panes", () => {
-  it("names a shell by its place, not by the word 'shell'", () => {
-    const t = paneParts(pane({ kind: "shell", agent: "shell", tabLabel: "scratch" }));
-    expect(join(t)).toBe("moonward_os · scratch");
+describe("isUnnamedTab — on the shared fixtures", () => {
+  for (const c of fixtures.tabs) {
+    it(`${JSON.stringify(c.label)} is ${c.unnamed ? "unnamed" : "a name"}`, () => {
+      expect(isUnnamedTab(c.label)).toBe(c.unnamed);
+    });
+  }
+
+  it("is undefined-safe, because a pane's own tabLabel is optional", () => {
+    expect(isUnnamedTab(undefined)).toBe(true);
   });
 });
 
-describe("paneParts — the cwd fallback only when it says something", () => {
-  it("drops the cwd when the directory is just the project again", () => {
-    // The space is named after its directory on almost every row, so the fallback was printing
-    // line 1 twice.
-    expect(paneParts(pane({ workspaceLabel: "collie", cwd: "/home/kon/dev/ai/collie" })).secondary)
-      .toBeNull();
+describe("panePlace — the one place rule, on the shared fixtures", () => {
+  for (const c of fixtures.places) {
+    it(`${c.space} + ${JSON.stringify(c.tab)} reads as ${c.place}`, () => {
+      const view = c.tab === null ? pane({ workspaceLabel: c.space }) : pane({ workspaceLabel: c.space, tabLabel: c.tab });
+      // The fixture's own `place` is the MIRRORED expectation — what `isUnnamedTab`/`placeOf` still
+      // share with the bridge (drop the tab entirely). A positional tab (unnamed, a digit sitting in
+      // the raw label) is the one case web and bridge now disagree on ON PURPOSE: the web's
+      // `panePlace` reads the tab's POSITION (`tabTitle`, web-only) instead of dropping it, so its
+      // expectation here is derived locally rather than taken from the shared fixture.
+      const title = c.tab === null ? null : tabTitle(c.tab);
+      const expected = title?.positional ? `${c.space}${PLACE_SEP}${title.text}` : c.place;
+      expect(panePlace(view)).toBe(expected);
+    });
+  }
+
+  it("joins with the crumb, never a middot — a space CONTAINS a tab", () => {
+    expect(PLACE_SEP).toBe(" › ");
+    expect(panePlace(pane({ tabLabel: "fix-auth" }))).toBe("moonward_os › fix-auth");
   });
 
-  it("is case-insensitive about that match", () => {
-    expect(paneParts(pane({ workspaceLabel: "Collie", cwd: "/home/kon/dev/ai/collie" })).secondary)
-      .toBeNull();
-  });
-
-  it("KEEPS the cwd when the pane sits somewhere else — a worktree or a subdir", () => {
-    expect(paneParts(pane({ workspaceLabel: "collie", cwd: "/home/kon/dev/ai/collie/web" })).secondary)
-      .toBe("~/dev/ai/collie/web");
-  });
-
-  it("still prefers the pane's own name over either", () => {
-    const t = paneParts(pane({ workspaceLabel: "collie", cwd: "/home/kon/dev/ai/collie", sessionName: "oauth" }));
-    expect(t.secondary).toBe("oauth");
+  it("falls back to the workspace id when a space has no label at all", () => {
+    expect(panePlace(pane({ workspaceLabel: "" }))).toBe("w0");
   });
 });
 
-describe("paneTitleInTab — inside a space view, where project and tab are already established", () => {
-  it("leads with the pane's own name, since repeating project · tab would say nothing", () => {
-    const t = paneTitleInTab(pane({ tabLabel: "fix-auth", sessionName: "oauth-refactor" }));
-    expect(t.primary).toBe("oauth-refactor");
-    expect(t.secondary).toBe("~/dev/moonward");
+describe("panePlaceParts — the two halves, so the tab survives truncation", () => {
+  it("keeps the halves apart", () => {
+    expect(panePlaceParts(pane({ tabLabel: "fix-auth" }))).toEqual({
+      space: "moonward_os",
+      tab: { text: "fix-auth", positional: false },
+    });
   });
 
-  it("falls back through paneDisplayName's precedence: label, session name, then agent", () => {
-    expect(paneTitleInTab(pane({ paneLabel: "hand-named", sessionName: "auto" })).primary).toBe("hand-named");
-    expect(paneTitleInTab(pane()).primary).toBe("claude");
-    expect(paneTitleInTab(pane({ kind: "shell", agent: "shell" })).primary).toBe("shell");
+  it("reports the tab's position, not its raw number, when the tab is unnamed", () => {
+    expect(panePlaceParts(pane({ tabLabel: "1" })).tab).toEqual({ text: "tab 1", positional: true });
+    expect(panePlaceParts(pane()).tab).toBeNull();
+  });
+
+  it("prefers the RAW tab list when the caller has one — the pane header's path", () => {
+    // The header reads `tabs[]`, which is unfiltered: the positional label the bridge already
+    // dropped from `tabLabel` is still there, and the SAME rule has to drop it a second time.
+    expect(panePlaceParts(pane(), [tab({ label: "1" })]).tab).toEqual({
+      text: "tab 1",
+      positional: true,
+    });
+    expect(panePlaceParts(pane(), [tab({ label: "UI work" })]).tab).toEqual({
+      text: "UI work",
+      positional: false,
+    });
+  });
+
+  // (Upstream also pins "never takes another machine's tab of the same id" here — a crew rule keyed
+  // on host-tagged tabs. Pup is single-host and its TabView carries no host, so the hazard cannot
+  // arise; the case is dropped rather than adapted to a fiction.)
+
+  it("trims, so a padded tab name does not render with its padding", () => {
+    expect(panePlaceParts(pane({ tabLabel: "  deploy  " })).tab).toEqual({
+      text: "deploy",
+      positional: false,
+    });
+  });
+});
+
+describe("tabTitle — one function for a tab's title, named or positional", () => {
+  it("names a real tab, unchanged", () => {
+    expect(tabTitle("fix-auth")).toEqual({ text: "fix-auth", positional: false });
+  });
+
+  it("trims a real name", () => {
+    expect(tabTitle("  deploy  ")).toEqual({ text: "deploy", positional: false });
+  });
+
+  it("reads a herdr-numbered tab's position off its digit", () => {
+    expect(tabTitle("2")).toEqual({ text: "tab 2", positional: true });
+  });
+
+  it("reads a zellij-numbered tab's position off its digit", () => {
+    expect(tabTitle("Tab #3")).toEqual({ text: "tab 3", positional: true });
+  });
+
+  it("is null for an empty label — no name and no digit to read", () => {
+    expect(tabTitle("")).toBeNull();
+    expect(tabTitle(undefined)).toBeNull();
+    expect(tabTitle(null)).toBeNull();
+  });
+});
+
+describe("paneCwdLine — line 2 where the place is already the heading", () => {
+  it("shortens the path for a phone row", () => {
+    expect(paneCwdLine(pane({ cwd: "/home/kon/dev/moonward" }))).toBe("~/dev/moonward");
+  });
+
+  it("says nothing when the multiplexer reports no cwd (every zellij pane)", () => {
+    expect(paneCwdLine(pane({ cwd: "" }))).toBeNull();
   });
 });
