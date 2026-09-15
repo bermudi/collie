@@ -6,7 +6,7 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
-## [0.46.0] - 2026-09-14
+## [0.46.0] - 2026-09-15
 
 The upstream **1.9.0 redesign round**, ported whole onto Pup: the composer's actions belt, the
 dashboard's workspace grouping, and the one-name rule — on a branch first, so the herd on the phone
@@ -109,6 +109,21 @@ mux abstraction the redesign upstream rides on are **not** part of this port; se
   ~275px to ~119px at 390px with every key still ≥36px tall; Enter and Shift draw glyphs with the
   full word as the accessible name. A composed key queue still dies with its dock (ADR 0005) and
   still survives switching to the digit grid mid-chord. (upstream e12b4334)
+
+### Declined (this round, with reasons)
+
+- **The prompt-cache subsystem** (~6,400 lines upstream): countdown chips, cold-cache push
+  warnings, dated vendor TTL claims, `cache-rules.toml`. A feature, not a fix, and still settling
+  upstream (six follow-up fixes in the days after 1.9.0). Revisit once quiet.
+- **config.toml + `collie config show/check/init`** (~3,000 lines): a config layering machine for a
+  single-user install that has `.env`.
+- **The crew/mux substrate**: protocol floors and compat removals, host-keyed grouping, the mux
+  adapter layer the redesign upstream rides on, tmux auto-rename. Pup is one host on Herdr.
+- **The first-launch screen**: onboarding for a fresh install, shaped around crews.
+- **Screen slide transitions, tour, playground, i18n**: polish and scaffolding Pup doesn't carry.
+  Upstream's locale strings landed as the literals they rendered to.
+- **omp's Tree bar button**: waits on an `omp--tree.txt` capture in this repo's corpus (the same
+  rule upstream held it to before their capture existed).
 
 ## [0.45.0] - 2026-09-12
 
