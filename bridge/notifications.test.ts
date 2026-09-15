@@ -97,7 +97,7 @@ describe("NotificationCoordinator — debounce", () => {
     clock.fireAll();
     expect(sink.last).toEqual({
       title: "claude needs you",
-      body: "demo · /home/you/demo",
+      body: "demo",
       paneId: "p1",
       renotify: true,
     });
@@ -143,6 +143,34 @@ describe("NotificationCoordinator — coalescing", () => {
     expect(sink.last?.title).toBe("2 agents need attention");
   });
 
+  test("a digest names the panes, not the agent kind, and disambiguates by place (upstream 15f9db67)", () => {
+    const { clock, sink, coord } = setup();
+    // Two claude panes: one hand-named, one known only by its title. A third pane in another
+    // space carries the SAME title, so the digest must append its place to tell them apart.
+    const named = { ...agentNamed("p1", "claude", "blocked"), paneLabel: "release notes" };
+    const titled = {
+      ...agentNamed("p2", "claude", "blocked"),
+      terminalTitle: "Reviewing the diff",
+      tabLabel: "checks",
+    };
+    const elsewhere = {
+      ...agentNamed("p3", "claude", "blocked"),
+      workspaceLabel: "other",
+      workspaceNumber: 2,
+      terminalTitle: "Reviewing the diff",
+      tabLabel: "checks",
+    };
+    coord.onTransition(named, "working", "blocked");
+    coord.onTransition(titled, "working", "blocked");
+    coord.onTransition(elsewhere, "working", "blocked");
+    clock.fireAll();
+    // Before the fix this read "claude, claude, claude". Now: the pane's own name, and a place
+    // only on the two that would otherwise read the same.
+    expect(sink.last?.body).toBe(
+      "release notes, Reviewing the diff · demo › checks, Reviewing the diff · other › checks",
+    );
+  });
+
   test("resolving one of two falls back to the named single, silently", () => {
     const { clock, sink, coord } = setup();
     coord.onTransition(agentNamed("p1", "claude", "blocked"), "working", "blocked");
@@ -151,7 +179,7 @@ describe("NotificationCoordinator — coalescing", () => {
     coord.onTransition(agentNamed("p2", "codex", "idle"), "blocked", "idle"); // codex handled
     expect(sink.last).toEqual({
       title: "claude needs you",
-      body: "demo · /home/you/demo",
+      body: "demo",
       paneId: "p1",
       renotify: false, // a retraction update must not re-buzz
     });
@@ -254,7 +282,7 @@ describe("NotificationCoordinator — type preferences", () => {
 describe("makeNotifySink", () => {
   const summary: HerdSummary = {
     title: "claude needs you",
-    body: "demo · /home/you/demo",
+    body: "demo",
     paneId: "p1",
     renotify: true,
   };
@@ -269,7 +297,7 @@ describe("makeNotifySink", () => {
     const push = new RecordingPush();
     makeNotifySink(push, { isMuted: () => false }, "collie:herd").render(summary);
     expect(push.sent).toEqual([
-      { title: "claude needs you", body: "demo · /home/you/demo", tag: "collie:herd", paneId: "p1", renotify: true },
+      { title: "claude needs you", body: "demo", tag: "collie:herd", paneId: "p1", renotify: true },
     ]);
   });
 

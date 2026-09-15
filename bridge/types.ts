@@ -68,6 +68,14 @@ export interface AgentView {
    */
   terminalTitle?: string;
   /**
+   * True when the title was printed by a program that has already exited — a multiplexer keeps a
+   * pane's title after its writer is gone. A rendering hint for the one name rule (pane-name.ts),
+   * never a deletion: the title stays on the wire and the phone shows it quietly instead of as the
+   * pane's name. Herdr's listing reports no foreground command, so on this bridge the flag is never
+   * set — the field exists because the mirrored rule reads it and the shared fixtures exercise it.
+   */
+  terminalTitleStale?: boolean;
+  /**
    * Epoch ms of this agent's last observed status transition (bridge/activity.ts). The only thing
    * that can make a pane read as unseen. Absent until the ledger has an entry, and on the very
    * first poll after a fresh install.

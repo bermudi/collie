@@ -277,6 +277,21 @@ export class StateEngine {
       const hasAgent = (p: (typeof panes)[number]): p is (typeof panes)[number] & { agent: string } =>
         typeof p.agent === "string" && p.agent.length > 0;
 
+      // ── ONE STABLE ORDER, AND IT IS THE MULTIPLEXER'S ─────────────────────────
+      // Space, then tab, then pane, each read off the arrangement Herdr reported: the tab's own
+      // index in the listing, and the pane's own index in `panes`. Nothing here sorts by pane id
+      // any more. A pane id is opaque and alphabetical order over opaque ids is an order nobody
+      // can see — `%10` before `%2` — so two panes side by side on the desk arrived at the phone in
+      // an order the desk never showed. Position is what the operator arranged, and position is
+      // what the phone now reads back. (upstream 6e8eeafc, on Herdr's own listing)
+      const tabRank = new Map(tabs.map((t, i) => [t.tab_id, i]));
+      const paneRank = new Map(panes.map((p, i) => [p.pane_id, i]));
+      const rankOf = (rank: Map<string, number>, id: string): number => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
+      const byPlace = (a: AgentView, b: AgentView) =>
+        a.workspaceNumber - b.workspaceNumber ||
+        rankOf(tabRank, a.tabId) - rankOf(tabRank, b.tabId) ||
+        rankOf(paneRank, a.paneId) - rankOf(paneRank, b.paneId);
+
       const agents: AgentView[] = panes
         .filter(hasAgent)
         .map((p) => toView(p, p.agent, "agent"))
@@ -284,14 +299,15 @@ export class StateEngine {
           (a, b) =>
             STATUS_RANK[a.status] - STATUS_RANK[b.status] ||
             a.workspaceNumber - b.workspaceNumber ||
-            a.paneId.localeCompare(b.paneId),
+            rankOf(tabRank, a.tabId) - rankOf(tabRank, b.tabId) ||
+            rankOf(paneRank, a.paneId) - rankOf(paneRank, b.paneId),
         );
 
-      // Bare shell panes (no agent), ordered by space then pane so a space's panes read top-down.
+      // Bare shell panes (no agent), in the same place order so a space's panes read top-down.
       const shellPanes: AgentView[] = panes
         .filter((p) => !p.agent)
         .map((p) => toView(p, "shell", "shell"))
-        .sort((a, b) => a.workspaceNumber - b.workspaceNumber || a.paneId.localeCompare(b.paneId));
+        .sort(byPlace);
 
       const workspaceViews: WorkspaceView[] = workspaces
         .map((w) => ({

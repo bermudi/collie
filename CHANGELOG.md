@@ -6,6 +6,30 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.46.0] - 2026-09-14
+
+The upstream **1.9.0 redesign round**, ported whole onto Pup: the composer's actions belt, the
+dashboard's workspace grouping, and the one-name rule — on a branch first, so the herd on the phone
+can try it before it becomes Pup's face. The cache subsystem, config.toml, crew machinery, and the
+mux abstraction the redesign upstream rides on are **not** part of this port; see Declined.
+
+### Bridge
+
+- **One name rule, one place rule, mirrored bridge-side.** `bridge/pane-name.ts` is the push's half
+  of the rule the screens use: NAME — paneLabel, else sessionName, else a non-stale terminalTitle,
+  else the agent word; PLACE — `space › tab`. Shared fixtures (`pane-name.fixtures.json`) run on both
+  sides, so a rule changed on one side alone turns red. A multi-agent push digest names the panes
+  instead of reading "claude, claude, claude", appending the place only when two panes would read
+  the same; a single alert's body is the place, not `workspace · absolute-path`. (upstream 6e8eeafc,
+  15f9db67)
+- **Panes arrive in the multiplexer's own arrangement.** The bridge no longer tie-breaks panes by
+  pane id (an opaque string whose alphabetical order nobody can see); space, then tab, then pane
+  position all read off Herdr's listing order, and a poll caught mid-create sorts last. (upstream
+  6e8eeafc, on Herdr's listing — Pup does not port the mux layer upstream built this on)
+- `terminalTitleStale` is declared on the wire type for the mirrored rule to read; Herdr reports no
+  foreground command, so on this bridge it is never set. Known limit: Claude `/rename` session
+  names are already sniffed and ride the wire as before.
+
 ## [0.45.0] - 2026-09-12
 
 ### Changed
