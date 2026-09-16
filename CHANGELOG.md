@@ -135,6 +135,14 @@ mux abstraction the redesign upstream rides on are **not** part of this port; se
   256×294 viewBox to 24×24 and centred; verified rasterized at render time — ink box dead-centre,
   53–61% tile coverage, no clipping. Tried from the phone on day one of the redesign trial.
 
+- **Sheets no longer pick up stale terminal paint while sliding in.** Both floating panels (the
+  switcher and Agent commands) showed bands of terminal output across their surface during the
+  entrance, gone the next frame — the animated sheet shared its paint with the filtered mirror
+  layers beneath. The panel is now one isolated paint boundary, promoted for the life of the
+  sheet (f770a73d); and the dim settles before the slide — a 150ms ease-out scrim on its own
+  compositor layer, so the panel moves against a stable ground instead of a dim still mid-fade
+  (7fbfad84). Found on the phone during the redesign trial.
+
 ## [0.45.0] - 2026-09-12
 
 ### Changed
