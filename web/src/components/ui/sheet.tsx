@@ -181,7 +181,13 @@ export function BottomSheet({ open, onClose, title, children, className, pull = 
         tabIndex={-1}
         className={cn(
           "absolute inset-0 bg-black/50",
-          !peeking && !continuingFromPeek && "duration-200 animate-in fade-in",
+          // The scrim settles BEFORE the panel lands, on a compositor layer of its own. A 200ms
+          // fade running lockstep with the slide read as jank on the phone — the dim was still
+          // mid-fade under the moving sheet, re-compositing every frame against the terminal,
+          // which is itself a filtered layer in light mode (ADR 0002). Short fade, own layer,
+          // decelerating curve: the slide then plays against a stable ground.
+          !peeking && !continuingFromPeek &&
+            "duration-150 ease-out [will-change:opacity] animate-in fade-in",
         )}
         style={peeking ? { opacity: Math.min(1, pull / 120) * 0.5 } : undefined}
         onPointerDown={() => {

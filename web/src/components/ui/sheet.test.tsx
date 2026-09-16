@@ -209,6 +209,20 @@ describe("BottomSheet: pull-driven peek", () => {
     expect(panel.className).toMatch(/slide-in-from-bottom/);
   });
 
+  it("settles the scrim early on its own layer, so the slide plays against a stable dim", () => {
+    const { container } = render(
+      <BottomSheet open onClose={vi.fn()} title="Switch pane">
+        body
+      </BottomSheet>,
+    );
+    const backdrop = container.querySelector('button[aria-hidden="true"]')!;
+    // Short fade that finishes before the panel's 200ms slide, decelerating.
+    expect(backdrop.className).toMatch(/duration-150/);
+    expect(backdrop.className).toMatch(/ease-out/);
+    // Compositor-owned opacity: the fade must not re-composite the filtered terminal per frame.
+    expect(backdrop.className).toContain("[will-change:opacity]");
+  });
+
   it.each(["Switch pane", "Agent commands"])(
     "keeps %s in an isolated paint layer without removing its entrance",
     (title) => {
