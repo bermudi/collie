@@ -208,6 +208,19 @@ describe("BottomSheet: pull-driven peek", () => {
     expect(panel.className).toMatch(/animate-in/);
     expect(panel.className).toMatch(/slide-in-from-bottom/);
   });
+
+  it.each(["Switch pane", "Agent commands"])(
+    "keeps %s in an isolated paint layer without removing its entrance",
+    (title) => {
+      const { container } = render(
+        <BottomSheet open onClose={vi.fn()} title={title}>body</BottomSheet>,
+      );
+      const panel = container.querySelector<HTMLElement>('div[tabindex="-1"]')!;
+      expect(panel).toHaveClass("isolate", "[contain:paint]", "will-change-transform");
+      expect(panel).toHaveClass("bg-background", "animate-in", "slide-in-from-bottom");
+      expect(panel.querySelector(".sticky")).toHaveClass("backdrop-blur-md");
+    },
+  );
 });
 
   it("caps the panel at the content column while the backdrop stays the whole screen", () => {
