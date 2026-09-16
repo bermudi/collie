@@ -14,6 +14,10 @@ Upstream repo: `AltanS/collie` · Fork: `bermudi/collie` · Plugin id stays `her
 
 Phone web UI for your Herdr herd over Tailscale. Bun bridge + Vite/React PWA. Single-user, tailnet-only. Pup's job is to be the boring, reliable viewer you open 20 times a day — not the place for distributed quorum or voice pipelines.
 
+## The herd this fork serves
+
+The real herd is **pi + devin daily, opencode riding along sometimes**. Codex, cc, omp and the rest are downstream concerns. Upstream under-serves devin — closing that gap is Pup's job, not theirs. **Parity rule:** when a feature lands for one harness (belt button, command catalog, composer shape, icon), check pi and devin before calling it done. A pi or devin pane must never be the degraded case while a louder harness gets the polish.
+
 ## Stack
 
 Bun + TypeScript (bridge) · Vite + React + Tailwind v4 + shadcn (web) · Herdr Unix socket · Tailscale Serve as the one managed front door · `web-push` for notifications.
