@@ -1,4 +1,5 @@
 import { lineText, type StyledLine } from "../../blocks";
+import { isLightFill, NEAR_WHITE_FILL_LUMA } from "../light-fill";
 import { PURE_HORIZONTAL_RULE_GLYPH_CLASS } from "../../rule-glyphs";
 
 // A CODEX LABELLED SEPARATOR: a short rule, one label, then a rule that runs to the row's end, as
@@ -26,15 +27,15 @@ const LABELLED_RULE_ROW = new RegExp(
     `([${RULE}])\\2{${MIN_TRAILING_RULE_RUN - 1},}\\s*$`, // a rule to the row's end
 );
 
-// Codex fills submitted user-message rows to the terminal edge with this truecolor background.
-// The mirror is authored in dark space and inverted in the app's light theme, so #f0f0f0 becomes
-// #0f0f0f: a solid black 195-column bar on a phone. Keep the desktop TUI presentation intact and
-// mark only this exact, observed fill for the renderer's mobile-width transparency rule. Semantic
-// diff backgrounds use different colours and remain untouched.
-const CODEX_USER_MESSAGE_BG = "rgb(240,240,240)";
+// Codex paints its submitted-message band and composer box near-white, running to the terminal
+// edge. The mirror is authored in dark space and inverted in the app's light theme, so such a fill
+// arrives on the phone as a solid black bar. The fill's exact value drifts between panes (240 vs
+// 244 on the same version), so matching is by LUMINANCE in `../light-fill.ts`, shared with omp —
+// not by one observed palette value, which fails silently the next time Codex moves four levels.
+// Semantic diff backgrounds are dark and remain untouched.
 
 /** Presentation-only pass over Codex's raw lines: clip its labelled separators, and mark its
- *  user-message fill for mobile transparency. Not one byte of visible text changes. The input array
+ *  near-white fills for mobile transparency. Not one byte of visible text changes. The input array
  *  is returned as-is when nothing matched, so a screen Codex does not paint this way stays
  *  identical, object for object. */
 export function decorateCodexDisplay(lines: StyledLine[]): StyledLine[] {
@@ -43,7 +44,7 @@ export function decorateCodexDisplay(lines: StyledLine[]): StyledLine[] {
     const noWrap = line.noWrap || LABELLED_RULE_ROW.test(lineText(line));
     let changedSegments = false;
     const segments = line.segments.map((segment) => {
-      if (segment.bg !== CODEX_USER_MESSAGE_BG || segment.mobileTransparentBg) return segment;
+      if (!isLightFill(segment.bg, NEAR_WHITE_FILL_LUMA) || segment.mobileTransparentBg) return segment;
       changedSegments = true;
       return { ...segment, mobileTransparentBg: true as const };
     });

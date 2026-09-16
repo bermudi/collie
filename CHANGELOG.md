@@ -143,6 +143,35 @@ mux abstraction the redesign upstream rides on are **not** part of this port; se
   compositor layer, so the panel moves against a stable ground instead of a dim still mid-fade
   (7fbfad84). Found on the phone during the redesign trial.
 
+### Fixed (upstream round, ported 2026-09-16)
+
+- **A plugin action resolves the service's state directory** (upstream #226, d07ec4c4). Herdr
+  injects `HERDR_PLUGIN_STATE_DIR` into every plugin action; the systemd service never receives
+  it. Honouring it split one install in two: push-test, pairing and devices — every verb that
+  reads or writes state through an action — read `~/.local/state/herdr/plugins/herdr.collie`,
+  found no subscriptions, and failed, while the service kept them under `~/.local/state/collie`.
+  `resolveStateDir` (now pure and exported, like `defaultSocketPath`) reads `COLLIE_STATE_DIR`,
+  else the user state dir, and ignores Herdr's variable on purpose.
+- **A finished agent that Herdr reports as `idle` reaches Ready · unseen** (upstream #222,
+  769cdaa8). Herdr 0.9's API says `idle` for an agent whose turn ended; only its own client
+  projects `done`. `isUnseen` now accepts either settled status, gated by our own read receipts
+  and excluding bare shells; and only a turn that ends (`working`/`blocked` → idle/done) counts
+  as new work, so Herdr's own acknowledgement and detection flicker never re-mark a read pane.
+  The ledger wiring moved to `bridge/activity-tracking.ts` so the gate has one home. ADR 0003
+  and HERDR_API.md carry the compatibility note.
+- **Light fills match by luminance, not by one observed value** (upstream #224, 6fb0f1f5 +
+  ebd63ffd). Codex's submitted-message band was matched against the literal `rgb(240,240,240)`,
+  and a 0.154.0 pane paints `rgb(244,244,244)` — four levels apart, so the whole band inverted
+  to a black bar again. The rule moved to `lib/harness/light-fill.ts` (Rec. 709 luma, Codex's
+  floor 220, omp's 180), shared by both adapters; a real 0.154.0 capture pins the shape. omp's
+  belt of pastel card fills now gets the same marking on Pup for the first time — upstream has
+  marked them since before the fork point; Pup's raw-only omp path just never carried it.
+- **The belt stands at 40px, and the field's focus ring clears it** (upstream a0ae39e7). The
+  belt's scroller reads `py-1` — 40px on the phone instead of a thin 32px strip; the harness
+  section grows to `h-10` with `-my-1` so its tint still runs rule to rule; and the field row's
+  `pt-1` is the one place that puts the focus ring's 4px reach inside the row rather than on the
+  belt's bottom edge.
+
 ## [0.45.0] - 2026-09-12
 
 ### Changed

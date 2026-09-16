@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ActivityLedger } from "./activity.ts";
+import { trackActivity } from "./activity-tracking.ts";
 import { AuditLog, fileAuditAppender } from "./audit.ts";
 import { loadConfig, type Config } from "./config.ts";
 import { EventPoker } from "./event-poker.ts";
@@ -135,14 +136,11 @@ const makeSession: SessionFactory = (name, socketPath, isPrimary) => {
   poker.onHealth((h) => engine.setCadence(h ? cfg.pollIdleMs : cfg.pollMs));
   engine.onUpdate((s) => poker.setAgentPanes(s.agents.map((a) => a.paneId)));
 
-  // Activity bookkeeping. A status change stamps `activeAt` (the only thing that can make a pane
+  // Activity bookkeeping. A turn that ends stamps `activeAt` (the only thing that can make a pane
   // read as unseen); every successful poll reconciles the ledger against the panes that exist, which
   // seeds first sightings as already-seen and reaps closed ones. Reconciling covers bare shells too,
   // which the engine's agent-derived removal event never reports.
-  engine.onTransition((agent) => activity.noteActive(name, agent.paneId));
-  engine.onUpdate((s) =>
-    activity.reconcile(name, [...s.agents, ...s.shellPanes].map((p) => p.paneId)),
-  );
+  trackActivity(engine, activity, name);
 
   // Background notifications on lifecycle transitions (foreground toasts are computed client-side by
   // diffing snapshots). Each session gets its own coordinator + notification slot: the primary keeps

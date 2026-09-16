@@ -123,6 +123,20 @@ describe("AgentList — the two questions, in order", () => {
     expect(screen.getByRole("img", { name: "unseen" })).toBeTruthy();
   });
 
+  it("pulls an unread idle completion out of its workspace until it is seen (upstream #222)", () => {
+    // Herdr 0.9's API reports a finished turn as `idle`, not `done` — the unread path takes both.
+    const finished = agent("finished", "idle", { lastActiveAt: 200, lastSeenAt: 100 });
+    const { rerender } = render(<AgentList agents={[finished]} onOpen={vi.fn()} />);
+    expect(headings()).toEqual([expect.stringContaining("ready · unseen")]);
+    expect(rowNames()).toEqual(["finished"]);
+    expect(screen.getByRole("img", { name: "unseen" })).toBeTruthy();
+
+    rerender(<AgentList agents={[{ ...finished, lastSeenAt: 300 }]} onOpen={vi.fn()} />);
+    expect(headings()).toEqual([expect.stringContaining("proj")]);
+    expect(rowNames()).toEqual(["finished"]);
+    expect(screen.queryByRole("img", { name: "unseen" })).not.toBeTruthy();
+  });
+
   it("says so when nothing needs you, rather than leaving an absence to interpret", () => {
     render(<AgentList agents={[agent("busy", "working")]} onOpen={vi.fn()} />);
     expect(screen.getByText(/nothing needs you/i)).toBeTruthy();

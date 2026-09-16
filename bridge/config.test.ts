@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { defaultSocketPath, isLoopbackBindHost, loadConfig } from "./config.ts";
+import { defaultSocketPath, isLoopbackBindHost, loadConfig, resolveStateDir } from "./config.ts";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "./uploads.ts";
 
 // loadConfig is the deployment contract — env vars in, a resolved Config out. Pure (just reads
@@ -389,5 +389,20 @@ describe("defaultSocketPath", () => {
     expect(defaultSocketPath("win32", {}, "C:\\Users\\u")).toBe(
       join("C:\\Users\\u", "AppData", "Roaming", "herdr", "herdr.sock"),
     );
+  });
+});
+
+// #226: a Herdr plugin action carries HERDR_PLUGIN_STATE_DIR and the service does not, so honouring
+// it sent `push-test` (and every other state-reading action) to a directory the bridge never uses.
+describe("resolveStateDir", () => {
+  test("ignores the state dir Herdr injects into a plugin action", () => {
+    expect(resolveStateDir({ HERDR_PLUGIN_STATE_DIR: "/h/.local/state/herdr/plugins/herdr.collie" }, "/h")).toBe(
+      join("/h", ".local", "state", "collie"),
+    );
+  });
+
+  test("COLLIE_STATE_DIR still moves it, with or without Herdr's variable beside it", () => {
+    expect(resolveStateDir({ COLLIE_STATE_DIR: "/s" }, "/h")).toBe("/s");
+    expect(resolveStateDir({ COLLIE_STATE_DIR: "/s", HERDR_PLUGIN_STATE_DIR: "/p" }, "/h")).toBe("/s");
   });
 });

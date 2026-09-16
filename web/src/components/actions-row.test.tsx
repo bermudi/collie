@@ -26,6 +26,18 @@ function row(over: Partial<Parameters<typeof ActionsRow>[0]> = {}) {
 }
 
 describe("ActionsRow — the belt", () => {
+  it("stands the belt's scroller at py-1 (40px), with no vertical scroll under a thumb", () => {
+    // The belt-shade deck's "Option 6" first dropped STRIP_SCROLLER's own `py-1.5` to `py-0`, the
+    // pill's own 32px; the phone read that as too thin, so it stands at `py-1` — 40px — and
+    // `overflow-y-hidden` stays paired with it so STRIP_TAP_TARGET's 46px `::before` reach, still
+    // wider than the 4px of padding a side, cannot force a vertical scrollbar under a thumb.
+    setHarnessBarEnabled(true);
+    render(row());
+    const scroller = document.querySelector<HTMLElement>(".overflow-x-auto")!;
+    expect(scroller.className).toMatch(/(?:^|\s)py-1(?=\s|$)/);
+    expect(scroller.className).toMatch(/(?:^|\s)overflow-y-hidden(?=\s|$)/);
+  });
+
   it("renders Collie's controls and the harness's commands on one row", () => {
     setHarnessBarEnabled(true);
     render(row());

@@ -154,6 +154,21 @@ describe("ompBuildBlocks emits nothing but raw", () => {
     expect(blocks.map((b) => b.kind)).toEqual(blocks.map(() => "raw"));
   });
 
+  // The raw pass marks light fills for mobile transparency (light-fill.ts, omp's 180 floor): a
+  // pastel card fill inverts to a black bar on the phone's light theme otherwise. Presentation
+  // only — text byte-identical, dark fills untouched, and identity preserved when nothing matches.
+  it("marks a pastel card fill for mobile transparency and leaves dark fills alone", () => {
+    const card = `${String.fromCharCode(27)}[48;2;250;250;250m a pastel card ${String.fromCharCode(27)}[0m`;
+    const body = `${String.fromCharCode(27)}[48;2;15;18;22m the dark body ${String.fromCharCode(27)}[0m`;
+    const [block] = ompAdapter.buildBlocks(splitLines(parseAnsi(`${card}\n${body}`)));
+    expect(block!.kind).toBe("raw");
+    if (block!.kind !== "raw") return;
+    const [cardLine, bodyLine] = block!.lines;
+    expect(cardLine!.segments[0]!.mobileTransparentBg).toBe(true);
+    expect(bodyLine!.segments[0]!.mobileTransparentBg).toBeUndefined();
+    expect(block!.lines.map(lineText)).toEqual(splitLines(parseAnsi(`${card}\n${body}`)).map(lineText));
+  });
+
   // The Tier-1 claim is about the whole adapter object, not only its pipeline: every surface it
   // exposes must be a pure reader over StyledLine[], so nothing here can ORIGINATE a keystroke. This
   // is the whole list, spelled out — adding a key is how an adapter accidentally goes hot, so make it

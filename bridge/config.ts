@@ -311,11 +311,28 @@ export function defaultSocketPath(
   return join(home, ".config", "herdr", "herdr.sock");
 }
 
+/**
+ * Where runtime state lives: uploads, `audit.log`, `push-subscriptions.json`, `snooze.json`. The
+ * explicit override, then the user state dir.
+ *
+ * `HERDR_PLUGIN_STATE_DIR` is IGNORED, on purpose (#226). Herdr injects it into a plugin ACTION, but
+ * the bridge never runs as one: it runs as a systemd or launchd service, whose environment has never
+ * carried it. Honouring it split one install in two — `push-test`, pairing and devices (every verb
+ * that reads or writes state through an action) read `~/.local/state/herdr/plugins/herdr.collie`,
+ * found no subscriptions, and failed, while the service kept them under `~/.local/state/collie`.
+ * The service's answer is the one that has always held the data, so it is the only answer.
+ *
+ * Pure and exported so the precedence is unit-testable, like `defaultSocketPath` above.
+ */
+export function resolveStateDir(
+  env: Record<string, string | undefined> = process.env,
+  home: string = homedir(),
+): string {
+  return env.COLLIE_STATE_DIR ?? join(home, ".local", "state", "collie");
+}
+
 export function loadConfig(): Config {
-  const stateDir =
-    process.env.HERDR_PLUGIN_STATE_DIR ??
-    process.env.COLLIE_STATE_DIR ??
-    join(homedir(), ".local", "state", "collie");
+  const stateDir = resolveStateDir();
 
   const submitKeys = envList("COLLIE_SUBMIT_KEYS");
 

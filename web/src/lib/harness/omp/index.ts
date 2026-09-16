@@ -72,6 +72,7 @@
 
 import type { Block, StyledLine } from "../../blocks";
 import type { HarnessAdapter } from "../types";
+import { LIGHT_FILL_LUMA, markLightFills } from "../light-fill";
 import { locatePiComposer, piDraft } from "./pi-shape";
 import { ompOpaqueDraft, ompReplyChunks } from "./reply-chunks";
 import {
@@ -104,7 +105,10 @@ import {
  * Claude's `/model` picker is pinned against. `composerReady` already delivers the safety half.
  */
 export function ompBuildBlocks(lines: StyledLine[]): Block[] {
-  return [{ kind: "raw", lines: stripChrome(lines) }];
+  // omp paints its cards as pastel "paper" fills; on the inverted light-theme mirror those arrive
+  // as black bars, so the raw pass marks them for mobile transparency (shared rule, light-fill.ts).
+  // Presentation only — no byte of text changes, and the Tier-1 raw-only contract is untouched.
+  return [{ kind: "raw", lines: markLightFills(stripChrome(lines), LIGHT_FILL_LUMA) }];
 }
 
 export function extractStatusLines(lines: StyledLine[]): StyledLine[] {

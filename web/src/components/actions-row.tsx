@@ -219,18 +219,21 @@ export function ActionsRow({ general, agent, mine, onRun, disabled, handle }: Ac
           `pl-3` stays fixed (paired with the `-mx-3` above, the route's own gutter); the scroller
           carries no `paddingRight` — see the trailing spacer for why the room the Switch block
           needs is bought with a real flex child rather than padding.
-          `py-0` OVERRIDES `STRIP_SCROLLER`'s OWN `py-1.5` ON THIS SCROLLER ALONE: the belt stands
-          at the pill's own height, 32px, rather than the 44px `STRIP_TAP_TARGET` answers for.
-          `overflow-y-hidden` is the fix for a bug `py-0` alone would reopen: the `::before` still
-          reaches its full hit box, and a 32px scroller has only its own height to absorb that
-          reach into — `overflow-x: auto` forces `overflow-y: auto` too, which turns that overflow
-          into a real vertical scrollbar under a thumb. This belt alone forces the other axis
-          shut. */}
+          `py-1` OVERRIDES `STRIP_SCROLLER`'s OWN `py-1.5` ON THIS SCROLLER ALONE: the belt-shade
+          deck's "Option 6" first dropped it to `py-0`, the pill's own 32px; the phone read that as
+          too thin, so it stands at `py-1` — 40px, the pill plus 4px above and below, still short of
+          the 44px `STRIP_TAP_TARGET` answers for. The key rail keeps `STRIP_SCROLLER`'s shipped
+          `py-1.5` unmodified — it is a different scroller, not this one.
+          `overflow-y-hidden` is the fix for a bug `py-0` reopened and `py-1` does not retire: the
+          `::before` still reaches its full 46px hit box, and even a 40px scroller has only 4px of
+          padding per side to absorb that reach into — `overflow-x: auto` forces `overflow-y: auto`
+          too, which turns that overflow into a real vertical scrollbar under a thumb. This belt
+          alone forces the other axis shut. */}
       <OverflowEdges edges={handle ? "left" : "both"} cue="none">
         {(scrollerRef) => (
           <div
             ref={scrollerRef}
-            className={cn(STRIP_SCROLLER, "bg-primary/10 pl-3 py-0 overflow-y-hidden", !handle && "pr-3")}
+            className={cn(STRIP_SCROLLER, "bg-primary/10 pl-3 py-1 overflow-y-hidden", !handle && "pr-3")}
           >
             {general.length > 0 && (
               // The word "Controls" is `sr-only` and load-bearing: in the accessibility tree it is

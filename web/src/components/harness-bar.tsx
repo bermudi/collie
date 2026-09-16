@@ -115,11 +115,21 @@ export function HarnessBar({ agent, mine, onRun, disabled }: HarnessBarProps) {
       data-slot="harness-bar"
       role="group"
       aria-label="Harness commands"
-      // A tinted section of the belt. The geometry is BELT_SECTION's and nothing here changes it;
-      // this adds the paint alone. The `border-l-border` rides with `bg-muted` and only with it,
+      // A tinted section of the belt. The `border-l-border` rides with `bg-muted` and only with it,
       // and it colours the width BELT_SECTION already reserved, so the tinted and the muted
       // section are the same box to the pixel.
-      className={cn(BELT_SECTION, accent === undefined && "border-l-border bg-muted")}
+      //
+      // `h-10 -my-1` is the ONE override past BELT_SECTION's own box, and it exists only because the
+      // scroller around this section stands at `py-1` now (actions-row.tsx), not the `py-0`
+      // BELT_SECTION's own comment was written against. BELT_SECTION's `h-8` is a FIXED border-box
+      // height — padding added beside it cannot grow it — so this overrides the height itself, to
+      // `h-10` (40px, the scroller's new total). `-my-1` pulls the box's FLOW contribution back down
+      // by 4px a side (40px border box, 32px margin box) so it still centres and gaps like every
+      // other 32px pill; the border box itself does not shrink, so the visible paint stays 40px tall
+      // and lands exactly on the scroller's own `py-1` padding box, top rule to bottom rule, with no
+      // untinted band. Safe for the same reason the old recipe was: the scroller has real padding to
+      // land on again, so nothing overflows `clientHeight`.
+      className={cn(BELT_SECTION, "h-10 -my-1", accent === undefined && "border-l-border bg-muted")}
       style={
         accent === undefined
           ? undefined
