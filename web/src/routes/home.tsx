@@ -81,7 +81,7 @@ export function HomeRoute() {
   );
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-screen-sm flex-1 flex-col">
+    <div className="mx-auto flex min-h-0 w-full max-w-screen-sm flex-1 flex-col overflow-hidden">
       {/* The dashboard header: wordmark + the session switcher (dashboard-only), then the shared pill
           and the Settings gear. The switcher self-hides on a single-session install. */}
       <RouteHeader
@@ -97,7 +97,10 @@ export function HomeRoute() {
           load-bearing: it makes this scroller the containing block for its absolutely-positioned
           descendants. Tailwind's `sr-only` is `position: absolute`, so every status label in the
           list would otherwise escape this scroller's clip and grow the document's own scrollbar. */}
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {/* Content region below the header: a viewport-clipped internal scroller. This is the ONLY
+          scroll container on this route — html/body/#root and the frame are overflow-hidden so the
+          page never scrolls under the sticky header (no "two independent scrollings"). */}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
         {/* A notice BELOW the header is content, not viewport chrome: it is an inset box on the
             page gutter, not a full-bleed strip. Full-bleed it ran its left edge 16px outside the
             list it sat on top of — two left edges stacked, the loudest misalignment on the page. */}

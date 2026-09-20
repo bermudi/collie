@@ -16,6 +16,7 @@ import { usePushSetup } from "@/hooks/use-push";
 import { useConnectionLost } from "@/hooks/use-connection-lost";
 import { ConnectionBanner } from "@/components/connection-banner";
 import { UpdateAvailableBanner } from "@/components/update-available-banner";
+import { ViewportFrame } from "@/components/viewport-frame";
 import { AppHeaderHost } from "@/components/app-header";
 import { StripHost } from "@/components/ui/strip-host";
 import { ScreenTransition } from "@/components/screen-transition";
@@ -102,7 +103,12 @@ export function RootLayout() {
           inside it because it is not a strip: it covers the screen, it does not share the top of
           it. */}
       <TourHost home={data} onDecision={setTourDecision} />
-      <div className="flex h-[100dvh] flex-col overflow-hidden">
+      {/* A viewport-height flex column: ViewportFrame repairs Android Chrome's occasionally stale
+          `dvh` after keyboard/toolbar changes (and skips Firefox, which CSS dvh serves). The top
+          banners (when shown) are in-flow rows at the top and the active route fills the rest
+          (each route root is `min-h-0 flex-1`). This is what keeps a banner from covering the
+          route's sticky header — it reserves real space instead of overlaying. */}
+      <ViewportFrame>
         {/* THE SELF-UPDATE BANNER, above the band: the fallback row for a bundle the bridge has left
             behind while the page holds unsent work (or has already auto-updated once for this
             build). Mounted unconditionally so useSelfUpdate()'s controller runs for the app's
@@ -158,7 +164,7 @@ export function RootLayout() {
             </ScreenTransition>
           </AppHeaderHost>
         </StripHost>
-      </div>
+      </ViewportFrame>
     </>
   );
 }

@@ -661,6 +661,11 @@
     /* Respect notches; keep the app glued to the viewport edges on mobile. */
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    /* Single scroll container: the document never scrolls. Only a route's inner scroller
+       (overflow-y-auto) does, so the sticky header can't clip the list under it and the page
+       can't keep scrolling past where the inner scroller ends. */
+    height: 100%;
+    overflow: hidden;
   }
   body {
     @apply bg-background text-foreground;
@@ -668,6 +673,12 @@
        fact you can read in this file instead of a preflight default you have to know about. */
     font-family: var(--font-sans);
     overscroll-behavior-y: none;
+    height: 100%;
+    overflow: hidden;
+  }
+  #root {
+    height: 100%;
+    overflow: hidden;
   }
 }
 
