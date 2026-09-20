@@ -137,7 +137,30 @@ export function hasComposer(lines: StyledLine[]): boolean {
 
 export function composerPrompt(lines: StyledLine[]): string | null {
   const pi = locatePiComposer(lines);
-  if (pi) return lines.slice(pi.top, pi.bottom + 1).map((line) => line.segments.map((s) => s.text).join("").trimEnd()).join("\n");
+  if (pi) {
+    // The region is bounded to its TRAILING rows, and that is sound by construction: the bridge's
+    // expected_prompt binding is a contiguous multi-line match that must sit in the screen's TAIL
+    // (bridge/prompt-binding.ts), so the last rows of the region carry the whole binding. Without
+    // the bound, a ~101-row pi editor on a wide pane produces a region past the bridge's 8192-char
+    // cap, and the submit is refused with `bad expected_prompt` — fail-closed, but it stalls a long
+    // reply, the exact case the multipart transport exists for. Upstream carries the same unbounded
+    // region; this bound is Pup's.
+    const MAX_REGION_CHARS = 6000;
+    const rows = lines
+      .slice(pi.top, pi.bottom + 1)
+      .map((line) => line.segments.map((s) => s.text).join("").trimEnd());
+    let total = 0;
+    let keepFrom = rows.length;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const next = total + rows[i]!.length + 1;
+      // Always keep the bottom two rows — the closing rule and the draft row above it — so the
+      // binding still spans the boundary it exists to pin.
+      if (next > MAX_REGION_CHARS && rows.length - i >= 2) break;
+      total = next;
+      keepFrom = i;
+    }
+    return rows.slice(keepFrom).join("\n");
+  }
   const rule = locateRuleComposer(lines);
   return rule === null ? boxComposerPrompt(lines) : ruleComposerPrompt(lines, rule);
 }

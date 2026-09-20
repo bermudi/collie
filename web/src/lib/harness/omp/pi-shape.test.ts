@@ -66,3 +66,25 @@ describe("OMP 18.1.13 pi-shaped editor (live captures, 2026-09-07)", () => {
     expect(hasComposer(parse(idle.replace("─", "━")))).toBe(false);
   });
 });
+
+// The prompt region the pi branch hands the destructive-write binding is bounded to its TRAILING
+// rows: the bridge's expected_prompt check is a contiguous match in the screen tail, so the last
+// rows carry the binding — and an unbounded ~101-row region on a wide pane would pass the bridge's
+// 8192-char cap and fail-closed the submit of exactly the long reply the transport exists for.
+describe("pi composerPrompt — the region is bounded for the wire", () => {
+  it("keeps the region under the bridge's expected_prompt cap on a tall wide editor", () => {
+    // The idle fixture's real styled rules and footer, with 99 wide draft rows spliced in — 99
+    // plus the fixture's own draft row is the 101-row span the locator accepts at most.
+    const rows = idle.split("\n");
+    const wide = Array.from({ length: 99 }, () => ` ${"x".repeat(178)}`);
+    const tall = [...rows.slice(0, 1), ...wide, ...rows.slice(1)].join("\n");
+    const screen = parse(tall);
+    expect(hasComposer(screen)).toBe(true);
+
+    const region = composerPrompt(screen);
+    expect(region).not.toBeNull();
+    // Comfortably under the bridge's 8192 MAX_EXPECTED_PROMPT_CHARS, and still ends on the rule.
+    expect(region!.length).toBeLessThanOrEqual(8192);
+    expect(region!.split("\n").length).toBeGreaterThanOrEqual(2);
+  });
+});

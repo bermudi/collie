@@ -231,6 +231,9 @@ export const ja: Dictionary = {
   "composer.upload.success": "ファイルを追加しました（パスを挿入）",
   "composer.upload.tooLarge": "上限の {max} MB を超えています。",
   "composer.upload.badType": "{name} は添付できません。",
+  "composer.upload.successBatch": "{n}件のファイルを追加、パスはメッセージ内",
+  "composer.upload.mixed": "{total}件中{attached}件を追加 — {detail}",
+  "composer.upload.nothing": "何も追加されていません — {detail}",
   "composer.noEcho.title": "パスワード入力プロンプト: エコーバック無効",
   "composer.noEcho.noLiveTyped":
     "入力内容はペインに存在しますが未送信です。このビューはライブではないため送信できません。ターミナルで直接操作してください。",

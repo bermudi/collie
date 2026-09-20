@@ -235,6 +235,9 @@ export const de: Dictionary = {
   "composer.upload.success": "Datei hinzugefügt, Pfad in Nachricht",
   "composer.upload.tooLarge": "Die Datei ist größer als {max} MB, das Limit für diesen Collie.",
   "composer.upload.badType": "Collie kann {name} nicht anhängen.",
+  "composer.upload.successBatch": "{n} Dateien hinzugefügt, Pfade in Nachricht",
+  "composer.upload.mixed": "{attached} von {total} hinzugefügt — {detail}",
+  "composer.upload.nothing": "Nichts hinzugefügt — {detail}",
   "composer.noEcho.title": "Passwortabfrage ohne Echo",
   "composer.noEcho.noLiveTyped":
     "Der Text steht unbestätigt im Pane. Da diese Ansicht nicht live ist, kann von hier aus nichts gesendet werden. Die Eingabe direkt im Terminal beantworten.",

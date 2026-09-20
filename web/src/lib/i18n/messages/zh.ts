@@ -219,6 +219,9 @@ export const zh: Dictionary = {
   "composer.upload.success": "文件已添加，路径已填入消息",
   "composer.upload.tooLarge": "文件超过此 collie 的 {max} MB 大小限制。",
   "composer.upload.badType": "Collie 无法附加 {name}。",
+  "composer.upload.successBatch": "已添加 {n} 个文件，路径在消息中",
+  "composer.upload.mixed": "已添加 {total} 个中的 {attached} 个 — {detail}",
+  "composer.upload.nothing": "未添加任何文件 — {detail}",
   "composer.noEcho.title": "密码提示（无回显）",
   "composer.noEcho.noLiveTyped":
     "已键入内容已在窗格中但未提交。当前视图非实时，无法在此发送。请直接在终端中处理。",

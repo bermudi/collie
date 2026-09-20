@@ -1,5 +1,15 @@
 // Hermes' local SessionDB journal adapter.
 //
+// Live-verified against a real on-disk SessionDB (messages: 13 columns, no
+// active/compacted/display_kind/reasoning_content — 2026-04 data) and against upstream's newer
+// shape that carries those four optional columns. The SELECT is built from what
+// `pragma table_info` reports, so both schemas read; a schema that carries NEITHER shape fails
+// loudly out of `load` instead of serving an empty page that looks like "no history"
+// (see `withDb`). Run `bun scripts/journal-probe.ts hermes` after touching this file — the
+// unit fixtures pin the grammar, the probe catches on-disk drift, and this adapter's history is
+// exactly why: upstream's own fixture built its table from the adapter's SELECT, so a column
+// that never existed passed every test.
+//
 // Hermes stores sessions in one SQLite database (`~/.hermes/state.db`). The pane supplies the
 // session id through Herdr, so this adapter reads exactly that session; it never guesses from the
 // newest row. The database is opened read-only and the fixed filename is confined to the configured
@@ -43,12 +53,15 @@ function withDb<T>(dbPath: string, fn: (db: Database) => T): T | null {
   try {
     db = new Database(dbPath, { readonly: true });
   } catch {
+    // An unopenable database is an ordinary negative for resolve()'s root walk (a root without
+    // its db simply cannot host the session). Deliberately silent, same stance as opencode.ts.
     return null;
   }
   try {
+    // fn's own errors PROPAGATE: a query failure in stat/load is schema drift or corruption, and
+    // swallowing it here is how a real SessionDB once read as "no history". The history route
+    // answers an error loudly instead of an empty page.
     return fn(db);
-  } catch {
-    return null;
   } finally {
     db.close();
   }
@@ -63,10 +76,13 @@ interface MessageRow {
   tool_name: string | null;
   timestamp: number;
   reasoning: string | null;
-  reasoning_content: string | null;
-  active: number;
-  compacted: number;
-  display_kind: string | null;
+  /** Present only when the on-disk schema carries them (upstream's newer shape); absent in the
+   * 13-column schema live-verified on this host — defaults below make the older schema read as
+   * "every row is an active message of record". */
+  reasoning_content?: string | null;
+  active?: number | null;
+  compacted?: number | null;
+  display_kind?: string | null;
 }
 
 function parseJson(raw: string | null): JsonValue {
@@ -113,10 +129,11 @@ function isMessageRow(value: JsonValue): value is ParsedMessageRow {
 }
 
 function rowEntry(row: MessageRow): TranscriptEntry | null {
-  if ((row.active === 0 && row.compacted === 0) || row.display_kind === "hidden") return null;
+  if ((row.active ?? 1) === 0 && (row.compacted ?? 0) === 0) return null;
+  if ((row.display_kind ?? null) === "hidden") return null;
 
   const parts: TranscriptPart[] = [];
-  const reasoning = textPart(row.reasoning ?? row.reasoning_content);
+  const reasoning = textPart(row.reasoning ?? row.reasoning_content ?? null);
   if (reasoning !== null && reasoning.kind === "text") {
     const thinking: TranscriptPart = { kind: "thinking", text: reasoning.text };
     if (reasoning.truncated) thinking.truncated = true;
@@ -145,10 +162,47 @@ function rowEntry(row: MessageRow): TranscriptEntry | null {
   return { uuid: String(row.id), ts: isoTimestamp(row.timestamp), role: row.role, parts };
 }
 
+// The columns every observed Hermes schema carries. The four optional ones (upstream's newer
+// shape) are probed per-database; the names are whitelisted constants — nothing user-controlled
+// ever reaches the SQL text, and ids ride parameterized `?` bindings.
+const BASE_COLUMNS = [
+  "m.id",
+  "m.role",
+  "m.content",
+  "m.tool_call_id",
+  "m.tool_calls",
+  "m.tool_name",
+  "m.timestamp",
+  "m.reasoning",
+] as const;
+const OPTIONAL_COLUMNS = [
+  "m.reasoning_content",
+  "m.active",
+  "m.compacted",
+  "m.display_kind",
+] as const;
+
+function messageColumns(db: Database): Set<string> {
+  const rows = db.query<{ name: string }, []>("pragma table_info('messages')").all();
+  return new Set(rows.map((r) => r.name));
+}
+
 function composeLines(db: Database, sessionId: string): string[] {
-  const rows = db.query<MessageRow, [string]>(
-    "with recursive lineage(id, depth) as (select ? as id, 0 union all select s.parent_session_id, lineage.depth + 1 from sessions s join lineage on s.id = lineage.id where s.parent_session_id is not null and lineage.depth < 32) select m.id, m.role, m.content, m.tool_call_id, m.tool_calls, m.tool_name, m.timestamp, m.reasoning, m.reasoning_content, m.active, m.compacted, m.display_kind from messages m join lineage on lineage.id = m.session_id where m.active = 1 or m.compacted = 1 order by lineage.depth desc, m.id",
-  ).all(sessionId);
+  const present = messageColumns(db);
+  const select = [...BASE_COLUMNS, ...OPTIONAL_COLUMNS.filter((c) => present.has(c.slice(2)))]
+    .map((c) => `${c} as "${c.slice(2)}"`)
+    .join(", ");
+  // The active/compacted filter applies only where those columns exist; the older schema has no
+  // such notion and every row is a message of record.
+  const lineage =
+    "with recursive lineage(id, depth) as (select ? as id, 0 union all select s.parent_session_id, lineage.depth + 1 from sessions s join lineage on s.id = lineage.id where s.parent_session_id is not null and lineage.depth < 32)";
+  const filter =
+    present.has("active") || present.has("compacted") ? " where m.active = 1 or m.compacted = 1" : "";
+  const rows = db
+    .query<MessageRow, [string]>(
+      `${lineage} select ${select} from messages m join lineage on lineage.id = m.session_id${filter} order by lineage.depth desc, m.id`,
+    )
+    .all(sessionId);
   return rows.map((row: MessageRow) => JSON.stringify(row));
 }
 
@@ -204,14 +258,20 @@ export class HermesTranscriptSource implements TranscriptSource {
     for (const root of this.roots) {
       const path = await containedRealpath(join(root, DB_FILE), root);
       if (path === null) continue;
-      const found = withDb(path, (db) =>
-        db.query<{ id: string }, [string]>("select id from sessions where id = ?").get(ref.value),
-      );
+      let found: { id: string } | null | undefined;
+      try {
+        found = withDb(path, (db) =>
+          db.query<{ id: string }, [string]>("select id from sessions where id = ?").get(ref.value),
+        );
+      } catch {
+        // An unreadable sessions table disqualifies this ROOT, not the request — keep walking.
+        // The resolve probe is a primary-key point lookup; any failure here is about the root.
+        continue;
+      }
       if (found !== null && found !== undefined) return hermesKey(path, ref.value);
     }
     return null;
   }
-
   async stat(key: string): Promise<{ size: number; mtimeMs: number } | null> {
     const parts = splitHermesKey(key);
     if (parts === null) return null;

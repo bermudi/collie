@@ -249,6 +249,9 @@ export const en = {
   "composer.upload.success": "File added, path in message",
   "composer.upload.tooLarge": "That file is bigger than {max} MB, the limit on this collie.",
   "composer.upload.badType": "Collie can't attach {name}.",
+  "composer.upload.successBatch": "{n} files added, paths in message",
+  "composer.upload.mixed": "Added {attached} of {total} — {detail}",
+  "composer.upload.nothing": "Nothing added — {detail}",
   "composer.noEcho.title": "Password prompt — nothing echoes",
   "composer.noEcho.noLiveTyped":
     "What you typed is already in the pane, unsubmitted — but this view isn't live, so nothing can be sent from here. Answer it at the terminal.",

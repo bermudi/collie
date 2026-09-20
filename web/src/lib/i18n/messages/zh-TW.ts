@@ -218,6 +218,9 @@ export const zhTW: Dictionary = {
   "composer.upload.success": "檔案已新增，路徑已填入訊息",
   "composer.upload.tooLarge": "檔案超過此 collie 的 {max} MB 大小限制。",
   "composer.upload.badType": "Collie 無法附加 {name}。",
+  "composer.upload.successBatch": "已加入 {n} 個檔案，路徑在訊息中",
+  "composer.upload.mixed": "已加入 {total} 個中的 {attached} 個 — {detail}",
+  "composer.upload.nothing": "未加入任何檔案 — {detail}",
   "composer.noEcho.title": "密碼提示（無回顯）",
   "composer.noEcho.noLiveTyped":
     "已輸入內容目前位於窗格中但尚未提交。目前檢視不是即時狀態，無法在此傳送。請直接在終端機中處理。",

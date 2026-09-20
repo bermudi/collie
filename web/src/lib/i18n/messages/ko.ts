@@ -229,6 +229,9 @@ export const ko: Dictionary = {
   "composer.upload.success": "파일 추가됨, 메시지에 경로 표시",
   "composer.upload.tooLarge": "파일이 이 Collie의 제한인 {max}MB를 초과합니다.",
   "composer.upload.badType": "Collie에서 {name} 파일을 첨부할 수 없습니다.",
+  "composer.upload.successBatch": "파일 {n}개 추가됨, 경로는 메시지에",
+  "composer.upload.mixed": "{total}개 중 {attached}개 추가됨 — {detail}",
+  "composer.upload.nothing": "추가된 파일 없음 — {detail}",
   "composer.noEcho.title": "비밀번호 입력 프롬프트. 입력 내용이 표시되지 않습니다.",
   "composer.noEcho.noLiveTyped":
     "입력한 내용이 창에 남아 있지만 제출되지 않았습니다. 현재 뷰는 실시간 세션이 아니므로 여기서 전송할 수 없습니다. 터미널에서 직접 처리하세요.",

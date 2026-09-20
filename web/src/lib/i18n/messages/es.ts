@@ -233,6 +233,9 @@ export const es: Dictionary = {
   "composer.upload.success": "Archivo añadido, ruta en el mensaje",
   "composer.upload.tooLarge": "El archivo supera los {max} MB, el límite en este collie.",
   "composer.upload.badType": "Collie no puede adjuntar {name}.",
+  "composer.upload.successBatch": "{n} archivos añadidos, rutas en el mensaje",
+  "composer.upload.mixed": "Añadidos {attached} de {total} — {detail}",
+  "composer.upload.nothing": "Nada añadido — {detail}",
   "composer.noEcho.title": "Solicitud de contraseña: sin eco en terminal",
   "composer.noEcho.noLiveTyped":
     "El texto introducido está en el panel sin enviar. Esta vista no está en vivo y no permite enviar datos; responde directamente en la terminal.",
