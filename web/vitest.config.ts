@@ -29,5 +29,12 @@ export default defineConfig({
     css: false,
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // POLITE DEFAULTS: this suite runs on the same laptop as the live herd (bridge + agents), and
+    // vitest's default is one jsdom worker per core — a full run pins every core and the whole
+    // machine buckles. Four workers keep peak load to a quarter of the cores; the wall clock pays
+    // for it, the other tenants don't. Override with --maxWorkers=N when you genuinely want the
+    // burn. (Full-suite validation runs on CI — .github/workflows/ci.yml — so this is the laptop's
+    // comfort, not the gate's.)
+    maxWorkers: 4,
   },
 });

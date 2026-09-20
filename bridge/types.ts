@@ -6,7 +6,6 @@ import type { PaneCache } from "./cache/engine.ts";
 import type { ApiErrorDetail, ErrorCode } from "./error-codes.ts";
 import type { AgentSessionRef, TranscriptEntry } from "./journal/types.ts";
 import type { MuxCapability, MuxSpaceCapacity, MuxTopologyLatency } from "./mux/capabilities.ts";
-import type { UpdateRun } from "./update-run.ts";
 
 // Re-exported so the wire surface has ONE import site: a consumer of PaneHistoryResponse gets the
 // entry shape from here too, without reaching into an adapter module. `PaneCache` rides along for the
@@ -509,107 +508,10 @@ export interface UpdateStatus {
   majorAvailable: string | null;
   /** GitHub release page for `majorAvailable`, or null when there is none. */
   majorUrl: string | null;
-  /**
-   * How this Collie is installed (`cli/install-kind.ts`'s classifier, flattened to its kind) — the
-   * banner's command spelling is a function of it: Herdr actions reach only a Herdr-managed
-   * (detached) checkout; every other kind is told the `collie` verbs (M14/01 §5.3).
-   */
-  installKind: "linked-clone" | "detached-checkout" | "binary" | "packaged" | "unknown";
-  /**
-   * The package manager's own upgrade command for this machine, when the resolved root names a
-   * manager Collie recognises (`cli/package-command.ts`). Absent on every other kind, and absent on
-   * a packaged install under a prefix nobody recognises — there the boundary sentence stands alone.
-   *
-   * **Resolved on the HOST, once, at boot.** The prefix is a fact about this machine, and a second
-   * derivation on the phone would be a second thing to drift.
-   */
-  packageCommand?: string;
-  /**
-   * The release whose OFFER the operator closed, or null when none was closed.
-   *
-   * It is the BRIDGE's fact, not a browser's: a dismissal is a decision about this machine's
-   * update, so it holds on every screen that polls this snapshot (M17/08). Keyed by version — a
-   * newer release is a different fact and raises the band again.
-   */
-  dismissedVersion: string | null;
-  /**
-   * The version whose quiet CREW notice the operator closed, or null.
-   *
-   * Two decisions, two fields. "A release is available here" and "that machine is standing behind,
-   * and a package manager owns it" are about different machines, so putting one down must not put
-   * the other down with it, even when both name the same version.
-   */
-  dismissedCrewVersion: string | null;
   /** The running process is behind the on-disk bridge source — needs `systemctl --user restart collie`. */
   bridgeStale: boolean;
-  /**
-   * The collie on disk is no longer the collie this process is running.
-   *
-   * Only a package manager can produce it: every other kind swaps files through Collie's own
-   * updater, which restarts the service as its last act. `pacman -Syu` replaces the root under a
-   * live process, and `collieVersion()` re-reads from disk on every call — so without this the
-   * bridge would answer with the NEW version while running the OLD code, on `/api/health`, on
-   * `hello` and therefore on the crew wire, where a lead reads it as "that peer already levelled".
-   *
-   * TWO witnesses, either of which raises it: the version files stopped naming what this process
-   * runs, and — on a single-file install under Linux — the executable behind `/proc/self/exe` was
-   * replaced (`bridge/exe-replaced.ts`). The second is what catches a package REBUILD of the same
-   * version, where no version string moves at all and the first sees nothing.
-   *
-   * While it is raised, what this process puts ON THE CREW WIRE stays the version captured at boot:
-   * stale but true, never new but false.
-   */
-  restartNeeded: boolean;
-  /** The command that clears {@link restartNeeded}, spelled for the install kind. Absent when
-   *  nothing needs restarting. */
-  restartCommand?: string;
   /** When the upstream check last completed (epoch ms), or null if it hasn't run yet. */
   checkedAt: number | null;
-  /**
-   * Every release newer than the running one, oldest first — the same list the daily digest names.
-   *
-   * The update card lists them so the operator can see WHAT they are about to fold in, rather than
-   * only the top of the pile. Versions and nothing else: the phone never fetches release notes from
-   * GitHub. The HOST reads each release's small `collie-release.json` sidecar — that is where
-   * {@link linkChange} and {@link urgent} come from — and what is not already on this wire is not
-   * shown (M15/05, ADR 0046).
-   */
-  newerVersions?: string[];
-  /**
-   * The detached updater's run record (`<state dir>/update.json`, M15/04) — read from disk on every
-   * snapshot, so a bridge that has just been restarted BY an update reports the run it is part of
-   * instead of coming up with nothing to say. Absent when this install has never updated through the
-   * runner. The staleness rule is applied before it gets here: a run nobody is driving reads as
-   * `interrupted`, never as still in flight.
-   */
-  run?: UpdateRun;
-  /**
-   * The newest release changes the CREW LINK, and by how much — or null when it does not (M27/06).
-   *
-   * Null on a solo install (there is no link to change), null when the release speaks the wire this
-   * install already speaks, and null when the release says nothing about it: every release before
-   * 1.8.0 published no `collie-release.json`, and a release that cannot be read reads as no change
-   * rather than as a warning nobody can act on.
-   *
-   * It is a generic reading of a NUMBER, never a hard-coded release name, so the release after the
-   * next one says it too without a line of code moving.
-   *
-   * OPTIONAL, and absent rather than null when there is nothing to say — the reason `run` and
-   * `packageCommand` are: a solo instance's snapshot must stay byte-identical to what it always was
-   * (`bridge/solo-baseline.test.ts`), and a solo instance never has a link change.
-   */
-  linkChange?: UpdateLinkChange | null;
-  /**
-   * The newest release in the delta that called itself urgent, and why (ADR 0046).
-   *
-   * An urgent release is an ordinary release on every axis but one: it keeps the DAILY digest
-   * cadence even when the delta is patches only. The surfaces print a short label and the sentence,
-   * so the operator reads why before they decide.
-   *
-   * OPTIONAL and ABSENT when there is nothing to say, the rule `run` and `linkChange` follow: no
-   * release in the delta carried the marker, the sidecars could not be read, or no check has run.
-   */
-  urgent?: UpdateUrgent;
 }
 
 /** GET /api/pane/:id — recent terminal output for one agent (ANSI/SGR, rendered colored). */

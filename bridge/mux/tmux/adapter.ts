@@ -90,7 +90,6 @@ import {
   type TmuxRunResult,
 } from "./exec.ts";
 import { toTmuxKey, TMUX_UNSENDABLE_KEYS } from "./keys.ts";
-import { tmuxBeaconMatcher } from "./markers.ts";
 import {
   CREATED_FORMAT,
   LISTING_ARGS,
@@ -1020,17 +1019,7 @@ export const tmuxMuxFactory: MuxAdapterFactory = {
   mux: TMUX_MUX,
   create(target: MuxTarget) {
     return new TmuxMux(execFor(target));
-  },
-  /**
-   * tmux's half of the beacon join (M11/03) — the ONE thing that can give this adapter sight, and it
-   * is contributed here rather than declared: `agentDetection` stays absent above, because the raw
-   * adapter really cannot answer it. The decorator is what declares it, and only when the agent's own
-   * hooks are installed.
-   */
-  beaconMatcher(target: MuxTarget) {
-    return tmuxBeaconMatcher(TMUX_MUX, execFor(target));
-  },
-  describeTarget: tmuxServerLabel,
+  },  describeTarget: tmuxServerLabel,
 };
 
 /** The transport for one target. Stateless configuration, so the matcher may build its own. */

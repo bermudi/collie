@@ -85,46 +85,32 @@ the pointer, it was a supersede.
 | [0008](./0008-collie-does-not-run-a-terminal-emulator.md) | Collie does not run a terminal emulator | Accepted |
 | [0009](./0009-a-generic-menu-is-driven-by-the-keys-it-names.md) | A generic menu is driven by the keys it names, never by digits | Accepted |
 | [0010](./0010-long-sends-are-verified-via-the-paste-placeholder.md) | Long sends are verified via the paste placeholder, not by chunking them | Accepted |
-| [0011](./0011-the-pack-protocol-is-the-mux-driver-seam.md) | The pack protocol is the mux-driver seam, and peers are full collies | Accepted |
-| [0012](./0012-every-machine-runs-a-collie-and-the-pack-has-a-lead.md) | Every machine runs a collie; the pack has a lead | Accepted |
-| [0013](./0013-a-peer-listens-without-becoming-a-front-door.md) | A peer listens without becoming a front door (amends 0001) | Accepted |
-| [0014](./0014-promote-is-a-confirm-on-the-lead.md) | Promotion is a confirm on the receiver, not a command from the claimant | Accepted |
-| [0015](./0015-pack-add-pushes-over-the-operators-ssh.md) | `pack add` pushes the lead's own commit over the operator's SSH | Accepted |
-| [0016](./0016-updates-ride-the-operators-ssh.md) | Updates ride the operator's SSH, never the pack wire (addendum 2026-09-04: peers follow) | Accepted |
 | [0017](./0017-recognising-a-password-prompt-changes-what-collie-says.md) | Recognising a password prompt changes what Collie says, never what it sends | Accepted |
 | [0018](./0018-operator-command-rows-replace-the-catalog.md) | The operator's command rows replace the catalog, never merge into it | Accepted |
 | [0019](./0019-oxlint-and-vendored-anti-slop-are-the-lint-gate.md) | oxlint + vendored anti-slop is the lint gate; one linter; TypeScript 7 | Accepted |
 | [0020](./0020-a-major-upgrade-is-consented-by-flag.md) | A major upgrade is consented by flag; routine update follows tags within the major | Accepted |
-| [0021](./0021-the-path-name-is-a-pointer-never-a-copy.md) | The name on PATH is a pointer, never a copy | Accepted |
 | [0022](./0022-the-mux-seam-is-a-port-collie-owns.md) | The multiplexer is a port Collie owns, not a relocated Herdr client | Accepted |
-| [0023](./0023-compression-is-hop-local-on-the-pack-link.md) | Compression is hop-local on the pack link; the ETag names the identity bytes | Accepted |
-| [0024](./0024-a-beacon-is-a-hint-never-a-control-channel.md) | A beacon is a hint, never a control channel | Accepted |
-| [0025](./0025-the-wire-guard-forces-a-decision-never-a-bump.md) | The pack-wire guard forces a decision, never a bump | Accepted |
-| [0026](./0026-the-operator-is-the-quorum.md) | The operator is the quorum | Accepted |
-| [0027](./0027-the-deputy-is-named-ahead-of-time.md) | The deputy is named ahead of time, and takes over on the operator's word | Accepted |
-| [0028](./0028-the-standby-door-is-a-second-listener.md) | The standby door is a second listener that arms on silence (amends 0013) | Accepted |
-| [0029](./0029-speech-to-text-is-a-provider-seam-collie-owns.md) | Speech-to-text is a provider seam Collie owns; Codex auth rides the operator's own binary | Accepted |
 | [0030](./0030-the-ui-is-translated-by-a-typed-dictionary-not-a-library.md) | The UI is translated by a typed dictionary, not an i18n library | Accepted |
 | [0031](./0031-freshness-is-a-declared-promise.md) | Freshness, focus and shape are contract promises, not adapter folklore | Accepted |
 | [0032](./0032-a-worktree-is-opened-by-the-multiplexer-not-by-git.md) | A worktree is opened by the multiplexer, not by Git | Accepted |
 | [0033](./0033-the-app-face-is-a-device-preference.md) | The app's face is a device preference; an operator's fonts add to the list (differs from 0018) | Accepted |
 | [0034](./0034-collie-collects-nothing-and-opt-in-is-the-ceiling.md) | Collie collects nothing, and opt-in is the ceiling | Accepted |
-| [0035](./0035-a-packaged-install-is-not-ours-to-update.md) | A packaged install is not ours to update | Accepted |
 | [0036](./0036-the-map-of-machines-is-collies-a-mux-reports-one-machine.md) | The map of machines is Collie's, a mux reports one machine | Accepted |
-| [0037](./0037-a-staged-update-confirms-its-runner-before-it-exits.md) | A staged update confirms its runner before it exits | Accepted |
-| [0038](./0038-the-group-is-a-crew-the-wire-keeps-pack.md) | The group is a crew; the wire keeps "pack" (supersedes the word in 0012) | Superseded in part by 0039 |
-| [0039](./0039-the-machine-says-crew-too.md) | The machine says "crew" too: protocol version 2, one release of overlap (supersedes the machine names in 0038) | Accepted |
 | [0040](./0040-configuration-precedence-and-the-config-file.md) | Configuration precedence, and the config file under it | Accepted |
 | [0041](./0041-cache-rules-are-sourced-claims.md) | Cache rules are sourced claims | Accepted |
 | [0042](./0042-notification-kinds-and-the-cache-watch.md) | Notification kinds, and the cache watch: global OR per-pane, keyed by session ref | Accepted |
 | [0043](./0043-operator-bar-rows-replace-the-bar-not-the-palette.md) | Operator bar rows replace the bar, not the palette (applies 0018 per surface) | Accepted |
-| [0044](./0044-the-update-screen-is-one-reducer-and-one-shared-poll.md) | The update screen is one reducer and one shared poll | Accepted |
-| [0045](./0045-a-build-below-the-protocol-floor-is-a-red-preflight.md) | A build below the protocol floor is a red preflight, never a silent link | Accepted |
 | [0046](./0046-an-urgent-patch-keeps-the-daily-cadence.md) | An urgent patch keeps the daily cadence | Accepted |
 | [0047](./0047-muse-panes-render-natively.md) | Muse panes render natively: no light-theme inversion | Accepted |
 | [0048](./0048-the-input-box-is-found-by-its-own-frame.md) | The input box is found by its own frame; the statusline bound only bounds what is stripped (amends 0004) | Accepted |
 | [0049](./0049-no-child-inherits-a-relocated-repository.md) | No child of Collie inherits a variable that relocates a git repository | Accepted |
+| [0050](./0050-opencode-sessions-are-pane-scoped.md) | Opencode sessions are pane-scoped, not server-scoped | Accepted (Pup) |
+| [0051](./0051-a-journal-image-reference-is-never-a-remote-url.md) | A journal image reference is this bridge's blob path or inline bytes, never a remote URL | Accepted (Pup) |
+| [0052](./0052-the-mirror-does-not-guess-images.md) | The mirror does not reconstruct terminal images; blank image rows collapse | Accepted (Pup) |
+| [0053](./0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md) | Pup tracks upstream wholesale and strips the pack, not the viewer | Accepted (Pup) |
 
-Numbers are claimed across **both** branches: 0011–0016 were accepted here on `v1` while `main` was
-still at 0010, so a new ADR continues from the highest number in use anywhere, not the highest one on
-the branch you happen to be on.
+Numbers are claimed across **both** lines: upstream's 0011–0016 were accepted on their `v1` while
+their `main` was still at 0010. On Pup, rows marked **(Pup)** are the fork's own decisions; the
+0011–0045 rows upstream uses for their pack/crew/STT/CLI machinery are gone with that machinery
+(ADR 0053), so their numbers stay reserved in the index but link nothing here. A new Pup ADR
+continues from the highest number in use; a merged upstream ADR keeps its own number.

@@ -11,25 +11,14 @@
 // It reads only, prints only counts and roles — never transcript content, so its output is safe to
 // paste into an issue. A harness you don't have installed reports `no logs found`, which is not a
 // failure: exit code is non-zero only when a log EXISTS and the adapter couldn't resolve or parse it.
-//
-// SECOND SECTION: BEACON MODE (M11/04). The first section asks "can each adapter read this machine's
-// logs at all", walking the roots itself. The beacon section asks the question the operator actually
-// has when history is missing on tmux or zellij — "does the session ref MY AGENT NAMED resolve to a
-// real, parseable log here?" — by taking the refs out of the beacon directory and handing each to the
-// journal registry exactly as the history route does. Same read-only promise, same counts-not-content
-// output; the ref's kind and a short prefix of its value are printed, never a turn of a transcript.
 
 import { Database } from "bun:sqlite";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { beaconReader } from "../bridge/beacon-io.ts";
-import { identityOf } from "../bridge/beacon/decorate.ts";
-import { beaconsDir } from "../bridge/beacon/paths.ts";
-import { readBeacons } from "../bridge/beacon/reader.ts";
 import { loadConfig } from "../bridge/config.ts";
 import { isGrokSessionId } from "../bridge/journal/grok.ts";
-import { adapterFor, buildJournalRegistry } from "../bridge/journal/registry.ts";
+import { buildJournalRegistry } from "../bridge/journal/registry.ts";
 import type { AgentSessionRef, JournalAdapter, TranscriptEntry } from "../bridge/journal/types.ts";
 
 /**
@@ -65,7 +54,7 @@ async function logsNewestFirst(dir: string, depth = 4): Promise<string[]> {
     }
   };
   await walk(dir, depth);
-  return found.toSorted((a, b) => b.mtimeMs - a.mtimeMs).map((f) => f.path);
+  return found.sort((a, b) => b.mtimeMs - a.mtimeMs).map((f) => f.path);
 }
 
 /** How many candidates to try before calling a harness unreadable. */
@@ -132,6 +121,33 @@ async function candidateRefsUnder(
       const rows = db
         .query<{ id: string }, [number]>(
           "select id from session where parent_id is null order by time_updated desc limit ?",
+        )
+        .all(MAX_CANDIDATES);
+      const refs: AgentSessionRef[] = rows.map((r) => ({ kind: "id", value: r.id }));
+      return { refs, total: refs.length };
+    } catch {
+      return { refs: [], total: 0 };
+    } finally {
+      db.close();
+    }
+  }
+
+  if (agent === "hermes") {
+    // Same shape as opencode: ONE sqlite database per root, root sessions only — a
+    // `parent_session_id` row is a compaction child the adapter walks at load time, not a pane
+    // herdr would ever name. This branch is what makes the probe the drift check CLAUDE.md
+    // promises for the sixth adapter: without it a schema the adapter cannot read surfaced as
+    // "no logs found" instead of a red row.
+    let db: Database;
+    try {
+      db = new Database(join(root, "state.db"), { readonly: true });
+    } catch {
+      return { refs: [], total: 0 };
+    }
+    try {
+      const rows = db
+        .query<{ id: string }, [number]>(
+          "select id from sessions where parent_session_id is null order by started_at desc limit ?",
         )
         .all(MAX_CANDIDATES);
       const refs: AgentSessionRef[] = rows.map((r) => ({ kind: "id", value: r.id }));
@@ -228,93 +244,7 @@ async function probe(adapter: JournalAdapter, roots: readonly string[]): Promise
   return failed === 0 ? "ok" : "fail";
 }
 
-// ── Beacon mode ───────────────────────────────────────────────────────────────
-
-/** What one beacon's ref did when the journal registry was asked to read it. */
-type BeaconOutcome = "parsed" | "empty" | "unresolved" | "no-adapter" | "unnamed";
-
-/** How much of a session ref is printed. Enough to recognise, short enough to stay a label. */
-const REF_PREVIEW_CHARS = 12;
-
-/**
- * One beacon's ref, run through the SAME two calls the history route makes.
- *
- * `identityOf` rather than a re-read of the record's own fields, so the harness name is normalised
- * here exactly as the decorator normalises it (M11/03) — a probe that accepted a name the decorator
- * rejects would report history the bridge could never serve. Nothing in this function writes, and
- * nothing it prints comes out of a transcript.
- */
-async function probeBeaconRef(
-  reading: Awaited<ReturnType<typeof readBeacons>>[number],
-  registry: Record<string, JournalAdapter>,
-): Promise<BeaconOutcome> {
-  const label = `${reading.key}  ${reading.liveness.padEnd(7)}`;
-  const identity = identityOf(reading);
-  if (identity === null) {
-    console.log(`${label} ✗ harness "${reading.harness.slice(0, REF_PREVIEW_CHARS)}…" is not a name Collie will carry`);
-    return "unnamed";
-  }
-
-  const ref = identity.session;
-  const preview = `${ref.kind}:${ref.value.slice(0, REF_PREVIEW_CHARS)}`;
-  const adapter = adapterFor(registry, identity.agent);
-  if (adapter === undefined) {
-    // An ordinary `no-session`, not a failure: a harness may be registered for identity and have no
-    // journal adapter at all, and the route already reports that as "no history here".
-    console.log(`${label} — ${identity.agent} ${preview}: no journal adapter (no-session)`);
-    return "no-adapter";
-  }
-
-  // The ONLY path this script takes to a beacon's file, and it is the adapter's own: an `id` is
-  // pattern-checked and then built into a path inside a configured root, a `path` is confined by
-  // `containedRealpathIn`. The probe adds no branch of its own, so it can never read something the
-  // bridge would refuse.
-  const resolved = await adapter.source.resolve(ref);
-  if (resolved === null) {
-    console.log(`${label} — ${identity.agent} ${preview}: did not resolve (log deleted, or another profile's root)`);
-    return "unresolved";
-  }
-
-  const { text, complete } = await adapter.source.load(resolved);
-  const entries = adapter.parse(text);
-  if (entries.length === 0) {
-    console.log(`${label} ✗ ${identity.agent} ${preview}: resolved a log but parsed 0 turns from ${text.length} bytes`);
-    return "empty";
-  }
-  console.log(`${label} ✓ ${identity.agent} ${preview}: ${summarise(entries)}${complete ? "" : " [tail-clipped]"}`);
-  return "parsed";
-}
-
-/**
- * Every beacon on this machine, resolved against the journal registry.
- *
- * Exit status is deliberately narrow. A beacon that DID resolve and parsed nothing is drift — the
- * same failure the adapter section reports — so it fails. A beacon that did not resolve is not:
- * `/clear`, a deleted log and a profile whose root this build was not configured with all land there,
- * and every one of them is an honest `no-session` rather than a broken parser.
- */
-async function probeBeacons(registry: Record<string, JournalAdapter>, stateDir: string): Promise<number> {
-  const dir = beaconsDir(stateDir);
-  console.log(`\nbeacons — resolving the session refs agents named (${dir})\n`);
-  const readings = await readBeacons(beaconReader(stateDir));
-  if (readings.length === 0) {
-    console.log("          no beacons here (hooks not installed, or no agent has run in a pane since)");
-    return 0;
-  }
-  const outcomes: BeaconOutcome[] = [];
-  for (const reading of readings) outcomes.push(await probeBeaconRef(reading, registry));
-  const count = (kind: BeaconOutcome) => outcomes.filter((o) => o === kind).length;
-  console.log(
-    `\n${readings.length} beacon(s): ${count("parsed")} parsed, ${count("unresolved")} unresolved, ` +
-      `${count("no-adapter")} without an adapter, ${count("empty") + count("unnamed")} failed`,
-  );
-  return count("empty") + count("unnamed");
-}
-
-// Guarded so `journal-probe.test.ts` can import `refFor` above with no side effects: unguarded,
-// this whole probe (and its `process.exit`) ran at import time, which killed the combined
-// `bun test ./bridge ./cli ./scripts` run mid-suite before it ever printed a summary.
-if (import.meta.main) {
+async function main(): Promise<void> {
   const cfg = loadConfig();
   const registry = buildJournalRegistry(cfg.journalRoots);
   // Keyed lookup rather than a cast: JournalRoots is a closed shape on purpose (adding a harness
@@ -328,7 +258,9 @@ if (import.meta.main) {
   const failed = results.filter((r) => r === "fail").length;
   const ok = results.filter((r) => r === "ok").length;
   console.log(`\n${ok} ok, ${results.length - ok - failed} with no logs, ${failed} failed`);
+  process.exit(failed > 0 ? 1 : 0);
+}
 
-  const beaconFailures = await probeBeacons(registry, cfg.stateDir);
-  process.exit(failed + beaconFailures > 0 ? 1 : 0);
+if (import.meta.main) {
+  await main();
 }

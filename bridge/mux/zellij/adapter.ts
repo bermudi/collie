@@ -94,7 +94,6 @@ import {
 } from "../types.ts";
 import { resolveZellijBinary, SpawnZellijExec } from "./exec.ts";
 import { toZellijKey, ZELLIJ_UNSENDABLE_KEYS } from "./keys.ts";
-import { zellijBeaconMatcher } from "./markers.ts";
 import {
   closePaneArgs,
   closeTabArgs,
@@ -801,17 +800,7 @@ export const zellijMuxFactory: MuxAdapterFactory = {
   mux: ZELLIJ_MUX,
   create(target: MuxTarget) {
     return new ZellijMux(bindingFor(target));
-  },
-  /**
-   * zellij's half of the beacon join (M11/03) — the ONE thing that can give this adapter sight, and
-   * it is contributed here rather than declared: `agentDetection` stays absent above, because the raw
-   * adapter really cannot answer it. The decorator is what declares it, and only when the agent's own
-   * hooks are installed.
-   */
-  beaconMatcher(target: MuxTarget) {
-    return zellijBeaconMatcher(ZELLIJ_MUX, bindingFor(target));
-  },
-  describeTarget(endpoint: string) {
+  },  describeTarget(endpoint: string) {
     const named = endpoint.trim();
     return named === "" ? "the single running session" : `session ${named}`;
   },

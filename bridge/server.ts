@@ -3,14 +3,14 @@ import { homedir } from "node:os";
 import { extname, join, normalize, sep } from "node:path";
 import type { JsonObject, JsonValue } from "./json.ts";
 import type { ActivityLedger } from "./activity.ts";
-import { type AuditDetail, type AuditEntry, AuditLog } from "./audit.ts";
+import { type AuditDetail, AuditLog } from "./audit.ts";
 import { isLoopbackBindHost, type Config } from "./config.ts";
 import { apiError, type ApiErrorBody, type ApiErrorDetail, type ErrorCode } from "./error-codes.ts";
 import { MUX_CAPABILITIES, type MuxCapability, type MuxCapabilityDeclaration } from "./mux/capabilities.ts";
 import type { MuxAdapter, MuxAck, MuxGrid } from "./mux/types.ts";
 import { allCacheRules } from "./cache/rules/index.ts";
 import type { CacheOverride } from "./cache/engine.ts";
-import { localWatchPane, peerWatchPane, type CacheWarnPane } from "./cache/watch-key.ts";
+import { localWatchPane, type CacheWarnPane } from "./cache/watch-key.ts";
 import { watchKeyOf, type CacheWatchSurface } from "./cache/watch.ts";
 import { createCacheRulesReader } from "./operator-cache-rules.ts";
 import { computeEtag, gzipJsonResponse, notModified, wantsGzip } from "./http-cache.ts";
@@ -32,12 +32,6 @@ import { herdTagFor, selectView, type SessionRegistry, type SessionRuntime, wide
 import type { Snooze } from "./snooze.ts";
 import { IMAGE_EXTS, TEXT_EXTS, TEXT_SNIFF_BYTES, uploadExt } from "./uploads.ts";
 import type { UpdateMonitor } from "./update.ts";
-import { readStagingLog } from "./staging-log.ts";
-import {
-  parseUpdateStartRequest,
-  updateStartVerdict,
-  type PreflightReport,
-} from "./update-action.ts";
 import type { StateEngine } from "./state-engine.ts";
 import { adapterFor, buildJournalRegistry } from "./journal/registry.ts";
 import { TranscriptStore } from "./journal/store.ts";
@@ -51,16 +45,6 @@ import {
   type ClaimFailure,
   type PairingStore,
 } from "./pairing.ts";
-import { modeForWire } from "./crew/mode.ts";
-import type { CrewRuntime } from "./crew/config.ts";
-import type { CrewLead } from "./crew/lead.ts";
-import { crewDeviceOf, crewGate } from "./crew/peer-gate.ts";
-import { snapshotPlan } from "./crew/merge.ts";
-import { selectHostFrom, type HostSelector } from "./crew/registry.ts";
-import type { CrewHandler, CrewSurface } from "./crew/router.ts";
-import type { CrewTlsOptions } from "./crew/transport.ts";
-import { createSttAdmission, MAX_STT_AUDIO_BYTES, sttCapability, transcribeRequest } from "./stt/http.ts";
-import type { SttProvider } from "./stt/provider.ts";
 import { uploadTooLarge } from "./uploads.ts";
 import { MUX_LOGO_PATH, OPERATOR_FONTS_PATH, journalAgentOf, toPaneWire } from "./types.ts";
 import type {
@@ -76,7 +60,6 @@ import type {
   OperatorKeyRow,
   OperatorFontRow,
   OperatorQuickReplyRow,
-  CrewStatusResponse,
   Launcher,
   LaunchersResponse,
   CacheRulesResponse,
@@ -88,8 +71,6 @@ import type {
   PaneReadResponse,
   PaneWire,
   SnapshotResponse,
-  SttCapability,
-  UpdateStatus,
   UploadCapability,
   UploadResponse,
 } from "./types.ts";
@@ -104,24 +85,16 @@ const REQUEST_BODY_HEADROOM = 2 * 1024 * 1024; // 2 MB, well clear of uploads.ts
 /**
  * The runtime's body cap for EVERY route, not just `/upload` — Bun applies it to the whole listener.
  * So it is the largest body any handler is willing to read, plus the headroom above.
- *
- * The max is what makes an operator's small `COLLIE_MAX_UPLOAD_MB` safe: at the floor of 1 MB a
- * fixed `cfg.maxUploadBytes + headroom` would be 3 MB, and a 5 MB voice note would be cut off by
- * the runtime before `/api/stt` could answer its own `stt.too_large`. Each handler still enforces
- * its own precise number; this only decides where the runtime stops reading.
+ * Each handler still enforces its own precise number; this only decides where the runtime stops
+ * reading.
  */
 export function requestBodyCap(cfg: Config): number {
-  return Math.max(cfg.maxUploadBytes, MAX_STT_AUDIO_BYTES) + REQUEST_BODY_HEADROOM;
+  return cfg.maxUploadBytes + REQUEST_BODY_HEADROOM;
 }
 // Upper bound on the pane-read `lines` param — don't trust the client (or Herdr) to cap it.
 const MAX_READ_LINES = 10_000;
 const MAX_EXPECTED_PROMPT_CHARS = 8192;
 const PROMPT_BINDING_BLANK_LINE_HEADROOM = 6;
-// How long `GET /api/update/check` waits for an on-demand poll before answering with what it has.
-// Only paid once per boot: it fires exactly while `latest` is still null (the monitor's deliberate
-// first-poll delay, so the bridge never probes the network mid-boot) and never again once a check has
-// landed either way.
-const UPDATE_ON_DEMAND_POLL_TIMEOUT_MS = 5_000;
 // An image's type is sniffed from magic bytes in uploadPane — never from the client-supplied MIME.
 
 // The built PWA lives in web/dist (Vite output). If it's missing, the bridge still runs the API
@@ -196,12 +169,6 @@ const PAIRING_ERROR_CODES = {
   "duplicate-label": "pairing.duplicate_label",
 } satisfies Record<ClaimFailure, ErrorCode>;
 
-/**
- * The host selector every request takes when this collie has no trust store — i.e. the only one a
- * solo instance ever sees. Named rather than parsed so that on solo the `?host=` grammar is never
- * applied to a URL at all: not a lookup, not a regex, not a branch a client can steer (§11).
- */
-const LOCAL_HOST: HostSelector = { kind: "local" };
 // Turns per history page. "Show entire history" means the WHOLE conversation, so the client asks for
 // everything and this ceiling is a safety net against a pathological log, not the normal path — a
 // 1400-turn session is ~1.4 MB raw / ~400 KB gzipped, which a tailnet link serves fine. The default
@@ -217,9 +184,7 @@ const TAB_ACTION_ROUTE = /^\/api\/tab\/([^/]+)\/(rename|close)$/;
  *
  * The hash is matched as an opaque segment here and validated by {@link isBlobHash} in the handler,
  * exactly as `PANE_ROUTE` matches a pane id and `decodeURIComponent` interprets it: a route grammar
- * says where a request goes, never whether its argument is well formed. `bridge/crew/forward.ts`
- * mirrors this shape one-for-one (`forward.test.ts` pins the correspondence), because a blob lives
- * on the machine whose journal named it and is therefore a forwarded READ.
+ * says where a request goes, never whether its argument is well formed.
  */
 const BLOB_ROUTE = /^\/api\/blobs\/([^/]+)$/;
 
@@ -266,31 +231,24 @@ export function marksPaneSeen(req: Request, action: string | undefined): boolean
 /**
  * The `/api/config` body. Pure, and exported for that reason: the handler lives inside `Bun.serve`,
  * which `bun test` cannot stand up (CLAUDE.md), so the shape is asserted here instead.
- *
- * `mode` is present only when this collie is in a crew — see {@link modeForWire}. A solo instance's
- * body is byte-identical to the pre-federation one, which is the whole zero-tax point; a client
- * reads the mode as `mode ?? "solo"`.
  */
 /**
- * Who is asking for a session-scoped route, and everything that differs between them.
+ * Who is asking for a session-scoped route.
  *
- * There are exactly two implementations and there must never be a third: the browser at this
- * collie's front door, and a lead over an admitted crew link (CREW_PROTOCOL.md §5). Each route
- * handler below is written once and consumes this — so the answer to "does a peer run the same code
- * my phone does?" is structural rather than a promise.
+ * One implementation: the browser at this collie's front door. Each route handler below is written
+ * once and consumes this — so how a request resolves to a runtime, how it is authorised, and where
+ * a write's audit line lands are answered in exactly one place.
  */
 interface RouteCaller {
   /**
-   * `(host, session)` → the runtime to act on, or the Response refusing/answering it. For a browser
-   * this may resolve to *another machine*, in which case the request is forwarded and the peer's own
-   * response comes back here (§9.1). For a crew caller it is always local.
+   * `session` → the runtime to act on, or the Response refusing it (the unknown-session 404).
    */
   resolve(): Promise<SessionRuntime | Response>;
   /** The caller's own authorisation at this level, or `null` to proceed. */
   gate(level: "read" | "write"): Response | null;
   /** The device a write is attributed to. */
   device(): string | null;
-  /** Where a write's audit line lands — the peer's is pre-stamped `via:"crew"` + originator (§12). */
+  /** Where a write's audit line lands. */
   readonly audit: AuditLog;
 }
 
@@ -495,24 +453,14 @@ export function bridgeConfigBody(opts: {
   push: boolean;
   vapidPublicKey: string;
   build: string;
-  mode: CrewRuntime["mode"];
   /**
-   * The active adapter, when there is one. Optional so the crew-mode assertions below (and any
-   * caller that has no session registry) stay about the crew and nothing else; the real handler
-   * always passes it.
+   * The active adapter, when there is one. Optional so any caller without a session registry stays
+   * about the body and nothing else; the real handler always passes it.
    */
   mux?: MuxPublication;
   /**
-   * A MEMBER's own block, already in wire shape, for `/api/config?host=<member>` (M22/03).
-   *
-   * When present it REPLACES what `mux` would have produced, in the same position, so a member's
-   * answer differs from the lead's in the block's contents and in nothing else. Absent means "answer
-   * for this host", which is both the solo body and the lead's own answer with no `host=` on it.
-   */
-  muxWire?: MuxConfig;
-  /**
    * The operator's own palette rows. Omitted entirely when there are none, so an operator who never
-   * wrote a `commands.toml` ships the same payload as before — the same reasoning `mode` follows.
+   * wrote a `commands.toml` ships the same payload as before.
    */
   operatorCommands?: readonly OperatorCommand[];
   /** The operator's own Keys-tray rows. Same omit-when-empty rule as `operatorCommands`. */
@@ -526,18 +474,11 @@ export function bridgeConfigBody(opts: {
    */
   operatorFonts?: readonly OperatorFontRow[];
   /**
-   * Speech-to-text, when a provider resolved. Omitted entirely otherwise — an operator who
-   * configured none ships the same payload as before, the same rule `mode` follows.
-   */
-  stt?: SttCapability;
-  /**
-   * What this host accepts as an attachment. Optional here for the reason `mux` is — the crew-mode
-   * assertions build this body by hand and are about the crew — and always passed by the real
-   * handler, so an absent key on the wire means an older bridge and nothing else.
+   * What this host accepts as an attachment. Optional here for the reason `mux` is — and always
+   * passed by the real handler, so an absent key on the wire means an older bridge and nothing else.
    */
   upload?: UploadCapability;
 }): BridgeConfig {
-  const mode = modeForWire(opts.mode);
   const mine = opts.operatorCommands ?? [];
   const myKeys = opts.operatorKeys ?? [];
   const myReplies = opts.operatorQuickReplies ?? [];
@@ -547,52 +488,20 @@ export function bridgeConfigBody(opts: {
     vapidPublicKey: opts.vapidPublicKey,
     build: opts.build,
   };
-  // Assigned, never conditionally spread: a solo instance's body must carry NEITHER key, byte for
-  // byte as before the crew existed (CREW_PROTOCOL.md §11).
-  if (mode !== undefined) wire.mode = mode;
+  // Assigned, never conditionally spread: keys are added only when there is something to say.
   if (mine.length > 0) wire.operatorCommands = [...mine];
   if (myKeys.length > 0) wire.operatorKeys = [...myKeys];
   if (myReplies.length > 0) wire.operatorQuickReplies = [...myReplies];
   if (myFonts.length > 0) wire.operatorFonts = [...myFonts];
-  // Appended last, and unconditional once an adapter is in hand: unlike `mode`, this is not
-  // omit-when-default. There is no default to omit — "no mux key" already means something on the
-  // phone (an older bridge, read as fully capable), so a Herdr bridge staying silent here would be
-  // indistinguishable from one that cannot answer.
-  if (opts.muxWire !== undefined) wire.mux = opts.muxWire;
-  else if (opts.mux !== undefined) wire.mux = muxConfigBody(opts.mux);
-  // Appended after the mux block, and omit-when-absent for the reason `mode` is: no key means no
-  // microphone, which is precisely true of a collie with no provider configured.
-  if (opts.stt !== undefined) wire.stt = opts.stt;
+  // Appended last, and unconditional once an adapter is in hand: unlike the omit-when-empty rows
+  // above, there is no default to omit — "no mux key" already means something on the phone (an older
+  // bridge, read as fully capable), so a Herdr bridge staying silent here would be indistinguishable
+  // from one that cannot answer.
+  if (opts.mux !== undefined) wire.mux = muxConfigBody(opts.mux);
   // Same omit-when-absent rule, and the same reading on the other end: no key is an older bridge,
   // which the phone falls back to the pre-attachment contract for (images, 10 MB).
   if (opts.upload !== undefined) wire.upload = opts.upload;
   return wire;
-}
-
-/**
- * What `POST /api/update` needs from the world, as three questions and one act.
- *
- * Every member is a SEAM index.ts fills, and the shape is what makes the route testable at all: the
- * handler lives inside `Bun.serve`, so the only thing `bun test` can hold is this interface and the
- * pure verdict behind it (`bridge/update-action.ts`).
- */
-export interface UpdateActionDeps {
-  /** The cached preflight report, or null when one could not be produced. `force` re-runs it now. */
-  preflight: (force?: boolean) => Promise<PreflightReport | null>;
-  /** Whether the updater's lock is held by a process that is still alive (spec 04's lock). */
-  lockHeld: () => boolean;
-  /** Start `collie update`, detached from this process. Never awaits the update itself. */
-  start: (a: { major: boolean; runId: string }) => { ok: true } | { ok: false; reason: string };
-  /**
-   * Mint an opaque run id (M16/04). A seam because the source of randomness is index.ts's, exactly
-   * as the two spawns above are — and because a test must be able to pin the id it asserts on.
-   */
-  newRunId: () => string;
-  /**
-   * Tell the crew a run has begun, so the lead starts granting turns and fires the first of §20's
-   * three immediate sweeps. A no-op on a solo install and on a peer.
-   */
-  beginCrewRun?: (a: { runId: string; to: string }) => void;
 }
 
 export function startServer(opts: {
@@ -603,115 +512,19 @@ export function startServer(opts: {
   notifyPrefs: NotifyPrefsStore;
   updateMonitor: UpdateMonitor;
   /**
-   * The two effects `POST /api/update` needs and this file must not own: the cached preflight
-   * (a `collie update --check --json` subprocess) and the detached `collie update` handoff itself
-   * (M15/05). Both are spawns, and a spawn is index.ts's business — the same arrangement the mux
-   * adapters, the STT provider and the front door already have.
-   *
-   * **Undefined disables the route**, which answers 503. That is the honest state for a bridge whose
-   * own binary it cannot name: the phone learns the update must be run from the terminal instead of
-   * tapping a button that quietly does nothing.
-   */
-  updateAction?: UpdateActionDeps;
-  /**
    * The BARE version string this process answers with (`bridge/version.ts`'s `collieVersionBare`) —
    * `<semver>` or `<semver>+<short sha>`. Resolved once in index.ts, never re-read here: it is the
-   * same string `/crew/v1/hello` carries, so one machine can never report two different versions.
+   * same string `/api/health` reports, so one process can never report two different versions.
    */
   version: string;
   audit: AuditLog;
   activity: ActivityLedger;
-  /** Resolved once at startup in index.ts, before anything is wired. Solo is `SOLO_RUNTIME`. */
-  crew: CrewRuntime;
-  /**
-   * The federated surface, supplied by index.ts **only** when a trust store exists. Undefined on
-   * every solo instance, and the paths it owns are declared in `bridge/crew/router.ts` rather than
-   * here — deliberately, so this file names no crew route and `solo-baseline.test.ts` can prove by
-   * grep that solo registers nothing (CREW_PROTOCOL.md §11, "`/crew/v1/*`: not routed at all").
-   *
-   * A **factory**, not a handler, for one reason: a peer's `/crew/v1/*` must answer exactly what its
-   * own `/api/*` would, and the only way to guarantee that is to hand the crew router the very
-   * closures this file serves browsers from — the snapshot body, and the session-scoped route block.
-   * Two assemblies that "agree" would be two assemblies that drift.
-   */
-  crewRouter?: (surface: CrewSurface) => CrewHandler;
-  /**
-   * The **deposed** answer, when this collie has learned the crown has moved (CREW_PROTOCOL.md
-   * §18.12). Returns a `Response` for every request it should swallow and `null` otherwise — so an
-   * instance that has not been deposed passes `undefined` and this file's dispatch is byte-identical
-   * to today's.
-   *
-   * A closure rather than a route, for the reason `crewRouter` is one: the paths it owns are declared
-   * in `bridge/crew/deposed.ts`, so this file names none of them and `solo-baseline.test.ts` can keep
-   * proving by grep that the route table here is exactly today's.
-   */
-  deposed?: (req: Request, url: URL) => Response | null;
-  /**
-   * The peer listener's pinned-mTLS options, supplied **only** by a peer that could build them
-   * (`bridge/crew/transport.ts`). Absent on solo and on a lead, so this file's `Bun.serve` call is
-   * byte-identical to today's for every instance that is not a peer (§11).
-   */
-  tls?: CrewTlsOptions;
-  /**
-   * The lead runtime, supplied **only** when this collie leads a crew with at least one enrolled
-   * member. Its presence is exactly the condition under which `servers` goes on the wire and every
-   * session and pane gains a `host` (CREW_PROTOCOL.md §9.2, §11) — undefined here means the snapshot
-   * body that leaves this file is the object literal it has always been.
-   */
-  crewLead?: CrewLead;
-  /**
-   * The Crew overview body (`GET /api/crew`), or `null` when this collie is not a lead with a crew.
-   *
-   * A CLOSURE, and it is composed in index.ts rather than here, for the reason `crewRouter` is one:
-   * this file may name no crew state. What it holds instead is a question it can ask on the request
-   * path — the answer is assembled by `bridge/crew/status-wire.ts` from the trust store this process
-   * already read and the per-peer beliefs the sweep already maintains, so asking it dials nobody and
-   * opens no file (CREW_PROTOCOL.md §10.1, §11).
-   *
-   * `undefined` on every solo instance and on every peer, `null` from the closure whenever the mode
-   * says the same thing at request time — both are the route's 404, and a lead that has just lost its
-   * last member stops answering without this file learning why.
-   */
-  crewStatus?: () => CrewStatusResponse | null;
-  /**
-   * The lead's per-peer notification coordinators, supplied under the same condition as
-   * {@link startServer} `crewLead`. The two notification-policy routes below fan across it exactly as
-   * they fan across `registry.all()` — snooze and prefs are one crew-wide setting the lead owns
-   * (CREW_PROTOCOL.md §5), and the lead being the only sender is what makes that fan complete.
-   * Structurally typed, not the class: this file needs "fan a pref change, list the live slots".
-   */
-  peerNotifier?: { applyPrefs(): void; tags(): string[] };
   /**
    * Device pairing (bridge/pairing.ts). Always supplied by index.ts — it is not an opt-in feature
    * flag: the store reads its own registry off disk, and an empty registry means "nothing paired",
    * which enforces nothing. Optional here only so the existing tests can build a server without it.
-   *
-   * It is deliberately NOT threaded into the crew surface. `/crew/v1/*` is admitted by pinned mutual
-   * TLS plus the crew secret and shares nothing with a browser credential (CREW_PROTOCOL.md §6,
-   * ADR 0013) — a lead does not hold one of this collie's pairing tokens and must never need one.
-   *
-   * **ONE EXCEPTION, added 2026-08-20, and the rule above survives verbatim** (RFC §16, decision 5;
-   * CREW_PROTOCOL.md §18.14). `POST /crew/v1/pairing` carries a lead's registry — **hashes only** — to
-   * the one member it has named DEPUTY, so that member's standby door can check a phone's bearer
-   * credential when the lead is gone. What is unchanged: **no crew request is ever admitted by a
-   * pairing token**, and that route is admitted by the crew's own two factors plus a role check like
-   * every other one. What is new: a browser credential's hash rides a crew route and lands on a
-   * peer's disk — in `standby-devices.json`, its own file, **never** merged into
-   * `paired-devices.json`, because `PairingStore.enforced()` is "the registry is non-empty" and a
-   * merge would arm the deputy's own write gate for its own operator. The reasoning, at length, is in
-   * `bridge/crew/standby-devices.ts`.
    */
   pairing?: PairingStore;
-  /**
-   * Speech-to-text, asked for per request rather than resolved once.
-   *
-   * A FUNCTION, not a provider, because the settings behind it are re-read behind an mtime check
-   * (`bridge/stt/config.ts`) — `collie stt setup` must go live without a `systemctl restart`, the
-   * same posture `commands.toml` has. `null` from it is the feature being off, which is also the
-   * whole of what makes this optional here: an instance that never calls it registers the route and
-   * answers 503, and one that was never given it does the same.
-   */
-  stt?: () => Promise<SttProvider | null>;
   /**
    * The journal registry, built once by the caller. Absent means this function builds its own, which
    * is what every test does; `bridge/index.ts` passes one so the cache tracker and the history route
@@ -733,21 +546,14 @@ export function startServer(opts: {
    */
   cacheWatch?: CacheWatchSurface;
 }) {
-  const { cfg, registry, push, snooze, notifyPrefs, updateMonitor, audit, activity, crew } = opts;
+  const { cfg, registry, push, snooze, notifyPrefs, updateMonitor, audit, activity } = opts;
   // The prompt-cache ledger, built in bridge/index.ts beside the journal registry it probes through,
   // because the state engine's poll is what drives it and that poll is wired there. Undefined when
   // `COLLIE_TRANSCRIPT` is off: no journal, no probe, and every pane reads exactly as it did in 1.8.2.
   const cache = opts.cache;
   const pairing = opts.pairing;
-  const stt = opts.stt ?? (async () => null);
-  // One gate per Bun server, not per request: two slow uploads and their two provider calls share
-  // the same bounded process-local capacity (bridge/stt/http.ts).
-  const sttAdmission = createSttAdmission();
   /** Who the requester is, across both device gates — see {@link requestDevice}. */
   const whois = (req: Request): DeviceAuth => requestDevice(req, cfg, pairing);
-  const crewLead = opts.crewLead;
-  const crewStatus = opts.crewStatus;
-  const peerNotifier = opts.peerNotifier;
   // One journal registry + store for the process. The store's cache is keyed by absolute path, so
   // sharing it across herdr sessions AND across harnesses is correct — two sessions can front panes
   // whose agents write into the same root. Which harnesses have journals at all is decided in
@@ -795,12 +601,11 @@ export function startServer(opts: {
   };
 
   /**
-   * This collie's own snapshot body — the whole of what `/api/snapshot` answered before crews
-   * existed, and (with `device` omitted) exactly what a peer serves its lead on `/crew/v1/snapshot`.
+   * This collie's own snapshot body — the whole of what `/api/snapshot` answers.
    *
    * `undefined` means the session name is unknown, which every caller turns into the same 404 it
-   * always did. Nothing federated happens in here: the host tag and the `servers` array are added
-   * afterwards, by the lead and only by a lead, so a solo instance's bytes are untouched (§11).
+   * always did. The body is the object literal it has always been: no `servers` array, no `host`
+   * tags — one machine, and every field says exactly that.
    */
   const localSnapshot = (
     sessionName: string | undefined,
@@ -841,13 +646,10 @@ export function startServer(opts: {
     // came from so the phone can address it (types.ts states why ALL of them are tagged, never just
     // the non-primary ones).
     //
-    // NOTHING ELSE IN THE BODY WIDENS, and that is the same shape the crew merge already has rather
-    // than a shortcut: a peer contributes its `agents` and `shellPanes` and nothing more
-    // (crew/merge.ts `PeerSnapshotBody`), because `workspaces`, `tabs` and `bridge` are statements
-    // about one link the phone reads one at a time. `bridge`, `workspaces` and `tabs` here stay the
-    // AMBIENT session's — the one `?s=` named — exactly as they are today. So the triage lists
-    // widen and the navigation tree does not, one dimension down from a crew, where the same is
-    // already true of every peer.
+    // NOTHING ELSE IN THE BODY WIDENS, and that is the shape the crew merge kept rather than a
+    // shortcut: `workspaces`, `tabs` and `bridge` are statements
+    // about one link the phone reads one at a time. So the triage lists
+    // widen and the navigation tree does not.
     //
     // The ORDER is the registry's own — primary first, then alphabetical — so it matches the
     // `sessions` array below and does not depend on which runtime happened to be spawned first.
@@ -870,7 +672,7 @@ export function startServer(opts: {
       tabs,
       sessions: registry.list(),
       notifications: { snoozedUntil: snooze.until() },
-      update: updateStatusWithPeers(),
+      update: updateMonitor.status(),
       ts: Date.now(),
     };
     // Only report device state when the feature is on, so an off deployment sends nothing new.
@@ -893,12 +695,6 @@ export function startServer(opts: {
         if (pane !== undefined) out.set(pane.key, pane.paneId);
       }
     }
-    for (const contribution of crewLead?.contributions() ?? []) {
-      for (const wire of contribution.body?.agents ?? []) {
-        const pane = peerWatchPane(wire, contribution.state.memberId);
-        if (pane !== undefined) out.set(pane.key, pane.paneId);
-      }
-    }
     return out;
   };
 
@@ -917,11 +713,8 @@ export function startServer(opts: {
   };
 
   /**
-   * This collie's own `(session)` resolution: the identical `registry.get` call the bridge made
-   * before crews existed, plus the 404 it always answered. Named once so that BOTH the browser's host
-   * gate and the peer's crew dispatch reach a local runtime through the same expression — two
-   * spellings of "the primary session, or 404" would be two chances to disagree about what `?session=`
-   * means, and §5 says a peer resolves it with today's exact semantics.
+   * This collie's own `(session)` resolution: the identical `registry.get` call the bridge has
+   * always made, plus the 404 it has always answered for an unknown name.
    */
   const localRuntime = (session: string | undefined, acceptEncoding: string | null): SessionRuntime | Response =>
     registry.get(session) ??
@@ -930,18 +723,9 @@ export function startServer(opts: {
   /**
    * Everything session-scoped: the pane family, tab create/rename/close, workspace create.
    *
-   * ── ONE BLOCK, TWO CALLERS, NO SECOND HANDLER SET ────────────────────────────
-   * A browser reaches it through `Bun.serve`'s dispatch below; a LEAD reaches it through this
-   * collie's `/crew/v1/*` surface, which hands over this very closure (CREW_PROTOCOL.md §5: "a 1:1
-   * re-exposure of the routes the phone already calls, dispatched into the same handlers"). Not a
-   * copy that agrees — the same code, so `reply` cannot acquire a crew-only behaviour and `history`
-   * cannot acquire a host parameter.
-   *
-   * What differs between the two callers is *only* who is asking, which is exactly the
-   * {@link RouteCaller} it takes: how the caller's request resolves to a runtime (a browser's may
-   * resolve to another machine and be forwarded), how the caller is authorised (a browser by
-   * `guard()`, a lead by the crew link plus the peer's own device policy — §12), and which audit log
-   * the write lands in (the peer's is stamped `via:"crew"`).
+   * Reached only through `Bun.serve`'s dispatch below, with the {@link RouteCaller} naming how the
+   * request resolves to a runtime, how it is authorised (`guard()`), and which audit log a write
+   * lands in.
    *
    * `null` ⇒ not a session-scoped path; the caller carries on with its own routing.
    */
@@ -984,8 +768,7 @@ export function startServer(opts: {
       return createWorkspace(rt.herdr, rt.engine, req, caller.audit, caller.device(), rt.name);
     }
     // A launch is a `/api/workspace` create the operator pre-declared: the client names a row in
-    // `launchers.toml` and the bridge, never the client, supplies the command line. It sits here
-    // rather than beside it in the browser dispatch so a crew lead reaches the same handler (§5).
+    // `launchers.toml` and the bridge, never the client, supplies the command line.
     if (pathname === "/api/launch" && req.method === "POST") {
       const denied = caller.gate("write");
       if (denied) return denied;
@@ -993,11 +776,9 @@ export function startServer(opts: {
       if (rt instanceof Response) return rt;
       return launch(rt.herdr, rt.engine, req, caller.audit, caller.device(), rt.name, operatorLaunchers);
     }
-    // Rows must come from the host that runs them: today's `/api/config` (a lead-only body) sent
-    // the LEAD's rows down even for a launch addressed at a peer via `?host=`. Session-scoped like
-    // `/api/launch` beside it, so the same `?host=` forward (§5) reaches the peer's own
-    // `launchers.toml` rather than the lead's. `home` rides along so the client can shorten a
-    // pinned `cwd` with a leading `~` without knowing which machine answered.
+    // Session-scoped like `/api/launch` beside it, so the rows come off THIS machine's own
+    // `launchers.toml`. `home` rides along so the client can shorten a pinned `cwd` with a leading
+    // `~`.
     if (pathname === "/api/launchers" && req.method === "GET") {
       const denied = caller.gate("read");
       if (denied) return denied;
@@ -1009,8 +790,7 @@ export function startServer(opts: {
     //
     // A READ, and gated as one: it hands back a picture an agent already put in its own log, so a
     // read-only or unpaired-but-permitted device may see it exactly as it may see the pane text
-    // that mentions it. It is session-scoped so `caller.resolve()` forwards a `?host=` call to the
-    // member whose disk holds the file — the lead has no copy of a peer's blob (§9.1).
+    // that mentions it.
     const blobMatch = pathname.match(BLOB_ROUTE);
     if (blobMatch && req.method === "GET") {
       const denied = caller.gate("read");
@@ -1085,18 +865,10 @@ export function startServer(opts: {
       // Gated on the request actually being ROUTED below. PANE_ROUTE constrains `action` to the
       // known set, so the only way to reach here unrouted is a method mismatch (a GET at /reply, a
       // POST at /history) — which 405s. Without this a malformed request still marked the pane seen.
-      //
-      // ── AND IT IS RECORDED EXACTLY ONCE, ON THE OWNING HOST ────────────────
-      // A pane on a peer never reaches this line on the LEAD: `caller.resolve()` returned the peer's
-      // forwarded response above. It reaches it on the PEER, through the crew dispatch, against the
-      // peer's own ledger — which is what makes "seen" one shared fact (.adr/0003) rather than two
-      // machines' guesses, and why the `x-collie-seen` header is forwarded verbatim.
       const routed = isRead ? req.method === "GET" : req.method === "POST";
       if (routed && marksPaneSeen(req, action)) activity.noteSeen(session, paneId);
       // A pane request means a phone is looking at this collie — the second of the two routes that
-      // stamp attention (state-engine.ts § noteAttention). It is stamped HERE rather than at the
-      // browser's dispatch so that a pane the lead FORWARDED to a peer counts on the peer, where
-      // the census that attention tightens actually runs.
+      // stamp attention (state-engine.ts § noteAttention).
       if (routed) rt.engine.noteAttention();
       // Every action is a write; attribute it to the authorised device for the audit trail.
       // `history` is a read, so it gets no device attribution (nothing is written to attribute).
@@ -1118,129 +890,9 @@ export function startServer(opts: {
     return null;
   };
 
-  // A peer answers its lead with its OWN view and never a merged one — a crew link never forwards a
-  // `host=` because a peer has no peers (§4). Hence `localSnapshot`, not the merged body below.
-  //
-  // The second closure is the per-pane half of the same idea (§5): the lead's request is dispatched
-  // into the block above, authorised by the PEER's own gate (bridge/crew/peer-gate.ts) and audited in
-  // the PEER's own log with `via:"crew"` and the originating member (§12). The lead's verdict is not
-  // an input — it never crosses the wire.
-  const crewHandler = opts.crewRouter?.({
-    // The view comes off the LEAD's request (`bridge/crew/router.ts` reads it with the same
-    // `selectView` the browser route uses), never from a literal here: this line used to hard-code a
-    // narrow answer, which made a member's second session unreachable no matter what the phone asked
-    // (M22/06). `?sessions=all` is additive and optional under §7.1, so CREW_PROTOCOL_VERSION does
-    // not move, and a lead that does not send it still gets the primary session. A crew request may
-    // still not name a host — widening is a second dimension of ONE machine, and a peer has no
-    // peers (§4).
-    snapshot: (view) => localSnapshot(view.session, null, view.widen),
-    // M22/03: this collie's own capability declaration, for `hello`. The SAME expression the
-    // `/api/config` route below publishes to a browser — the primary session's adapter — so a peer
-    // cannot report capabilities that differ from the ones it serves its own operator.
-    mux: () => {
-      const active = registry.get();
-      return active === undefined ? null : muxConfigBody(active.herdr);
-    },
-    dispatch: async (req, url, from) => {
-      const session = url.searchParams.get("session") ?? undefined;
-      const device = crewDeviceOf(req);
-      const routed = await serveSessionRoute(req, url, {
-        resolve: async () => localRuntime(session, null),
-        gate: (level) => {
-          const verdict = crewGate(level, cfg, device);
-          return verdict.ok ? null : text(verdict.reason, 403);
-        },
-        device: () => device,
-        audit: audit.scoped({ via: "crew", from }),
-      });
-      // Deliberately UNCODED. This is the crew link's own 404, answered to a LEAD and never to a
-      // browser, and `/crew/v1/*` is a separately-versioned surface (CREW_PROTOCOL.md, ADR 0025) —
-      // it keeps today's body in this release. Error codes are the phone's vocabulary, not the
-      // crew's.
-      return routed ?? jsonError({ error: "not found" }, 404, null);
-    },
-  });
   // Per-session background notifications live in each session's runtime (built by the factory in
   // index.ts, wired to its StateEngine transitions). The routes here only fan preference changes and
   // snooze-clears across every live session's coordinator.
-
-  // Present ONLY on a peer that pins its lead; ASSIGNED below rather than conditionally spread, so
-  // solo and lead keep the zero-tax shape — an absent key, not a disabled one.
-  // `ca` is copied out of its readonly array because Bun's `TLSOptions` wants a mutable one.
-  const listenerTls = opts.tls === undefined ? undefined : { ...opts.tls, ca: [...opts.tls.ca] };
-
-  /**
-   * The update status, with the peer LEGS of the run this lead is driving folded into its run record
-   * (M16/04).
-   *
-   * One composer for both surfaces the phone reads — the snapshot's `update` and the card's own
-   * `GET /api/update/check` — because the band reads the first and the Updates page reads the
-   * second, and two compositions would be two objects that could disagree about the same run.
-   *
-   * It **dials nobody**: `updatePeers()` is a read of what the sweep banked, exactly as
-   * `updateRows()` is. Absent legs are omitted rather than sent empty, so a solo install and a
-   * bridge with no run in flight send precisely today's object.
-   */
-  function updateStatusWithPeers() {
-    const status = withStagingTail(updateMonitor.status());
-    const legs = opts.crewLead?.updatePeers() ?? [];
-    if (legs.length === 0) return status;
-    // §20's one clock (M20/01). Omitted while the run is still moving, so "absent" keeps meaning
-    // "not settled" on a phone talking to a bridge that predates the field.
-    const settledAt = opts.crewLead?.updateSettledAt() ?? null;
-    const crewState = settledAt === null ? { peers: legs } : { peers: legs, settledAt };
-    // A PEERS-ONLY RUN IS STILL A RUN (M20/09). "Retry crew update" never calls the updater on this
-    // machine — it begins the turn queue and re-sweeps — so nothing is written to `update.json` and
-    // `status.run` is null for the whole run. The old guard dropped the live legs on exactly that
-    // path, and the phone then had no way to learn the run had started, let alone finished.
-    //
-    // The legs ride the RUN when there is one and the STATUS when there is not. Two positions, one
-    // reader: `peerLegsOf` in `web/src/lib/update-ribbon.ts` is where both surfaces ask. Sending
-    // them at the top level unconditionally would be a second copy of a field already shipped on
-    // `run`, and a phone older than this change would then have two places to disagree about.
-    //
-    // AND WHERE THEY RIDE THE STATUS, THEY SAY WHERE THEY ARE GOING (M32). `peersTo` is the version
-    // the run levels the members to. A peers-only run levels them to this lead's own version, which
-    // is how the phone knows the lead is not part of the run and says so on its rows; a full run
-    // begins its queue before its own record lands, and there the target is the release above
-    // `current`. Additive and optional: absent from a bridge that predates it, and never on the run
-    // record, whose own `to` already says it.
-    const legsTo = opts.crewLead?.updateLegsTo() ?? null;
-    const statusState = legsTo === null ? crewState : { ...crewState, peersTo: legsTo };
-    if (status.run === undefined || status.run === null) return { ...status, ...statusState };
-    // AND THEY RIDE THEIR OWN RUN, NEVER THE NEXT ONE. The legs outlive the run that made them, so
-    // the outcome stays on the screen the operator confirmed on — which means a later run would
-    // otherwise carry the previous run's peer rows, and its failures, as if they were its own.
-    //
-    // They are not DROPPED when they belong to a different run, they fall to the top level, which is
-    // the position for legs this machine's record does not own. Dropping them was the first shape of
-    // this guard and it re-opened spec 09 on the commonest path there is: a local update leaves a
-    // `done` record behind, the operator then taps "Retry crew update", and that peers-only run has
-    // a different run id and no record of its own. The legs would be discarded for the whole run and
-    // the phone would learn nothing, which is the very bug this composer exists to fix.
-    if (opts.crewLead?.updateLegsRun() !== status.run.runId) return { ...status, ...statusState };
-    return { ...status, run: { ...status.run, ...crewState } };
-  }
-
-  /**
-   * The staging progress file, folded into the run record it belongs to (M20/10).
-   *
-   * ONE OBJECT ON THE WIRE. The client is given no second channel to poll and no route to tail: a
-   * second client-visible source about one run is a second thing that can disagree with the run
-   * record, which is the fault the composer above was written to avoid. So the tail rides `logTail`,
-   * the field the card already renders under "Log tail".
-   *
-   * Only while STAGING, and only when the run carries no tail of its own. A failure's tail is the
-   * service log, which is the more useful document at that point and must not be overwritten by the
-   * build output that preceded it.
-   */
-  function withStagingTail(status: UpdateStatus): UpdateStatus {
-    const run = status.run;
-    if (run === undefined || run.state !== "staging" || run.logTail !== undefined) return status;
-    if (run.runId === undefined) return status;
-    const tail = readStagingLog(cfg.stateDir, run.runId);
-    return tail === null ? status : { ...status, run: { ...run, logTail: tail } };
-  }
 
   const server = Bun.serve({
     hostname: cfg.host,
@@ -1248,46 +900,18 @@ export function startServer(opts: {
     // Runtime cap on any request body — a chunked/lying client is cut off here even if its
     // Content-Length is absent or false. The upload handler still does its own precise check.
     maxRequestBodySize: requestBodyCap(cfg),
-    // When TLS is present the handshake itself is the first factor: an unpinned or absent client
-    // certificate never reaches `fetch` at all, so nothing below has to defend against it.
-    tls: listenerTls,
 
     async fetch(req) {
       const url = new URL(req.url);
       const { pathname } = url;
 
-      // The federated surface, before anything else. It answers only the prefix it owns and returns
-      // null otherwise, so this is not a branch a browser request can take. Its admission is two
-      // independent factors and shares nothing with `checkAccess()` below — a crew credential never
-      // admits an `/api/*` request and a browser credential never admits a crew one
-      // (CREW_PROTOCOL.md §6, ADR 0013).
-      if (crewHandler) {
-        const packed = await crewHandler(req, url);
-        if (packed) return secure(packed);
-      }
-
-      // The peer-address check, and it sits HERE — after the federated surface, before the front
-      // door — so that the exemption is granted by the surface that has its own admission rather
-      // than by a path literal this file must never carry (solo-baseline.test.ts).
-      //
-      // Everything below trusts headers a client writes (`Tailscale-User-Login`,
-      // COLLIE_DEVICE_HEADER, Origin/Host), which are only untamperable while the sole client is the
-      // local front door. A crew request is not that, and does not need to be: it was already
-      // admitted by pinned mutual TLS plus the crew secret and answered above (CREW_PROTOCOL.md §6,
-      // ADR 0013). A crew path the handler DECLINED falls through to here and is refused like any
-      // other remote caller. `COLLIE_ALLOW_NON_LOOPBACK_BIND=1` turns the check off wholesale, which
-      // is what that flag has always meant.
+      // The peer-address check, ahead of the front door: everything below trusts headers a client
+      // writes (`Tailscale-User-Login`, COLLIE_DEVICE_HEADER, Origin/Host), which are only
+      // untamperable while the sole client is the local front door. `COLLIE_ALLOW_NON_LOOPBACK_BIND=1`
+      // turns the check off wholesale, which is what that flag has always meant.
       if (!cfg.allowNonLoopbackBind && !isLoopbackPeer(server.requestIP(req)?.address)) {
         return text("non-loopback peer rejected", 403);
       }
-
-      // A DEPOSED collie serves one page and fails its health check (§18.12). It sits AFTER the
-      // federated surface on purpose: the machine that just deposed this one must still be able to
-      // reach `/crew/v1/*` here — that is how it was told, and how it will be told again — while the
-      // app, the PWA and `/api/*` are gone. Everything below this line is the front door, and a
-      // deposed collie has none.
-      const deposedAnswer = opts.deposed?.(req, url);
-      if (deposedAnswer) return secure(deposedAnswer);
 
       // ── The health check (M15/04) ────────────────────────────────────────
       // `GET /api/health`: is this collie up, and WHICH BUILD is answering? The detached updater
@@ -1301,13 +925,9 @@ export function startServer(opts: {
       // has already reached a loopback-bound listener behind the operator's own front door; the same
       // string is on every response as `X-Collie-Build`. It grants nothing, mutates nothing and
       // reads no session.
-      //
-      // It sits AFTER the deposed answer on purpose: a DEPOSED collie must FAIL this check
-      // (`bridge/crew/deposed.ts`), and it does so by answering its one page here instead. That is
-      // why a deposed peer can never be mistaken for a successful update.
       if (pathname === "/api/health") {
         if (req.method !== "GET" && req.method !== "HEAD") return text("method not allowed", 405);
-        return json(healthBody(opts.version, crew.mode), req.headers.get("accept-encoding"));
+        return json(healthBody(opts.version), req.headers.get("accept-encoding"));
       }
 
       // Session-scoped routes accept an optional `?session=<name>`; absent → the primary session
@@ -1321,41 +941,17 @@ export function startServer(opts: {
           req.headers.get("accept-encoding"),
         );
 
-      // The host dimension of the `(host, session, paneId)` address (§4), read exactly where the
-      // session name is and by the same rule: a client-supplied value that is ONLY ever a registry
-      // key. Parsed only when this collie has a trust store — the same predicate the crew surface
-      // mounts on — so a solo instance never applies the grammar to a URL and `?h=` stays a
-      // parameter that provably does not exist there (§11).
-      const host = crewHandler ? selectHostFrom(url) : LOCAL_HOST;
-
       /**
-       * The watch identity behind `(host, session, paneId)`, or the reason there is none.
+       * The watch identity behind `(session, paneId)`, or the reason there is none.
        *
        * THE BRIDGE IS THE ONLY PARTY THAT CAN DO THIS, which is the whole reason the routes speak an
-       * address rather than a key: a phone can only ever name `(host, session, paneId)`, and the ref a
-       * watch is keyed by is server-side only (`bridge/types.ts` § agentSession).
-       *
-       * It resolves WITHOUT FORWARDING. A peer's pane is read out of the body the lead's own sweep
-       * last parsed (`CrewLead.contributions`), exactly as `bridge/crew/notify.ts` reads it, because
-       * the preference belongs on the machine holding the subscription and a forward would store it on
-       * the machine that cannot send.
+       * address rather than a key: a phone can only ever name a pane, and the ref a watch is keyed
+       * by is server-side only (`bridge/types.ts` § agentSession).
        */
       const watchTargetFor = (
         paneId: string,
-        selector: HostSelector,
         session: string | undefined,
       ): { pane: CacheWarnPane; error?: undefined } | { pane?: undefined; error: ErrorCode } => {
-        if (selector.kind === "member") {
-          const body = crewLead?.contributions().find((c) => c.state.memberId === selector.id)?.body;
-          const wire = body?.agents.find((p) => p.paneId === paneId);
-          if (wire === undefined) return { error: "cache.pane_unknown" };
-          // A peer's pane carries no ref, so `hasSession` is what "names a session" means here — the
-          // same flag the History affordance is gated on.
-          if (wire.hasSession !== true) return { error: "cache.no_session" };
-          const pane = peerWatchPane(wire, selector.id);
-          return pane === undefined ? { error: "cache.no_session" } : { pane };
-        }
-        if (selector.kind !== "local") return { error: "cache.pane_unknown" };
         const rt = registry.get(session);
         if (!rt) return { error: "cache.pane_unknown" };
         const view = rt.engine.current().agents.find((p) => p.paneId === paneId);
@@ -1368,105 +964,40 @@ export function startServer(opts: {
       };
 
       /**
-       * The `(host, session)` target of a session-scoped route, or the Response refusing it.
-       *
-       * An unknown host is a 404, mirroring `unknownSession()` exactly (§4) — and so is an
-       * ill-formed one, which is the shape a probe takes (a path, a URL, an IP). A *known* peer is
-       * FORWARDED, and the peer's own answer is what comes back (§5, §9.1): the load-bearing part is
-       * that it is never silently served from the LEAD's registry, because pane ids collide across
-       * machines and `?h=laptop` + `w1:p1` must never type into the desk's `w1:p1`.
-       *
-       * The forward is the only asynchrony this adds, and it is why `target()` is async: a local
-       * request does not await a thing it did not do — `registry.get` is still one Map lookup.
+       * The `(session)` target of a session-scoped route, or the Response refusing it — the same
+       * `localRuntime` 404 every session-scoped route has always answered.
        */
-      const target = async (): Promise<SessionRuntime | Response> => {
-        if (host.kind !== "local") {
-          const resolved = crewLead?.resolve(host, sessionName);
-          if (resolved === undefined) {
-            return jsonError(
-              apiError("host.unknown", { host: host.kind === "member" ? host.id : host.raw }),
-              404,
-              req.headers.get("accept-encoding"),
-            );
-          }
-          if (resolved.kind === "peer") {
-            // The lead's own record of the forward (§12): one line, the same `action` the peer will
-            // write, plus the target host — two independent logs of one event, neither depending on
-            // the other machine's disk.
-            return secure(
-              await crewLead!.forward(req, url, resolved, {
-                device: whois(req).device,
-                audit: (entry) => {
-                  // Assigned, never conditionally spread: an entry without a pane or session must
-                  // carry NO such key rather than record it as `undefined`.
-                  const row: AuditEntry = {
-                    action: entry.action,
-                    host: entry.host,
-                    device: whois(req).device,
-                    detail: { forwarded: entry.outcome },
-                  };
-                  if (entry.paneId !== undefined) row.paneId = entry.paneId;
-                  if (entry.session !== undefined) row.session = entry.session;
-                  audit.record(row);
-                },
-              }),
-            );
-          }
-          return resolved.runtime;
-        }
-        return localRuntime(sessionName, req.headers.get("accept-encoding"));
-      };
+      const target = async (): Promise<SessionRuntime | Response> =>
+        localRuntime(sessionName, req.headers.get("accept-encoding"));
 
       // ── Live state (polled by the client) ────────────────────────────────
       if (pathname === "/api/snapshot") {
         const gate = checkAccess(req, cfg);
         if (!gate.ok) return text(gate.reason, 403);
         const device = whois(req);
-        // A BROWSER poll is a phone looking; the lead's own sweep of a peer is not, which is why
-        // this stamp sits here rather than inside `localSnapshot` (that closure also serves
-        // `/crew/v1/snapshot`, and a lead sweeps on its own clock whether or not anybody is reading
-        // it — stamping there would pin every peer at `watched` for the life of the crew).
+        // A BROWSER poll is a phone looking, which is attention by any reading.
         registry.get(sessionName)?.engine.noteAttention();
         // `?sessions=all` WIDENS the pane lists to every session on ONE machine (see localSnapshot).
         // One exact spelling and nothing else is accepted: the parameter is a switch, not a list, and
         // a typo must read as "no" rather than as some third behaviour. It does NOT replace
         // `?session=` — the named session still decides `bridge`, `workspaces`, `tabs` and the 404
         // below, so a widened view of an unknown session is still an unknown session.
-        //
-        // WHICH MACHINE is the other half, and the two compose (M22/06). `?host=` was resolved above
-        // for every session-scoped route; this route is the one that answers from the lead's own
-        // registry plus its CACHE of every member, so it never forwards and it reads the host here
-        // rather than through the gate. No host, or the lead, and the view lands on this collie's own
-        // registry exactly as it always has — which is the only body a solo install can get, because
-        // it cannot emit the parameter at all (§11). A member, and the view lands on that member's
-        // cached body at the merge instead, where `narrowPeerBody` applies it.
-        const plan = snapshotPlan(host.kind === "member" ? host.id : null, selectView(url));
-        const body = localSnapshot(plan.local.session, device.enforced ? device : null, plan.local.widen);
+        const view = selectView(url);
+        const body = localSnapshot(view.session, device.enforced ? device : null, view.widen);
         if (!body) return unknownSession();
-        // The ONE place the lead re-serialises (§9.2). With no crew this is the identity function's
-        // absence: `body` goes out as assembled, same keys, same order, same bytes, same ETag.
-        // The merged body's ETag is then the lead's own assertion about its own merged view — a
-        // peer's ETag is never recomputed here, because no peer body is re-hashed on this path.
         // Tag every snapshot poll with the on-disk build id so an open client notices a live rebuild
         // between polls — the no-service-worker self-update path (web/src/lib/self-update.ts).
-        return withBuildHeader(
-          json(crewLead ? crewLead.merge(body, plan) : body, req.headers.get("accept-encoding")),
-          await buildId(),
-        );
+        return withBuildHeader(json(body, req.headers.get("accept-encoding")), await buildId());
       }
 
       // ── Session-scoped routes: the pane family, tabs, workspaces ─────────
-      // The block itself lives above, shared with the crew surface (§5). What a browser supplies is
-      // its own gate (`guard`), its own device attribution, this collie's audit log, and the host
-      // gate — which is the one thing a crew caller never has, because a peer has no peers (§4).
+      // The block itself lives above. What the browser supplies is its own gate (`guard`), its own
+      // device attribution, and this collie's audit log.
       //
       // ── ONE GATE EXPRESSION, SHARED BY NAME ──────────────────────────────
       // `browserGate` is the browser's whole authorisation story: `checkAccess` (host allowlist,
       // same-origin, Tailscale identity) plus, for a write, the device header AND the pairing
-      // credential. Typing into a pane goes through it, and so does `POST /api/update` below — the
-      // SAME closure, passed to both, never a second call that agrees today. Two authorisation
-      // checks meant to be identical drift the moment one of them is edited, so there is only one
-      // (spec M15/05; `server.test.ts` → "same device auth as pane input").
+      // credential. Every write goes through it, and there is only one spelling of it.
       const browserGate = (level: "read" | "write"): Response | null => guard(req, cfg, level, pairing);
       const sessionRouted = await serveSessionRoute(req, url, {
         resolve: target,
@@ -1513,50 +1044,18 @@ export function startServer(opts: {
         // is not a choice. `?.` only because `get()` is total over a Map — the primary is created
         // eagerly in the constructor and never disposed.
         const activeMux = registry.get();
-        // ── `?host=<member>`: THIS MEMBER's capability declaration (M22/03) ──────────────────
-        //
-        // Answered from what the lead already holds, and never forwarded: `config` is on
-        // `bridge/crew/forward.ts`'s not-forwarded list and must stay there, because a config read
-        // is the request every page load makes and it must not be able to make the lead dial a
-        // machine. The lead learned the block from that member's last `hello`.
-        //
-        // The host selector is the one `target()` above already resolved, so an unknown or
-        // ill-formed member id gets the same 404 every host-scoped route gives it. It is never
-        // silently rewritten to the lead: quietly answering for a different machine is the exact
-        // failure the host dimension exists to prevent.
-        const scoped = host.kind === "local" ? undefined : crewLead?.resolve(host);
-        if (host.kind !== "local" && scoped === undefined) {
-          return jsonError(
-            apiError("host.unknown", { host: host.kind === "member" ? host.id : host.raw }),
-            404,
-            req.headers.get("accept-encoding"),
-          );
-        }
-        // A member that has published nothing answers with the LEAD's block, because absent means
-        // "use the lead's" — which is byte for byte the reading the phone gives every pane today.
-        // The lead's own entry resolves `local`, so it takes its own branch and its own adapter.
-        const memberMux = scoped?.kind === "peer" ? crewLead?.muxFor(scoped.link.memberId) : null;
-        // Re-resolved per request for the same reason `commands.toml` is: `collie stt setup` is
-        // live, and this is where the phone learns whether to draw a microphone at all. `?? undefined`
-        // because "no provider" must OMIT the key, never send a null one (CREW_PROTOCOL.md §11).
-        const sttWire = (await sttCapability(await stt())) ?? undefined;
         return json(
           bridgeConfigBody({
             push: push.enabled,
             vapidPublicKey: push.publicKey,
             build: await buildId(),
-            mode: crew.mode,
             operatorCommands: mine,
             operatorKeys: myKeys,
             operatorQuickReplies: myReplies,
             operatorFonts: myFonts,
             mux: activeMux?.herdr,
-            // Assigned through `?? undefined` rather than conditionally, so the no-`host=` request
-            // builds the byte-identical body it always did (CREW_PROTOCOL.md §11).
-            muxWire: memberMux ?? undefined,
-            stt: sttWire,
-            // This host's own limits, read from cfg on every request like everything else here.
-            // A crew member answers with ITS number, which is the number that will judge the bytes.
+            // This host's own limits, read from cfg on every request like everything else here —
+            // this is the number that will judge the bytes.
             upload: {
               maxBytes: cfg.maxUploadBytes,
               imageTypes: [...IMAGE_EXTS],
@@ -1585,8 +1084,8 @@ export function startServer(opts: {
       }
       if (pathname.startsWith(OPERATOR_FONTS_PATH) && req.method === "GET") {
         // Read-level, and in the Misc block beside the mux mark rather than in the session router:
-        // this is a file THIS collie's operator declared, not a pane's, so there is nothing to
-        // forward to a peer. Reads are ungated app-wide, so a read-only device still gets the face
+        // this is a file THIS collie's operator declared, not session-scoped, and there is nothing to
+        // forward anywhere. Reads are ungated app-wide, so a read-only device still gets the face
         // it is set to — a picker whose choice cannot render is worse than no picker.
         const denied = guard(req, cfg, "read", pairing);
         if (denied) return denied;
@@ -1649,11 +1148,6 @@ export function startServer(opts: {
           for (const rt of registry.all()) {
             void push.send({ type: "clear", tag: herdTagFor(rt.isPrimary, rt.name) });
           }
-          // …and across every peer's slot. A snooze that only quiets the lead's own sessions is the
-          // bug the operator finds at 3am. Nothing is asked of the peer to make this work: the lead
-          // raised those alerts and owns the subscription, so an unreachable peer is irrelevant here
-          // — there is no policy to deliver and nothing to queue for reconnect (§5).
-          for (const tag of peerNotifier?.tags() ?? []) void push.send({ type: "clear", tag });
         }
         return json({ snoozedUntil: snooze.until() }, req.headers.get("accept-encoding"));
       }
@@ -1682,8 +1176,6 @@ export function startServer(opts: {
           // Prefs may have just disabled a kind — retract any pending/outstanding alerts of it, in
           // every live session (prefs are bridge-wide; each session has its own coordinator).
           for (const rt of registry.all()) rt.notifications.applyPrefs();
-          // Same fan, one dimension out — a disabled kind must retract on every host, not just here.
-          peerNotifier?.applyPrefs();
           return json(updated, req.headers.get("accept-encoding"));
         }
         return text("method not allowed", 405);
@@ -1692,10 +1184,8 @@ export function startServer(opts: {
       // Three paths in the `notifications` family, all read-level for the reason the prefs block above
       // is: setting your own notification preference does not drive a terminal.
       //
-      // THEY ARE QUERY-ADDRESSED AND NONE OF THEM IS FORWARDABLE. `?host=` names the machine the PANE
-      // lives on; the preference itself always lives on the collie the phone is talking to, because
-      // that is the only machine holding a push subscription (CREW_PROTOCOL.md §5). A segment on
-      // `PANE_ROUTE` would have been forwarded to the peer and stored there, where nothing can send.
+      // They are QUERY-ADDRESSED (`?pane=`), and never a segment on `PANE_ROUTE`: the pane is only
+      // named here, never driven, so the write-gate grammar would be the wrong one.
       if (pathname === "/api/notifications/cache-watch") {
         const denied = guard(req, cfg, "read", pairing);
         if (denied) return denied;
@@ -1706,7 +1196,7 @@ export function startServer(opts: {
         // no code. A code is for a refusal the phone has to explain to the operator, and "you forgot a
         // query parameter" is a bug in the caller. The two refusals below are the explainable ones.
         if (paneId === null || paneId === "") return text("bad request", 400);
-        const found = watchTargetFor(paneId, host, sessionName);
+        const found = watchTargetFor(paneId, sessionName);
         if (found.error !== undefined) {
           const status = found.error === "cache.pane_unknown" ? 404 : 409;
           return jsonError(apiError(found.error, { paneId }), status, req.headers.get("accept-encoding"));
@@ -1769,211 +1259,6 @@ export function startServer(opts: {
         await updateMonitor.checkRelease();
         return json(updateMonitor.status(), req.headers.get("accept-encoding"));
       }
-      if (pathname === "/api/update/snooze" && req.method === "POST") {
-        // "Remind me next digest" — dismisses the CURRENT update push without touching the `updates`
-        // pref, which stays the only off switch. Read-level like the notification snooze: managing
-        // your own notifications isn't terminal-driving. The banner keeps showing; only the push waits.
-        const denied = guard(req, cfg, "read", pairing);
-        if (denied) return denied;
-        await updateMonitor.snoozeDigest();
-        return json(updateMonitor.status(), req.headers.get("accept-encoding"));
-      }
-      if (pathname === "/api/update/dismiss" && req.method === "POST") {
-        // The update band was closed, for the version it named, in the scope it was closed in. The
-        // version is recorded on the bridge rather than in the browser that closed it, so the band
-        // stays down wherever it is read next (M17/08). Closing THIS host's offer also snoozes the
-        // digest, in the monitor's one write — hiding a notice about another machine does not.
-        //
-        // Read-level, exactly like the snooze beside it: declining a notification about your own
-        // machine isn't terminal-driving. Not a mute either — `updatesEnabled()` stays the only off
-        // switch, and a NEWER release raises the band again.
-        const denied = guard(req, cfg, "read", pairing);
-        if (denied) return denied;
-        let body: JsonValue;
-        try {
-          // SAFETY: `Request.json()` output IS a JsonValue by construction; the version is checked
-          // for being a non-empty string below before anything is written.
-          body = (await req.json()) as JsonValue;
-        } catch {
-          return text("bad request", 400);
-        }
-        const record = body !== null && typeof body === "object" && !Array.isArray(body) ? body : null;
-        const version = record === null ? undefined : record.version;
-        if (typeof version !== "string" || version.trim() === "") return text("bad version", 400);
-        // WHICH band, because they are two decisions: the offer this host was given, and the quiet
-        // notice about a machine a package manager owns. Absent reads as the offer, which is what
-        // every client before the crew states could close.
-        //
-        const scope = record === null ? undefined : record.scope;
-        if (scope !== undefined && scope !== "offer" && scope !== "crew") {
-          return text("bad scope", 400);
-        }
-        await updateMonitor.dismiss(version, scope ?? "offer");
-        return json(updateMonitor.status(), req.headers.get("accept-encoding"));
-      }
-      if (pathname === "/api/update/check" && req.method === "GET") {
-        // The card's own read: everything `POST /api/update/check` answers, plus the PREFLIGHT that
-        // decides whether the update button is live and what it says when it is not (M15/05).
-        //
-        // A GET because it is a read in the strictest sense — it starts nothing, takes no upstream
-        // look and mutates no state — and read-gated for the same reason the snapshot is. It is safe
-        // to poll: the preflight behind it is cached (bridge/update-action.ts), so a phone sitting on
-        // the settings screen costs one `collie update --check` a minute at most.
-        //
-        // It is deliberately NOT folded into the snapshot. The snapshot is polled by every open
-        // client on a burst cadence, and the preflight shells out to git and to `doctor`; paying that
-        // on every poll for a card nobody has opened is the wrong trade.
-        const denied = guard(req, cfg, "read", pairing);
-        if (denied) return denied;
-        // Right after a restart `latest` is null until the monitor's own first poll — deliberately
-        // delayed so the bridge never probes the network mid-boot (bridge/index.ts). A card opened in
-        // that window must not print "isn't known yet" over a healthy network just because it read a
-        // second too early, so THIS read triggers the SAME poll the timer would eventually run
-        // (`checkRelease` de-dupes, so a concurrent timer tick or a second tab awaits the one fetch)
-        // and waits a bounded moment for it. Once `latest` is set — success or a settled failure — this
-        // never fires again; a persistently offline network still answers within the bound, unchanged.
-        if (updateMonitor.status().latest === null) {
-          await Promise.race([
-            updateMonitor.checkRelease(),
-            new Promise<void>((resolve) => setTimeout(resolve, UPDATE_ON_DEMAND_POLL_TIMEOUT_MS)),
-          ]);
-        }
-        // ── THE CREW'S HALF (M16/03) ────────────────────────────────────────
-        // The same on-demand shape, one line lower: six hours is the right cadence for a background
-        // fact and the wrong one for a page the operator is looking at, so this read fires ONE
-        // immediate sweep carrying `X-Crew-Preflight: fresh` and waits the same bounded moment for
-        // it. Past the bound the answer is what the lead already has — a stale `asOf`, never a
-        // fabricated green — and a peer that ignores the header is a correct peer.
-        //
-        // The peer's own `PREFLIGHT_TTL_MS` is what keeps this cheap: the header is honoured at most
-        // once a minute per member, so a phone sitting on the page cannot make a peer shell out to
-        // git and `doctor` on every poll.
-        const freshSweep = opts.crewLead?.sweep({ freshPreflight: true });
-        if (freshSweep !== undefined) {
-          await Promise.race([
-            freshSweep,
-            new Promise<void>((resolve) => setTimeout(resolve, UPDATE_ON_DEMAND_POLL_TIMEOUT_MS)),
-          ]);
-        }
-        const report = opts.updateAction ? await opts.updateAction.preflight() : null;
-        // `preflight: null` is a fact the card renders ("could not be checked"), not an omission —
-        // the key is always present so the phone can tell "not checked" from "old bridge". `crew`
-        // follows the same rule: `[]` on a solo instance and on a peer, never absent. It is composed
-        // from what the sweep BANKED (`CrewLead.updateRows`) and dials nobody — `status-wire.ts`'s
-        // purity argument, one route over.
-        return json(
-          { ...updateStatusWithPeers(), preflight: report, crew: opts.crewLead?.updateRows() ?? [] },
-          req.headers.get("accept-encoding"),
-        );
-      }
-      if (pathname === "/api/update" && req.method === "POST") {
-        // ── STARTING AN UPDATE FROM THE PHONE (M15/05) ──────────────────────
-        // A WRITE, through the pane path's own `browserGate` — same host allowlist, same same-origin
-        // rule, same device header, same pairing credential. No new authentication concept, and no
-        // beacon path: an update is an action, and an action is armed by a named choice of the
-        // operator's and by nothing else (ADR 0024).
-        const denied = browserGate("write");
-        if (denied) return denied;
-        const action = opts.updateAction;
-        if (!action) return text("update action unavailable", 503);
-        let body: JsonValue;
-        try {
-          // SAFETY: `Request.json()` output IS a JsonValue by construction, and
-          // `parseUpdateStartRequest` re-checks every field of it before any of it is believed.
-          body = (await req.json()) as JsonValue;
-        } catch {
-          return jsonError(apiError("update.confirm_required"), 400, req.headers.get("accept-encoding"));
-        }
-        const parsed = parseUpdateStartRequest(body);
-        if (parsed === null) {
-          return jsonError(apiError("update.confirm_required"), 400, req.headers.get("accept-encoding"));
-        }
-        // FORCED, never the cached report: the client's disabled button is a courtesy and this is
-        // the actual gate, so it asks the machine now rather than trusting a minute-old answer.
-        const report = await action.preflight(true);
-        const status = updateMonitor.status();
-        const verdict = updateStartVerdict(parsed, {
-          current: status.current,
-          latest: status.latest,
-          majorAvailable: status.majorAvailable,
-          run: status.run ?? null,
-          lockHeld: action.lockHeld(),
-          preflight: report,
-          // The one gate a green preflight cannot express: a package manager owns this folder, so there is
-          // nothing here Collie may replace (ADR 0035).
-          installKind: status.installKind,
-          // One confirm covers the crew (M16/03): the members' banked verdicts gate this start the
-          // same way the lead's own does. Read, never fetched — the sweep is the only thing that
-          // talks to a member.
-          crew: opts.crewLead?.updateRows() ?? [],
-          // And the legs of the last run, which is what "Retry crew update" is about (M16/04).
-          peers: opts.crewLead?.updatePeers() ?? [],
-        });
-        if (verdict.kind === "refuse") {
-          return jsonError(verdict.body, verdict.status, req.headers.get("accept-encoding"));
-        }
-        // ONE id per confirm, minted here and nowhere else. It is what the peers' turns carry and
-        // what a member that rolled back keys its "not twice" memory on — so a fresh confirm, and
-        // only a fresh confirm, permits one further attempt at the same tag.
-        const runId = action.newRunId();
-        // ── A PEERS-ONLY RUN MOVES NOTHING HERE ────────────────────────────
-        // The lead is already current. It starts no updater, spawns nothing and restarts nothing:
-        // it opens a run whose only legs are the peers, and the first of §20's three immediate
-        // sweeps carries the first turn out.
-        if (verdict.kind === "peers") {
-          action.beginCrewRun?.({ runId, to: verdict.to });
-          audit.record({
-            action: "update",
-            device: whois(req).device,
-            detail: { to: verdict.to, major: false, peersOnly: true },
-          });
-          return json({ ok: true, to: verdict.to, major: false, run: status.run ?? null }, req.headers.get("accept-encoding"), 202);
-        }
-        const started = action.start({ major: verdict.major, runId });
-        if (!started.ok) {
-          return jsonError(
-            apiError("update.start_failed", { reason: started.reason }),
-            500,
-            req.headers.get("accept-encoding"),
-          );
-        }
-        // The peers ride the SAME confirm and the same id. Their turns are granted once this lead's
-        // own health gate settles — a lead that announced a version it has not finished taking would
-        // send its whole crew after a release it may itself roll back from (§20).
-        action.beginCrewRun?.({ runId, to: verdict.to });
-        audit.record({
-          action: "update",
-          device: whois(req).device,
-          detail: { to: verdict.to, major: verdict.major },
-        });
-        // 202, and the request ENDS HERE. The update stages and then restarts this very process —
-        // holding the request open across that would mean answering with a socket that is about to
-        // be closed by the thing the request asked for. The card watches the run record instead, on
-        // the snapshot it already polls, and on `/standby/update` while this door is shut.
-        return json(
-          { ok: true, to: verdict.to, major: verdict.major, run: status.run ?? null },
-          req.headers.get("accept-encoding"),
-          202,
-        );
-      }
-
-      // ── Speech-to-text (bridge/stt/) ─────────────────────────────────────
-      if (pathname === "/api/stt" && req.method === "POST") {
-        // WRITE-gated, exactly like typing into a pane — and for the same reason. This route's whole
-        // purpose is to put words in the composer, and the audio leaves the host for an
-        // operator-configured endpoint. A read-only device watches; it does not speak.
-        const denied = guard(req, cfg, "write", pairing);
-        if (denied) return denied;
-        // Deliberately NOT session- or pane-scoped: the transcript is text handed back to the
-        // phone, which then decides what to do with it. Nothing here touches a terminal, so there is
-        // no pane to attribute it to and no `x-collie-seen` meaning to claim.
-        const { response, attempt } = await transcribeRequest(await stt(), req, sttAdmission);
-        // One line per attempt, and route metadata only: the recording, the transcript and the
-        // provider's own words never reach the audit log.
-        audit.record({ action: "stt", device: whois(req).device, detail: { ...attempt } });
-        return secure(response);
-      }
-
       // ── Device pairing (bridge/pairing.ts) ───────────────────────────────
       if (pathname === "/api/pair" && req.method === "POST") {
         if (!pairing) return text("pairing unavailable", 503);
@@ -2017,21 +1302,6 @@ export function startServer(opts: {
         audit.record({ action: "pair", device: parsed.label, detail: { label: parsed.label } });
         // The ONLY time this token exists outside the requesting device. Nothing stores it here.
         return json({ token: claimed.token, label: parsed.label }, req.headers.get("accept-encoding"));
-      }
-      if (pathname === "/api/crew" && req.method === "GET") {
-        // Read-level, exactly like `/api/devices` and `/api/config`: this is a report about machines
-        // the operator already owns, and it drives nothing. Every field is a fact this process was
-        // already holding — the route reads no disk, dials no member, and cannot start a call.
-        const denied = guard(req, cfg, "read", pairing);
-        if (denied) return denied;
-        // 404 for a solo instance AND for a peer, from one closure. A peer is not a front door
-        // (ADR 0013), and a solo instance has no crew to describe — the phone's move is the same in
-        // both cases, so the refusal is too. Not a 403: nothing was withheld, there is nothing here.
-        const body = crewStatus?.() ?? null;
-        if (body === null) {
-          return jsonError(apiError("crew.not_lead"), 404, req.headers.get("accept-encoding"));
-        }
-        return json(body, req.headers.get("accept-encoding"));
       }
       if (pathname === "/api/devices" && req.method === "GET") {
         if (!pairing) return text("pairing unavailable", 503);
@@ -3313,10 +2583,6 @@ export async function launchersRoute(
 // A READ, and a cheap one: a dozen object literals and one mtime-checked file read. ETagged because
 // the catalog only moves on a release or a file edit, so a phone that has it re-asks with one
 // `if-none-match` and gets 304 for the rest of its boot.
-//
-// NOT FORWARDED ACROSS THE CREW LINK, and that is a decision rather than an omission. A peer may hold
-// its own override, so quoting the lead's catalog for a peer's number would cite a page that peer never
-// read. The sheet on a peer's pane says where the number was read instead (ADR 0041, Decision 11).
 export async function cacheRulesRoute(
   getOverrides: () => Promise<readonly CacheOverride[]>,
   acceptEncoding: string | null,
@@ -3510,8 +2776,7 @@ export async function launch(
 
 /**
  * The two numbers an oversize refusal carries: the exact byte cap for a client that computes, and
- * the whole megabytes the sentence itself is written in. Both come off THIS host's config, so a
- * phone talking to a crew reads each member's own limit rather than the lead's.
+ * the whole megabytes the sentence itself is written in. Both come off THIS host's config.
  */
 function uploadLimitDetail(cfg: Config) {
   return {
@@ -3799,8 +3064,7 @@ function json<TBody>(data: TBody, acceptEncoding: string | null, status = 200): 
  * path. `acceptEncoding` is accepted for call-site symmetry with {@link json} but not needed here.
  *
  * It takes a BODY rather than a message so a caller must have gone through {@link apiError} to get
- * one — which is what keeps a refusal's English and its code in the catalogue together. The bare
- * `{ error }` shape stays legal for the one caller that must not carry a code: the crew link's 404.
+ * one — which is what keeps a refusal's English and its code in the catalogue together.
  */
 function jsonError(
   body: ApiErrorBody | { error: string },
@@ -3963,9 +3227,6 @@ function supersededEndpoint(body: JsonValue | undefined): string | undefined {
 // Build id of the bundle currently on disk (written by the Vite build to dist/build-info.json).
 // Surfaced via the X-Collie-Build header and /api/config so a stale, service-worker-cached client
 // can tell it's behind. Cached by file mtime so a frontend rebuild (live, no restart) is picked up.
-// Exported since M15/05 for the STANDBY listener, which reports the same fact on its own port
-// (`bridge/crew/standby.ts`) — one answer to "which bundle is on disk", never a second reader that
-// caches it differently.
 let buildCache: { id: string; mtime: number } | null = null;
 export async function buildId(): Promise<string> {
   try {
@@ -3995,23 +3256,23 @@ export const BUILD_HEADER = "x-collie-build";
  * rather than by a live listener.
  *
  * `version` is the load-bearing field: the detached updater compares it against the version it just
- * flipped to, under `bridge/version.ts`'s tolerant `<semver>+<sha>` rule. `deposed` is always
- * `false` HERE, and that is honest rather than a stub — a deposed collie never reaches this route,
- * because `deposed.ts` answers its one page for every path before the front door is consulted. The
- * field exists so the prober can state the rule it applies instead of inferring it from a parse
- * failure.
+ * flipped to, under `bridge/version.ts`'s tolerant `<semver>+<sha>` rule. The other two fields keep
+ * upstream's wire shape and are constant here because Pup is a solo bridge by construction: there
+ * is no crew mode to report and no takeover that could depose this process, so `mode` is always
+ * `"solo"` and `deposed` always `false` — trivially, rather than by a check.
  */
 export interface HealthBody {
   readonly ok: true;
   /** The BARE `<semver>` or `<semver>+<short sha>` this process answers with. */
   readonly version: string;
-  /** Always false here — see {@link healthBody}. */
+  /** Always false — there is no takeover machinery to depose this bridge. */
   readonly deposed: false;
-  readonly mode: CrewRuntime["mode"];
+  /** Always `"solo"` — this build fronts exactly one machine and no crew. */
+  readonly mode: "solo";
 }
 
-export function healthBody(version: string, mode: CrewRuntime["mode"]): HealthBody {
-  return { ok: true, version, deposed: false, mode };
+export function healthBody(version: string): HealthBody {
+  return { ok: true, version, deposed: false, mode: "solo" };
 }
 
 /**
