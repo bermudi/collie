@@ -21,6 +21,30 @@ describe("commandsFor", () => {
     expect(cmds.some((c) => c.command === "/branch")).toBe(false); // in Claude's and omp's, not here
   });
 
+  it("returns the Devin CLI catalog for 'devin'", () => {
+    const cmds = commandsFor("devin");
+    expect(cmds.length).toBeGreaterThan(0);
+    expect(cmds.some((c) => c.command === "/handoff")).toBe(true); // Devin-specific command
+    expect(cmds.some((c) => c.command === "/tree")).toBe(false); // Pi-specific command
+    expect(cmds.some((c) => c.command === "/rm-session")).toBe(false); // irreversible arg commands cannot two-tap
+    expect(cmds.find((c) => c.command === "/accept-edits")?.dangerous).toBe(true);
+    expect(cmds.find((c) => c.command === "/smart")?.dangerous).toBe(true);
+    expect(cmds.find((c) => c.command === "/bypass")?.dangerous).toBe(true);
+    expect(cmds.find((c) => c.command === "/model")?.takesArg).toBe(true);
+    // /thinking is NOT a Devin command — Devin's docs have no such slash command (the thinking
+    // trace is Ctrl+O, a keybinding). The row exists in opencode's and (since 0.41.1) pi's
+    // catalogs; a future sync must not cargo-cult it into Devin's from theirs.
+    expect(cmds.some((c) => c.command === "/thinking")).toBe(false);
+    // /handoff fell off the current reference table (docs.devin.ai/cli/reference/commands) but the
+    // CLI changelog still ships changes to it — the changelog vouches, so the row stays.
+    expect(cmds.find((c) => c.command === "/handoff")?.common).toBe(true);
+    // The 2026-09 sync: /fork//steps//revert landed, and /revert rewrites files AND the
+    // conversation — it earns the same two-tap confirm as /bypass.
+    expect(cmds.some((c) => c.command === "/fork")).toBe(true);
+    expect(cmds.some((c) => c.command === "/revert")).toBe(true);
+    expect(cmds.find((c) => c.command === "/revert")?.dangerous).toBe(true);
+  });
+
   it("returns the opencode catalog for 'opencode'", () => {
     const cmds = commandsFor("opencode");
     expect(cmds.length).toBeGreaterThan(0);
@@ -82,6 +106,7 @@ describe("commandsFor", () => {
     expect(commandsFor("CLAUDE")).toBe(commandsFor("claude"));
     expect(commandsFor("Codex")).toBe(commandsFor("codex"));
     expect(commandsFor("PI")).toBe(commandsFor("pi"));
+    expect(commandsFor("DEVIN")).toBe(commandsFor("devin"));
     expect(commandsFor("OpenCode")).toBe(commandsFor("opencode"));
     expect(commandsFor("OMP")).toBe(commandsFor("omp"));
     expect(commandsFor("GROK")).toBe(commandsFor("grok"));
@@ -91,9 +116,10 @@ describe("commandsFor", () => {
     expect(commandsFor("  claude  ")).toBe(commandsFor("claude"));
   });
 
-  it("tolerates label variants via prefix (claude-code, codex-cli, opencode-dev)", () => {
+  it("tolerates label variants via prefix (claude-code, codex-cli, devin-cli, opencode-dev)", () => {
     expect(commandsFor("claude-code")).toBe(commandsFor("claude"));
     expect(commandsFor("codex-cli")).toBe(commandsFor("codex"));
+    expect(commandsFor("devin-cli")).toBe(commandsFor("devin"));
     expect(commandsFor("opencode-dev")).toBe(commandsFor("opencode"));
     expect(commandsFor("pi-go")).toBe(commandsFor("pi"));
     expect(commandsFor("omp-dev")).toBe(commandsFor("omp"));
@@ -121,7 +147,7 @@ describe("commandsFor", () => {
     }
   });
 
-  it.each(["claude", "codex", "pi", "opencode", "omp", "grok"])(
+  it.each(["claude", "codex", "pi", "devin", "opencode", "omp", "grok"])(
     "exposes for '%s' a 'common' subset that is a proper, non-empty subset of all commands",
     (agent) => {
       const all = commandsFor(agent);
@@ -133,7 +159,7 @@ describe("commandsFor", () => {
     },
   );
 
-  it.each(["claude", "codex", "pi", "opencode", "omp", "grok"])(
+  it.each(["claude", "codex", "pi", "devin", "opencode", "omp", "grok"])(
     "'%s' entries are well-formed (slash-prefixed, unique, arg hints only when takesArg)",
     (agent) => {
       const all = commandsFor(agent);

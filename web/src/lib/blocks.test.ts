@@ -21,6 +21,7 @@ const blockText = (lines: StyledLine[]) =>
 
 const ESC = "\x1b";
 const PI_WORKING_EDITOR = "pi--v085-working-editor.txt";
+const DEVIN_COMPOSER = "devin--composer-labelled-rules.txt";
 const PI_WIDTH = 94;
 const PI_TOP = `── ⠴ Working ${"─".repeat(81)}`;
 const PI_FIXTURE_BYTES = [
@@ -229,12 +230,50 @@ describe("splitLines — labelled terminal rules", () => {
     expect(rule?.segments[1]!.style.opacity).toBe(0.6);
   });
 
+  it("clips Devin's two-label composer rules — the rows that wrapped into a picket fence (issue: devin input box)", () => {
+    const lines = fixtureLines(DEVIN_COMPOSER);
+    const mutedText = (line: StyledLine) =>
+      line.segments.filter((segment) => segment.muted).map((segment) => segment.text).join("");
+    const inkText = (line: StyledLine) =>
+      line.segments.filter((segment) => !segment.muted).map((segment) => segment.text).join("");
+
+    // The cwd + mode rule and the queue strip both hang TWO labels on one rule; each clips to one
+    // visual row instead of wrapping into stacked fragments of itself.
+    const cwd = lines.find(
+      (line) => lineText(line).includes("~/build/pi-review-v2") && lineText(line).includes("(bypass permissions on)"),
+    )!;
+    const queue = lines.find((line) => lineText(line).includes("1 queued"))!;
+    expect(cwd.noWrap).toBe(true);
+    expect(queue.noWrap).toBe(true);
+    // Every rule run is chrome (muted); the labels — including the right-hand one clipping would
+    // hide on a phone — keep byte-exact ink.
+    expect(mutedText(cwd)).toMatch(/^─+$/);
+    expect(inkText(cwd)).toBe(" ~/build/pi-review-v2  (bypass permissions on) ");
+    expect(mutedText(queue)).toMatch(/^─+$/);
+    expect(inkText(queue)).toBe(" 1 queued  ↑ edit · ↵ send now ");
+  });
+
+  it("keeps Devin's own prose and the pure bottom rule on their existing paths", () => {
+    const lines = fixtureLines(DEVIN_COMPOSER);
+    // The prompt line is the operator's own text direction — it must never clip.
+    const prose = lines.find((line) => lineText(line).startsWith("❭"))!;
+    expect(prose.noWrap).toBeUndefined();
+    // The bottom rule is a bare border: clipped by PURE_HORIZONTAL_BORDER, untouched by this shape.
+    const bottom = lines.find((line) => lineText(line).startsWith("─") && !lineText(line).includes(" "))!;
+    expect(bottom.noWrap).toBe(true);
+    // The parser mutes bare rule runs on its own (checkMuted); no labelled ranges were applied.
+    expect(bottom.segments.map((segment) => segment.muted)).toEqual([true]);
+    expect(bottom.segments[0]!.style.opacity).toBeUndefined();
+  });
+
   it.each([
     ["one leading glyph and twenty trailing glyphs", labelled("─", "label", "─".repeat(20))],
     [
       "four leading glyphs, a different trailing glyph, and outer whitespace",
       labelled("━".repeat(4), "two words", "─".repeat(20), "\t "),
     ],
+    ["a Devin chain: two labels around a long interior run", `─ cwd ${"─".repeat(40)} (mode) ─`],
+    ["a long interior run with a short closing edge", `── queued ${"─".repeat(20)} send now ─`],
   ])("marks %s", (_name, text) => {
     expect(splitLines(parseAnsi(text))[0]!.noWrap).toBe(true);
   });
@@ -260,6 +299,8 @@ describe("splitLines — labelled terminal rules", () => {
     ["ASCII hyphens", labelled("-", "label", "-".repeat(20))],
     ["a table row with a long inner rule", `| id | ${"─".repeat(40)} | note |`],
     ["a rule with text after it", `${"─".repeat(40)} and then some prose about it`],
+    ["a two-label chain whose interior run is short", `─ cwd ─ mode ─`],
+    ["a chain that ends on its label with no closing run", `─ cwd ${"─".repeat(20)} mode`],
   ])("leaves %s wrapping", (_name, text) => {
     expect(splitLines(parseAnsi(text))[0]!.noWrap).toBeUndefined();
   });
