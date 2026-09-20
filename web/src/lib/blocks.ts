@@ -211,49 +211,81 @@ const PURE_HORIZONTAL_BORDER = new RegExp(
   `^([${PURE_HORIZONTAL_RULE_GLYPH_CLASS}])\\1{${MIN_NO_WRAP_BORDER_LENGTH - 1},}$`,
 );
 
-// A LABELLED TERMINAL RULE: a short rule, one label, then a rule that runs to the row's end. It
-// falls through the bare-border test because the label interrupts its repetition. The complete row
-// shape is the guard: clipping hides a row's right edge, and only its captured rule runs are
-// decorative, so a table, code, diff, prose, or a label carrying a rule glyph keeps ordinary
-// wrapping and untouched segment presentation.
+// A LABELLED TERMINAL RULE: a chain of rule runs and labels — a short leading rule, then one or
+// more labels, each followed by a LONG rule, optionally ending on one more short rule. It falls
+// through the bare-border test because the labels interrupt the repetition. The complete row shape
+// is the guard: clipping hides a row's right edge, and only its captured rule runs are decorative,
+// so a table, code, diff, prose, or a label carrying a rule glyph keeps ordinary wrapping and
+// untouched segment presentation.
 //
-// The leading run is deliberately short; the trailing run is long enough that it would wrap on the
-// narrowest mirror. Leading and trailing glyphs are captured separately, so they may differ.
+// Two label slots are the observed population. Claude pads one label to the terminal edge
+// ("──── (bypass permissions on) ────"); Devin hangs TWO on one rule — cwd + mode
+// ("─ ~/build/pi-review-v2 ────…──── (bypass permissions on) ─") — and the same shape again on its
+// queue strip, rows that a phone mirror wrapped into a picket fence of stacked rules. The chain
+// form covers both without naming either. Bounds are the guard, each its own fact: the leading run
+// is deliberately short (a long opening run is nearly a bare border, and "────40 and then prose"
+// must keep wrapping); every run BETWEEN labels is long enough that it would wrap on the narrowest
+// mirror (nothing in prose, markdown or code runs to twenty identical rule glyphs, so the chain
+// cannot fire on real content — and a label carrying a rule glyph breaks the chain); the closing
+// run may be long (Claude) or a short edge (Devin), but some run after the first must be long —
+// that run is the whole point, the part that would wrap.
 const MAX_LEADING_RULE_RUN = 4;
-const MIN_TRAILING_RULE_RUN = 20;
-const RULE = PURE_HORIZONTAL_RULE_GLYPH_CLASS;
-const LABELLED_RULE_ROW = new RegExp(
-  `^\\s*(([${RULE}])\\2{0,${MAX_LEADING_RULE_RUN - 1}}) +` + // a short leading rule
-    `[^${RULE}\\s](?:[^${RULE}]*[^${RULE}\\s])? +` + // the label: no rule glyph, no edge space
-    `(([${RULE}])\\4{${MIN_TRAILING_RULE_RUN - 1},})\\s*$`, // a rule to the row's end
-);
+const MIN_LONG_RULE_RUN = 20;
+const RULE_GLYPH = new RegExp(`[${PURE_HORIZONTAL_RULE_GLYPH_CLASS}]`);
 
 interface TextRange {
   start: number;
   end: number;
 }
 
-interface LabelledRuleRow {
-  leading: TextRange;
-  trailing: TextRange;
-}
+/**
+ * The one strict classifier owns labelled-row clipping: the ranges of EVERY rule run on the row
+ * (each is chrome, and each gets the muted ink), or null when the row is not that shape.
+ */
+function labelledRuleRow(text: string): TextRange[] | null {
+  // Outer whitespace is trim, exactly the old ^\s* / \s*$ anchors; between runs and labels only
+  // ASCII spaces separate.
+  let start = 0;
+  while (start < text.length && /\s/.test(text[start]!)) start++;
+  let end = text.length;
+  while (end > start && /\s/.test(text[end - 1]!)) end--;
+  if (start >= end || !RULE_GLYPH.test(text[start]!)) return null;
 
-/** The one strict classifier owns both labelled-row clipping and its decorative rule ranges. */
-function labelledRuleRow(text: string): LabelledRuleRow | null {
-  const match = LABELLED_RULE_ROW.exec(text);
-  if (!match) return null;
+  const runs: TextRange[] = [];
+  let at = start;
+  for (;;) {
+    // — a run: one rule glyph, repeated —
+    if (at >= end || !RULE_GLYPH.test(text[at]!)) return null;
+    const glyph = text[at]!;
+    const runStart = at;
+    do {
+      at++;
+    } while (at < end && text[at] === glyph);
+    runs.push({ start: runStart, end: at });
+    if (at >= end) break;
+    // — a gap: one or more ASCII spaces, a label, one or more ASCII spaces —
+    const gapStart = at;
+    while (at < end && text[at] === " ") at++;
+    if (at === gapStart) return null; // a run and its label are space-separated
+    const labelStart = at;
+    while (at < end && !RULE_GLYPH.test(text[at]!)) at++;
+    let labelEnd = at;
+    while (labelEnd > labelStart && text[labelEnd - 1] === " ") labelEnd--;
+    if (labelEnd === at) return null; // the label is space-separated from the next run too
+    // A label carries no rule glyphs (the scan stopped at one) and starts and ends on ink, not
+    // whitespace — a tab is not a space here, matching the anchored regex this scanner replaced.
+    if (/\s/.test(text[labelStart]!) || /\s/.test(text[labelEnd - 1]!)) return null;
+  }
 
-  const leading = match[1]!;
-  const trailing = match[3]!;
-  // The expression anchors the whole line; before the leading capture is whitespace only, and the
-  // label cannot contain a rule glyph, so these locate the exact captured runs without a second
-  // predicate or a looser scan.
-  const leadingStart = match[0].indexOf(leading);
-  const trailingStart = match[0].lastIndexOf(trailing);
-  return {
-    leading: { start: leadingStart, end: leadingStart + leading.length },
-    trailing: { start: trailingStart, end: trailingStart + trailing.length },
-  };
+  const width = (run: TextRange) => run.end - run.start;
+  if (width(runs[0]!) > MAX_LEADING_RULE_RUN) return null;
+  let long = false;
+  for (let i = 1; i < runs.length; i++) {
+    if (width(runs[i]!) >= MIN_LONG_RULE_RUN) long = true;
+    else if (i < runs.length - 1) return null; // a run between two labels must be a long one
+  }
+  if (!long) return null; // no run long enough to wrap — nothing for clipping to buy
+  return runs;
 }
 
 function segmentPiece(segment: AnsiSegment, start: number, end: number, muted: boolean): AnsiSegment {
@@ -303,7 +335,7 @@ function styledLine(segments: AnsiSegment[]): StyledLine {
   const text = segments.map((segment) => segment.text).join("");
   const labelled = labelledRuleRow(text);
   if (PURE_HORIZONTAL_BORDER.test(text.trim()) || labelled || FRAME_ROW.test(text)) {
-    return { segments: labelled ? muteRanges(segments, [labelled.leading, labelled.trailing]) : segments, noWrap: true };
+    return { segments: labelled ? muteRanges(segments, labelled) : segments, noWrap: true };
   }
   return { segments };
 }

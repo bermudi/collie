@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { AgentIcon } from "./agent-icon";
 
 describe("AgentIcon", () => {
-  it.each(["claude", "codex", "pi", "opencode", "agy", "antigravity", "omp"])(
+  it.each(["claude", "codex", "pi", "opencode", "agy", "antigravity", "omp", "devin"])(
     "renders the %s brand logo as an inline-SVG app-icon tile",
     (agent) => {
       const { container } = render(<AgentIcon agent={agent} />);
@@ -81,6 +81,16 @@ describe("AgentIcon", () => {
     const el = screen.getByRole("img", { name: "gemini icon" });
     expect(el).toHaveTextContent("GE");
     expect(el.querySelector("svg")).toBeNull(); // fallback is text, not a brand mark
+  });
+
+  it("carries a Devin brand tile — this herd runs devin panes, and they read as a bare 'DE' monogram without it", () => {
+    const { container } = render(<AgentIcon agent="devin" />);
+    // The brand tile, not the initials fallback.
+    expect(screen.getByRole("img", { name: "devin logo" })).toBeInTheDocument();
+    expect(container.querySelector("svg path")).not.toBeNull();
+    // Monochrome mark on the black tile, like Codex and pi.
+    expect(container.querySelector("svg g")?.getAttribute("fill")).toBe("#FFFFFF");
+    expect(container.querySelector("linearGradient")).toBeNull();
   });
 
   it("renders a fallback (no crash) for null / undefined agents", () => {
