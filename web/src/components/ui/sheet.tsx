@@ -207,7 +207,13 @@ export function BottomSheet({
         tabIndex={-1}
         className={cn(
           "absolute inset-0 bg-black/50",
-          !peeking && !continuingFromPeek && "duration-200 animate-in fade-in",
+          // The scrim settles BEFORE the panel lands, on a compositor layer of its own. A 200ms
+          // fade running lockstep with the slide read as jank on the phone — the dim was still
+          // mid-fade under the moving sheet, re-compositing every frame against the terminal,
+          // which is itself a filtered layer in light mode (ADR 0002). Short fade, own layer,
+          // decelerating curve: the slide then plays against a stable ground.
+          !peeking && !continuingFromPeek &&
+            "duration-150 ease-out [will-change:opacity] animate-in fade-in",
         )}
         style={peeking ? { opacity: Math.min(1, pull / 120) * 0.5 } : undefined}
         onPointerDown={() => {
@@ -241,7 +247,12 @@ export function BottomSheet({
           // floating layer at. The BACKDROP above stays `absolute inset-0` — the dim is the whole
           // screen or it is not a dim. Without this the panel spanned the whole viewport, 1366px on
           // a landscape 13-inch iPad, for rows that were drawn for a phone.
-          "relative z-10 mx-auto max-h-[82dvh] w-full max-w-screen-sm overflow-y-auto overscroll-contain rounded-t-md border-t border-rule bg-card shadow-2xl",
+          // Keep the animated sheet's opaque ground, scroller and sticky header in one isolated
+          // paint boundary. The terminal beneath is itself filtered in light mode; phone captures
+          // showed stale terminal tiles over the moving sheet. Reserve the transform layer from
+          // mount through settling (including peeks), rather than creating/dropping it at the
+          // animation boundaries.
+          "relative z-10 isolate [contain:paint] will-change-transform mx-auto max-h-[82dvh] w-full max-w-screen-sm overflow-y-auto overscroll-contain rounded-t-md border-t border-rule bg-card shadow-2xl",
           // The slide-in entrance plays on a fresh open only. A peek has no entrance (it's tracking
           // the finger, not animating), and a drag that continues into an open gets its own 180ms
           // transform transition above rather than restarting from the keyframe's own 100%.
