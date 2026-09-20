@@ -17,6 +17,12 @@ import {
 // anything against real paths. The database is opened read-write HERE (the fixture is the agent
 // writing its log); the adapter under test must only ever read it.
 
+// The rule against `unknown` parameters wants the shape named: a rejected promise's payload is
+// unknown BY TYPE, so the parse happens here, once, exactly like the adapter's own reason().
+function messageOf<T>(error: T): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 const SID = "20260909_154520_9e0b91";
 const OTHER = "20260909_999999_ffffffff";
 const PARENT = "20260909_150000_aaa000";
@@ -433,7 +439,7 @@ describe("HermesTranscriptSource — the live-verified v6 schema", () => {
     // bun's forgiving runner, and "some error" is weaker than the drift we mean.
     const outcome = await src.load(key!).then(
       () => "resolved",
-      (e: unknown) => `${e}`,
+      messageOf,
     );
     expect(outcome).toContain("no such column");
     await rm(base, { recursive: true, force: true });
