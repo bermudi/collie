@@ -526,6 +526,7 @@ export const zh: Dictionary = {
   // --- pwa (self-update banner) ---
   "pwa.updateAvailable": "发现新版本，点击以应用更新",
   "pwa.updateInstalling": "Downloading the new version…",
+  "updateRibbon.hideNotice": "隐藏此通知",
 
   // --- history (pane transcript route) ---
   "history.unavailable.disabled": "当前网桥已禁用会话记录（COLLIE_TRANSCRIPT）。",

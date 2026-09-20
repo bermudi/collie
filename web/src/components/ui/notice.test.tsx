@@ -274,7 +274,6 @@ describe("Notice — enforcement, so the alert family does not regrow", () => {
     const allowed = new Set([
       "components/ui/notice.tsx", // the table itself
       "components/connection-banner.tsx", // migration step 4 (the top band, in one change)
-      "components/update-available-banner.tsx", // the solo stale-bundle row, the fork's own band idiom
       "components/alpha-bar.tsx", // step 6, optional: not an alert, and already correct
     ]);
     const offenders = sources().filter((file) => {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import {
   blobRoute,
@@ -2409,8 +2409,16 @@ describe("resolvePaneCwd — tilde expansion + loud failures for new-pane direct
   test("~ and ~/… expand against the bridge's home", async () => {
     expect(await resolvePaneCwd("~")).toBe(homedir());
     expect(await resolvePaneCwd("~/")).toBe(homedir());
-    expect(await resolvePaneCwd("~/build")).toBe(join(homedir(), "build"));
-    expect(await resolvePaneCwd("  ~/build  ")).toBe(join(homedir(), "build")); // phone whitespace
+    // A real directory under home, so the existence check passes on any machine — the laptop's
+    // `~/build` is not a CI runner's.
+    const dir = join(homedir(), `collie-cwd-probe-${process.pid}`);
+    await mkdir(dir, { recursive: true });
+    try {
+      expect(await resolvePaneCwd(`~/${basename(dir)}`)).toBe(dir);
+      expect(await resolvePaneCwd(`  ~/${basename(dir)}  `)).toBe(dir); // phone whitespace
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   test("an existing absolute directory passes through untouched", async () => {

@@ -12,7 +12,7 @@ import { ReadOnlyBanner } from "@/components/read-only-banner";
 import { SessionSwitcher } from "@/components/session-switcher";
 import { SpaceStrip } from "@/components/space-strip";
 import { TabStrip } from "@/components/tab-strip";
-import { UpdateAvailableBanner } from "@/components/update-available-banner";
+import { UpdateRibbon } from "@/components/update-ribbon";
 import { UpdateBanner } from "@/components/update-banner";
 import { clearNotPaired, markNotPaired } from "@/lib/pairing";
 import { holdReload, releaseReload, __resetReloadGuard } from "@/lib/reload-guard";
@@ -361,7 +361,7 @@ function StaleBuildHarness() {
       />
       <Stage>
         <RootRouter data={homeSolo}>
-          <UpdateAvailableBanner />
+          <UpdateRibbon />
         </RootRouter>
       </Stage>
     </>

@@ -15,7 +15,7 @@ import { useAgentTransitions } from "@/hooks/use-transitions";
 import { usePushSetup } from "@/hooks/use-push";
 import { useConnectionLost } from "@/hooks/use-connection-lost";
 import { ConnectionBanner } from "@/components/connection-banner";
-import { UpdateAvailableBanner } from "@/components/update-available-banner";
+import { UpdateRibbon } from "@/components/update-ribbon";
 import { ViewportFrame } from "@/components/viewport-frame";
 import { AppHeaderHost } from "@/components/app-header";
 import { StripHost } from "@/components/ui/strip-host";
@@ -109,13 +109,6 @@ export function RootLayout() {
           (each route root is `min-h-0 flex-1`). This is what keeps a banner from covering the
           route's sticky header — it reserves real space instead of overlaying. */}
       <ViewportFrame>
-        {/* THE SELF-UPDATE BANNER, above the band: the fallback row for a bundle the bridge has left
-            behind while the page holds unsent work (or has already auto-updated once for this
-            build). Mounted unconditionally so useSelfUpdate()'s controller runs for the app's
-            lifetime — it renders null while there is nothing to say. It is an in-flow row, not a
-            strip, because it is not a condition of the LINK: the app works fine on the old bundle.
-            See components/update-available-banner.tsx. */}
-        <UpdateAvailableBanner />
         {/* THE BAND, and the rule that there is only ever one strip in it. Three facts can be true at
             once above the header — the auth refusal, a lost connection, a degraded one — and none of
             them excludes another. Before this host arbitrated them, each row
@@ -127,6 +120,12 @@ export function RootLayout() {
             the route are the host's `children` and follow the band in the DOM. Which fact beats
             which is `lib/strip-priority.ts` — a fact about this app, deliberately not about `ui/`. */}
         <StripHost>
+          {/* THE update band, and the only one: a new bridge this bundle is behind, and a new
+              bundle downloading into the precache — one row that says whichever of those is true.
+              Mounted unconditionally so the bundle self-updater's controller runs (and can
+              auto-update) for the app's lifetime; it registers no slot when it has nothing to say.
+              Solo carries no collie-update rows: the host updates with `collie update`. */}
+          <UpdateRibbon />
           {/* The app's ONE connection surface: a thin bar that stays hidden while healthy, appears
               amber "reconnecting…" only after ≥4s of sustained trouble (the flicker fix), escalates to a
               red "not connected" cause + Retry/Reload at ≥15s, and flashes green on recovery. Reads the

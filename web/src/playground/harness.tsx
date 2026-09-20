@@ -12,6 +12,7 @@ import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { AgentChat } from "@/components/agent-chat";
 import { AppHeaderHost } from "@/components/app-header";
 import { ConnectionBanner } from "@/components/connection-banner";
+import { UpdateRibbon } from "@/components/update-ribbon";
 import { StripHost } from "@/components/ui/strip-host";
 import { CONNECTION_LOST_MS, TROUBLE_MS } from "@/hooks/use-connection-lost";
 import { __resetConnectionHealth, markLive } from "@/lib/connection-health";
@@ -88,7 +89,7 @@ export function useConnectionClock(mode: ClockMode): void {
  * all need it. Built once (`useState`'s lazy initialiser) so the route element is stable; the
  * components inside subscribe to their own module stores and re-render without it.
  *
- * IT CARRIES THE BAND, exactly as `routes/root.tsx` does. The `ConnectionBanner`
+ * IT CARRIES THE BAND, exactly as `routes/root.tsx` does. The `UpdateRibbon` and `ConnectionBanner`
  * render nothing where they sit — they register a `StripSlot` with `ui/strip-host.tsx` and the band
  * paints the winner — so a card that mounts one of them without a host would show an empty stage and
  * report a bug that is not there. It costs the cards that mount no strip nothing: the band collapses
@@ -280,6 +281,7 @@ export function PaneStackRouter({
           element: (
             <div className="flex h-full flex-col">
               <StripHost>
+                <UpdateRibbon />
                 <ConnectionBanner bridge={undefined} error authError />
                 <AppHeaderHost bridge={data.bridge} error={false}>
                   <StackPane data={data} fixture={fixture} />

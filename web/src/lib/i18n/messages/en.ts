@@ -565,6 +565,7 @@ export const en = {
   // The band while a new bundle is downloading into the precache (2026-09-12). The other six
   // dictionaries carry this English sentence until it is translated.
   "pwa.updateInstalling": "Downloading the new version…",
+  "updateRibbon.hideNotice": "Hide this notice",
 
   // --- history (pane transcript route) ---
   "history.unavailable.disabled": "Transcript history is switched off on this bridge (COLLIE_TRANSCRIPT).",

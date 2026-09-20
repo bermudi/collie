@@ -539,6 +539,7 @@ export const ja: Dictionary = {
   // --- pwa (self-update banner) ---
   "pwa.updateAvailable": "新しいバージョンがあります。タップして更新してください。",
   "pwa.updateInstalling": "Downloading the new version…",
+  "updateRibbon.hideNotice": "この通知を非表示",
 
   // --- history (pane transcript route) ---
   "history.unavailable.disabled": "このブリッジでは会話履歴が無効化されています (COLLIE_TRANSCRIPT)。",
