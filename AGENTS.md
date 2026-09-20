@@ -54,8 +54,8 @@ prompt-cache chip and watch (kept from upstream 1.10).
 - `scripts/collie-ctl.sh` + `herdr-plugin.toml` are Pup's operating surface (build / restart / update /
   doctor / serve). Upstream equivalents live in their stripped cli — don't port them back.
 - Version line stays **0.x** (ADR 0020). A merge never bumps the version by itself; releases are cut
-  by hand (the fork Actions gate) until Actions is enabled in `bermudi/collie`'s Actions tab — and
-  even then, `release.yml` is not carried, so the hand-cut procedure in this file stands.
+  by hand — `release.yml` is not carried, so the hand-cut procedure in this file stands. (Actions
+  was enabled on 2026-09-20 via the API; CI runs on every push to main.)
 
 ## Constraints & Red Lines
 
@@ -88,9 +88,10 @@ worker per core. Rules:
 - Full web suite defaults are polite: `maxWorkers: 4` in `web/vitest.config.ts` + `nice -n 19`
   in the test script (~155s at a quarter of the cores instead of ~90s at full burn). Leave them.
 - The real gate is CI: `.github/workflows/ci.yml` — upstream's full tier (version gate, lint,
-  typecheck, both suites, Playwright e2e), running on GitHub's runners. It does nothing until
-  Actions is enabled once in the fork's GitHub Actions tab (the known fork gate).
-- The pre-push hook still runs both suites locally; with CI on, that's the remaining heavy moment.
+  typecheck, both suites, Playwright e2e), running on GitHub's runners. Actions was enabled via the
+  API on 2026-09-20; every push to main runs it.
+- The pre-push hook still runs both suites locally; that's the remaining heavy moment, and it is
+  also the last local chance to catch what CI would only report after the push.
 
 ## Quality bar for Pup
 
