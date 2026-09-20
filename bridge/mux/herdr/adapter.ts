@@ -72,6 +72,7 @@ import {
 } from "./client.ts";
 import { buildSubscriptions, changedPaneId } from "./events.ts";
 import { HERDR_UNSENDABLE_KEYS, toHerdrKey } from "./keys.ts";
+import { PartialKeySendError } from "./client.ts";
 
 /** The registry name this adapter answers to, and the value of {@link HerdrMux.mux}. */
 export const HERDR_MUX = "herdr";
@@ -343,6 +344,11 @@ export class HerdrMux implements MuxAdapter {
    * A batch containing one chord Herdr cannot express sends NOTHING — the keys of one call are a
    * sequence, and delivering its front half is worse than delivering none of it (the pane would be
    * left mid-chord with no way for the caller to know where it stopped).
+   *
+   * Shift+Tab is the one deliberate segmentation: it rides a raw BackTab `pane.send_text` (the
+   * client plans that), so a failure after an earlier segment landed comes back as a
+   * PartialKeySendError — refused with the do-not-retry message rather than reported as a
+   * transport failure, because the pane has already changed under the caller.
    */
   async sendKeys(paneId: string, keys: readonly string[]): Promise<MuxAck> {
     const translated: string[] = [];
@@ -357,7 +363,15 @@ export class HerdrMux implements MuxAdapter {
       }
       translated.push(result.key);
     }
-    return this.attempt(() => this.client.sendPaneKeys(paneId, translated));
+    try {
+      await this.client.sendPaneKeys(paneId, translated);
+      return muxAck();
+    } catch (err) {
+      // A segmented queue that died mid-way is NOT a transport failure: part of it landed, so the
+      // pane has already changed. Refuse with the do-not-retry message instead.
+      if (err instanceof PartialKeySendError) return muxRefused(err.message);
+      return transportRefusal(err);
+    }
   }
 
   async renamePane(paneId: string, label: string | null): Promise<MuxAck> {
