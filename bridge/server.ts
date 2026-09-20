@@ -646,10 +646,8 @@ export function startServer(opts: {
     // came from so the phone can address it (types.ts states why ALL of them are tagged, never just
     // the non-primary ones).
     //
-    // NOTHING ELSE IN THE BODY WIDENS, and that is the shape the crew merge kept rather than a
-    // shortcut: `workspaces`, `tabs` and `bridge` are statements
-    // about one link the phone reads one at a time. So the triage lists
-    // widen and the navigation tree does not.
+    // NOTHING ELSE IN THE BODY WIDENS: `workspaces`, `tabs` and `bridge` are statements about one
+    // link the phone reads one at a time. So the triage lists widen and the navigation tree does not.
     //
     // The ORDER is the registry's own — primary first, then alphabetical — so it matches the
     // `sessions` array below and does not depend on which runtime happened to be spawned first.

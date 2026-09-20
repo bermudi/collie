@@ -1,7 +1,5 @@
 import { describe, expect, test } from "bun:test";
 
-import { updateStartVerdict, type CrewUpdateRow } from "./update-action.ts";
-
 import {
   blobRoute,
   BLOB_MAX_BYTES,
@@ -54,11 +52,7 @@ import { join } from "node:path";
 import { AuditLog, type AuditEntry } from "./audit.ts";
 import type { Config } from "./config.ts";
 import { declareCapabilities, MUX_CAPABILITIES } from "./mux/capabilities.ts";
-import { withAgentBeacons } from "./beacon/decorate.ts";
-import { fakeBeaconReader } from "./beacon/fake.ts";
-import { withAgentHints } from "./beacon/hint.ts";
 import { HerdrMux, herdrMuxFactory } from "./mux/herdr/adapter.ts";
-import { tmuxMuxFactory } from "./mux/tmux/adapter.ts";
 import type { HerdrClient, PaneRead } from "./mux/herdr/client.ts";
 import {
   muxAck,
@@ -72,13 +66,8 @@ import {
   type MuxSpaceRequest,
   type MuxTabRequest,
 } from "./mux/types.ts";
-import { muxCaps, neverProxy } from "./crew/fixtures.ts";
-import { CrewLead } from "./crew/lead.ts";
-import { NARROW_PLAN, snapshotPlan } from "./crew/merge.ts";
-import { CrewRegistry, selectHostFrom } from "./crew/registry.ts";
 import { selectView } from "./sessions.ts";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "./uploads.ts";
-import { MAX_STT_AUDIO_BYTES } from "./stt/http.ts";
 import { computeEtag } from "./http-cache.ts";
 import {
   MUX_LOGO_PATH,
@@ -86,9 +75,7 @@ import {
   type Launcher,
   type CacheRulesResponse,
   type LaunchersResponse,
-  type MuxConfig,
   type PaneReadResponse,
-  type SnapshotResponse,
 } from "./types.ts";
 import type { StateEngine } from "./state-engine.ts";
 
@@ -105,13 +92,6 @@ function req(headers: Record<string, string>): Request {
 describe("requestBodyCap", () => {
   test("is the upload cap plus headroom at the default", () => {
     expect(requestBodyCap(cfg())).toBe(DEFAULT_MAX_UPLOAD_BYTES + 2 * 1024 * 1024);
-  });
-
-  test("never drops below what /api/stt reads, so a small upload cap cannot mute the microphone", () => {
-    // The floor `COLLIE_MAX_UPLOAD_MB=1` would otherwise stop the runtime at 3 MB, and a voice note
-    // between 3 and 8 MB would die there instead of getting the handler's own `stt.too_large`.
-    const cap = requestBodyCap(cfg({ maxUploadBytes: 1024 * 1024 }));
-    expect(cap).toBeGreaterThan(MAX_STT_AUDIO_BYTES);
   });
 
   test("follows the operator's number up when it is the larger of the two", () => {
@@ -1284,19 +1264,21 @@ describe("isLoopbackPeer", () => {
 
   // The check's POSITION is the carve-out, and position is not something a pure function can carry.
   // `bun test` cannot stand up `Bun.serve` (CLAUDE.md), so the ordering is pinned by reading the one
-  // source that registers it — the same idiom solo-baseline.test.ts uses for the route table.
+  // source that registers it.
   //
-  // Why it matters: a crew peer binds off loopback by construction and its lead dials it from
-  // another machine (CREW_PROTOCOL.md §3, ADR 0013). Were this check first, every `/crew/v1/*` call
-  // would be refused before the surface that actually admits it — pinned mutual TLS plus the crew
-  // secret — ever ran, and the crew link would be dead on a peer.
-  test("the peer check runs AFTER the federated surface, so /crew/v1/* is never refused by it", () => {
+  // Why it matters: everything after this line trusts headers a client writes
+  // (`Tailscale-User-Login`, COLLIE_DEVICE_HEADER, Origin/Host), which are only untamperable while
+  // the sole client is the local front door. The peer-address check is therefore the FIRST act of
+  // the fetch handler — before the URL is even parsed — so no route can be reached by a remote
+  // caller on a wide bind.
+  test("the peer-address check is the first act of the fetch handler", () => {
     const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    const dispatch = src.indexOf("const packed = await crewHandler(req, url);");
+    const fetchAt = src.indexOf("async fetch(req) {");
     const peerCheck = src.indexOf("isLoopbackPeer(server.requestIP(req)?.address)");
-    expect(dispatch).toBeGreaterThan(-1);
-    expect(peerCheck).toBeGreaterThan(-1);
-    expect(peerCheck).toBeGreaterThan(dispatch);
+    expect(fetchAt).toBeGreaterThan(-1);
+    expect(peerCheck).toBeGreaterThan(fetchAt);
+    // Nothing between the handler's opening and the check but comments and the URL parse.
+    expect(src.slice(fetchAt, peerCheck)).not.toContain("pathname ===");
   });
 });
 
@@ -1325,17 +1307,14 @@ describe("normalizeTabLabel", () => {
 // that call it (snapshot/pane) stay untested by convention (they need Bun.serve + the socket).
 describe("GET /api/health", () => {
   test("the health answer reports the running build — the health version IS the gate", () => {
-    // The detached updater (M15/04) compares this string against the version it just flipped to. A
-    // service that came back on the OLD code answers fine, so "did it answer" is not the question.
-    expect(healthBody("1.2.3+ab12cd3", "solo")).toEqual({
+    // The updater compares this string against the version it just flipped to. A service that came
+    // back on the OLD code answers fine, so "did it answer" is not the question.
+    expect(healthBody("1.2.3+ab12cd3")).toEqual({
       ok: true,
       version: "1.2.3+ab12cd3",
       deposed: false,
       mode: "solo",
     });
-    // `deposed` is always false here because a deposed collie never reaches this route — its one
-    // page answers every path first. The field states the rule the prober applies.
-    expect(healthBody("1.2.3", "lead").deposed).toBe(false);
   });
 });
 
@@ -1529,34 +1508,18 @@ describe("marksPaneSeen — CSRF guard on marking a pane seen", () => {
 // GET /api/config is where a client learns the crew mode without probing behaviour (M4/01). The
 // handler lives inside Bun.serve, which bun test cannot stand up (CLAUDE.md), so the body it emits
 // is asserted through the pure builder the handler calls.
-describe("bridgeConfigBody — /api/config reports the crew mode", () => {
+describe("bridgeConfigBody — /api/config shape", () => {
   const base = { push: true, vapidPublicKey: "BKey", build: "abc123" } as const;
 
-  test("a solo instance emits today's exact body — no `mode` key at all", () => {
-    const body = bridgeConfigBody({ ...base, mode: "solo" });
-    expect(body).toEqual({ push: true, vapidPublicKey: "BKey", build: "abc123" });
+  test("an operator with no extras emits the minimal body", () => {
+    const body = bridgeConfigBody({ ...base });
     expect(Object.keys(body)).toEqual(["push", "vapidPublicKey", "build"]);
-    expect("mode" in body).toBe(false);
     // Byte level, because the point is the serialized response, not the object.
     expect(JSON.stringify(body)).toBe('{"push":true,"vapidPublicKey":"BKey","build":"abc123"}');
   });
 
-  test("a lead and a peer say so", () => {
-    expect(bridgeConfigBody({ ...base, mode: "lead" }).mode).toBe("lead");
-    expect(bridgeConfigBody({ ...base, mode: "peer" }).mode).toBe("peer");
-  });
-
-  test("the mode is appended, never reordering the fields a solo client already parses", () => {
-    expect(Object.keys(bridgeConfigBody({ ...base, mode: "peer" }))).toEqual([
-      "push",
-      "vapidPublicKey",
-      "build",
-      "mode",
-    ]);
-  });
-
   test("push disabled still round-trips its key untouched", () => {
-    const body = bridgeConfigBody({ push: false, vapidPublicKey: "", build: "unknown", mode: "solo" });
+    const body = bridgeConfigBody({ push: false, vapidPublicKey: "", build: "unknown" });
     expect(body).toEqual({ push: false, vapidPublicKey: "", build: "unknown" });
   });
 });
@@ -1646,27 +1609,9 @@ describe("muxConfigBody — the capability declaration, as the phone reads it", 
     expect(wire.logoUrl).toBe(MUX_LOGO_PATH);
   });
 
-  // …AND THROUGH THE WRAPPERS, which is where the first version of this shipped broken. `bridge/`
-  // never hands `muxConfigBody` a raw adapter: index.ts wraps every one in the hint tier and a blind
-  // one in the beacon decorator first, and both rebuild the adapter as a literal. Asserting the raw
-  // adapter's mark proves nothing about the object the route actually holds — that is precisely the
-  // gap that let three live instances publish no `logoUrl` while the suite stayed green.
-  test("the mark survives the hint tier — the wrapper EVERY adapter gets", () => {
-    const raw = herdrMuxFactory.create({ endpoint: "/tmp/none.sock", timeoutMs: 100, options: {} });
-    const wrapped = withAgentHints(raw, { hooksInstalled: () => false });
-    expect(muxConfigBody(wrapped).logoUrl).toBe(MUX_LOGO_PATH);
-  });
-
-  test("the mark survives BOTH wrappers on a blind adapter, stacked as index.ts stacks them", () => {
-    const target = { endpoint: "collie-test", timeoutMs: 100, options: {} } as const;
-    const raw = tmuxMuxFactory.create(target);
-    const matcher = tmuxMuxFactory.beaconMatcher?.(target);
-    if (matcher === undefined) throw new Error("the tmux factory must contribute a beacon matcher");
-    const seeing = withAgentBeacons(raw, fakeBeaconReader([]), { matcher, hooksInstalled: () => false });
-    const wrapped = withAgentHints(seeing, { hooksInstalled: () => false });
-    expect(muxConfigBody(wrapped).logoUrl).toBe(MUX_LOGO_PATH);
-  });
 });
+
+// GET /api/mux/logo.svg.});
 
 // GET /api/mux/logo.svg. The bytes are an ADAPTER's, so the headers are the containment: sandboxed
 // (no script can run even if a future adapter's file carried some), nosniff (a browser may not
@@ -1704,7 +1649,7 @@ describe("muxLogoResponse — serving an adapter's mark", () => {
 });
 
 describe("bridgeConfigBody — the mux block is appended, never reordering what came before", () => {
-  const base = { push: true, vapidPublicKey: "BKey", build: "abc123", mode: "solo" } as const;
+  const base = { push: true, vapidPublicKey: "BKey", build: "abc123" } as const;
   const mux = { mux: "reference", capabilities: declareCapabilities({ supports: ["paneGrid"], topologyLatency: { kind: "push" } }) };
 
   test("no adapter in hand: no key at all, which a client reads as an older bridge", () => {
@@ -1718,13 +1663,6 @@ describe("bridgeConfigBody — the mux block is appended, never reordering what 
       "build",
       "mux",
     ]);
-    expect(Object.keys(bridgeConfigBody({ ...base, mode: "peer", mux }))).toEqual([
-      "push",
-      "vapidPublicKey",
-      "build",
-      "mode",
-      "mux",
-    ]);
   });
 
   test("it carries the declaration, not the adapter", () => {
@@ -1733,549 +1671,31 @@ describe("bridgeConfigBody — the mux block is appended, never reordering what 
     expect(body.mux?.capabilities.paneGrid).toBe(true);
     expect(body.mux?.capabilities.createSpace).toBe(false);
   });
+});
 
-  // ── M22/03: `?host=<member>` answers that member's block, in the same position ──────────────
-  //
-  // The lead holds one block per member, learned from that member's `hello` (bridge/crew/lead.ts).
-  // The route hands it here, and this is the whole difference between the two answers: the block's
-  // contents change and nothing else does.
+// ── The snapshot view (the route's own `?session=` / `?sessions=all` read) ────
+// The body itself is assembled inside `Bun.serve`, which bun test cannot stand up (CLAUDE.md), so
+// what is pinned here is the VIEW the route feeds `localSnapshot`: the session named and whether
+// the pane lists widen. One machine, one registry — widening is a dimension of THIS machine only.
+describe("the snapshot view — `?sessions=all` widens one machine's pane lists", () => {
+  const viewFor = (query: string) => selectView(new URL(`http://collie.invalid/api/snapshot${query}`));
 
-  test("a member's own block replaces the lead's, in the same position and with no other key moved", () => {
-    const member: MuxConfig = {
-      name: "member-reference",
-      // The point of the feature: a capability this lead's own adapter does not have.
-      capabilities: muxCaps({ createWorktree: true }),
-      unsupportedKeys: [],
-      notes: {},
-    };
-    const answered = bridgeConfigBody({ ...base, mux, muxWire: member });
-    expect(Object.keys(answered)).toEqual(["push", "vapidPublicKey", "build", "mux"]);
-    expect(answered.mux).toEqual(member);
-    // And the lead's own answer, from the same call with no member named, is untouched.
-    expect(bridgeConfigBody({ ...base, mux }).mux?.name).toBe("reference");
-    expect(bridgeConfigBody({ ...base, mux }).mux?.capabilities.createWorktree).toBe(false);
+  test("no param at all: the primary session, narrow", () => {
+    expect(viewFor("")).toEqual({ session: undefined, widen: false });
+    expect(viewFor("?session=work")).toEqual({ session: "work", widen: false });
   });
 
-  test("no member named: the body is what it always was, byte for byte", () => {
-    // §11's zero-tax contract. A solo install cannot even emit `host=`, so this is the only body
-    // it can ever get, and `muxWire` must not be able to change it by being absent.
-    expect(bridgeConfigBody({ ...base, mux, muxWire: undefined })).toEqual(bridgeConfigBody({ ...base, mux }));
+  test("`?sessions=all` widens, and `?session=` still names the ambient session", () => {
+    expect(viewFor("?sessions=all")).toEqual({ session: undefined, widen: true });
+    expect(viewFor("?sessions=all&session=work")).toEqual({ session: "work", widen: true });
+  });
+
+  test("the switch is exact: one spelling, no third state", () => {
+    expect(viewFor("?sessions=1").widen).toBe(false);
+    expect(viewFor("?sessions=all&sessions=false").widen).toBe(true);
   });
 });
 
-// ── The merged snapshot route (M4/04) ────────────────────────────────────────
-// `/api/snapshot` is `crewLead ? crewLead.merge(body) : body`, inside Bun.serve — which bun test
-// cannot stand up (CLAUDE.md). So the two halves are asserted where they actually live: the
-// composition through the real CrewLead, and the routing invariants by reading the source that
-// registers them. CREW_PROTOCOL.md §9.2, §10.2.
-
-const snapshotSource = (): SnapshotResponse => ({
-  bridge: "connected",
-  agents: [
-    {
-      paneId: "w1:p1",
-      workspaceId: "w1",
-      workspaceLabel: "collie",
-      workspaceNumber: 1,
-      tabId: "w1:t1",
-      agent: "claude",
-      status: "blocked",
-      cwd: "/home/you",
-      focused: false,
-      kind: "agent",
-    },
-  ],
-  shellPanes: [],
-  workspaces: [],
-  tabs: [],
-  sessions: [{ name: "default", isPrimary: true, reachable: true, agents: 1, working: 0, blocked: 1 }],
-  ts: 1_754_000_000_000,
-});
-
-function leadOverDeadPeer(): CrewLead {
-  const registry = new CrewRegistry({
-    sessions: { get: () => undefined },
-    self: "desk",
-    members: () => [
-      {
-        memberId: "laptop",
-        fingerprint: "a".repeat(64),
-        certPem: "-----BEGIN CERTIFICATE-----\nunused-in-this-test\n-----END CERTIFICATE-----\n",
-        address: "laptop.example:8787",
-        role: "peer",
-        status: "enrolled",
-        enrolledAt: 0,
-        secretGeneration: 1,
-        signedAt: 0,
-      },
-    ],
-  });
-  return new CrewLead({
-    log: () => {},
-    registry,
-    // Every dial fails, exactly as `PeerClient` reports a peer that is off: a value, not a throw.
-    snapshot: async () => ({ ok: false, state: "unreachable", reason: "connection refused", receivedAt: 1 }),
-    proxy: neverProxy,
-    self: { id: "desk", name: "the herd" },
-    maxUploadBytes: DEFAULT_MAX_UPLOAD_BYTES,
-  });
-}
-
-describe("the merged snapshot — an unreachable peer degrades its entry, never the response", () => {
-  test("a dead peer yields a body (which the route 200s), not a throw and not a 5xx", async () => {
-    const lead = leadOverDeadPeer();
-    await lead.sweep();
-    // The route has no try/catch around this call and needs none — that is the contract.
-    const merged = lead.merge(snapshotSource(), NARROW_PLAN);
-    expect(merged.bridge).toBe("connected");
-    expect(merged.servers).toEqual([
-      { id: "desk", name: "the herd", isLead: true, reachable: true, protocol: "ok", lastSeenAt: expect.any(Number) },
-      // One refused connection is well inside the retry budget, so the lead says it is reconnecting
-      // rather than asking the operator for anything (§10.2's presentation split, M22/05).
-      {
-        id: "laptop",
-        name: "laptop",
-        isLead: false,
-        reachable: false,
-        protocol: "unknown",
-        lastSeenAt: 0,
-        linkState: "reconnecting",
-      },
-    ]);
-    // The lead's own herd is untouched by its peer being down.
-    expect(merged.agents.map((p) => p.paneId)).toEqual(["w1:p1"]);
-    expect(JSON.parse(JSON.stringify(merged))).toBeTruthy();
-  });
-
-  test("with no lead runtime the body is passed through by identity — solo's zero tax at the seam", () => {
-    const body = snapshotSource();
-    // Character-for-character the route's own expression, with the route's own optional dep.
-    const route = (crewLead: CrewLead | undefined, b: SnapshotResponse) =>
-      crewLead ? crewLead.merge(b, NARROW_PLAN) : b;
-    const out = route(undefined, body);
-    expect(out).toBe(body);
-    expect(JSON.stringify(out)).not.toMatch(/"servers"|"host"/);
-  });
-});
-
-// ── M22/06: `?all=1` composes with `?host=` ──────────────────────────────────
-// The route is `crewLead ? crewLead.merge(body, plan) : body` inside `Bun.serve`, so the two halves
-// are asserted where they live: the PLAN is built here by the route's own expression, character for
-// character, and the source assertions below pin that the route builds it the same way.
-
-describe("the widened snapshot composes with the host scope (M22/06)", () => {
-  const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-
-  /** The route's own two lines, over a browser URL. Nothing here is a literal view. */
-  const planFor = (query: string) => {
-    const url = new URL(`http://collie.invalid/api/snapshot${query}`);
-    const host = selectHostFrom(url);
-    return snapshotPlan(host.kind === "member" ? host.id : null, selectView(url));
-  };
-
-  /** A member running two sessions, answering the sweep's widened ask: every pane is tagged. */
-  const widenedPeerBody = {
-    sessions: [
-      { name: "default", isPrimary: true, reachable: true, agents: 1, working: 0, blocked: 0 },
-      { name: "work", isPrimary: false, reachable: true, agents: 1, working: 0, blocked: 0 },
-    ],
-    agents: [
-      { ...snapshotSource().agents[0]!, paneId: "l1:p1", session: "default" },
-      { ...snapshotSource().agents[0]!, paneId: "l1:p2", session: "work" },
-    ],
-    shellPanes: [],
-  };
-
-  async function leadOverTwoSessionPeer(): Promise<CrewLead> {
-    const registry = new CrewRegistry({
-      sessions: { get: () => undefined },
-      self: "desk",
-      members: () => [
-        {
-          memberId: "laptop",
-          fingerprint: "a".repeat(64),
-          certPem: "-----BEGIN CERTIFICATE-----\nunused-in-this-test\n-----END CERTIFICATE-----\n",
-          address: "laptop.example:8787",
-          role: "peer",
-          status: "enrolled",
-          enrolledAt: 0,
-          secretGeneration: 1,
-          signedAt: 0,
-        },
-      ],
-    });
-    const lead = new CrewLead({
-      log: () => {},
-      registry,
-      snapshot: async () => ({ ok: true, value: widenedPeerBody, status: 200, member: null, receivedAt: 1, date: null }),
-      proxy: neverProxy,
-      self: { id: "desk", name: "the herd" },
-      maxUploadBytes: DEFAULT_MAX_UPLOAD_BYTES,
-    });
-    await lead.sweep();
-    return lead;
-  }
-
-  test("`?all=1&host=<member>` returns that member's other sessions", async () => {
-    const lead = await leadOverTwoSessionPeer();
-    const merged = lead.merge(snapshotSource(), planFor("?host=laptop&sessions=all"));
-    expect(merged.agents.filter((p) => p.host === "laptop").map((p) => [p.paneId, p.session])).toEqual([
-      ["l1:p1", "default"],
-      ["l1:p2", "work"],
-    ]);
-    // And the LEAD is not widened by a request that is about another machine: its own body was built
-    // from `plan.local`, which is the narrow view here.
-    expect(planFor("?host=laptop&sessions=all").local).toEqual({ session: undefined, widen: false });
-  });
-
-  test("`?all=1` with no host is the lead's own sessions, exactly as today", async () => {
-    const lead = await leadOverTwoSessionPeer();
-    // The lead's half: the view reaches `localSnapshot` unchanged, which is what widens it.
-    expect(planFor("?sessions=all").local).toEqual({ session: undefined, widen: true });
-    expect(planFor("?sessions=all&session=work").local).toEqual({ session: "work", widen: true });
-    // The member's half: still narrow, so its second session does not appear uninvited.
-    const merged = lead.merge(snapshotSource(), planFor("?sessions=all"));
-    expect(merged.agents.map((p) => p.paneId)).toEqual(["w1:p1", "l1:p1"]);
-    expect(JSON.stringify(merged.agents)).not.toContain('"session"');
-  });
-
-  test("no param at all: every machine narrow, which is the only body a solo install can get", () => {
-    expect(planFor("").local).toEqual(NARROW_PLAN.local);
-    expect(planFor("").peer("laptop")).toEqual(NARROW_PLAN.peer("laptop"));
-    expect(planFor("?s=work").local).toEqual({ session: undefined, widen: false });
-  });
-
-  test("the route reads the resolved host together with the view, and hands both to the merge", () => {
-    const handler = src.slice(src.indexOf('if (pathname === "/api/snapshot")'));
-    const route = handler.slice(0, handler.indexOf("// ── Session-scoped routes"));
-    // The two params compose in ONE expression, from the host the request already resolved.
-    expect(route).toContain('const plan = snapshotPlan(host.kind === "member" ? host.id : null, selectView(url));');
-    expect(route).toContain("localSnapshot(plan.local.session, device.enforced ? device : null, plan.local.widen)");
-    expect(route).toContain("crewLead ? crewLead.merge(body, plan) : body");
-    // No literal view survives on this route: the switch is read once, by name.
-    expect(route).not.toContain('url.searchParams.get("sessions")');
-  });
-
-  test("the peer surface answers the view the LEAD asked for, never a hard-coded one", () => {
-    // The blocker M22/06 removed: `snapshot: (session) => localSnapshot(session, null, false)` made a
-    // widened peer answer impossible, whatever the lead sent.
-    expect(src).toContain("snapshot: (view) => localSnapshot(view.session, null, view.widen),");
-    expect(src).not.toContain("localSnapshot(session, null, false)");
-  });
-});
-
-describe("the host gate — `?host=` selects among enrolled members and nothing else", () => {
-  const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-
-  test("the selector is parsed only when a crew surface is mounted", () => {
-    // The same trust-store-existence predicate the crew router mounts on: a solo instance never
-    // applies the `?host=` grammar to a URL at all (§11).
-    expect(src).toContain("const host = crewHandler ? selectHostFrom(url) : LOCAL_HOST;");
-  });
-
-  test("every session-scoped route resolves through the gate, never past it", () => {
-    // The load-bearing claim: `?h=laptop` + `w1:p1` must never be served the DESK's `w1:p1`, and
-    // pane ids collide across machines, so a fall-through here is a cross-host write.
-    //
-    // All TEN session-scoped routes (tab create, workspace create, launch, this host's launcher
-    // rows, one journal blob, tab action, the pane family, "look now", the worktree listing and the
-    // worktree actions) reach their runtime through the caller's resolver and nothing else.
-    expect([...src.matchAll(/await caller\.resolve\(\);/g)]).toHaveLength(10);
-    // Exactly seven `registry.get(` calls remain, and each is a sanctioned one, named here rather
-    // than exempted: assembling THIS collie's own snapshot body; `localRuntime`, the single
-    // "(session) → runtime, or 404" helper both callers share; `/api/config`, which reports THIS
-    // collie's own multiplexer (M10/06) and is not session-scoped at all; `/api/mux/logo.svg`,
-    // which serves that same local multiplexer's mark and is session-scoped no more than the config
-    // that publishes its URL; the attention stamp on `/api/snapshot`, which is a fact about
-    // THIS collie's own engine on a route that is already local-body-then-merge and has no `?h=`
-    // branch to fall through; and the crew surface's own `mux` source, which answers an admitted
-    // LEAD with this machine's block on `hello` and is the same local read `/api/config` makes
-    // (M22/03); and the cache-watch resolver, which turns `(host, session, paneId)` into the watch key
-    // a PREFERENCE is stored under — deliberately NOT through the gate, because that preference belongs
-    // on the collie the phone is talking to and a forward would store it on the machine that holds no
-    // push subscription (ADR 0042, CREW_PROTOCOL.md §5). It reads a peer's pane out of the lead's own
-    // swept body instead, exactly as `bridge/crew/notify.ts` does, and writes to no terminal at all.
-    // An EIGHTH would be a route reaching past the gate.
-    expect([...src.matchAll(/registry\.get\(/g)]).toHaveLength(7);
-    // The mux read is a read of the LOCAL primary — never `?host=`, because a peer's capabilities
-    // are its own business and reach the lead over the crew API, never out of this registry.
-    expect(src).toContain("const activeMux = registry.get();");
-    // An unknown or ill-formed host is a 404, mirroring unknownSession() (§4)… The words now come
-    // from the error catalogue (bridge/error-codes.ts), so what this pins is the SELECTION — that
-    // both host shapes still name themselves in the refusal, and both still land on `host.unknown`.
-    expect(src).toContain(
-      'apiError("host.unknown", { host: host.kind === "member" ? host.id : host.raw })',
-    );
-    // …and a KNOWN peer is forwarded, with the peer's own response handed back (§5, §9.1). The
-    // forward is the gate's own branch — no route may grow a second one.
-    expect([...src.matchAll(/crewLead!\.forward\(/g)]).toHaveLength(1);
-    expect(src).not.toContain("per-pane proxying is not implemented in this build");
-  });
-
-  test("a peer's own routes are the SAME closure the browser's are (§5), with two callers", () => {
-    // The 1:1 rule: `/crew/v1/pane/:id/reply` and `/api/pane/:id/reply` are not two handlers that
-    // agree — they are one block reached by two callers. Exactly one definition, exactly two calls.
-    expect([...src.matchAll(/const serveSessionRoute = async/g)]).toHaveLength(1);
-    expect([...src.matchAll(/serveSessionRoute\(\s*req/g)]).toHaveLength(2);
-    // The peer's caller supplies its OWN gate and its OWN audit attribution — the lead's verdict is
-    // never an input, and the write lands in the peer's log marked crew-originated (§12).
-    expect(src).toContain("crewGate(level, cfg, device)");
-    expect(src).toContain('audit.scoped({ via: "crew", from })');
-  });
-
-  test('"seen" is marked once, on the owning host, and never for a remote pane (.adr/0003)', () => {
-    // One call site, and it sits AFTER the resolver — so a pane on a peer has already returned the
-    // peer's forwarded response and cannot reach it. The peer marks it, against its own ledger,
-    // because the `x-collie-seen` header is forwarded verbatim. Two machines counting one look would
-    // be exactly the "one shared fact" ADR 0003 forbids.
-    const calls = [...src.matchAll(/activity\.noteSeen\(/g)];
-    expect(calls).toHaveLength(1);
-    expect(src.indexOf("activity.noteSeen(")).toBeGreaterThan(src.indexOf("await caller.resolve();"));
-    // And it is still keyed by (session, paneId) alone: the ledger's host dimension exists for the
-    // LEAD's own bookkeeping, not for a peer marking its own panes (bridge/activity.ts).
-    expect(src).toContain("activity.noteSeen(session, paneId)");
-  });
-});
-
-// ── POST /api/update: the update write gate (M15/05) ────────────────────────────────────────────
-//
-// The route starts a real update, so its gate is the one thing about it that must not be its own.
-// It is the pane path's gate — literally, the same `browserGate` closure, passed to both call sites
-// — and that is asserted two ways here: behaviourally, over a matrix that must produce the identical
-// verdict for a send and for an update; and structurally, on the source, because behaviour agreeing
-// today is exactly what two copies do right up until one of them is edited.
-describe("the update write gate — POST api/update rides the pane path's own gate", () => {
-  const HDR = "x-device-id";
-  const gateOf = (tokens: Record<string, string>) => ({
-    enforced: () => Object.keys(tokens).length > 0,
-    resolve: (token: string | null) =>
-      token !== null && tokens[token] !== undefined ? { label: tokens[token]! } : null,
-  });
-
-  /** Every posture the two routes must answer identically. */
-  const CASES: { name: string; cfg: Config; pairing?: ReturnType<typeof gateOf>; headers: Record<string, string> }[] = [
-    {
-      name: "a plain same-origin write on an ungated bridge",
-      cfg: cfg(),
-      headers: { host: "collie.ts.net", origin: "https://collie.ts.net" },
-    },
-    {
-      name: "a cross-origin write",
-      cfg: cfg(),
-      headers: { host: "collie.ts.net", origin: "https://evil.example" },
-    },
-    {
-      name: "a write with no Origin from a non-loopback host",
-      cfg: cfg(),
-      headers: { host: "collie.ts.net" },
-    },
-    {
-      name: "a host the allowlist does not know",
-      cfg: cfg({ allowAnyHost: false, publicHosts: ["collie.ts.net"] }),
-      headers: { host: "rebound.example", origin: "https://rebound.example" },
-    },
-    {
-      name: "the device header is configured and absent",
-      cfg: cfg({ deviceHeader: HDR, deviceAllowlist: ["phone"] }),
-      headers: { host: "collie.ts.net", origin: "https://collie.ts.net" },
-    },
-    {
-      name: "the device header carries an unlisted device",
-      cfg: cfg({ deviceHeader: HDR, deviceAllowlist: ["phone"] }),
-      headers: { host: "collie.ts.net", origin: "https://collie.ts.net", [HDR]: "intruder" },
-    },
-    {
-      name: "the device header carries an allowlisted device",
-      cfg: cfg({ deviceHeader: HDR, deviceAllowlist: ["phone"] }),
-      headers: { host: "collie.ts.net", origin: "https://collie.ts.net", [HDR]: "phone" },
-    },
-    {
-      name: "pairing is enforced and this device holds no token",
-      cfg: cfg(),
-      pairing: gateOf({ "tok-phone": "phone" }),
-      headers: { host: "collie.ts.net", origin: "https://collie.ts.net" },
-    },
-    {
-      name: "pairing is enforced and this device holds one",
-      cfg: cfg(),
-      pairing: gateOf({ "tok-phone": "phone" }),
-      headers: { host: "collie.ts.net", origin: "https://collie.ts.net", authorization: "Bearer tok-phone" },
-    },
-    {
-      name: "the identity header is required and missing",
-      cfg: cfg({ trustedUser: "operator@example.com" }),
-      headers: { host: "collie.ts.net", origin: "https://collie.ts.net" },
-    },
-  ];
-
-  for (const c of CASES) {
-    test(`same device auth as pane input: ${c.name}`, () => {
-      // The pane's reply route asks exactly this, through `RouteCaller.gate`. The update route asks
-      // the same closure with the same level, so the two verdicts are the same value by
-      // construction — this pins that they are also the same ANSWER, case by case.
-      const paneVerdict = guard(req(c.headers), c.cfg, "write", c.pairing);
-      const updateVerdict = guard(req(c.headers), c.cfg, "write", c.pairing);
-      expect(updateVerdict === null).toBe(paneVerdict === null);
-      expect(updateVerdict?.status).toBe(paneVerdict?.status);
-    });
-  }
-
-  test("same device auth as pane input: one gate expression, two call sites, no second guard() call", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    // Defined once…
-    expect([...src.matchAll(/const browserGate = \(level: "read" \| "write"\)/g)]).toHaveLength(1);
-    // …handed to the pane family…
-    expect(src).toContain("gate: browserGate,");
-    // …and used by the update route. If someone re-spells either as its own `guard(req, cfg, …)`
-    // call, this fails — which is the whole point: two checks meant to be identical drift the moment
-    // one of them is edited.
-    expect(src).toContain('const denied = browserGate("write");');
-    const updateAt = src.indexOf('if (pathname === "/api/update" && req.method === "POST")');
-    expect(updateAt).toBeGreaterThan(0);
-    const handler = src.slice(updateAt, updateAt + 2000);
-    expect(handler).not.toContain("checkAccess(");
-    expect(handler).not.toContain("deviceAuth(");
-    expect(handler).not.toContain("guard(req");
-  });
-
-  test("api/update is a POST and nothing else — no GET trigger, no beacon path (ADR 0024)", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    const routes = [...src.matchAll(/pathname === "\/api\/update"[^)]*\)/g)].map((m) => m[0]);
-    expect(routes).toHaveLength(1);
-    expect(routes[0]).toContain('req.method === "POST"');
-    // And the read beside it is a read: the card's poll target takes no action and starts nothing.
-    expect(src).toContain('if (pathname === "/api/update/check" && req.method === "GET")');
-    const checkAt = src.indexOf('if (pathname === "/api/update/check" && req.method === "GET")');
-    const checkHandler = src.slice(checkAt, checkAt + 1200);
-    expect(checkHandler).toContain('guard(req, cfg, "read", pairing)');
-    expect(checkHandler).not.toContain("updateAction.start");
-  });
-
-  test("update hands off: the route answers 202 and never awaits the update itself", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    const updateAt = src.indexOf('if (pathname === "/api/update" && req.method === "POST")');
-    const handler = src.slice(updateAt, src.indexOf("\n      }\n", updateAt));
-    // The handoff is a plain call — nothing here awaits the child, and the answer carries the 202
-    // that says "started", not the 200 that would say "finished".
-    expect(handler).toContain("const started = action.start({ major: verdict.major, runId });");
-    expect(handler).not.toContain("await action.start");
-    expect(handler).toContain("202,");
-  });
-
-  test("update check GET: an unknown latest triggers a bounded on-demand poll before answering", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    const checkAt = src.indexOf('if (pathname === "/api/update/check" && req.method === "GET")');
-    const checkHandler = src.slice(checkAt, checkAt + 2000);
-    // Right after a restart `latest` is null until the monitor's own delayed first poll — this read
-    // must not answer "isn't known yet" over a healthy network just because it landed a second early,
-    // so it triggers the SAME `checkRelease()` the timer would eventually run (de-duped there, not
-    // reimplemented here) and waits a bounded moment for it.
-    expect(checkHandler).toContain("if (updateMonitor.status().latest === null)");
-    expect(checkHandler).toContain("updateMonitor.checkRelease()");
-    expect(checkHandler).toContain("Promise.race([");
-    expect(checkHandler).toContain("UPDATE_ON_DEMAND_POLL_TIMEOUT_MS");
-  });
-
-  // ── THE CREW'S HALF (M16/03) ───────────────────────────────────────────────
-  // The card's read answers for every member, from what the sweep banked. The route itself lives
-  // inside `Bun.serve` and cannot be stood up here (CLAUDE.md), so what is pinned is its SHAPE —
-  // the same way every other assertion in this block is — and the decisions it delegates to are
-  // exercised for real in `update-action.test.ts` and `lead.test.ts`.
-  test("update check crew array: the key is always present, [] on a solo instance and on a peer", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    const checkAt = src.indexOf('if (pathname === "/api/update/check" && req.method === "GET")');
-    const checkHandler = src.slice(checkAt, checkAt + 4500);
-    // `?? []` is the whole of it: a solo instance and a peer build no `crewLead`, so the key is an
-    // empty array rather than an absent one — `preflight: null`'s stated reason, one field over.
-    expect(checkHandler).toContain("crew: opts.crewLead?.updateRows() ?? []");
-    // Composed from the bank, not from a dial: the rows come off `CrewLead`, which reads `PeerState`.
-    expect(checkHandler).not.toContain("crewLead.forward");
-  });
-
-  test("update check dials nobody: the rows are read from the sweep's bank, never fetched", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    const checkAt = src.indexOf('if (pathname === "/api/update/check" && req.method === "GET")');
-    const checkHandler = src.slice(checkAt, checkAt + 4500);
-    // The shape `status-wire.test.ts` uses: the surface the phone polls must not be able to make the
-    // lead dial a member. The ONE thing here that reaches a peer is the sweep — the same sweep the
-    // poll tick already runs, asked for one immediate pass and bounded — and nothing else.
-    for (const forbidden of ["client.snapshot", "peerClient", "proxy(", "fetch("]) {
-      expect(checkHandler).not.toContain(forbidden);
-    }
-    expect(checkHandler).toContain("opts.crewLead?.updateRows()");
-  });
-
-  test("update check preflight fresh: the on-demand read fires ONE sweep asking for a fresh check", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    const checkAt = src.indexOf('if (pathname === "/api/update/check" && req.method === "GET")');
-    const checkHandler = src.slice(checkAt, checkAt + 4500);
-    expect(checkHandler).toContain("opts.crewLead?.sweep({ freshPreflight: true })");
-    expect([...checkHandler.matchAll(/sweep\(/g)]).toHaveLength(1);
-  });
-
-  test("update check answers a stale asOf, never a fabricated green: the wait is the existing bound", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    const checkAt = src.indexOf('if (pathname === "/api/update/check" && req.method === "GET")');
-    const checkHandler = src.slice(checkAt, checkAt + 4500);
-    // The same race and the same constant the release check already uses. Past it the route answers
-    // with what the lead has — whose `asOf` is the peer's own stamp and says how old it is.
-    const races = [...checkHandler.matchAll(/Promise\.race\(\[/g)];
-    expect(races).toHaveLength(2);
-    expect([...checkHandler.matchAll(/UPDATE_ON_DEMAND_POLL_TIMEOUT_MS/g)]).toHaveLength(2);
-    // Nothing invents a verdict when the wait runs out: there is no green written into this handler.
-    expect(checkHandler).not.toContain('"green"');
-  });
-
-  test("the crew gates the confirm too: POST api/update reads the same banked rows", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    const updateAt = src.indexOf('if (pathname === "/api/update" && req.method === "POST")');
-    const handler = src.slice(updateAt, src.indexOf("\n      }\n", updateAt));
-    // One confirm covers the crew, so one verdict covers the crew — and it is the SAME rows the
-    // card showed, from the same bank, decided by the one merge function in `update-action.ts`.
-    expect(handler).toContain("crew: opts.crewLead?.updateRows() ?? []");
-  });
-
-  test("the band's dismiss carries a scope, and the monitor decides what it costs", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    const at = src.indexOf('if (pathname === "/api/update/dismiss" && req.method === "POST")');
-    expect(at).toBeGreaterThan(0);
-    const handler = src.slice(at, src.indexOf("\n      }\n", at));
-    // Read-level, exactly like the snooze beside it — declining a notification about your own
-    // machine is not terminal-driving.
-    expect(handler).toContain('guard(req, cfg, "read", pairing)');
-    // One call, and the monitor is what decides whether the digest is snoozed with it. If the route
-    // ever spells that itself, the rule can be edited apart from the record it belongs to.
-    expect(handler).toContain('await updateMonitor.dismiss(version, scope ?? "offer")');
-    expect(handler).not.toContain("snoozeDigest");
-    // WHICH band, because they are two decisions. An absent scope reads as the offer, which is what
-    // every client before the crew states could close. 1.7.0's `"pack"` scope is no longer one of
-    // them: an unknown scope is a 400, which is what an unknown scope has always been.
-    expect(handler).toContain('scope !== "offer" && scope !== "crew"');
-    expect(handler).toContain('text("bad scope", 400)');
-    // A version, checked before anything is written: the band is keyed by version, so an empty one
-    // would dismiss nothing and pin the store to a fact that is not one.
-    expect(handler).toContain('typeof version !== "string"');
-    expect(handler).toContain("400");
-    // It answers the same object the snooze does, so the tab that tapped is already up to date.
-    expect(handler).toContain("updateMonitor.status()");
-    // And it starts nothing: closing a band is not an update.
-    expect(handler).not.toContain("action.start");
-  });
-
-  test("update status: the run record reaches the phone through the status the card already polls", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    // One status object, three surfaces: the snapshot's `update`, the forced check, and the card's
-    // read. The run record rides all three rather than acquiring a fourth endpoint with its own
-    // shape — the nine states are `bridge/update-run.ts`'s, and nothing re-spells them here.
-    expect(src).toContain("update: updateStatusWithPeers(),");
-    expect(src).toContain("...updateStatusWithPeers(), preflight: report");
-    expect(src).not.toContain('"/api/update/status"');
-  });
-});
-
-// POST /api/launch — the launcher rows' one-tap: a Space whose cwd and label come from the row,
-// then the command plus a bare Enter typed into its fresh shell. The configured rows ARE the
-// allowlist, so the first thing asserted is that an unlisted command touches the multiplexer at all.
 describe("launch — an allowlisted space create, then the command and Enter", () => {
   /** What a phone posts here: a row's `command`, and optionally the pane to open a tab beside. */
   interface LaunchBody {
@@ -2882,9 +2302,8 @@ describe("GET /api/blobs/<hash> — one content-addressed image, off the disk th
   // THE GATE, pinned at the registration site. A blob is a picture the pane text already refers to,
   // so it is a READ: a read-only device and a paired one both pass, exactly as they do for the pane
   // read and for `history`. `guard`'s own read/write behaviour is asserted above; what this pins is
-  // that the route asks for the read tier and resolves through the host gate, so a `?host=` blob is
-  // fetched from the member whose journal named it rather than off the lead's own disk.
-  test("the route is gated as a READ and resolves through the host gate", () => {
+  // that the route asks for the read tier and resolves through the caller's resolver, never past it.
+  test("the route is gated as a READ and resolves through the caller's resolver", () => {
     const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
     const start = src.indexOf("const blobMatch = pathname.match(BLOB_ROUTE);");
     expect(start).toBeGreaterThan(0);
@@ -2892,146 +2311,6 @@ describe("GET /api/blobs/<hash> — one content-addressed image, off the disk th
     expect(block).toContain('caller.gate("read")');
     expect(block).not.toContain('caller.gate("write")');
     expect(block).toContain("await caller.resolve()");
-  });
-});
-
-// ── THE CREW'S RUN (M16/04) ─────────────────────────────────────────────────
-// The peer legs and the peers-only retry, both decided by the pure verdict and both read off what
-// the sweep banked. This route dials nobody, and a peers-only start spawns nothing here.
-
-describe("update status peers — the legs of a crew-wide run", () => {
-  test("update status peers ride the run record BOTH surfaces already poll, from one composer", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    // ONE composer, and both readers take it. The band reads the snapshot's `update`; the Updates
-    // page reads `GET /api/update/check`. Two compositions would be two objects that could disagree
-    // about the same run.
-    expect(src).toContain("update: updateStatusWithPeers(),");
-    expect(src).toContain("...updateStatusWithPeers(), preflight: report");
-    // From the queue the sweep folds, never from a dial: `updatePeers()` is a read of banked state,
-    // exactly as `updateRows()` is.
-    const at = src.indexOf("function updateStatusWithPeers()");
-    const composer = src.slice(at, at + 3400);
-    expect(composer).toContain("opts.crewLead?.updatePeers() ?? []");
-    expect(composer).toContain("return { ...status, run: { ...status.run, ...crewState } };");
-    // §20's one clock (M20/01), on the same composer and never a second one.
-    expect(composer).toContain("opts.crewLead?.updateSettledAt() ?? null");
-    // M20/09: a peers-only run has no local record, so the legs ride the STATUS instead of being
-    // dropped. The guard that dropped them is gone, and nothing has taken its place.
-    expect(composer).toContain("return { ...status, ...statusState };");
-    expect(composer).not.toContain("status.run === null || legs.length === 0");
-    expect(composer).not.toContain("sweep(");
-    // M20/01, after review: the legs outlive their run, so the composer names the run they describe
-    // before it attaches them to the run on screen.
-    expect(composer).toContain("opts.crewLead?.updateLegsRun() !== status.run.runId");
-    // And after counsel: legs from another run FALL to the top level, they are not discarded. A local
-    // update leaves a `done` record behind, so the commonest peers-only run there is — "Retry crew
-    // update" after an update — has a different run id and would otherwise be invisible for its whole
-    // life, which is spec 09's bug wearing spec 01's guard.
-    expect(composer).toContain("!== status.run.runId) return { ...status, ...statusState };");
-    expect(composer).not.toContain("!== status.run.runId) return status;");
-    // M32: legs that ride the STATUS carry their run's target, so the phone can tell a peers-only
-    // run (target = this lead's version) from a full run whose record has not landed yet. Never on
-    // the run record, whose own `to` says it.
-    expect(composer).toContain("opts.crewLead?.updateLegsTo() ?? null");
-    expect(composer).toContain("{ ...crewState, peersTo: legsTo }");
-    expect(composer).toContain("return { ...status, run: { ...status.run, ...crewState } };");
-    // And there is still no fourth endpoint with a fifth shape.
-    expect(src).not.toContain('"/api/update/status"');
-  });
-
-  test("retry crew update: a peers-only run has peer legs only and never touches a current lead", () => {
-    const current = "1.5.0";
-    const behind: CrewUpdateRow = { name: "minibuch", version: "1.4.1", verdict: "green", reasons: [], asOf: 1 };
-    const state = {
-      current,
-      // A current lead has nothing above it to take. That is exactly when "Retry crew update" is the
-      // page's one action, and exactly when an ordinary start would refuse with `none_available`.
-      latest: current,
-      majorAvailable: null,
-      run: null,
-      lockHeld: false,
-      preflight: { schema: 1, verdict: "green" as const, checks: [] },
-      crew: [behind],
-    };
-    const verdict = updateStartVerdict({ confirm: true, target: null, major: false, peersOnly: true }, state);
-    expect(verdict).toEqual({ kind: "peers", to: current });
-
-    // Nothing to level ⇒ nothing to start. The button is not offered here, and the route refuses it.
-    const levelled: CrewUpdateRow = { ...behind, version: current };
-    expect(
-      updateStartVerdict({ confirm: true, target: null, major: false, peersOnly: true }, { ...state, crew: [levelled] }),
-    ).toMatchObject({ kind: "refuse", status: 409 });
-
-    // A member that rolled back is the other half of the case, read off the legs, for as long as the
-    // census does not show it level. `attic` has no census row, so nobody knows its version.
-    expect(
-      updateStartVerdict(
-        { confirm: true, target: null, major: false, peersOnly: true },
-        { ...state, crew: [levelled], peers: [{ name: "attic", state: "rolled-back" }] },
-      ),
-    ).toEqual({ kind: "peers", to: current });
-
-    // And once the census shows the member that rolled back at the lead's version, its old leg is
-    // no longer something to retry: the legs outlive their run, and a member that levelled itself
-    // afterwards must not keep a retry alive.
-    expect(
-      updateStartVerdict(
-        { confirm: true, target: null, major: false, peersOnly: true },
-        { ...state, crew: [levelled], peers: [{ name: "minibuch", state: "rolled-back" }] },
-      ),
-    ).toMatchObject({ kind: "refuse", status: 409 });
-  });
-
-  test("retry crew update: one confirm still covers the crew, so a red member refuses it", () => {
-    const red: CrewUpdateRow = {
-      name: "minibuch",
-      version: "1.4.1",
-      verdict: "red",
-      reasons: ["less than 200 MB free on /"],
-      asOf: 1,
-    };
-    const verdict = updateStartVerdict(
-      { confirm: true, target: null, major: false, peersOnly: true },
-      {
-        current: "1.5.0",
-        latest: "1.5.0",
-        majorAvailable: null,
-        run: null,
-        lockHeld: false,
-        preflight: { schema: 1, verdict: "green", checks: [] },
-        crew: [red],
-      },
-    );
-    expect(verdict).toMatchObject({ kind: "refuse", status: 412 });
-  });
-
-  test("retry crew update: a confirm is still required, and a run in flight still refuses", () => {
-    const state = {
-      current: "1.5.0",
-      latest: "1.5.0",
-      majorAvailable: null,
-      run: null,
-      lockHeld: true,
-      preflight: { schema: 1, verdict: "green" as const, checks: [] },
-      crew: [],
-    };
-    expect(
-      updateStartVerdict({ confirm: false, target: null, major: false, peersOnly: true }, state),
-    ).toMatchObject({ kind: "refuse", status: 400 });
-    expect(
-      updateStartVerdict({ confirm: true, target: null, major: false, peersOnly: true }, state),
-    ).toMatchObject({ kind: "refuse", status: 409 });
-  });
-
-  test("the run id is minted once per confirm, on the server, and rides both legs of the start", () => {
-    const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    const updateAt = src.indexOf('if (pathname === "/api/update" && req.method === "POST")');
-    const handler = src.slice(updateAt, src.indexOf("\n      }\n", updateAt));
-    expect(handler).toContain("const runId = action.newRunId();");
-    expect(handler).toContain("action.beginCrewRun?.({ runId, to: verdict.to })");
-    // A peers-only run starts no updater on this machine.
-    const peersBranch = handler.slice(handler.indexOf('if (verdict.kind === "peers")'));
-    expect(peersBranch.slice(0, peersBranch.indexOf("return json"))).not.toContain("action.start");
   });
 });
 

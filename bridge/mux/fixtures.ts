@@ -13,7 +13,6 @@ import type { MuxConformanceFixture } from "./conformance.ts";
 import { herdrConformanceFixture } from "./herdr/fixture.ts";
 import { tmuxConformanceFixture } from "./tmux/fixture.ts";
 import { zellijConformanceFixture } from "./zellij/fixture.ts";
-import type { MuxAdapter } from "./types.ts";
 
 /**
  * One fixture per registered adapter, plus the decorated build of each adapter that has a beacon
