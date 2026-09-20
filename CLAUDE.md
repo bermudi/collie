@@ -325,8 +325,7 @@ tests nothing Vitest already covers.
   never touches a live bridge. The `states` target runs the playground on port 5199, the way `make
   playground` runs it, and answers no API at all. Cases live under `web/e2e/`: today
   `smoke.spec.ts` and `handles.spec.ts`, plus the named cases proving a hand check,
-  `web/e2e/issue-180.spec.ts` and `web/e2e/service-worker.spec.ts`,
-  which builds two bundles under `web/e2e/.builds/` to prove an old shell picks up a new one.
+  `web/e2e/service-worker.spec.ts`, which builds two bundles under `web/e2e/.builds/` to prove an old shell picks up a new one.
 - **Tier 2** runs by hand, from the workspace root: `make e2e`. It drives the dev lane's lead,
   instance `next` on port 8788, reads only, and never restarts or rebuilds anything. Its cases live
   under `web/e2e/live/`, sharing the harness in `web/e2e/live/live.ts`. It never runs in CI:

@@ -564,9 +564,7 @@ export const ja: Dictionary = {
   "transcript.attachmentAlt": "添付ファイル",
 
   // --- mirror (terminal graphics in the pane mirror) ---
-  "mirror.imageAlt": "ターミナルグラフィックス",
-  "mirror.imageBadge": "[画像]",
-  "mirror.imageMatchedByOrder": "順序で対応付け。確認は履歴から",
+  "mirror.blankLines": "[{n}行の空行]",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "たった今",

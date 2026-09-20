@@ -562,9 +562,7 @@ export const ko: Dictionary = {
   "transcript.attachmentAlt": "첨부 파일",
 
   // --- mirror (terminal graphics in the pane mirror) ---
-  "mirror.imageAlt": "터미널 그래픽",
-  "mirror.imageBadge": "[이미지]",
-  "mirror.imageMatchedByOrder": "순서로 맞춤, 확인은 기록에서",
+  "mirror.blankLines": "[{n}개의 빈 줄]",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "방금 전",

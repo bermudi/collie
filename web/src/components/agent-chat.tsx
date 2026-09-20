@@ -18,7 +18,6 @@ import { useLaunchers } from "@/lib/launchers";
 import { buzz } from "@/lib/haptics";
 import { mirrorFont, useDisplayPrefs } from "@/hooks/use-display-prefs";
 import { useLatestReply } from "@/hooks/use-latest-reply";
-import { useMirrorImages } from "@/hooks/use-mirror-images";
 import { useStableTerminalDraft } from "@/hooks/use-terminal-draft";
 import { useLocale } from "@/hooks/use-locale";
 import { isConnecting } from "@/lib/connection";
@@ -714,16 +713,6 @@ export function AgentChat({
     [latestReply, display],
   );
 
-  // Terminal graphics: the mirror tells us how many image placeholders it is showing, and only a
-  // count that GREW costs a journal read. The pane read carries no image field and the bridge does
-  // no journal work on the poll path — see hooks/use-mirror-images.ts for the whole cadence.
-  const [imageClusterCount, setImageClusterCount] = useState(0);
-  const mirrorImages = useMirrorImages({
-    paneId,
-    scope,
-    enabled: historyAvailable && imageClusterCount > 0,
-    clusterCount: imageClusterCount,
-  });
   // Find searches the mirror, so while it is open the mirror is WHOLE and the card stands down —
   // otherwise a hit inside the reply would be unfindable in the one surface find can highlight.
   const clippedReply = placement?.fit === "clipped" && !findOpen ? latestReply : null;
@@ -1816,8 +1805,6 @@ export function AgentChat({
                     onMenuAction={handleMenuAction}
                     promptDisabled={readOnly || gone}
                     hideLeadingLines={hiddenMirrorLines}
-                    images={mirrorImages}
-                    onImageClusterCount={setImageClusterCount}
                   />
                 </>
               ) : (

@@ -551,9 +551,7 @@ export const zh: Dictionary = {
   "transcript.attachmentAlt": "附件",
 
   // --- mirror (terminal graphics in the pane mirror) ---
-  "mirror.imageAlt": "终端图像",
-  "mirror.imageBadge": "[图片]",
-  "mirror.imageMatchedByOrder": "按顺序匹配，打开历史记录核对",
+  "mirror.blankLines": "[{n} 行空白]",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "刚刚",

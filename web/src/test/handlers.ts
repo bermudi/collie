@@ -233,9 +233,9 @@ export const fixtureImageRef = "/api/blobs/" + "3f".repeat(32);
  * newest one — moves what "the newest spoken turn" is. So the two-turn body stays exactly what it
  * was, and the image case takes this one, which is that body with a turn appended.
  *
- * ONE image, deliberately. The mirror aligns pictures to placeholder clusters FROM THE END
- * (`lib/mirror-images.ts` § alignImagesFromEnd), so a screen showing two clusters and holding one
- * image renders a badge above a picture — both states at once, in one fixture.
+ * ONE image, deliberately. The journal/history surface renders journal images exactly (ADR 0051 —
+ * the mirror itself guesses nothing and reconstructs no picture, ADR 0052), so this pins the one
+ * shape a history image turn may carry.
  */
 export const fixtureTranscriptWithImage: TranscriptEntry[] = [
   ...fixtureTranscript,

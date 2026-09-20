@@ -547,9 +547,7 @@ export const zhTW: Dictionary = {
   "transcript.attachmentAlt": "附件",
 
   // --- mirror (terminal graphics in the pane mirror) ---
-  "mirror.imageAlt": "終端機圖形",
-  "mirror.imageBadge": "[圖片]",
-  "mirror.imageMatchedByOrder": "依順序比對，開啟歷史記錄確認",
+  "mirror.blankLines": "[{n} 行空白]",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "剛剛",

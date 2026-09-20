@@ -570,9 +570,7 @@ export const de: Dictionary = {
   "transcript.attachmentAlt": "Anhang",
 
   // --- mirror (terminal graphics in the pane mirror) ---
-  "mirror.imageAlt": "Terminal-Grafik",
-  "mirror.imageBadge": "[Bild]",
-  "mirror.imageMatchedByOrder": "nach Reihenfolge zugeordnet, zum Prüfen den Verlauf öffnen",
+  "mirror.blankLines": "[{n} Leerzeilen]",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "gerade eben",

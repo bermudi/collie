@@ -569,9 +569,7 @@ export const es: Dictionary = {
   "transcript.attachmentAlt": "Archivo adjunto",
 
   // --- mirror (terminal graphics in the pane mirror) ---
-  "mirror.imageAlt": "Gráfico de terminal",
-  "mirror.imageBadge": "[Imagen]",
-  "mirror.imageMatchedByOrder": "emparejada por orden, abre el Historial para comprobarlo",
+  "mirror.blankLines": "[{n} líneas en blanco]",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "ahora mismo",
