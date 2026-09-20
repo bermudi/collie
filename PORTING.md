@@ -146,7 +146,7 @@ was the exact pre-fix code; two new MSW cases pin one-fetch-when-unseeded, zero-
 
 ### Images in the mirror — upstream `fd28d018`, `fbae4cf6`, `8e8cf78a`, `ba8e19a0`, `797318d6` (v1.8.0)
 
-**Status:** Ported, then **the mirror half was reverted** ([.adr/0041](./.adr/0041-the-mirror-does-not-guess-images.md)).
+**Status:** Ported, then **the mirror half was reverted** ([.adr/0041](./.adr/0052-the-mirror-does-not-guess-images.md)).
 The cluster/card/badge machinery below only ever fired for harnesses that *print* Kitty unicode
 placeholders (omp does, pi does not — pi's direct `a=T` placement leaves only blank rows in the
 read). What survives: the journal half — History/transcript render exact image references — the

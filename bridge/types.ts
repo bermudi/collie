@@ -364,9 +364,8 @@ export interface ServerSummary {
   /** The peer's refusal reason, verbatim, when incompatible. */
   protocolDetail?: string;
   /**
-   * §10.2's presentation split for a member that is not answering, exactly as
-   * {@link CrewMemberStatus.linkState} carries it: `reconnecting` needs nothing of the operator,
-   * `attention` does.
+   * The presentation split for a member that is not answering: `reconnecting` needs nothing of the
+   * operator, `attention` does.
    *
    * Additive and optional (§7.1): omitted for a reachable member, and omitted by a lead that predates
    * the field. An absent value beside `reachable: false` therefore means "no distinction offered",
@@ -381,86 +380,7 @@ export interface ServerSummary {
   lastSeenAt: number;
 }
 
-/**
- * GET /api/crew — what the RUNNING lead already knows about its own crew, for the phone's Crew
- * overview page. The read-only browser spelling of `collie crew status` (cli/crew.ts).
- *
- * **It is a report, never a probe.** Every field below is answered from state this process already
- * holds: the trust store it read at startup (`TrustStore.current()`, no disk touched per request)
- * and the {@link PeerState} the lead's existing sweep maintains (bridge/crew/registry.ts). Nothing
- * in this shape can make the lead dial a member — which is what lets a phone poll it beside the
- * snapshot without adding a second call rate to every peer (CREW_PROTOCOL.md §10.1, §11).
- *
- * **Only a lead answers it.** A solo instance and a peer 404 (`crew.not_lead`): a peer is not a
- * front door (ADR 0013), and a solo instance has no crew to describe.
- *
- * Nothing here is a secret. Fingerprints, certificates, the crew secret and pairing credentials are
- * absent by construction, exactly as {@link ServerSummary} keeps them off the snapshot.
- */
-export interface CrewStatusResponse {
-  /** The crew itself, as the trust store records it (`CrewIdentity`). */
-  crew: { id: string; name: string; secretGeneration: number; rotatedAt: number };
-  /** This lead. `version` per bridge/version.ts, the same string `hello` answers with. */
-  self: { id: string; name: string; version: string };
-  /**
-   * The named deputy (ADR 0027), or null when none is named.
-   *
-   * The DESIGNATION is the source, never the warrant: after a takeover the new lead keeps a warrant
-   * naming itself, so reading the deputy off it reports a lead as its own deputy (cli/
-   * crew-status-deputy.ts says so at length). `warrantGeneration` is the generation of the warrant
-   * this lead currently holds, and it is **nullable rather than omitted**: a designation with no
-   * warrant behind it is a state the operator has to see, not a key to go missing.
-   */
-  deputy: { id: string; warrantGeneration: number | null } | null;
-  /** The lead's own entry FIRST, then peers by member id — the exact order of `servers[]` (§9.2). */
-  members: CrewMemberStatus[];
-  /** The LEAD's clock, like every other timestamp the lead publishes (§10.2). */
-  ts: number;
-}
 
-/**
- * One member's row on the Crew overview page.
- *
- * Mostly {@link PeerState} re-spelled for the browser, plus the three roster facts the registry does
- * not carry (`address`, `enrolledAt`, `secretBehind`). Optional keys are OMITTED when absent and
- * never sent as null (CREW_PROTOCOL.md §11) — the lead's own entry therefore carries no `address`
- * and no `enrolledAt`, because a lead is not in its own roster.
- */
-export interface CrewMemberStatus {
-  /** Member id — the same value `?h=` takes and `servers[].id` reports. */
-  id: string;
-  name: string;
-  isLead: boolean;
-  /** The enrolled address as stored — never re-derived, never probed. Omitted for the lead itself. */
-  address?: string;
-  /** Omitted for the lead, for the reason `address` is. */
-  enrolledAt?: number;
-  /** {@link PeerState.health} verbatim (§10.2, §18.10). The lead's own entry is always `reachable`. */
-  health: "reachable" | "unreachable" | "incompatible" | "conflicted";
-  /** {@link PeerState.reason}, verbatim and unparaphrased, when there is one. */
-  reason?: string;
-  /** The lead's receipt time of the last successful call; `0` = never (§10.2). */
-  lastSeenAt: number;
-  /** What this member last reported, over the sweep or over `hello` (§7.1, §19), when it has. */
-  version?: string;
-  /** This member has not picked up the current crew secret (§8.4). False for the lead. */
-  secretBehind: boolean;
-  /** Enrolled but never once reachable — the shape a half-finished join takes (§8.2). */
-  provisional: boolean;
-  /** Who a `conflicted` member says it follows instead (§18.10). Present only in that state. */
-  conflict?: { leadMemberId: string; warrantGeneration: number | null };
-  /**
-   * {@link PeerState.linkState} — §10.2's **presentation split**, and NOT a fifth value of `health`.
-   *
-   * `reconnecting` says the lead is retrying inside its budget and the operator does nothing.
-   * `attention` says re-dialling cannot fix this and the operator must look.
-   *
-   * **Omitted whenever there is nothing to say**, which is every reachable member — and omitted by a
-   * lead older than this field, so an absent value on a member that is NOT reachable means "this lead
-   * does not make the distinction" and the page renders today's single word (§7.1).
-   */
-  linkState?: "reconnecting" | "attention";
-}
 
 /**
  * The crew wire version this release moves to, and the one this install speaks (M27/06).
@@ -630,11 +550,6 @@ export type WorktreeOpenResponse =
   | { ok: false; error: string; code?: ErrorCode; detail?: ApiErrorDetail };
 
 
-/**
- * Which role this collie plays in a crew (CREW_PROTOCOL.md §3). `solo` is a lead with zero peers —
- * today's Collie, exactly — and is the only mode that needs no configuration whatsoever.
- */
-export type CrewMode = "solo" | "lead" | "peer";
 
 /**
  * One operator-declared slash command (a `[[commands]]` row in their `commands.toml`). A pane any of
@@ -927,13 +842,6 @@ export interface BridgeConfig {
   vapidPublicKey: string;
   /** Build id of the bundle the bridge is currently serving (for stale-cache detection). */
   build?: string;
-  /**
-   * This collie's crew mode, so `crew status` and the UI can render it without probing behaviour.
-   * **Omitted when the mode is `solo`** — absent means "no crew", which is precisely true, and keeps
-   * a solo `/api/config` body byte-identical to today's (the `servers` reasoning, CREW_PROTOCOL.md
-   * §11). Read it as `mode ?? "solo"`.
-   */
-  mode?: CrewMode;
   /** The operator's own palette rows. Absent/empty when there is no `commands.toml`. */
   operatorCommands?: OperatorCommand[];
   /** The operator's own Keys-tray presets. Absent/empty when there is no `keys.toml`. */

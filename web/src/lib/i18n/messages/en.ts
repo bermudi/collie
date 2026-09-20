@@ -717,9 +717,7 @@ export const en = {
   "apiError.cache.pane_unknown": "That pane is gone, nothing was changed.",
   "apiError.cache.no_session": "That pane's agent names no session, so it can't be watched.",
   "apiError.session.unknown": "There is no session called {session} on this collie.",
-  "apiError.host.unknown": "There is no collie called {host} in this crew.",
   // The key mirrors the wire code `crew.not_lead` (`bridge/error-codes.ts`). Both say crew from 1.8.0.
-  "apiError.crew.not_lead": "This collie doesn't lead a crew, so there is no crew to show.",
   // --- worktrees (ADR 0032) ---
   "apiError.worktree.list_failed": "The worktrees couldn't be listed: {reason}",
   "apiError.worktree.create_failed": "The worktree couldn't be created: {reason}",
@@ -746,17 +744,6 @@ export const en = {
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "Repository",
   "worktree.orOpenExisting": "Or open one that already exists",
-  // --- apiError.update (POST /api/update refusals, M15/05) ---
-  "apiError.update.confirm_required": "That update needed a confirm, so nothing was started.",
-  "apiError.update.in_progress": "An update is already running ({state}). Nothing was started.",
-  "apiError.update.preflight_unavailable": "The preflight couldn't be run on this machine, so the update was refused.",
-  "apiError.update.preflight_red": "Preflight is red on {check}: {reason}",
-  "apiError.update.major_confirm_required": "{version} crosses a major, and a major needs its own confirm.",
-  "apiError.update.target_mismatch": "This screen offered {asked}, but this collie would install {would}. Reload and read it again.",
-  "apiError.update.none_available": "There is no newer release to take.",
-  "apiError.update.peers_packaged": "{name} is a packaged install. Its updates come from its own package manager.",
-  "apiError.update.packaged": "Updates come from your package manager. Collie won't replace this install's files.",
-  "apiError.update.start_failed": "The update couldn't be started: {reason}",
   // --- settings.updateCard (the update card, M15/05) ---
   "cache.warm": "Prompt cache warm",
   "cache.expiring": "Prompt cache expiring",

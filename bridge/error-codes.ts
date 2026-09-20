@@ -123,7 +123,6 @@ export const ERROR_CODES = {
   /** The bytes arrived but the host write failed (disk full, permissions). */
   "upload.write_failed": "{reason}",
 
-
   // ── Device pairing: POST /api/pair, POST /api/devices/revoke ───────────────────────
   //
   // These sentences look like codes because they ARE the machine-readable reasons pairing has always
@@ -154,21 +153,6 @@ export const ERROR_CODES = {
 
   // ── Addressing: the `(host, session)` a request named does not exist ───────────────
   "session.unknown": "unknown session: {session}",
-
-
-  // ── The crew overview: GET /api/crew ───────────────────────────────────────────────
-
-
-  // ── Starting an update from the phone: POST /api/update (M15/05) ───────────────────
-
-
-
-
-
-
-
-
-
 
 } as const;
 

@@ -692,8 +692,6 @@ export const es: Dictionary = {
   "apiError.cache.pane_unknown": "That pane is gone, nothing was changed.",
   "apiError.cache.no_session": "That pane's agent names no session, so it can't be watched.",
   "apiError.session.unknown": "No existe la sesión {session} en este collie.",
-  "apiError.host.unknown": "No existe el collie {host} en este equipo.",
-  "apiError.crew.not_lead": "Este collie no lidera ningún equipo. No hay datos para mostrar.",
   // --- worktrees (ADR 0032) ---
   "apiError.worktree.list_failed": "Error al listar los worktrees: {reason}",
   "apiError.worktree.create_failed": "Error al crear el worktree: {reason}",
@@ -720,17 +718,6 @@ export const es: Dictionary = {
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "Repositorio",
   "worktree.orOpenExisting": "Abrir worktree existente",
-  // --- apiError.update (POST /api/update refusals, M15/05) ---
-  "apiError.update.confirm_required": "La actualización requería confirmación; no se inició nada.",
-  "apiError.update.in_progress": "Ya hay una actualización en curso ({state}). No se inició nada.",
-  "apiError.update.preflight_unavailable": "No se pudo ejecutar la comprobación previa en este equipo; se rechazó la actualización.",
-  "apiError.update.preflight_red": "Falló la comprobación previa en {check}: {reason}",
-  "apiError.update.major_confirm_required": "{version} pasa a una versión mayor y requiere confirmación explícita.",
-  "apiError.update.target_mismatch": "Esta pantalla ofreció {asked}, pero este collie instalaría {would}. Recargue y vuelva a revisar.",
-  "apiError.update.none_available": "No hay ninguna versión más reciente disponible.",
-  "apiError.update.peers_packaged": "{name} es una instalación por paquete. Sus actualizaciones vienen de su propio gestor de paquetes.",
-  "apiError.update.packaged": "Las actualizaciones se gestionan con tu gestor de paquetes. Collie no reemplazará los archivos de esta instalación.",
-  "apiError.update.start_failed": "No se pudo iniciar la actualización: {reason}",
   // --- settings.updateCard (the update card, M15/05) ---
   "cache.warm": "Prompt cache warm",
   "cache.expiring": "Prompt cache expiring",

@@ -678,8 +678,6 @@ export const ko: Dictionary = {
   "apiError.cache.pane_unknown": "That pane is gone, nothing was changed.",
   "apiError.cache.no_session": "That pane's agent names no session, so it can't be watched.",
   "apiError.session.unknown": "해당 collie에 {session} 세션이 없습니다.",
-  "apiError.host.unknown": "해당 크루에 {host} collie가 없습니다.",
-  "apiError.crew.not_lead": "해당 collie가 크루를 lead하지 않으므로 표시할 크루가 없습니다.",
   // --- worktrees (ADR 0032) ---
   "apiError.worktree.list_failed": "worktree 목록을 가져오지 못했습니다: {reason}",
   "apiError.worktree.create_failed": "worktree를 생성하지 못했습니다: {reason}",
@@ -706,17 +704,6 @@ export const ko: Dictionary = {
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "저장소",
   "worktree.orOpenExisting": "기존 worktree 열기",
-  // --- apiError.update (POST /api/update refusals, M15/05) ---
-  "apiError.update.confirm_required": "업데이트 확인이 필요하여 작업을 시작하지 않았습니다.",
-  "apiError.update.in_progress": "업데이트가 이미 진행 중입니다({state}). 새 작업을 시작하지 않았습니다.",
-  "apiError.update.preflight_unavailable": "이 머신에서 사전 점검을 실행할 수 없어 업데이트를 중단했습니다.",
-  "apiError.update.preflight_red": "{check} 항목의 사전 점검에 실패했습니다: {reason}",
-  "apiError.update.major_confirm_required": "{version} 버전은 메이저 업데이트이므로 별도 승인이 필요합니다.",
-  "apiError.update.target_mismatch": "화면에는 {asked} 버전이 표시되었으나 실제로는 {would} 버전이 설치됩니다. 화면을 새로고침하십시오.",
-  "apiError.update.none_available": "설치할 최신 릴리스가 없습니다.",
-  "apiError.update.peers_packaged": "{name}은(는) 패키지 설치본입니다. 업데이트는 해당 머신의 패키지 관리자에서 받습니다.",
-  "apiError.update.packaged": "업데이트는 패키지 관리자를 통해 제공됩니다. Collie는 이 설치본의 파일을 덮어쓰지 않습니다.",
-  "apiError.update.start_failed": "업데이트를 시작하지 못했습니다: {reason}",
   // --- settings.updateCard (the update card, M15/05) ---
   "cache.warm": "Prompt cache warm",
   "cache.expiring": "Prompt cache expiring",

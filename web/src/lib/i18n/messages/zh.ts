@@ -664,8 +664,6 @@ export const zh: Dictionary = {
   "apiError.cache.pane_unknown": "That pane is gone, nothing was changed.",
   "apiError.cache.no_session": "That pane's agent names no session, so it can't be watched.",
   "apiError.session.unknown": "当前 collie 上不存在名为 {session} 的会话。",
-  "apiError.host.unknown": "当前机组中不存在名为 {host} 的 collie 实例。",
-  "apiError.crew.not_lead": "当前 collie 不是机组 lead，无可展示的机组。",
   // --- worktrees (ADR 0032) ---
   "apiError.worktree.list_failed": "获取 worktree 列表失败：{reason}",
   "apiError.worktree.create_failed": "创建 worktree 失败：{reason}",
@@ -692,17 +690,6 @@ export const zh: Dictionary = {
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "仓库",
   "worktree.orOpenExisting": "或打开已有 Worktree",
-  // --- apiError.update (POST /api/update refusals, M15/05) ---
-  "apiError.update.confirm_required": "本次更新需要确认，未启动任何操作。",
-  "apiError.update.in_progress": "已有更新正在运行（{state}），未启动新操作。",
-  "apiError.update.preflight_unavailable": "无法在此机器上运行预检，更新已被拒绝。",
-  "apiError.update.preflight_red": "预检未通过（{check}）：{reason}",
-  "apiError.update.major_confirm_required": "{version} 跨越了大版本，需单独确认。",
-  "apiError.update.target_mismatch": "当前界面显示的是 {asked}，但此 collie 将安装 {would}。请重新加载查看。",
-  "apiError.update.none_available": "没有可更新的版本。",
-  "apiError.update.peers_packaged": "{name} 是包管理器安装的。它的更新来自它自己的包管理器。",
-  "apiError.update.packaged": "更新由系统的包管理器提供。Collie 不会替换当前安装的文件。",
-  "apiError.update.start_failed": "无法启动更新：{reason}",
   // --- settings.updateCard (the update card, M15/05) ---
   "cache.warm": "Prompt cache warm",
   "cache.expiring": "Prompt cache expiring",

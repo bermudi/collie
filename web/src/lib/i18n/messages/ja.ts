@@ -686,8 +686,6 @@ export const ja: Dictionary = {
   "apiError.cache.pane_unknown": "That pane is gone, nothing was changed.",
   "apiError.cache.no_session": "That pane's agent names no session, so it can't be watched.",
   "apiError.session.unknown": "この collie にセッション {session} は存在しません。",
-  "apiError.host.unknown": "このクルーに collie {host} は存在しません。",
-  "apiError.crew.not_lead": "この collie はクルーを統括していないため、表示可能なクルーがありません。",
   // --- worktrees (ADR 0032) ---
   "apiError.worktree.list_failed": "worktree の一覧取得に失敗しました: {reason}",
   "apiError.worktree.create_failed": "worktree の作成に失敗しました: {reason}",
@@ -714,17 +712,6 @@ export const ja: Dictionary = {
   "space.new.tab.worktree": "ワークツリー",
   "space.new.repo.label": "リポジトリ",
   "worktree.orOpenExisting": "または既存のものを開く",
-  // --- apiError.update (POST /api/update refusals, M15/05) ---
-  "apiError.update.confirm_required": "更新の確認が必要なため、処理は開始されませんでした。",
-  "apiError.update.in_progress": "別の更新がすでに実行中です（{state}）。処理は開始されませんでした。",
-  "apiError.update.preflight_unavailable": "このマシンで事前チェックを実行できないため、更新は拒絶されました。",
-  "apiError.update.preflight_red": "{check} の事前チェックに失敗しました: {reason}",
-  "apiError.update.major_confirm_required": "{version} はメジャー更新です。個別の確認が必要です。",
-  "apiError.update.target_mismatch": "画面上の対象は {asked} ですが、この collie にインストールされるのは {would} です。再読み込みして確認してください。",
-  "apiError.update.none_available": "利用可能な新しいリリースはありません。",
-  "apiError.update.peers_packaged": "{name} はパッケージ版です。更新はそのマシンのパッケージマネージャーから提供されます。",
-  "apiError.update.packaged": "更新はパッケージマネージャーから行われます。Collie はこのインストールのファイルを置換しません。",
-  "apiError.update.start_failed": "更新を開始できませんでした: {reason}",
   // --- settings.updateCard (the update card, M15/05) ---
   "cache.warm": "Prompt cache warm",
   "cache.expiring": "Prompt cache expiring",

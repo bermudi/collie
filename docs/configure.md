@@ -32,7 +32,7 @@ The instance file wins key by key, never file by file: a key absent from it keep
 value. There is no `config.<instance>.toml`, because on a Herdr-managed install the config dir is
 already per instance, and on a binary install it is `~/.config/collie`. A second Collie on one host
 therefore puts its own settings in its own config dir, see
-[docs/deployment.md → Several Collies on one host](deployment.md#several-collies-on-one-host). A
+[../DEPLOYMENT.md → Several Collies on one host](../DEPLOYMENT.md#several-collies-on-one-host). A
 `.collie/` inside a project directory is not read at all.
 
 Three verbs drive the file:
@@ -79,7 +79,7 @@ The [`.env.example`](../.env.example) file lists all options, and so does
 
 It includes `COLLIE_PORT`, `COLLIE_SERVE_MODE=http` (for Headscale or `.internal` domains), and
 `COLLIE_SERVE_PORT` (to expose HTTPS on a port other than `:443`; see
-[docs/deployment.md → Several Collies on one host](deployment.md#several-collies-on-one-host)). The
+[../DEPLOYMENT.md → Several Collies on one host](../DEPLOYMENT.md#several-collies-on-one-host)). The
 CLI reads the serve parameters to configure `tailscale serve`, rather than passing them to the
 bridge.
 
@@ -104,7 +104,7 @@ The config file groups every setting under a `[section]`. The environment name o
 To read history from multiple agent home directories, provide a comma-separated list in
 `COLLIE_TRANSCRIPT_ROOT`.
 
-[`docs/deployment.md`](deployment.md) covers custom domains and reverse proxies. Collie enforces a
+[`../DEPLOYMENT.md`](../DEPLOYMENT.md) covers custom domains and reverse proxies. Collie enforces a
 same-origin policy, so any custom hostname or external TLS terminator must be explicitly
 allowlisted:
 

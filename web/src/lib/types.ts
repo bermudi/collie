@@ -522,11 +522,6 @@ export type CreateResponse =
   | { ok: true; pane: CreatedPane }
   | { ok: false; error: string; code?: ApiErrorCode; detail?: ApiErrorDetail };
 
-/**
- * Which role the bridge plays in a crew (CREW_PROTOCOL.md §3). Mirrors CrewMode in bridge/types.ts.
- * `solo` is a lead with zero peers — today's Collie, exactly.
- */
-export type CrewMode = "solo" | "lead" | "peer";
 
 /**
  * One operator-declared palette row (a `[[commands]]` table in their `commands.toml`). Mirrors
@@ -730,12 +725,6 @@ export interface BridgeConfig {
   vapidPublicKey: string;
   /** Build id of the bundle the bridge is currently serving (for stale-cache detection). */
   build?: string;
-  /**
-   * The bridge's crew mode. **Absent means `solo`** — a solo bridge emits no such key, so its
-   * `/api/config` body stays byte-identical to the pre-federation one. Always read it as
-   * `mode ?? "solo"`; never infer the mode from behaviour.
-   */
-  mode?: CrewMode;
   /** The operator's own palette rows. Absent when there is no `commands.toml`. */
   operatorCommands?: OperatorCommand[];
   /** The operator's own Keys-tray presets. Absent when there is no `keys.toml`. */

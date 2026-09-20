@@ -49,7 +49,7 @@ Five failed code attempts invalidate the code, which requires running `collie pa
 
 On a host running multiple instances, prefix commands with `COLLIE_INSTANCE=<name>` and open that
 specific instance URL on the phone
-([Multiple Collie instances on one host](deployment.md#multiple-collie-instances-on-one-host)).
+([Several Collies on one host](../DEPLOYMENT.md#several-collies-on-one-host)).
 
 ## Risk model
 
@@ -91,7 +91,7 @@ Key security boundaries and risks:
 | `COLLIE_TRUSTED_USER` | Rejects a request whose `Tailscale-User-Login` header is missing or does not match. |
 | `COLLIE_TRUSTED_USER_OPTIONAL=1` | Permits a missing `Tailscale-User-Login` header (tagged nodes never send one). |
 | `COLLIE_DEVICE_HEADER` | Name of the header your proxy injects with a device id. |
-| `COLLIE_DEVICE_ALLOWLIST` | Comma-separated device ids allowed to write; every other device stays read-only ([`docs/deployment.md`](deployment.md)). |
+| `COLLIE_DEVICE_ALLOWLIST` | Comma-separated device ids allowed to write; every other device stays read-only ([`../DEPLOYMENT.md`](../DEPLOYMENT.md)). |
 
 > 🚫 **Never use `tailscale funnel` with Collie.** Funnel routes traffic to the public internet,
 > whereas `tailscale serve` restricts access to your private tailnet. There is no supported use case
