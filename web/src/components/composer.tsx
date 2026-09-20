@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { ChangeEvent, ClipboardEvent, CSSProperties, ReactNode } from "react";
 import { useRevalidator } from "react-router";
-import { Check, FileText, Image, Keyboard, Loader2, Mic, Paperclip, Send, Settings2, Slash, Square, Terminal, X, Zap } from "lucide-react";
+import { Check, FileText, Image, Keyboard, Loader2, Paperclip, Send, Settings2, Slash, Terminal, X, Zap } from "lucide-react";
 
 import { applyDraftFontSize, fontStack, inputFocusZoomsPage } from "@/hooks/use-display-prefs";
 import type { DisplayPrefs } from "@/hooks/use-display-prefs";
@@ -33,8 +33,6 @@ import { useOperatorCommands, useOperatorKeys, useUploadCapability } from "@/lib
 import { acceptAttribute, limitMb, offersFiles, PHOTO_ACCEPT, rejectAttachment, uploadLimits } from "@/lib/attachments";
 import { ctrlPresetsFor } from "@/lib/operator-keys";
 import { isDestructiveInput } from "@/lib/destructive";
-import { HostChip } from "@/components/host-chip";
-import { useAmbientHost, useHostLabel } from "@/components/crew-provider";
 import { clearDraft, fitsDraftStore, loadDraft, saveDraft } from "@/lib/drafts";
 import { useHoldReload } from "@/lib/reload-guard";
 import { isSelfEcho, normalizeDraft } from "@/hooks/use-terminal-draft";
@@ -43,9 +41,6 @@ import { sendGuardedReply } from "@/lib/reply-action";
 import { TerminalDraftPreview } from "@/components/terminal-draft-preview";
 import { scopeKey, type Scope } from "@/lib/scope";
 import { DirectTypingStrip } from "@/components/direct-typing-strip";
-import { RecordingStrip } from "@/components/recording-strip";
-import { useSttRecorder } from "@/hooks/use-stt-recorder";
-import { useHandsFree, useSttCapability } from "@/lib/stt";
 import { NoEchoNotice } from "@/components/no-echo-notice";
 
 export interface ComposerHandle {
@@ -72,14 +67,6 @@ interface ComposerProps {
   readOnly: boolean;
   /**
    * The pane's MACHINE is not reachable from the lead, so a write would be refused before it left
-   * the lead (CREW_PROTOCOL.md §10.3) — the refusal text, naming the host, or undefined when writes
-   * may proceed. Always undefined on a solo install, so nothing here changes for one machine.
-   *
-   * Locks the composer exactly as `readOnly` does. It is NOT folded into `readOnly` by the caller
-   * because the two say different things and the operator's next move differs: one is "this device
-   * will never be allowed to type", the other is "this machine is quiet, wait for the next poll".
-   */
-  hostBlock?: string;
   /**
    * The soft keyboard is up, so this dock is standing on it rather than on the screen's own bottom
    * edge. Read ONCE by the pane (agent-chat.tsx, `composing`) and passed down — never re-derived
@@ -171,13 +158,10 @@ const KEY_REVALIDATE_MS = 300;
 // viewport with a tall tray. One wrapper so Keys and Quick can't drift apart.
 function ComposerDock({
   title,
-  host,
   onClose,
   children,
 }: {
   title: string;
-  /** The machine a key sent from this dock lands on. Renders nothing on a single-host install. */
-  host?: string;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -186,8 +170,6 @@ function ComposerDock({
       <div className="flex items-center justify-between px-3 pt-2">
         <div className="flex min-w-0 items-center gap-2">
           <SectionLabel>{title}</SectionLabel>
-          {/* A key press from the Keys dock IS a write into a terminal — the dock names which one. */}
-          <HostChip host={host} variant="target" />
         </div>
         <Button
           variant="ghost"
@@ -209,7 +191,7 @@ function ComposerDock({
 const ATTACH_PRESS_MS = 220;
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { paneId, scope, agent, isShell, gone, readOnly, hostBlock, composing, dialogPresent, text, terminalDraft, rawTerminalDraft, prefs, setWrap, stepFontSize, setRawTerminal, setTapToFocus, setExpandClippedReply, onSent, pullHandle },
+  { paneId, scope, agent, isShell, gone, readOnly, composing, dialogPresent, text, terminalDraft, rawTerminalDraft, prefs, setWrap, stepFontSize, setRawTerminal, setTapToFocus, setExpandClippedReply, onSent, pullHandle },
   ref,
 ) {
   const revalidator = useRevalidator();
@@ -239,20 +221,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   // Two capabilities, one lock: a reply is `typeText` then `sendKeys` (bridge/mux/capabilities.ts),
   // and half a reply is not a feature. `typeText`'s reason is preferred when both are missing —
   // it is the half that fails first.
-  // Asked of the machine this row is on (M22/03) — the ambient scope IS the target here, exactly as
-  // `writeHost` below says of the write itself.
   const canType = useMuxCapability("typeText", scope);
   const canSendKeys = useMuxCapability("sendKeys", scope);
   const missingSend = !canType.capable ? canType : !canSendKeys.capable ? canSendKeys : null;
-  const locked = gone || readOnly || hostBlock !== undefined || missingSend !== null;
-  // The machine every write on this row lands on. The pane view addresses one host (the pane's own,
-  // carried in `?h=` since the row was opened), so the ambient scope IS the target here. Undefined on
-  // a solo install, which renders no chip and leaves every confirm string unchanged.
-  // It names the Keys dock's own header; the belt below it carried the tag for a day and the pane
-  // header carries it now (agent-chat.tsx).
-  const writeHost = useAmbientHost(scope?.host);
-  // Its display name, or undefined when there is no crew — the copy-level half of the hide rule.
-  const writeHostLabel = useHostLabel(scope?.host);
+  const locked = gone || readOnly || missingSend !== null;
   // …and a ref alongside it, for the ONE caller that reads it after an await. `send()` checks
   // `locked` once, up front, but its pre-clear sweep goes out on the far side of the pre-flight's
   // pane read; a re-render that locks the composer in that window must be able to stop the most
@@ -433,98 +405,17 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     focusInput: focusInputEnd,
   });
 
-  // ── VOICE (ADR 0029) ──────────────────────────────────────────────────────────────────────────
-  //
-  // `null` unless the bridge published a provider AND this browser can actually record — one
-  // predicate in lib/stt.ts, so the button here and the row in Settings can never disagree. Absent
-  // is the feature being off: no button at all, not a disabled one.
-  const stt = useSttCapability();
-  const handsFree = useHandsFree();
-  // The microphone is armed state, and it obeys the same rules as "Type into terminal": it dies on a
-  // pane switch, on any composer lock, and on a hidden page, and it is never persisted. The clip is
-  // DISCARDED on each of those, not finished — see the hook's header for why an orphaned transcript
-  // is worse than no transcript.
-  const recorder = useSttRecorder({
-    enabled: stt?.available === true && !locked && !direct.active,
-    paneKey: `${scopeId}\0${paneId}`,
-    suspended: locked || direct.active,
-    onTranscript: acceptTranscript,
-    onError: (message) => setStatus(message, "error"),
-  });
   // ── THE ORBIT TURNS WHILE THE OPERATOR'S WORK IS IN FLIGHT (lib/busy.ts) ───────────────────────
   //
-  // Three intervals, declared where the state already lives, so the Collie mark in the header spins
+  // Two intervals, declared where the state already lives, so the Collie mark in the header spins
   // for exactly as long as the work does and not a frame longer. `sending` spans the whole guarded
   // send (type → settle → verify → submit), which is the interval the operator is actually waiting
-  // through; `uploading` spans the attachment POST; the recorder's `transcribing` phase spans the trip to
-  // the provider. Each is a boolean this component already renders from, so nothing new is tracked —
-  // the mark just reads what the composer already knows.
-  //
-  // NOT the poll, and not `recorder.busy`: the poll is ambient (lib/busy.ts says why at the counter),
-  // and a RECORDING is the operator working, not the app — the microphone strip below already says
-  // so, in words, and a spinning mark would claim the phone was busy while it waits on a human.
+  // through; `uploading` spans the attachment POST. Each is a boolean this component already renders
+  // from, so nothing new is tracked — the mark just reads what the composer already knows. The poll
+  // is deliberately absent: it is ambient (lib/busy.ts says why at the counter), never the
+  // operator's own work.
   useBusyWhile(sending);
   useBusyWhile(uploading);
-  useBusyWhile(recorder.phase === "transcribing");
-
-  // Whether the round button at the end of the row is the microphone rather than Send. True only on
-  // an EMPTY box, which is the one state where Send can do nothing anyway; the first character typed
-  // hands the button straight back. `direct.active` keeps it, because there the same button is the
-  // "stop typing into the terminal" control and that must not be displaceable.
-  const micIsPrimary = stt !== null && !direct.active && input.trim() === "";
-
-  /**
-   * What happens to a finished transcript.
-   *
-   * DEFAULT: it lands in the draft at the caret, and the operator reads it before sending — a
-   * transcript is text of unusually low confidence going into a real terminal.
-   *
-   * HANDS-FREE: it goes out through `send()`, the same guarded path the Send button uses, with every
-   * pre-flight and the reply guard intact (ADR 0029 — through the guards, never around them). Three
-   * things withdraw it, and all three fall back to inserting rather than refusing:
-   *
-   *  • **A draft is already in the box.** Merging dictated words onto text the operator typed and
-   *    sending the result would send a sentence nobody has read. The two get combined in the box
-   *    instead, where the Send button is still theirs to press.
-   *  • **A password prompt is on screen** (ADR 0017). Typing behaves the same way there — the pane
-   *    gets nothing until the operator acts — and a spoken secret is the last thing to auto-submit.
-   *  • **The composer can't send at all** (locked, or a dialog owns the keyboard). `send()` would
-   *    refuse anyway; inserting keeps the words.
-   */
-  function acceptTranscript(transcript: string) {
-    const draftEmpty = inputValueRef.current.trim() === "";
-    const mayHandsFree =
-      handsFree && draftEmpty && noEchoRef.current === null && !locked && !dialogPresent;
-    if (mayHandsFree) {
-      void send(transcript, false);
-      return;
-    }
-    insertTranscript(transcript);
-  }
-
-  /** Splice a transcript into the draft AT THE CARET (the field is where the operator left it, and
-   *  dictating a clause into the middle of a sentence is the whole point of a caret), padded with a
-   *  space when it would otherwise weld itself to the word in front of it. */
-  function insertTranscript(transcript: string) {
-    direct.deactivateSilently();
-    const el = inputRef.current;
-    const prev = inputValueRef.current;
-    const start = el?.selectionStart ?? prev.length;
-    const end = el?.selectionEnd ?? prev.length;
-    const before = prev.slice(0, start);
-    const after = prev.slice(end);
-    const inserted = before !== "" && !/\s$/.test(before) ? ` ${transcript}` : transcript;
-    updateInput(`${before}${inserted}${after}`);
-    const caret = start + inserted.length;
-    // Deferred like every other focus in this component: React has to swap the controlled value
-    // before a selection range means anything.
-    setTimeout(() => {
-      const field = inputRef.current;
-      if (!field) return;
-      field.focus();
-      field.setSelectionRange(caret, caret);
-    }, 0);
-  }
 
   const sentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -888,15 +779,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     }
     const reason = isDestructiveInput(input);
     if (reason && !sendConfirm.confirm("send")) {
-      // On a crew the confirm names the machine as well as the pattern: "rm -r" is a different
-      // sentence depending on whose disk it runs on, and this line is the last thing read before the
-      // second tap. Solo copy is unchanged, byte for byte.
-      setStatus(
-        writeHostLabel
-          ? translate("composer.destructive.confirmOnHost", { reason, host: writeHostLabel })
-          : translate("composer.destructive.confirm", { reason }),
-        "info",
-      );
+      setStatus(translate("composer.destructive.confirm", { reason }), "info");
       return;
     }
     sendConfirm.reset();
@@ -1075,11 +958,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             one-tap reply grids; Display mounts the labelled mirror prefs. Agent stays a covering
             BottomSheet below (it's a palette, not a pad). */}
         {drawer === "keys" && (
-          <ComposerDock
-            title={translate("composer.controls.keys")}
-            host={writeHost}
-            onClose={closeDrawer}
-          >
+          <ComposerDock title={translate("composer.controls.keys")} onClose={closeDrawer}>
             <NavTray
               // The chords THIS multiplexer refuses (M10/06). A key is not a capability: the Keys
               // door is `sendKeys` (the lock above), and this is the list of holes behind it, so a
@@ -1315,27 +1194,13 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             />
           )}
         </Collapse>
-        {/* THE ARMED-MODE SLOT — one Collapse, two strips, because they are one idea: a mode this
-            composer is holding open, said in words where the eye already looks. Grouping them keeps
-            the arrival to a single 240ms slide when one hands over to the other (stop typing, start
-            dictating), instead of two boxes fighting over the same row. Both are CONDITIONS with
-            their own controls — Stop, and the recorder's separate ✕ — so neither belongs in the top
-            pills, which carry no controls at all. */}
-        <Collapse open={direct.active || (recorder.busy && recorder.phase !== "requesting")}>
+        {/* THE ARMED-MODE SLOT — a mode this composer is holding open, said in words where the eye
+            already looks. It is a CONDITION with its own control (Stop), so it does not belong in
+            the top pills, which carry no controls at all. */}
+        <Collapse open={direct.active}>
           {/* Armed indicator for direct typing, deliberately NOT only on the button and textarea —
               see the component. */}
           {direct.active && <DirectTypingStrip onStop={() => direct.deactivate()} />}
-          {/* The microphone's armed strip. Stop and ✕ are different actions: one transcribes the
-              clip, the other throws it away. */}
-          {recorder.busy && recorder.phase !== "requesting" && (
-            <RecordingStrip
-              elapsed={recorder.elapsedLabel}
-              transcribing={recorder.phase === "transcribing"}
-              handsFree={handsFree && input.trim() === "" && noEcho === null}
-              onStop={recorder.stopAndSend}
-              onDiscard={recorder.discard}
-            />
-          )}
         </Collapse>
         {/* A draft too large for the disk tier (lib/drafts.ts). It survives a pane switch — the
             memory tier holds it whole — but not the app closing, and that difference is invisible
@@ -1402,14 +1267,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                 ? translate("composer.placeholder.gone")
                 : readOnly
                   ? translate("composer.placeholder.readOnly")
-                  : // Names the machine, because on a crew "why can't I type?" has two possible
-                    // answers and only one of them is about this device.
-                    hostBlock
-                    ? hostBlock
-                    : // The multiplexer cannot type here at all — its own words where it gave any, so
-                      // the placeholder says what is true of THIS terminal rather than blaming the app.
-                      missingSend !== null
-                      ? missingSend.note || translate("composer.placeholder.noMuxSend")
+                  : // The multiplexer cannot type here at all — its own words where it gave any, so
+                    // the placeholder says what is true of THIS terminal rather than blaming the app.
+                    missingSend !== null
+                    ? missingSend.note || translate("composer.placeholder.noMuxSend")
                     : direct.active
                       ? translate("composer.placeholder.direct")
                       : isShell
@@ -1553,42 +1414,6 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               aria-label={translate("composer.send.reallySend")}
             >
               {translate("composer.send.reallySend")}
-            </Button>
-          ) : micIsPrimary ? (
-            // THE MICROPHONE IS THE PRIMARY ACTION WHILE THE BOX IS EMPTY, and becomes Send the
-            // moment there is anything to send. It used to be a second, permanent control tucked
-            // inside the field beside the attach button — deliberately, to avoid a split primary
-            // action. The v1 beta said that reads the workflow wrong: you either dictate a message
-            // or you type one, and nobody dictates into the middle of a draft. So the field paid
-            // 36px of its width, on every render, for a control that is only ever wanted on an empty
-            // box. An empty box has no Send either (`send` refuses a blank value), so this branch
-            // takes over a button that could do nothing anyway — it replaces no capability.
-            <Button
-              size="icon"
-              variant={recorder.busy ? "destructive" : "default"}
-              className="size-11 shrink-0 rounded-full"
-              disabled={!stt.available || locked || sending || recorder.phase === "transcribing"}
-              aria-pressed={recorder.busy}
-              // The bridge's own words when it cannot serve — the operator's next move is on the
-              // host, so the button says what is wrong rather than just refusing.
-              aria-label={
-                !stt.available
-                  ? (stt.reason ?? translate("composer.mic.unavailable"))
-                  : recorder.phase === "recording"
-                    ? translate("composer.mic.stopAria")
-                    : translate("composer.mic.recordAria")
-              }
-              title={stt.available ? undefined : stt.reason}
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={() => (recorder.phase === "recording" ? recorder.stopAndSend() : recorder.start())}
-            >
-              {recorder.phase === "transcribing" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : recorder.phase === "recording" ? (
-                <Square className="size-4 fill-current" />
-              ) : (
-                <Mic className="size-4" />
-              )}
             </Button>
           ) : (
             <Button

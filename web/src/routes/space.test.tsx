@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 
-import { CrewProvider } from "@/components/crew-provider";
 import { ROOT_ROUTE_ID, type HomeData } from "@/lib/loaders";
 import type { AgentView, TabView, WorkspaceView } from "@/lib/types";
 import { fixtureServers } from "@/test/handlers";
@@ -95,11 +94,7 @@ function renderSpace(spaceId: string, host?: string) {
         children: [
           {
             path: "space/:spaceId",
-            element: withHeaderHost(
-              <CrewProvider servers={data.servers} sessions={data.sessions} ts={data.ts} pollMs={1500}>
-                <SpaceRoute />
-              </CrewProvider>,
-            ),
+            element: withHeaderHost(<SpaceRoute />),
           },
         ],
       },

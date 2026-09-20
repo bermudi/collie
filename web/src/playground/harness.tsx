@@ -12,9 +12,7 @@ import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { AgentChat } from "@/components/agent-chat";
 import { AppHeaderHost } from "@/components/app-header";
 import { ConnectionBanner } from "@/components/connection-banner";
-import { CrewProvider } from "@/components/crew-provider";
 import { StripHost } from "@/components/ui/strip-host";
-import { UpdateRibbon } from "@/components/update-ribbon";
 import { CONNECTION_LOST_MS, TROUBLE_MS } from "@/hooks/use-connection-lost";
 import { __resetConnectionHealth, markLive } from "@/lib/connection-health";
 import { saveDraft } from "@/lib/drafts";
@@ -24,20 +22,17 @@ import {
   type DevicesData,
   type HistoryData,
   type HomeData,
-  type CrewData,
   type PaneData,
 } from "@/lib/loaders";
 import { internScope, scopeFromUrl, scopeKey } from "@/lib/scope";
 import type { DeviceAuth } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { CrewRoute } from "@/routes/crew";
 import { DetailRoute } from "@/routes/detail";
 import { HistoryRoute } from "@/routes/history";
 import { HomeRoute } from "@/routes/home";
 import { BootSplash, RootError, RootLayout } from "@/routes/root";
 import { SettingsRoute } from "@/routes/settings";
 import { SpaceRoute } from "@/routes/space";
-import { UpdatesRoute } from "@/routes/updates";
 import type { PaneFixture } from "./fixtures";
 
 // ── The shared connection clock ──────────────────────────────────────────────
@@ -89,11 +84,11 @@ export function useConnectionClock(mode: ClockMode): void {
 
 /**
  * A data router carrying the root snapshot under the real `ROOT_ROUTE_ID`, which is what
- * `useOptionalRootData()` reads — the update chip, the header's freshness stamp and the crew census
+ * `useOptionalRootData()` reads — the update chip and the header's freshness stamp
  * all need it. Built once (`useState`'s lazy initialiser) so the route element is stable; the
  * components inside subscribe to their own module stores and re-render without it.
  *
- * IT CARRIES THE BAND, exactly as `routes/root.tsx` does. `UpdateRibbon` and `ConnectionBanner`
+ * IT CARRIES THE BAND, exactly as `routes/root.tsx` does. The `ConnectionBanner`
  * render nothing where they sit — they register a `StripSlot` with `ui/strip-host.tsx` and the band
  * paints the winner — so a card that mounts one of them without a host would show an empty stage and
  * report a bug that is not there. It costs the cards that mount no strip nothing: the band collapses
@@ -117,74 +112,6 @@ export function RootRouter({ data, children }: { data: HomeData; children: React
 }
 
 /**
- * The same root, plus the `CrewProvider` the host-aware surfaces read. Tier-2 health is derived
- * there, against the LEAD's clock (`home.ts`) — never the phone's — so anything mounted inside gets
- * the same host health the real app would have derived for the same snapshot.
- */
-export function PackedRootRouter({ data, children }: { data: HomeData; children: ReactNode }) {
-  const [router] = useState(() =>
-    createMemoryRouter(
-      [
-        {
-          id: ROOT_ROUTE_ID,
-          path: "/",
-          loader: () => data,
-          element: (
-            <CrewProvider
-              servers={data.servers}
-              sessions={data.sessions}
-              ts={data.ts}
-              pollMs={3_000}
-            >
-              {children}
-            </CrewProvider>
-          ),
-        },
-      ],
-      { initialEntries: ["/"] },
-    ),
-  );
-  return <RouterProvider router={router} />;
-}
-
-/**
- * The crew census on its own router, assembled the way `routes/crew.test.tsx` assembles it: the root
- * route publishes the snapshot AND the `CrewProvider`, and `/crew` carries the census. A `crew` of
- * `{ status: null }` is the solo/empty card — the real 404 answer, not a stub.
- */
-export function CrewRouter({ home, crew }: { home: HomeData; crew: CrewData }) {
-  const [router] = useState(() =>
-    createMemoryRouter(
-      [
-        {
-          id: ROOT_ROUTE_ID,
-          path: "/",
-          loader: () => home,
-          element: (
-            <CrewProvider
-              servers={home.servers}
-              sessions={home.sessions}
-              ts={home.ts}
-              pollMs={3_000}
-            >
-              <AppHeaderHost bridge={home.bridge} error={false}>
-                <Outlet />
-              </AppHeaderHost>
-            </CrewProvider>
-          ),
-          children: [
-            { index: true, element: <div className="p-4 text-sm text-muted-foreground">home</div> },
-            { path: "crew", loader: () => crew, element: <CrewRoute /> },
-          ],
-        },
-      ],
-      { initialEntries: ["/crew"] },
-    ),
-  );
-  return <RouterProvider router={router} />;
-}
-
-/**
  * Settings on a memory router, with its OWN loader supplying the paired-device registry — the same
  * `DevicesData` shape `devicesLoader` returns, so the Paired devices card renders its real list
  * rather than its empty fallback.
@@ -197,13 +124,9 @@ export function CrewRouter({ home, crew }: { home: HomeData; crew: CrewData }) {
 export function SettingsRouter({
   home,
   devices,
-  start = "/settings",
 }: {
   home: HomeData;
   devices: DevicesData;
-  /** Which of the two routes to open on. `/settings/updates` is the Updates page, a child of
-   *  Settings, so the same router serves both and "back" works between them. */
-  start?: "/settings" | "/settings/updates";
 }) {
   const [router] = useState(() =>
     createMemoryRouter(
@@ -213,25 +136,17 @@ export function SettingsRouter({
           path: "/",
           loader: () => home,
           element: (
-            <CrewProvider
-              servers={home.servers}
-              sessions={home.sessions}
-              ts={home.ts}
-              pollMs={3_000}
-            >
-              <AppHeaderHost bridge={home.bridge} error={false}>
-                <Outlet />
-              </AppHeaderHost>
-            </CrewProvider>
+            <AppHeaderHost bridge={home.bridge} error={false}>
+              <Outlet />
+            </AppHeaderHost>
           ),
           children: [
             { index: true, element: <div className="p-4 text-sm text-muted-foreground">home</div> },
             { path: "settings", loader: () => devices, element: <SettingsRoute /> },
-            { path: "settings/updates", element: <UpdatesRoute /> },
           ],
         },
       ],
-      { initialEntries: [start] },
+      { initialEntries: ["/settings"] },
     ),
   );
   return <RouterProvider router={router} />;
@@ -285,30 +200,23 @@ export function PaneRouter({
           path: "/",
           loader: () => data,
           element: (
-            <CrewProvider
-              servers={data.servers}
-              sessions={data.sessions}
-              ts={data.ts}
-              pollMs={3_000}
-            >
-              <AppHeaderHost bridge={data.bridge} error={false}>
-                <AgentChat
-                  paneId={fixture.pane.paneId}
-                  agent={fixture.pane}
-                  agents={data.agents}
-                  shellPanes={data.shellPanes}
-                  tabs={data.tabs}
-                  text={fixture.text}
-                  requestedLines={400}
-                  revision={fixture.revision}
-                  device={data.device}
-                  bridge={data.bridge}
-                  error={false}
-                  onBack={() => {}}
-                  onSelect={() => {}}
-                />
-              </AppHeaderHost>
-            </CrewProvider>
+            <AppHeaderHost bridge={data.bridge} error={false}>
+              <AgentChat
+                paneId={fixture.pane.paneId}
+                agent={fixture.pane}
+                agents={data.agents}
+                shellPanes={data.shellPanes}
+                tabs={data.tabs}
+                text={fixture.text}
+                requestedLines={400}
+                revision={fixture.revision}
+                device={data.device}
+                bridge={data.bridge}
+                error={false}
+                onBack={() => {}}
+                onSelect={() => {}}
+              />
+            </AppHeaderHost>
           ),
         },
       ],
@@ -332,15 +240,13 @@ const StackDeviceContext = createContext<DeviceAuth | null>(null);
 
 /**
  * {@link PaneRouter}'s pane, PLUS the band RootLayout mounts above it — the real `<StripHost>` with
- * the real `<UpdateRibbon/>` and `<ConnectionBanner/>` registering into it — so the worst-case stack
- * (gap 4) can be judged as one screen instead of summed from cards measured apart. Same real
- * components, same nesting as `routes/root.tsx`: the host wraps the two features AND the header, so
- * the band arbitrates and the header knows whether it still owes the safe-area inset.
+ * the real `<ConnectionBanner/>` registering into it — so the worst-case stack can be judged as one
+ * screen instead of summed from cards measured apart. Same real components, same nesting as
+ * `routes/root.tsx`: the host wraps the banner AND the header, so the band arbitrates and the header
+ * knows whether it still owes the safe-area inset.
  *
- * BOTH FEATURES ARE MOUNTED AND ONE OF THEM SHOWS. That is not the harness being lazy — it is the
- * app's rule made visible: the band takes one strip at a time, and `AUTH` (the refusal below) beats
- * `UPDATE` (the offer). What this card is for is the height of the real worst case, which is one
- * strip plus the header, and never two strips plus the header.
+ * The self-update banner is not part of this stack: it is an in-flow row ABOVE the band in the real
+ * shell, not a strip in it, and its worst case is judged on the shell's own card.
  *
  * The red `ConnectionBanner` here is deliberately the AUTH-ERROR branch (`bridge=undefined,
  * authError`), not the trouble→lost escalation — that branch paints red off its props alone, with no
@@ -359,8 +265,8 @@ export function PaneStackRouter({
 }: {
   home: HomeData;
   fixture: PaneFixture;
-  /** The OTHER composer lock — the device gate, independent of the crew host gate the pane derives
-   *  from `home.servers`. Both are driven at once so the stack shows every lock at the same time. */
+  /** The OTHER composer lock — the device gate, independent of the read-only one. Driven at once
+   *  with whatever else the card holds, so the stack shows every lock at the same time. */
   device: DeviceAuth;
 }) {
   const [router] = useState(() => {
@@ -372,22 +278,14 @@ export function PaneStackRouter({
           path: "/",
           loader: () => data,
           element: (
-            <CrewProvider
-              servers={data.servers}
-              sessions={data.sessions}
-              ts={data.ts}
-              pollMs={3_000}
-            >
-              <div className="flex h-full flex-col">
-                <StripHost>
-                  <UpdateRibbon />
-                  <ConnectionBanner bridge={undefined} error authError />
-                  <AppHeaderHost bridge={data.bridge} error={false}>
-                    <StackPane data={data} fixture={fixture} />
-                  </AppHeaderHost>
-                </StripHost>
-              </div>
-            </CrewProvider>
+            <div className="flex h-full flex-col">
+              <StripHost>
+                <ConnectionBanner bridge={undefined} error authError />
+                <AppHeaderHost bridge={data.bridge} error={false}>
+                  <StackPane data={data} fixture={fixture} />
+                </AppHeaderHost>
+              </StripHost>
+            </div>
           ),
         },
       ],
@@ -431,7 +329,7 @@ function StackPane({ data, fixture }: { data: HomeData; fixture: PaneFixture }) 
 // because a card built out of placeholder screens moves more smoothly than the app does, which made
 // it useless for the one question a motion card is asked: does this stutter?
 //
-// WHAT IS REAL: the shell (`StripHost` → `UpdateRibbon` + `ConnectionBanner` → `AppHeaderHost` →
+// WHAT IS REAL: the shell (`StripHost` → `ConnectionBanner` → `AppHeaderHost` →
 // `ScreenTransition` → `Outlet`), every route component, the route ids the app reads its data by,
 // the loader RESULT SHAPES, and the `shouldRevalidate: false` history opts out with.
 //
@@ -449,8 +347,6 @@ export interface FullAppFixtures {
    * view built out of another pane's id is the thing that made the walk bounce home.
    */
   screenFor: (paneId: string) => { text: string; revision: number };
-  /** The census `/crew` renders. */
-  crew: CrewData;
   /** The paired-device registry `/settings` renders. */
   devices: DevicesData;
   /** The transcript `/pane/:paneId/history` renders. */
@@ -466,7 +362,7 @@ export type FullAppRouterInstance = ReturnType<typeof createMemoryRouter>;
  * module-scoped router does.
  */
 export function createFullAppRouter(fixtures: FullAppFixtures): FullAppRouterInstance {
-  const { home, screenFor, crew, devices, history } = fixtures;
+  const { home, screenFor, devices, history } = fixtures;
 
   // THE SCOPE FOLLOWS THE URL, exactly as `rootLoader` makes it. A host or session switch is a
   // navigation to `/?h=…` / `/?s=…` and nothing else: everything downstream reads the machine and
@@ -500,8 +396,6 @@ export function createFullAppRouter(fixtures: FullAppFixtures): FullAppRouterIns
           { index: true, element: <HomeRoute /> },
           { path: "space/:spaceId", element: <SpaceRoute /> },
           { path: "settings", loader: () => devices, element: <SettingsRoute /> },
-          { path: "settings/updates", element: <UpdatesRoute /> },
-          { path: "crew", loader: () => crew, element: <CrewRoute /> },
           {
             id: PANE_ROUTE_ID,
             path: "pane/:paneId",

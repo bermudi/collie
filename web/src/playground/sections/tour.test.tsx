@@ -15,7 +15,7 @@ describe("First run section", () => {
     expect(screen.queryByText(/must be rendered inside/i)).not.toBeInTheDocument();
 
     const cards = [...container.querySelectorAll(".pg-grid > *")];
-    expect(cards).toHaveLength(7);
+    expect(cards).toHaveLength(6);
     const handles = cards.map((c) => c.getAttribute("data-state") ?? "");
     expect(new Set(handles).size).toBe(handles.length);
     for (const h of handles) expect(h).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
@@ -24,7 +24,6 @@ describe("First run section", () => {
         "first-run-fresh",
         "first-run-panes",
         "first-run-unpaired",
-        "first-run-crew",
         "first-run-push-blocked",
         "first-run-installed",
         "settings-row",
@@ -46,7 +45,6 @@ describe("First run section", () => {
     expect(card("first-run-fresh").textContent).toContain(en["tour.setup.noPanes"]);
     expect(card("first-run-panes").textContent).toContain("4 panes, 1 needs you");
     expect(card("first-run-unpaired").textContent).toContain(en["tour.pair.title"]);
-    expect(card("first-run-crew").textContent).toContain("3 machines in your crew");
     expect(card("first-run-push-blocked").textContent).toContain(en["tour.setup.pushOff"]);
     expect(card("first-run-installed").textContent).toContain(en["tour.install.title"]);
     expect(card("settings-row").textContent).toContain(en["settings.tour.title"]);

@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 
-import { useCrew } from "@/components/crew-provider";
 import { BottomSheet } from "@/components/ui/sheet";
 import { useLocale } from "@/hooks/use-locale";
 import { fetchCacheRules } from "@/lib/api";
 import { timeAgoShort } from "@/lib/format";
-import { hostName } from "@/lib/hosts";
 import { t } from "@/lib/i18n";
 import type { CacheRuleWire, PaneCache } from "@/lib/types";
 
@@ -33,8 +31,6 @@ interface CacheSheetProps {
   open: boolean;
   onClose: () => void;
   cache: PaneCache | undefined;
-  /** The machine this pane lives on. Undefined = this one, which is every solo install. */
-  host?: string | undefined;
 }
 
 /** The catalog, once per document. A module singleton because the answer is the same for every sheet. */
@@ -45,9 +41,8 @@ export function resetCacheCatalogForTests(): void {
   catalog = null;
 }
 
-export function CacheSheet({ open, onClose, cache, host }: CacheSheetProps) {
+export function CacheSheet({ open, onClose, cache }: CacheSheetProps) {
   useLocale();
-  const { servers, multi } = useCrew();
   const [rules, setRules] = useState<CacheRuleWire[] | null>(catalog);
 
   useEffect(() => {
@@ -72,8 +67,7 @@ export function CacheSheet({ open, onClose, cache, host }: CacheSheetProps) {
   }, [open, rules]);
 
   if (cache === undefined) return null;
-  const onPeer = multi && host !== undefined;
-  const rule = onPeer ? undefined : rules?.find((r) => r.id === cache.ruleId);
+  const rule = rules?.find((r) => r.id === cache.ruleId);
   const measured = cache.confidence === "observed";
   const reset = resetLine(cache);
 
@@ -123,13 +117,8 @@ export function CacheSheet({ open, onClose, cache, host }: CacheSheetProps) {
           {rule?.overridden !== undefined && ` · ${rule.overridden.retrieved}`}
         </p>
       )}
-      {rule?.note !== undefined && !onPeer && (
+      {rule?.note !== undefined && (
         <p className="px-4 pb-3 text-xs text-muted-foreground">{rule.note}</p>
-      )}
-      {onPeer && (
-        <p className="px-4 pb-3 text-xs text-muted-foreground">
-          {t("cache.sheet.onPeer", { host: hostName(servers, host) ?? host })}
-        </p>
       )}
     </BottomSheet>
   );

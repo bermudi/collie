@@ -3,8 +3,6 @@ import { Pencil, XCircle } from "lucide-react";
 
 import { BottomSheet } from "@/components/ui/sheet";
 import { ActionRow, DestructiveActionRow, RenameView } from "@/components/action-sheet-rows";
-import { HostChip } from "@/components/host-chip";
-import { useAmbientHost, useHostWriteBlock } from "@/components/crew-provider";
 import { useActionEcho } from "@/hooks/use-action-echo";
 import { usePendingConfirm } from "@/hooks/use-pending-confirm";
 import * as api from "@/lib/api";
@@ -133,15 +131,7 @@ export function TabActionsSheet({
   }
 
   const confirming = !!tab && pending === tab.tabId;
-  // A tab has no host of its own — the tab list is the LEAD's, and both writes here are addressed by
-  // the ambient scope. So the chip names the machine the write will land on: `?h=` when set,
-  // otherwise the lead. Nothing renders on a single-host install.
-  const host = useAmbientHost(scope?.host);
-  // …and the same host is what decides whether either write may be attempted at all (§10.3). Same
-  // gate as the pane sheet, one dimension up: undefined on a solo install and on a reachable host.
-  const hostBlock = useHostWriteBlock(host);
-  // The tab verbs the multiplexer underneath declares (M10/06) — asked per row, below, and asked of
-  // the machine the write will land on (M22/03), which is the same scope `hostBlock` reads.
+  // The tab verbs the multiplexer underneath declares (M10/06) — asked per row, below.
   const canRename = useMuxCapability("renameTab", scope);
   const canClose = useMuxCapability("closeTab", scope);
   // Closing a tab kills every pane in it — name the blast radius on the confirm so it's honest. The
@@ -157,15 +147,8 @@ export function TabActionsSheet({
     >
       {readOnly ? (
         <p className="py-2 text-sm text-muted-foreground">{t("space.tab.readOnly")}</p>
-      ) : hostBlock ? (
-        // Refused before it is attempted (§10.3) — closing a tab kills every pane in it, and a
-        // half-known outcome on that is the worst one to hand somebody.
-        <p className="py-2 text-sm text-muted-foreground">
-          {t("space.tab.hostBlockSuffix", { hostBlock })}
-        </p>
       ) : mode === "actions" ? (
         <div className="flex flex-col gap-1">
-          <HostChip host={host} variant="target" className="mb-1 self-start" />
           {/* Per-row capability gating, one dimension up from the pane sheet and for exactly the
               same reasons — see the note there. The two sheets must stay identical in shape, which
               is why the rows themselves are shared components. */}

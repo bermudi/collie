@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ComponentProps } from "react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -10,10 +10,8 @@ import { isReloadHeld, __resetReloadGuard } from "@/lib/reload-guard";
 import { loadDraft } from "@/lib/drafts";
 import { __resetOperatorCommands } from "@/lib/operator-config";
 import { server } from "@/test/setup";
-import { fixtureServers, recordReply } from "@/test/handlers";
-import { CrewProvider } from "./crew-provider";
+import { recordReply } from "@/test/handlers";
 import { Composer, TUI_SETTLE_MS } from "./composer";
-import { type ServerSummary } from "@/lib/types";
 
 // A guarded send is TWO reply calls: type (submit:false), then — once the text is verified on the
 // input line — submit-only (empty text). Overriding the reply handler therefore has to keep the fake
@@ -104,11 +102,9 @@ function StatusSentinel() {
   return <div data-testid="status">{status?.text ?? ""}</div>;
 }
 
-/** renderComposer + the status sentinel, for cases that assert on the status line. `servers` opts
- *  the render into a crew (default: solo, i.e. no host chrome and no host in any copy). */
+/** renderComposer + the status sentinel, for cases that assert on the status line. */
 function renderComposerWithStatus(
   overrides: Partial<ComponentProps<typeof Composer>> = {},
-  servers?: ServerSummary[],
 ) {
   const props: ComponentProps<typeof Composer> = {
     paneId: "w1:p1",
@@ -133,10 +129,10 @@ function renderComposerWithStatus(
     {
       path: "/",
       element: (
-        <CrewProvider servers={servers}>
+        <>
           <StatusSentinel />
           <Composer {...props} />
-        </CrewProvider>
+        </>
       ),
     },
   ]);
@@ -1349,24 +1345,13 @@ describe("Composer — destructive-input confirm", () => {
     expect(props.onSent).toHaveBeenCalled();
   });
 
-  it("names the machine in the confirm — and only on a crew", async () => {
+  it("names the pattern in the confirm copy", async () => {
     const user = userEvent.setup();
-    // Solo: the copy is exactly what it has always been, host clause and all absent.
     renderComposerWithStatus({ scope: { host: "workshop" } });
     await user.type(screen.getByPlaceholderText(/type a reply/i), "sudo reboot");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(screen.getByTestId("status")).toHaveTextContent(
       "Destructive: sudo (runs as root) — tap Send again to confirm",
-    );
-    cleanup();
-
-    // On a crew, "rm -r" is a different sentence depending on whose disk it runs on.
-    clearStatus();
-    renderComposerWithStatus({ scope: { host: "workshop" } }, fixtureServers);
-    await user.type(screen.getByPlaceholderText(/type a reply/i), "sudo reboot");
-    await user.click(screen.getByRole("button", { name: "Send" }));
-    expect(screen.getByTestId("status")).toHaveTextContent(
-      "Destructive: sudo (runs as root) on workshop — tap Send again to confirm",
     );
   });
 
@@ -1405,7 +1390,7 @@ describe("Composer — the machine opens the actions belt, and no band stands ab
     // The band is gone, and the word did not move somewhere else: a status word anywhere in this
     // footer would be the thing Altan
     // asked to be rid of, wearing a different address.
-    renderComposerWithStatus({ scope: { host: "workshop" } }, fixtureServers);
+    renderComposerWithStatus({ scope: { host: "workshop" } });
     expect(document.querySelector('[data-slot="composer-status"]')).toBeNull();
     for (const word of ["needs you", "working", "done", "idle", "unknown", "shell"]) {
       expect(screen.queryByText(word)).toBeNull();
@@ -1418,7 +1403,7 @@ describe("Composer — the machine opens the actions belt, and no band stands ab
     // the crew figures were 194px and 124px. A second conditional `pr-*` would not stack
     // (tailwind-merge keeps the last padding-right), which is why the number is read off the class.
     const user = userEvent.setup();
-    renderComposerWithStatus({ scope: { host: "workshop" } }, fixtureServers);
+    renderComposerWithStatus({ scope: { host: "workshop" } });
     expect(reserved(box())).toBe("11");
     // …and nothing in the field's own relative box carries the host, by either route: no chip node
     // inside it, and no `aria-describedby` pointing the textarea at one.
@@ -1438,7 +1423,7 @@ describe("Composer — the machine opens the actions belt, and no band stands ab
     // self-labelling buttons; in the accessibility tree it is the ONLY thing naming the group. So it
     // is `sr-only`, not deleted — which is also why `composer.controls.label` is still a live key in
     // all seven dictionaries. Delete the label and this group announces as an unnamed run of buttons.
-    renderComposerWithStatus({ scope: { host: "workshop" } }, fixtureServers);
+    renderComposerWithStatus({ scope: { host: "workshop" } });
     expect(screen.getByRole("group", { name: "Controls" })).toBe(row());
     expect(row().getAttribute("aria-labelledby")).toBe("composer-controls-label");
     const label = document.getElementById("composer-controls-label")!;
@@ -1455,7 +1440,7 @@ describe("Composer — the machine opens the actions belt, and no band stands ab
     // carries the swipe handle, so the boundary against the terminal is drawn once above everything
     // the thumb operates — agent-chat.test.tsx pins that half), the status band that used to sit
     // between them is gone, and the belt now stands flush under that one rule with no margin.
-    renderComposerWithStatus({ scope: { host: "workshop" } }, fixtureServers);
+    renderComposerWithStatus({ scope: { host: "workshop" } });
     expect(actions().className).toMatch(/(?:^|\s)border-b(?=\s|$)/);
     // `border-border`, not `border-rule` — the belt's edge is a component edge inside ONE chrome
     // surface (the input below); the regional cut is the chrome block's top rule.
@@ -1492,7 +1477,7 @@ describe("Composer — the machine opens the actions belt, and no band stands ab
     // operator's call. WHICH fill is measured: against the composer's `--chrome`, `bg-foreground/6`
     // is 1.13:1 light and 1.16:1 dark, and it is the only symmetric recipe available — `--muted` IS
     // `--chrome` in light and `--card` IS `--chrome` in dark, so neither token separates in both.
-    renderComposerWithStatus({ scope: { host: "workshop" } }, fixtureServers);
+    renderComposerWithStatus({ scope: { host: "workshop" } });
     expect(actions().className).toMatch(/(?:^|\s)-mx-3(?=\s|$)/);
     expect(actions().className).toMatch(/(?:^|\s)bg-foreground\/6(?=\s|$)/);
     expect(actions().className).not.toMatch(/rounded/);

@@ -3,8 +3,6 @@ import type { Page, Route } from "@playwright/test";
 import type { Locale } from "@/lib/i18n/locale";
 import { TOUR_STORAGE_KEY, TOUR_VERSION } from "@/lib/tour";
 import {
-  fixtureCrewSnapshot,
-  fixtureCrewStatus,
   fixtureSnapshot,
   fixtureTranscript,
   paneTextWithDraft,
@@ -86,16 +84,6 @@ async function answer(route: Route, path: string): Promise<void> {
       revision: 1,
     });
   }
-
-  // The DEFAULT world is solo, so the census refuses exactly as a non-lead bridge does. A case that
-  // wants a crew overrides this route with `fixtureCrewStatus`.
-  if (path === "/api/crew") {
-    return fulfillJson(
-      route,
-      { error: "this collie is not the lead of a crew", code: "crew.not_lead" },
-      404,
-    );
-  }
   if (path === "/api/config") return fulfillJson(route, { push: false, vapidPublicKey: "" });
   if (path === "/api/launchers") return fulfillJson(route, { launchers: [], home: "" });
   // Nothing paired, nothing enforced — a fresh install.
@@ -164,29 +152,6 @@ export async function seedTourSeen(page: Page): Promise<void> {
       window.localStorage.setItem(key, value);
     },
     [TOUR_STORAGE_KEY, String(TOUR_VERSION)],
-  );
-}
-
-/**
- * Turn the default solo world into a CREW: three machines in the roster and a census to match.
- *
- * `fixtureCrewSnapshot` and `fixtureCrewStatus` describe the same three machines
- * (`src/test/handlers.ts` § the crew fixtures), so the roster the host chrome reads and the census
- * the crew page reads never disagree about who is out there. Two routes are replaced and nothing
- * else is: call it AFTER {@link installApiStub}, whose 501 fall-through still covers everything
- * these two do not name.
- *
- * The roster is what the crew chrome is gated on (`components/crew-provider.tsx:118`, `isMultiHost`),
- * so this is also what makes the footer line and the Settings row exist at all.
- */
-export async function installCrewWorld(page: Page): Promise<void> {
-  await page.route(
-    (url) => url.pathname === "/api/snapshot",
-    (route) => fulfillJson(route, fixtureCrewSnapshot),
-  );
-  await page.route(
-    (url) => url.pathname === "/api/crew",
-    (route) => fulfillJson(route, fixtureCrewStatus),
   );
 }
 

@@ -11,9 +11,8 @@ import { ROOT_ROUTE_ID } from "@/lib/loaders";
 import { AppHeaderHost, RouteHeader, SettingsGear } from "./app-header";
 import { StatusBadge } from "./status-badge";
 import { CONNECTION_LOST_MS, TROUBLE_MS } from "@/hooks/use-connection-lost";
-import { __resetConnectionHealth, isLostLatched } from "@/lib/connection-health";
-import { CrewProvider } from "./crew-provider";
-import type { BridgeStatus, ServerSummary } from "@/lib/types";
+import { __resetConnectionHealth } from "@/lib/connection-health";
+import type { BridgeStatus } from "@/lib/types";
 
 // The header shell mounts CollieHome (a button) and, via SettingsGear, useNavigate — so it needs a router.
 // A `createMemoryRouter` with the real root route id, no loader: the route initialises synchronously
@@ -222,26 +221,6 @@ describe("the header — the dog keys on trouble/lost, not the first not-live fr
 
 // The header dog and the ConnectionBanner read ONE anchor (lib/connection-health.ts), which is why
 // they can never disagree — and why a crew member going quiet must not reach it. The dog is asserted
-// alongside the banner deliberately: they escalate together, so a mistake here would be wrong twice.
-describe("the header — a quiet crew member is not the phone's connection", () => {
-  beforeEach(() => __resetConnectionHealth());
-
-  it("stays at rest with an unreachable peer in the roster and a healthy lead", () => {
-    const roster: ServerSummary[] = [
-      { id: "bluefin", name: "bluefin", isLead: true, reachable: true, protocol: "ok", lastSeenAt: 100_000 },
-      { id: "workshop", name: "workshop", isLead: false, reachable: false, protocol: "ok", lastSeenAt: 1_000 },
-    ];
-    const { container } = renderHeader(
-      <CrewProvider servers={roster} ts={100_000} pollMs={1500}>
-        <Header bridge="connected" error={false} wordmark />
-      </CrewProvider>,
-    );
-    // Nothing about a peer feeds `isConnecting`, so: no gallop, no pill, no escalation.
-    expect(container.querySelector(".dog-gallop")).toBeNull();
-    expect(screen.queryByRole("status")).toBeNull();
-    expect(isLostLatched()).toBe(false);
-  });
-});
 
 // "Collie" over "on <mux>" — the header says what this collie drives, and the name arrives as DATA
 // on the one /api/config read. The fabricated name below is not any real multiplexer's, deliberately:

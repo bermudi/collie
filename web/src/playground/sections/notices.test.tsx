@@ -40,7 +40,7 @@ describe("Notices section", () => {
       expect(screen.queryByText(/must be rendered inside/i)).not.toBeInTheDocument();
 
       const cards = [...container.querySelectorAll(".pg-grid > *")];
-      expect(cards.length).toBeGreaterThanOrEqual(5);
+      expect(cards.length).toBeGreaterThanOrEqual(4);
 
       const handles = cards.map((c) => c.getAttribute("data-state") ?? "");
       expect(handles.every((h) => h.length > 0)).toBe(true);

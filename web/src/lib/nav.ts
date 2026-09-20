@@ -36,22 +36,6 @@ export function settingsPath(scope?: Scope): string {
   return `/settings${scopeSearch(scope)}`;
 }
 
-/**
- * The crew overview — the read-only census of every machine in the crew. Carries the scope like the
- * others so "back" returns you to the machine you were looking at, not to the lead.
- */
-export function crewPath(scope?: Scope): string {
-  return `/crew${scopeSearch(scope)}`;
-}
-
-/**
- * The Updates page — a CHILD of Settings, not an anchor inside it. Updating is a flow with a lead,
- * N peers, progress and a rollback state, so it gets a page and Settings keeps one row that links
- * here. Carries the scope like the others, so "back" returns to the machine you came from.
- */
-export function updatesPath(scope?: Scope): string {
-  return `/settings/updates${scopeSearch(scope)}`;
-}
 
 /**
  * The fragment naming the Paired-devices card inside Settings. It is a route-level anchor, so it

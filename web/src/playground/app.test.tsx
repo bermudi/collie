@@ -9,7 +9,7 @@ beforeAll(() => {
   if (!Element.prototype.scrollTo) Element.prototype.scrollTo = () => {};
 });
 
-// Every router-backed card here (PaneRouter, CrewRouter, SettingsRouter, …) settles through the same
+// Every router-backed card here (PaneRouter, PaneStackRouter, SettingsRouter, …) settles through the same
 // promise-based navigation pipeline motion.test.tsx documents for the app-walkthrough card, so a
 // loaded CI runner needs seconds, not Testing Library's default 1000ms, before the first render lands.
 const SLOW = { timeout: 12_000 } as const;
@@ -18,7 +18,7 @@ const SLOW = { timeout: 12_000 } as const;
 // above the router outlet (`RootLayout` in routes/root.tsx), so `<RouteHeader/>` now throws when
 // mounted without an `<AppHeaderHost/>` above it — loud by design (app-header.tsx's `RouteHeader`).
 // The unit suite got a wrapper for this (`test/header-host.tsx`), but the playground's OWN route
-// fixtures (`PaneRouter`, `PaneStackRouter`, `CrewRouter`, `SettingsRouter` in `playground/harness.tsx`)
+// fixtures (`PaneRouter`, `PaneStackRouter`, `SettingsRouter` in `playground/harness.tsx`)
 // were never given the same treatment, so every card built on them rendered React Router's default
 // "Unexpected Application Error!" boundary instead of the state it claimed to show — silently,
 // because nothing here was tested.
@@ -46,11 +46,9 @@ describe("the states playground", () => {
         // "Pane actions" is `AgentChat`'s own right-cluster button, portalled through `RouteHeader`
         // into `AppHeaderHost`'s right host; waiting on it is itself a positive assertion that the
         // host is really there, for the router kind (`PaneRouter`/`PaneStackRouter`) this regression
-        // broke. "Crew"/"Settings" are the override host's take-over title (CrewRoute/SettingsRoute).
+        // broke. "Settings" is the override host's take-over title (SettingsRoute).
         if (entry.def.id === "pane") {
           await screen.findAllByRole("button", { name: "Pane actions" }, SLOW);
-        } else if (entry.def.id === "crew") {
-          await screen.findAllByRole("heading", { name: "Crew" }, SLOW);
         } else if (entry.def.id === "settings") {
           await screen.findAllByRole("heading", { name: "Settings" }, SLOW);
         } else {
@@ -62,9 +60,6 @@ describe("the states playground", () => {
 
         if (entry.def.id === "pane") {
           expect(screen.getAllByRole("button", { name: "Pane actions" }).length).toBeGreaterThan(0);
-        }
-        if (entry.def.id === "crew") {
-          expect(screen.getAllByRole("heading", { name: "Crew" }).length).toBeGreaterThan(0);
         }
         if (entry.def.id === "settings") {
           expect(screen.getAllByRole("heading", { name: "Settings" }).length).toBeGreaterThan(0);
@@ -169,10 +164,10 @@ describe("the playground's tab bar", () => {
     async () => {
       render(<PlaygroundApp />);
 
-      fireEvent.click(within(tablist("horizontal")).getByRole("tab", { name: "Crew" }));
+      fireEvent.click(within(tablist("horizontal")).getByRole("tab", { name: "Settings" }));
 
-      await screen.findAllByRole("heading", { name: "Crew" }, SLOW);
-      expect(localStorage.getItem("collie.playground.tab")).toBe("crew");
+      await screen.findAllByRole("heading", { name: "Settings" }, SLOW);
+      expect(localStorage.getItem("collie.playground.tab")).toBe("settings");
 
       // A tab reached by editing the hash (or by back/forward, which fires the same event) must be
       // remembered too, not just a click.

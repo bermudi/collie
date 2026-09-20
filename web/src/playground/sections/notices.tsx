@@ -1,37 +1,26 @@
 // The Notices tab of the states playground: everything that ANNOUNCES — the notice primitive, the
-// strip band above the header, the connection-recovery flash, the update ribbon's states, and the
-// status toast. See ../app.tsx's header for the page's own two rules (mount REAL components with
+// strip band above the header, the connection-recovery flash, and the status toast. See ../app.tsx's header for the page's own two rules (mount REAL components with
 // REAL props; drive a module store through its own mutators). This file follows both, and every card
 // still carries its own "reach it for real" line.
 //
 // DEV-ONLY, unreachable from the app entry: see ../app.tsx and web/playground.html.
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { AppHeaderHost, RouteHeader, SettingsGear } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Notice, NOTICE_ACTION, type NoticeTone, type NoticeVariant } from "@/components/ui/notice";
-import { StripHost, StripSlot } from "@/components/ui/strip-host";
+import { StripSlot } from "@/components/ui/strip-host";
 import { AUTH, OUTAGE, DEGRADED, UPDATE } from "@/lib/strip-priority";
 import { ConnectionBanner, GREEN_MS } from "@/components/connection-banner";
 import { __resetConnectionHealth, markLive } from "@/lib/connection-health";
 import { TROUBLE_MS, CONNECTION_LOST_MS } from "@/hooks/use-connection-lost";
-import { UpdateRibbon } from "@/components/update-ribbon";
 import { HeaderStatus } from "@/components/header-status";
 import { StatusArea } from "@/components/status-area";
 import { setStatus, clearStatus, type StatusTone } from "@/lib/status";
-import { ROOT_ROUTE_ID, type HomeData } from "@/lib/loaders";
-import type { UpdateInfo } from "@/lib/types";
 
 import { Card, Group, RootRouter, Section, Segmented, Stage, type SectionDef } from "../harness";
-import {
-  homeSolo,
-  updateInFlight,
-  updatePeersFollowing,
-  updateRelease,
-  updateRestart,
-} from "../fixtures";
+import { homeSolo } from "../fixtures";
 import { Replay, SlowStage } from "./motion-harness";
 import "./motion.css";
 
@@ -56,7 +45,6 @@ export function NoticesSection(): ReactNode {
       <Group title="The band">
         <StripBandCard />
         <ConnectionRecoveryCard />
-        <UpdateRibbonSwapsCard />
       </Group>
       <Group title="Toasts">
         <StatusToastCard />
@@ -396,111 +384,6 @@ function ConnectionRecoveryCard() {
       <Replay>
         <ConnectionRecoveryStage />
       </Replay>
-    </Card>
-  );
-}
-
-// ── 4. UpdateRibbon, stepping through its states ───────────────────────────
-
-const RIBBON_OPTIONS = [
-  { value: "release", label: "Release" },
-  { value: "preflight", label: "Preflight" },
-  { value: "staging", label: "Staging" },
-  { value: "restarting", label: "Restarting" },
-  { value: "peers", label: "Peers" },
-  { value: "bundle", label: "Bundle" },
-] as const;
-type RibbonState = (typeof RIBBON_OPTIONS)[number]["value"];
-
-function ribbonUpdateFor(state: RibbonState): UpdateInfo {
-  switch (state) {
-    case "release":
-      return updateRelease;
-    case "preflight":
-      return updateInFlight("preflight");
-    case "staging":
-      return updateInFlight("staging");
-    case "restarting":
-      return updateInFlight("restarting");
-    case "peers":
-      return updatePeersFollowing;
-    case "bundle":
-      return updateRestart;
-  }
-}
-
-/**
- * A router that can push new loader data into an ALREADY-MOUNTED UpdateRibbon, built locally
- * because harness.tsx's own `RootRouter` freezes both `data` and `children` inside a useState
- * initialiser (the same trap StripToggleContext's doc comment names above). UpdateRibbon reads its
- * update info through `useOptionalRootData()`, which is React Router's own `useRouteLoaderData` and
- * cannot be intercepted with a React Context the way StripBandContent and ConnectionBannerLive
- * intercept a plain prop above. The loader closes over a ref instead, and `router.revalidate()`, the
- * same imperative method `useRevalidator()` calls on a route change, re-reads it without remounting
- * anything.
- */
-function useRevalidatingRibbonRouter(initial: HomeData) {
-  const dataRef = useRef(initial);
-  const [router] = useState(() =>
-    createMemoryRouter(
-      [
-        {
-          id: ROOT_ROUTE_ID,
-          path: "/",
-          loader: () => dataRef.current,
-          element: (
-            <StripHost>
-              <UpdateRibbon />
-            </StripHost>
-          ),
-        },
-      ],
-      { initialEntries: ["/"] },
-    ),
-  );
-  return { router, dataRef };
-}
-
-function UpdateRibbonSwapsCard() {
-  const [state, setState] = useState<RibbonState>("release");
-  const { router, dataRef } = useRevalidatingRibbonRouter({
-    ...homeSolo,
-    update: ribbonUpdateFor("release"),
-  });
-
-  useEffect(() => {
-    dataRef.current = { ...homeSolo, update: ribbonUpdateFor(state) };
-    void router.revalidate();
-  }, [state, router, dataRef]);
-
-  return (
-    <Card
-      state="update-ribbon-swaps"
-      label="update ribbon, stepping through its states"
-      reach="confirm an update and leave the app on any screen. The band counts through the run
-        without the Updates page open (see the Dashboard tab's 'update band' cards for each state at
-        rest)."
-      note="One UpdateRibbon, mounted once, driven by router.revalidate() rather than a remount per
-        tap: RootRouter's own loader data is frozen at construction (see the trap named above), so a
-        genuine picture of this control needs its own router with a re-readable loader instead. That
-        turns out to be worth checking rather than assuming: even without a remount, stepping through
-        these six states shows NO cross-fade, because UpdateRibbon registers ONE StripSlot for its
-        whole mounted life (it unregisters only when `view.kind` is 'silent', which none of these six
-        states are), so the band's OneOf never changes which layer is active, only that layer's
-        content. The 120ms cross-fade lives between DIFFERENT slots winning, which the
-        strip-band-arbitration card above shows directly. The fixed-height fact still holds: every
-        strip, this one included, now sits on Notice's own min-h-[33px] floor rather than a number
-        UpdateRibbon states itself."
-      span={2}
-    >
-      <div className="mb-2">
-        <Segmented name="ribbon state" value={state} options={RIBBON_OPTIONS} onChange={setState} />
-      </div>
-      <SlowStage>
-        <Stage>
-          <RouterProvider router={router} />
-        </Stage>
-      </SlowStage>
     </Card>
   );
 }

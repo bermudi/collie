@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Outlet,
   useLoaderData,
@@ -14,18 +14,16 @@ import { useBusyWhile } from "@/lib/busy";
 import { useAgentTransitions } from "@/hooks/use-transitions";
 import { usePushSetup } from "@/hooks/use-push";
 import { useConnectionLost } from "@/hooks/use-connection-lost";
-import { UpdateRibbon } from "@/components/update-ribbon";
 import { ConnectionBanner } from "@/components/connection-banner";
+import { UpdateAvailableBanner } from "@/components/update-available-banner";
 import { AppHeaderHost } from "@/components/app-header";
 import { StripHost } from "@/components/ui/strip-host";
 import { ScreenTransition } from "@/components/screen-transition";
-import { CrewProvider } from "@/components/crew-provider";
 import { CollieMark } from "@/components/collie-mark";
 import { TourHost } from "@/components/tour-sheet";
 import { describeThrownError } from "@/lib/api-error-message";
 import { homePath } from "@/lib/nav";
 import { scopeFromUrl } from "@/lib/session";
-import { noteLeadName, noteSnapshotCrew, noteSnapshotRun } from "@/lib/update-run-store";
 import { PANE_ROUTE_ID, type HomeData, type PaneData } from "@/lib/loaders";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/hooks/use-locale";
@@ -70,7 +68,7 @@ export function RootLayout() {
 
   // The scope rides along so a "look now" on foreground lands on the machine and session the page is
   // actually showing — a refresh aimed at the lead would leave a peer's herd exactly as stale.
-  const pollMs = usePolling(data, paneId, data.scope);
+  usePolling(data, paneId, data.scope);
   // Surface the busy bar when a navigation or a poll runs slow, each against its own threshold —
   // routine fast polls/navigations stay invisible. Mounted here so the whole app shares one
   // detector inside the router context.
@@ -92,42 +90,11 @@ export function RootLayout() {
   const [tourDecision, setTourDecision] = useState<"pending" | "open" | "closed">("pending");
   usePushSetup(tourDecision !== "closed");
 
-  // TWO FACTS PUBLISHED OUT OF THIS ROUTER, and nothing mounted (M28/01). The update screen lives in
-  // `App.tsx`, beside the wrapper it makes inert, so it has no loader data and no `CrewProvider` — and
-  // it needs the snapshot's run record and this machine's own name. Both go into
-  // `lib/update-run-store.ts`, which is the one place the run is reconciled. A component rendered here
-  // would be a descendant of the node the sheet makes inert, which is the arrangement the sheet exists
-  // to avoid.
-  const leadName = data.servers?.find((server) => server.isLead)?.name ?? null;
-  useEffect(() => {
-    noteLeadName(leadName);
-  }, [leadName]);
-  const snapshotRun = data.update?.run;
-  useEffect(() => {
-    noteSnapshotRun(snapshotRun);
-  }, [snapshotRun]);
-  // And a THIRD, since M32: the legs that ride the status. A peers-only run writes no record, so the
-  // run above says nothing about it, and the screen learns of it from these. The store stamps each
-  // one on receipt and tells its readers only when what the crew says has changed.
-  const snapshotUpdate = data.update;
-  useEffect(() => {
-    noteSnapshotCrew(snapshotUpdate);
-  }, [snapshotUpdate]);
-
   // A viewport-height flex column: the top banners (when shown) are in-flow rows at the top and the
   // active route fills the rest (each route root is `min-h-0 flex-1`). This is what keeps a banner
   // from covering the route's sticky header — it reserves real space instead of overlaying.
   return (
-    // The crew roster is published here, at the data root, so every surface below — including sheets
-    // portalled out to document.body — can answer "which machine?" without a prop chain. With no crew
-    // the provider publishes the solo value and nothing downstream renders any host chrome.
-    //
-    // `ts` and the poll cadence ride along for tier-2 (lead↔peer) health: §10.2 presents a member
-    // stale once the lead's last receipt from it is older than `3 × pollMs` (capped at 15s), and
-    // the number is the one `usePolling` above RETURNS — the gap it is actually running on, not a
-    // second derivation of it, so the tolerance can never be computed against a cadence we aren't
-    // using. That mattered more once the cadence gained inputs beyond the snapshot (#156).
-    <CrewProvider servers={data.servers} sessions={data.sessions} ts={data.ts} pollMs={pollMs}>
+    <>
       {/* The first-launch tour, and the one component on this shelf that usually renders nothing. It
           is the GATE as well as the sheet: it reads the per-device store, opens once on the first
           real snapshot, marks itself seen before the first slide paints, and reports what it decided
@@ -136,9 +103,16 @@ export function RootLayout() {
           it. */}
       <TourHost home={data} onDecision={setTourDecision} />
       <div className="flex h-[100dvh] flex-col overflow-hidden">
-        {/* THE BAND, and the rule that there is only ever one strip in it. Four facts can be true at
-            once above the header — the auth refusal, a lost connection, a degraded one, an update on
-            offer — and none of them excludes another. Before this host arbitrated them, each row
+        {/* THE SELF-UPDATE BANNER, above the band: the fallback row for a bundle the bridge has left
+            behind while the page holds unsent work (or has already auto-updated once for this
+            build). Mounted unconditionally so useSelfUpdate()'s controller runs for the app's
+            lifetime — it renders null while there is nothing to say. It is an in-flow row, not a
+            strip, because it is not a condition of the LINK: the app works fine on the old bundle.
+            See components/update-available-banner.tsx. */}
+        <UpdateAvailableBanner />
+        {/* THE BAND, and the rule that there is only ever one strip in it. Three facts can be true at
+            once above the header — the auth refusal, a lost connection, a degraded one — and none of
+            them excludes another. Before this host arbitrated them, each row
             reserved the notch for itself (each was written assuming it might be the first thing on
             screen), so ribbon + header on an iPhone paid for the safe-area inset twice and left a
             dead band at the top of the app. One winner, one inset, one owner.
@@ -147,12 +121,6 @@ export function RootLayout() {
             the route are the host's `children` and follow the band in the DOM. Which fact beats
             which is `lib/strip-priority.ts` — a fact about this app, deliberately not about `ui/`. */}
         <StripHost>
-          {/* THE update band, and the only one: a release on offer, a confirm just tapped, a run in
-              flight, a new bridge this bundle is behind, and peers following — one row that says
-              whichever of those is true. Mounted unconditionally so the bundle self-updater's
-              controller runs (and can auto-update) for the app's lifetime; it registers no slot when
-              it has nothing to say. */}
-          <UpdateRibbon />
           {/* The app's ONE connection surface: a thin bar that stays hidden while healthy, appears
               amber "reconnecting…" only after ≥4s of sustained trouble (the flicker fix), escalates to a
               red "not connected" cause + Retry/Reload at ≥15s, and flashes green on recovery. Reads the
@@ -191,7 +159,7 @@ export function RootLayout() {
           </AppHeaderHost>
         </StripHost>
       </div>
-    </CrewProvider>
+    </>
   );
 }
 

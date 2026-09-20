@@ -67,34 +67,20 @@ describe("updateNotice", () => {
     expect(updateNotice(someUpdate({ releaseAvailable: true, latest: null }))).toBeNull();
   });
 
-  // The command spelling follows the install kind (M14/01 §5.3): Herdr's plugin actions reach only a
-  // Herdr-managed (detached) checkout. A binary install, a linked dev clone and an unknown layout are
-  // told the `collie` verbs; an ABSENT kind is an older, git-era bridge and keeps the Herdr spelling.
-  it("spells the collie verbs on a binary install", () => {
-    expect(updateNotice(someUpdate({ bridgeStale: true, installKind: "binary" }))?.command).toBe(
-      "collie restart",
-    );
-    expect(
-      updateNotice(someUpdate({ majorAvailable: "1.0.0", installKind: "binary" }))?.command,
-    ).toBe("collie update --major");
-  });
-
-  it("spells the collie verbs on a linked clone and an unknown layout", () => {
-    expect(updateNotice(someUpdate({ bridgeStale: true, installKind: "linked-clone" }))?.command).toBe(
-      "collie restart",
-    );
-    expect(updateNotice(someUpdate({ bridgeStale: true, installKind: "unknown" }))?.command).toBe(
-      "collie restart",
+  // The command spelling is the Herdr plugin action, unconditionally: the action runs from ANY
+  // directory (Herdr resolves the plugin's checkout), so it is the one command this banner can
+  // honestly name for the install kinds this build fronts.
+  it("names the Herdr restart action when the running bridge is stale", () => {
+    expect(updateNotice(someUpdate({ bridgeStale: true }))?.command).toBe(
+      "herdr plugin action invoke restart --plugin herdr.collie",
     );
   });
 
-  it("keeps the Herdr actions on a Herdr-managed checkout, named or absent (older bridge)", () => {
-    expect(
-      updateNotice(someUpdate({ bridgeStale: true, installKind: "detached-checkout" }))?.command,
-    ).toBe("herdr plugin action invoke restart --plugin herdr.collie");
-    expect(
-      updateNotice(someUpdate({ majorAvailable: "1.0.0", installKind: undefined }))?.command,
-    ).toBe("herdr plugin action invoke update-major --plugin herdr.collie");
+  it("names the Herdr update-major action for a major crossing", () => {
+    const major = "https://github.com/AltanS/collie/releases/tag/v1.0.0";
+    expect(updateNotice(someUpdate({ majorAvailable: "1.0.0", majorUrl: major }))?.command).toBe(
+      "herdr plugin action invoke update-major --plugin herdr.collie",
+    );
   });
 });
 
@@ -139,46 +125,12 @@ function renderBanner(update: UpdateInfo | undefined) {
   return render(<RouterProvider router={router} />);
 }
 
-// ── A PACKAGE SWAP UNDER A LIVE PROCESS (M17/02) ─────────────────────────────
-// `pacman -Syu` replaces the root while the bridge runs, so the version on disk stops being the
-// version running. The HOST decides both the state and the command; the phone renders them.
-describe("updateNotice — restart needed after a package swap", () => {
-  it("outranks the stale-source restart and takes the host's own command", () => {
-    expect(
-      updateNotice(
-        someUpdate({
-          restartNeeded: true,
-          restartCommand: "collie restart",
-          bridgeStale: true,
-          releaseAvailable: true,
-        }),
-      ),
-    ).toEqual({
-      line: "Collie was replaced on disk. Restart it.",
-      command: "collie restart",
-    });
-  });
-
-  it("says nothing on a bridge that sends neither field, which is every install before this", () => {
-    expect(updateNotice(someUpdate({}))).toBeNull();
-    // And a raised flag with no command to name falls through rather than printing a bare line: a
-    // restart notice the operator cannot act on is a notice with nothing in it.
-    expect(updateNotice(someUpdate({ restartNeeded: true }))).toBeNull();
-  });
-});
-
 describe("UpdateBanner", () => {
   it("shows the release notice as a link to the release, with no command (the page carries it)", async () => {
     renderBanner(someUpdate({ releaseAvailable: true, latest: "0.10.3" }));
     const link = await screen.findByRole("link", { name: "Collie 0.10.3 available" });
     expect(link).toHaveAttribute("href", RELEASE_URL);
     expect(screen.queryByRole("button")).toBeNull(); // no copyable command for the release case
-  });
-
-  it("shows the package-swap restart line with the host's command", async () => {
-    renderBanner(someUpdate({ restartNeeded: true, restartCommand: "collie restart" }));
-    expect(await screen.findByText("Collie was replaced on disk. Restart it.")).toBeInTheDocument();
-    expect(screen.getByText("collie restart")).toBeInTheDocument();
   });
 
   it("shows the restart line (no link) when the running bridge is stale", async () => {
@@ -195,38 +147,5 @@ describe("UpdateBanner", () => {
     await screen.findByTestId("root"); // wait for the loader to resolve
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.queryByText(/available|restart/i)).toBeNull();
-  });
-});
-
-// ── A packaged install (ADR 0035) ────────────────────────────────────────────
-// The kind that does not update itself. It is the one place the footer must NOT name an update
-// command: `collie update --major` is exactly what the CLI refuses on an unwritable root, so
-// printing it here would tell the operator to run the thing this build made fail.
-
-describe("updateNotice — a system package", () => {
-  it("names no update command for a major, and still links the release", () => {
-    const notice = updateNotice(
-      someUpdate({ majorAvailable: "2.0.0", majorUrl: RELEASE_URL, installKind: "packaged" }),
-    );
-    expect(notice?.command).toBeUndefined();
-    expect(notice?.href).toBe(RELEASE_URL);
-    // The LINE stays: that a major is out is worth knowing however it gets taken.
-    expect(notice?.line).toContain("2.0.0");
-  });
-
-  it("every other kind still gets its command, so this is not a blanket removal", () => {
-    expect(
-      updateNotice(someUpdate({ majorAvailable: "2.0.0", installKind: "detached-checkout" }))?.command,
-    ).toBe("herdr plugin action invoke update-major --plugin herdr.collie");
-    expect(updateNotice(someUpdate({ majorAvailable: "2.0.0", installKind: "binary" }))?.command).toBe(
-      "collie update --major",
-    );
-  });
-
-  it("restart still carries a command — a package restarts like anything else on PATH", () => {
-    // Only UPDATING is someone else's; the binary is on PATH and `collie restart` drives the unit.
-    expect(updateNotice(someUpdate({ bridgeStale: true, installKind: "packaged" }))?.command).toBe(
-      "collie restart",
-    );
   });
 });

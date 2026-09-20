@@ -9,11 +9,9 @@ import { ConnectionInfo } from "@/components/connection-info";
 import { Card } from "@/components/ui/card";
 import { NotifyPrefsControl } from "@/components/notify-prefs-control";
 import { PairedDevices } from "@/components/paired-devices";
-import { CrewSettingsCard } from "@/components/crew-settings-card";
 import { SnoozeControl } from "@/components/snooze-control";
 import { ThemeControl } from "@/components/theme-control";
 import { HapticsControl } from "@/components/haptics-control";
-import { HandsFreeControl } from "@/components/hands-free-control";
 import { ZenControl } from "@/components/zen-control";
 import { TourControl } from "@/components/tour-control";
 import { InstallControl } from "@/components/install-control";
@@ -21,7 +19,7 @@ import { LanguageControl } from "@/components/language-control";
 import { FontSettingsControl } from "@/components/font-settings";
 import { HarnessBarControl } from "@/components/harness-bar-control";
 import { TypefaceControl } from "@/components/typeface-control";
-import { UpdatesSettingsCard } from "@/components/updates-settings-card";
+import { UpdateCheckControl } from "@/components/update-check-control";
 import { Switch } from "@/components/ui/switch";
 import { fetchConfig } from "@/lib/api";
 import { usePushControl } from "@/hooks/use-push";
@@ -155,11 +153,6 @@ export function SettingsRoute() {
             to the herd/notification settings below. Renders nothing where vibrate is unsupported. */}
         <HapticsControl />
 
-        {/* Voice, when this collie has any: also "how this phone treats you", and it belongs beside
-            haptics rather than with the herd settings below. Renders nothing where no provider is
-            configured or the browser cannot record. */}
-        <HandsFreeControl />
-
         {/* AVAILABILITY ONLY. This row does not turn zen on — it decides whether the pane's actions
             sheet offers the "Zen mode" row at all. It sits with haptics and voice because it is the
             same kind of thing: a persisted, per-device decision about how this phone treats you,
@@ -221,21 +214,14 @@ export function SettingsRoute() {
           </>
         )}
 
-        {/* ONE row for the whole subject, where three cards used to stand. Updating is a flow with
-            a lead, N peers, progress and a rollback state, so it lives on `/settings/updates` and
-            this page keeps the row that opens it — a status line and a chevron, in the same idiom
-            as the crew row below. */}
-        <UpdatesSettingsCard />
+        {/* "Check for updates" — the one update surface left: it forces a fresh upstream look and
+            reports the result; the actionable lines live in the footer's UpdateBanner. */}
+        <UpdateCheckControl />
 
         {/* Access sits with the connection diagnostics — both answer "what is this device allowed
             to do, and why". Pairing is the gate you can change from here; ConnectionInfo below only
             reports the header-based one. */}
         <PairedDevices data={devices} />
-
-        {/* The crew census, immediately above the connection diagnostics: both answer "what is this
-            thing talking to, and is it well". Renders NOTHING on a solo install — the card owns that
-            gate itself (useCrew().multi), so this page needs no crew-shaped conditional. */}
-        <CrewSettingsCard />
 
         <ConnectionInfo bridge={root?.bridge} device={root?.device} build={serverBuild} />
 

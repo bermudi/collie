@@ -25,10 +25,8 @@ function renderScreen(props: Partial<TourSheetProps> = {}) {
       open
       onClose={onClose}
       mux="Herdr"
-      host="bluefin"
       panes={4}
       needsYou={1}
-      machines={0}
       pushState={pushDone}
       onEnablePush={onEnablePush}
       {...props}
@@ -77,24 +75,15 @@ describe("TourSheet — the claim", () => {
     expect(screen.getByRole("heading", { name: en["tour.title"] })).toBeInTheDocument();
   });
 
-  it("names this install's multiplexer and machine", () => {
-    renderScreen({ mux: "tmux", host: "minibuch" });
-    expect(
-      screen.getByText(t("tour.lead", { mux: "tmux", host: "minibuch" })),
-    ).toBeInTheDocument();
-  });
-
-  // A solo snapshot carries no `servers` at all, so there is no machine LABEL to print — and the URL
-  // host is not one (on a served install it is a long DNS name nobody calls the machine).
-  it("drops the machine clause when the snapshot names no machine", () => {
-    renderScreen({ host: undefined });
-    expect(screen.getByText(t("tour.leadNoHost", { mux: "Herdr" }))).toBeInTheDocument();
+  it("names this install's multiplexer", () => {
+    renderScreen({ mux: "tmux" });
+    expect(screen.getByText(t("tour.lead", { mux: "tmux" }))).toBeInTheDocument();
   });
 
   // "under unknown" is a worse sentence than no name at all — the rule lib/mux-capability.ts states
   // for every read of the multiplexer's name.
   it("drops the multiplexer clause too while no bridge has answered", () => {
-    renderScreen({ mux: "", host: undefined });
+    renderScreen({ mux: "" });
     expect(screen.getByText(en["tour.leadNoMux"])).toBeInTheDocument();
   });
 });
@@ -113,17 +102,6 @@ describe("TourSheet — your setup", () => {
   it("leaves the blocked half off when nothing is blocked", () => {
     renderScreen({ panes: 4, needsYou: 0 });
     expect(screen.getByText("4 panes")).toBeInTheDocument();
-  });
-
-  it("hides the crew row on a solo install", () => {
-    renderScreen({ machines: 0 });
-    // Anchored, because one of the six capability lines also ends in "in your crew".
-    expect(screen.queryByText(/^\d+ machines? in your crew$/)).not.toBeInTheDocument();
-  });
-
-  it("counts the machines on a crew", () => {
-    renderScreen({ machines: 3 });
-    expect(screen.getByText("3 machines in your crew")).toBeInTheDocument();
   });
 
   it("says this device may type", () => {
@@ -195,7 +173,6 @@ describe("TourSheet — what you can do here", () => {
       "tour.can.type",
       "tour.can.harness",
       "tour.can.session",
-      "tour.can.crew",
     ] as const) {
       expect(screen.getByText(en[key])).toBeInTheDocument();
     }

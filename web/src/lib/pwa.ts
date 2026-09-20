@@ -295,8 +295,8 @@ function setStage(next: UpdateStage): void {
 /**
  * WHEN THE DOWNLOAD STARTED, so a download with no progress yet still has an age.
  *
- * The update screen needs it twice: to show elapsed time, and to tell a download that is slow from
- * one that has stopped (`lib/update-screen.ts`'s `DOWNLOAD_HUNG_MS`). Before the first asset lands
+ * Readers need it twice: to show elapsed time, and to tell a download that is slow from one that
+ * has stopped. Before the first asset lands
  * there is no progress message to date, and a row that said nothing until one arrived would be
  * silent for exactly the worst case.
  */

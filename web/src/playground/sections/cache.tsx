@@ -11,8 +11,8 @@ import { useState } from "react";
 import { CacheChip } from "@/components/cache-chip";
 import { CacheSheet } from "@/components/cache-sheet";
 import type { PaneCache } from "@/lib/types";
-import { cacheNow, homeCrew, paneCache } from "../fixtures";
-import { Card, Group, PackedRootRouter, Section, Stage, type SectionDef } from "../harness";
+import { cacheNow, paneCache } from "../fixtures";
+import { Card, Group, Section, Stage, type SectionDef } from "../harness";
 
 export const DEF: SectionDef = {
   id: "cache",
@@ -25,11 +25,11 @@ export const DEF: SectionDef = {
 
 const MIN = 60_000;
 
-function ChipStage({ cache, host }: { cache: PaneCache | undefined; host?: string }) {
+function ChipStage({ cache }: { cache: PaneCache | undefined }) {
   return (
     <Stage height={72}>
       <div className="flex h-full items-center p-4">
-        <CacheChip cache={cache} host={host} />
+        <CacheChip cache={cache} />
       </div>
     </Stage>
   );
@@ -109,17 +109,6 @@ export function CacheSection() {
       </Group>
 
       <Group title="A peer's ink, and the sheet">
-        <Card
-          state="cache-peer"
-          label="cache chip, on a peer's pane"
-          reach="a crew dashboard, a pane hosted on another machine. The number is computed on that
-            machine with its own rules; the chip wears that machine's ink instead of a coloured dot
-            of its own."
-        >
-          <PackedRootRouter data={homeCrew}>
-            <ChipStage cache={paneCache({ state: "warm", expiresAt: cacheNow + 8 * MIN })} host="attic" />
-          </PackedRootRouter>
-        </Card>
 
         <Card
           state="cache-sheet"

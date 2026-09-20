@@ -26,8 +26,7 @@ import { __resetOperatorCommands } from "@/lib/operator-config";
 import { submitPromptOption } from "@/lib/prompt-action";
 import { submitWizardKeys } from "@/lib/wizard-action";
 import { fixtureAgents, fixtureShellPanes, fixtureTabs } from "@/test/handlers";
-import { CrewProvider } from "./crew-provider";
-import type { AgentStatus, AgentView, ServerSummary, TabView } from "@/lib/types";
+import type { AgentStatus, AgentView, TabView } from "@/lib/types";
 import { withHeaderHost } from "@/test/header-host";
 import { COLLAPSE_MS } from "./ui/collapse";
 import { AgentChat } from "./agent-chat";
@@ -258,53 +257,13 @@ describe("AgentChat — the pane header's identity block", () => {
     // Scoped by data-slot, never by a bare role query: `ui/strip-host.tsx` mounts two permanent
     // sr-only live regions, so `getByRole("status")` is ambiguous in any tree with a host in it and
     // would fail as "missing" rather than "duplicated".
-    const { container } = renderCrewChat("workshop"); // a REAL crew — HostChip hides on a solo one
+    const { container } = renderChat();
     expect(slot(container, "caption")).toBeNull();
     expect(block(container)?.textContent).not.toContain("needs you");
     const row = belt(container);
     expect(row!.querySelector('[aria-label*="host" i]')).toBeNull();
     // The state is not down there either — that was the half Altan asked to be rid of.
     expect(row!.textContent).not.toContain("needs you");
-  });
-
-  it("carries the machine at the END OF THE PATH LINE, beside the cache reading, on a crew only", () => {
-    // WHERE A PANE LIVES AND HOW LONG ITS WORK STAYS WARM ARE ONE SENTENCE, so they ride on the line
-    // the working directory already owns and the corner keeps the ⋮ alone. The pair stood in a
-    // two-slot column in that corner for a day, and Altan, reading his phone: "the top section with
-    // host and cache stuff is not where it needs to be yet". The nine options went to the playground
-    // and option 2 is this.
-    const { container } = renderCrewChat("workshop"); // a REAL crew — HostChip hides on a solo one
-    // The borderless `bare` run, and it still announces "host: …" — this header is ABOUT a pane, it
-    // is not the surface a reply is typed on, which is the whole of what `sends` marks. Unreachable
-    // here, so the run carries the fault with it.
-    const tag = screen.getByLabelText(/^host: workshop \(unreachable\)$/i);
-    // In the meta row, and that row is INSIDE the lines block, on the second line — not in the
-    // trailing corner and not beside the block, either of which would take the width from line 1 and
-    // from the pane's own name.
-    const meta = container.querySelector<HTMLElement>('[data-slot="pane-meta"]')!;
-    expect(meta.contains(tag)).toBe(true);
-    expect(slot(container, "lines")!.contains(meta)).toBe(true);
-    // SAFETY: the lines block's second child is the plain <div> line-2 row written in agent-chat.tsx,
-    // never an SVG or other non-HTMLElement.
-    const line2 = slot(container, "lines")!.children[1] as HTMLElement;
-    expect(line2.contains(meta)).toBe(true);
-    // The PATH is conditional and this fixture has none to add; the ROW is not. It stands either
-    // way, at the line's own height, so a pane with no path keeps the block at 36px and nothing
-    // around it moves when a reading arrives on the next poll.
-    expect(slot(container, "cwd")).toBeNull();
-    // THE CORNER IS THE ⋮ AND NOTHING ELSE, and the tap surface is not this run's parent: a button
-    // inside a button is a control no reader can reach, which is why the surface is a sibling laid
-    // under the lines rather than a box around them.
-    expect(meta.contains(screen.getByLabelText(/pane actions/i))).toBe(false);
-    expect(identity(container)!.contains(tag)).toBe(false);
-    cleanup();
-
-    // Solo — every install that exists today. The row is still drawn, so line 2 keeps its height;
-    // the chip inside it renders nothing at all.
-    const solo = renderChat();
-    expect(screen.queryByLabelText(/^host: /i)).toBeNull();
-    const soloMeta = solo.container.querySelector<HTMLElement>('[data-slot="pane-meta"]')!;
-    expect(soloMeta.className).toMatch(/(?:^|\s)h-3(?=\s|$)/);
   });
 
   it("never changes the header's height, whatever the meta has to say", () => {
@@ -324,26 +283,21 @@ describe("AgentChat — the pane header's identity block", () => {
       /(?:^|\s)(h-3)(?=\s|$)/.exec(
         c.querySelector<HTMLElement>('[data-slot="pane-meta"]')?.className ?? "",
       )?.[1];
-    const crew = renderCrewChat("workshop");
-    expect(metaHeight(crew.container)).toBe("h-3");
     // The row still states one floor and no height of its own, and the meta is the path line's own
-    // 12px box, so line 2 measures the same whatever the two chips have to say.
-    const row = crew.container.querySelector<HTMLElement>('[data-slot="header-row"]')!;
+    // 12px box, so line 2 measures the same whatever the chip has to say.
+    const solo = renderChat();
+    expect(metaHeight(solo.container)).toBe("h-3");
+    const row = solo.container.querySelector<HTMLElement>('[data-slot="header-row"]')!;
     expect(row.className).toMatch(/(?:^|\s)min-h-15(?=\s|$)/);
     expect(row.className).not.toMatch(/(?:^|\s)h-\d/);
     // Nothing in the meta draws a 44px box; the reading's target is reached with a `::before`.
-    const meta = crew.container.querySelector<HTMLElement>('[data-slot="pane-meta"]')!;
+    const meta = solo.container.querySelector<HTMLElement>('[data-slot="pane-meta"]')!;
     // SAFETY: every element inside the meta is HTML written in pane-meta.tsx or in the chips it
     // mounts; the `svg` marks inside them are excluded by the selector, so every hit carries a
     // string className.
     for (const el of meta.querySelectorAll<HTMLElement>("div, button, span")) {
       expect(el.className).not.toMatch(/(?:^|\s)(?:size-11|h-11|min-h-11)(?=\s|$)/);
     }
-    cleanup();
-
-    // Solo: no host run, and the same box.
-    const solo = renderChat();
-    expect(metaHeight(solo.container)).toBe("h-3");
     cleanup();
 
     // A pane whose agent is gone: no lines at all, no ⋮ — and the corner column stands empty rather
@@ -1224,34 +1178,6 @@ describe("AgentChat — top-of-mirror history affordance", () => {
 // log and reported none is the operator's to fix (the `herdr integration install` hook), while an
 // agent with no journal adapter has nothing to say. The line is prose, never a control — there is
 // still no transcript to open.
-describe("AgentChat — no session reported", () => {
-  const noSessionNote = () => screen.queryByText(/has not reported a session to Herdr/i);
-
-  it("explains the silence on an agent that could have a transcript but reported none", () => {
-    const agent = { ...fixtureAgents[0]!, agent: "claude" }; // journal adapter, no hasSession
-    renderChat({ agent, agents: [agent] });
-    const note = noSessionNote();
-    expect(note).toBeInTheDocument();
-    expect(note).toHaveTextContent(/^claude /);
-    // Prose, not an affordance: nothing here is tappable, and the history button stays absent.
-    expect(note?.closest("button")).toBeNull();
-    expect(screen.queryByRole("button", { name: /show entire history/i })).not.toBeInTheDocument();
-  });
-
-  it("says nothing once the pane has reported a session", () => {
-    const agent = { ...fixtureAgents[0]!, agent: "claude", hasSession: true };
-    renderChat({ agent, agents: [agent] });
-    expect(noSessionNote()).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /show entire history/i })).toBeInTheDocument();
-  });
-
-  it("says nothing for an agent with no journal adapter — there is no transcript to promise", () => {
-    const agent = { ...fixtureAgents[0]!, agent: "unknown-agent" }; // block grammars, no journal
-    renderChat({ agent, agents: [agent] });
-    expect(noSessionNote()).not.toBeInTheDocument();
-  });
-});
-
 // The strip has its own scroll bound (`max-h-[18dvh]`) for a statusline tall enough to spill it. On a
 // phone, dragging past that bound with no `overscroll-contain` chains the gesture into the document
 // (there is no other scrollable ancestor to absorb it) and drags the whole app — composer included —
@@ -1266,110 +1192,6 @@ describe("AgentChat — statusline strip scroll containment", () => {
     );
     expect(strip).toBeDefined();
     expect(strip!.className).toMatch(/(?:^|\s)overscroll-contain(?=\s|$)/);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TIER 2 — the pane's MACHINE is quiet, the phone's link is fine (M5/03).
-//
-// Everything here is about one distinction: a peer outage degrades THIS pane and says so, while the
-// app-wide connection surfaces (banner, header dog, polling) belong to tier 1 and stay out of it.
-// ─────────────────────────────────────────────────────────────────────────────
-
-const crewRoster: ServerSummary[] = [
-  { id: "bluefin", name: "bluefin", isLead: true, reachable: true, protocol: "ok", lastSeenAt: 5_000 },
-  // Reachable-but-long-unseen would be equally stale; unreachable is the case the operator meets.
-  { id: "workshop", name: "workshop", isLead: false, reachable: false, protocol: "ok", lastSeenAt: 1_000 },
-  {
-    id: "attic",
-    name: "attic",
-    isLead: false,
-    reachable: false,
-    protocol: "incompatible",
-    protocolDetail: "crew protocol 2 (this collie speaks 1)",
-    lastSeenAt: 0,
-  },
-];
-
-/** As above, but inside a crew whose lead assembled the snapshot at `ts` (the lead's own clock). */
-function renderCrewChat(host: string, overrides: Partial<ComponentProps<typeof AgentChat>> = {}) {
-  const agent = { ...fixtureAgents[0]!, host };
-  const props: ComponentProps<typeof AgentChat> = {
-    paneId: agent.paneId,
-    scope: { host },
-    agent,
-    agents: [agent],
-    shellPanes: [],
-    tabs: [],
-    text: "output from before it went quiet",
-    onBack: vi.fn(),
-    onSelect: vi.fn(),
-    ...overrides,
-  };
-  const router = createMemoryRouter([
-    {
-      path: "/",
-      element: withHeaderHost(
-        <CrewProvider servers={crewRoster} ts={20_000} pollMs={1500}>
-          <AgentChat {...props} />
-        </CrewProvider>,
-      ),
-    },
-  ]);
-  const { container } = render(<RouterProvider router={router} />);
-  return { props, container };
-}
-
-describe("AgentChat — a pane on a host the lead can't reach", () => {
-  it("keeps showing the last known mirror, attributed to the machine by name", () => {
-    renderCrewChat("workshop");
-    // Never blank, never a spinner: the content is real, it is just not current.
-    expect(screen.getByText(/output from before it went quiet/)).toBeInTheDocument();
-    const notice = screen.getByRole("status");
-    expect(notice).toHaveTextContent(/workshop is unreachable/i);
-    expect(notice).toHaveTextContent(/last known/i);
-  });
-
-  it("says a write will be refused — before the user taps Send to find out", () => {
-    renderCrewChat("workshop");
-    expect(screen.getByRole("status")).toHaveTextContent(/refused/i);
-    // The composer names the machine rather than the generic read-only reason.
-    expect(screen.getByPlaceholderText(/workshop is unreachable/i)).toBeDisabled();
-    expect(screen.queryByPlaceholderText(/type a reply/i)).not.toBeInTheDocument();
-  });
-
-  it("refuses the reply BEFORE any request is made (§10.3 — no queue, no retry)", async () => {
-    const calls: string[] = [];
-    server.use(
-      http.post(/\/api\/pane\/[^/]+\/(reply|keys)$/, ({ request }) => {
-        calls.push(request.url);
-        return HttpResponse.json({ ok: true });
-      }),
-    );
-    renderCrewChat("workshop");
-    const box = screen.getByPlaceholderText(/workshop is unreachable/i);
-    // Disabled, so the user can't even get text in — and Send is off with it. The point of asserting
-    // the network too is that nothing routes around the disabled state.
-    expect(box).toBeDisabled();
-    expect(screen.getByLabelText("Send")).toBeDisabled();
-    await new Promise((r) => setTimeout(r, 0));
-    expect(calls).toEqual([]);
-  });
-
-  it("gives an incompatible member its own reason, verbatim", () => {
-    renderCrewChat("attic");
-    const notice = screen.getByRole("status");
-    expect(notice).toHaveTextContent(/attic is running an incompatible Collie/i);
-    expect(notice).toHaveTextContent(/crew protocol 2 \(this collie speaks 1\)/);
-    // Never seen at all → there is no last-good screen under the banner, and it says so rather than
-    // implying the empty mirror is the machine's real state.
-    expect(notice).toHaveTextContent(/nothing cached/i);
-  });
-
-  it("a live host in the same crew is completely untouched", () => {
-    renderCrewChat("bluefin");
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/type a reply/i)).not.toBeDisabled();
   });
 });
 

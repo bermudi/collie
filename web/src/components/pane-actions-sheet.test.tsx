@@ -4,8 +4,7 @@ import { http, HttpResponse } from "msw";
 
 import { server } from "@/test/setup";
 import { clearStatus } from "@/lib/status";
-import type { AgentView, ServerSummary } from "@/lib/types";
-import { CrewProvider } from "./crew-provider";
+import type { AgentView } from "@/lib/types";
 import { PaneActionsSheet } from "./pane-actions-sheet";
 
 // The long-press pane actions sheet: an action-list first view (Rename / Close pane), with rename
@@ -227,35 +226,6 @@ describe("PaneActionsSheet — read-only", () => {
 // Close and rename are §10.3 writes to one specific machine — the pane's own. On a crew member the
 // lead can't reach they are refused BEFORE anything is attempted: there is no queue and no retry, and
 // a half-known "did the close land?" on a real terminal is the worst outcome to hand somebody.
-describe("PaneActionsSheet — a pane on an unreachable machine", () => {
-  const roster: ServerSummary[] = [
-    { id: "bluefin", name: "bluefin", isLead: true, reachable: true, protocol: "ok", lastSeenAt: 9_000 },
-    { id: "workshop", name: "workshop", isLead: false, reachable: false, protocol: "ok", lastSeenAt: 1_000 },
-  ];
-  const crew = ({ children }: { children: React.ReactNode }) => (
-    <CrewProvider servers={roster} ts={20_000} pollMs={1500}>
-      {children}
-    </CrewProvider>
-  );
-
-  it("replaces both actions with the machine's name and its last-seen age", () => {
-    render(<PaneActionsSheet {...renderProps({ pane: { ...agent, host: "workshop" } })} />, {
-      wrapper: crew,
-    });
-    expect(screen.getByText(/workshop is unreachable/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /rename/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /close pane/i })).not.toBeInTheDocument();
-  });
-
-  it("leaves a pane on a reachable member of the same crew exactly as it was", () => {
-    render(<PaneActionsSheet {...renderProps({ pane: { ...agent, host: "bluefin" } })} />, {
-      wrapper: crew,
-    });
-    expect(screen.getByRole("button", { name: /rename/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /close pane/i })).toBeInTheDocument();
-  });
-});
-
 // The two READ rows the pane header hands this sheet when the ⋮ opens it. The pane STRIP passes
 // neither, and that asymmetry is the design: find searches the buffer the open pane already fetched,
 // and a strip pill can open this sheet on a pane whose output was never loaded.
@@ -318,81 +288,5 @@ describe("PaneActionsSheet — the read rows", () => {
     for (const name of ["Find in output", "Conversation history", "Rename", "Close pane"]) {
       expect(screen.getByRole("button", { name })).toHaveClass("min-h-11");
     }
-  });
-});
-
-// The host chip moved INTO the title row (beside the pane name) so every row in the sheet — not
-// just Close — reads as acting on a specific machine. Queries are scoped by `data-slot` because a
-// bare text/role query is ambiguous once the title row can hold two name-shaped things.
-//
-// jsdom does no layout, so "the title row's height never changes" and "the pane name truncates
-// before the host does" are pinned here as the CSS/structure that PRODUCES those facts (the
-// `min-w-0`/`truncate` split, the chip's `shrink-0`/fixed `max-w-[8rem]`), not as measured pixels.
-// The pixels were measured over CDP in a real browser (Chrome, via agent-browser) against the exact
-// markup this component renders, at 402px (the phone frame's 390px + its 6px bezel) and at 320px,
-// both themes:
-//   - title row height: 44px in every one of solo / crew-short-name / crew-long-name — unchanged,
-//     because the 32px (`size-8`) close button, not the title's content, is what's tallest in the
-//     row; the row's own height was never coupled to whether a chip renders.
-//   - a long pane name ("deploy-frontend-webapp-production-release-candidate") truncates
-//     (`scrollWidth > clientWidth`, computed `text-overflow: ellipsis`) while the host chip keeps
-//     its full reserved width (128px = 8rem, unshrunk) at both 402px and 320px.
-//   - the dialog's computed accessible name (Chrome's own accessibility tree, not a hand-rolled
-//     string): solo — `"webapp"` (the sample pane name used for that measurement, byte-identical to
-//     before this change); crew — `"webapp Sends to host: workshop"` (the pane name, then the
-//     chip's own `aria-label`, space-joined by the browser's accname algorithm — nothing
-//     hand-authored produces that join).
-describe("PaneActionsSheet — title row names the machine", () => {
-  const roster: ServerSummary[] = [
-    { id: "bluefin", name: "bluefin", isLead: true, reachable: true, protocol: "ok", lastSeenAt: 9_000 },
-    { id: "workshop", name: "workshop", isLead: false, reachable: true, protocol: "ok", lastSeenAt: 9_000 },
-  ];
-  const crew = ({ children }: { children: React.ReactNode }) => (
-    <CrewProvider servers={roster} ts={20_000} pollMs={1500}>
-      {children}
-    </CrewProvider>
-  );
-
-  it("renders nothing extra in the title row on a solo install", () => {
-    renderSheet();
-    const row = document.querySelector('[data-slot="sheet-title-row"]')!;
-    expect(row.querySelector('[aria-label^="Sends to host"]')).toBeNull();
-    expect(document.querySelector('[data-slot="pane-actions-title-name"]')).toHaveTextContent("claude");
-  });
-
-  it("puts the host chip in the title row, beside the pane name, on a crew", () => {
-    render(<PaneActionsSheet {...renderProps({ pane: { ...agent, host: "workshop" } })} />, { wrapper: crew });
-    const row = document.querySelector('[data-slot="sheet-title-row"]')!;
-    const chip = row.querySelector('[aria-label^="Sends to host"]');
-    expect(chip).not.toBeNull();
-    expect(chip).toHaveAttribute("aria-label", "Sends to host: workshop");
-    // Same row as the name, not a second line below it.
-    expect(row.querySelector('[data-slot="pane-actions-title-name"]')?.compareDocumentPosition(chip!)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-  });
-
-  it("gives the pane name the shrinkable box and the host the protected one", () => {
-    render(<PaneActionsSheet {...renderProps({ pane: { ...agent, host: "workshop" } })} />, { wrapper: crew });
-    const name = document.querySelector('[data-slot="pane-actions-title-name"]')!;
-    const chip = document.querySelector('[aria-label^="Sends to host"]')!;
-    // The name's box may shrink below its content size and ellipsize; the chip's may not — it
-    // carries a fixed cap (`max-w-[8rem]`) and refuses to shrink (`shrink-0`) so a long pane name
-    // never eats into the machine name's budget.
-    expect(name.className).toContain("truncate");
-    expect(name.className).toContain("min-w-0");
-    expect(chip.className).toContain("shrink-0");
-    expect(chip.className).toContain("max-w-[8rem]");
-  });
-
-  it("the whole dialog's accessible name still says which machine — screen-reader value pinned above", () => {
-    render(<PaneActionsSheet {...renderProps({ pane: { ...agent, host: "workshop" } })} />, { wrapper: crew });
-    // aria-labelledby points at data-slot="sheet-title", whose subtree is the name plus the chip's
-    // own aria-label — the accname algorithm (verified over CDP, see the block comment above) joins
-    // them with a space: "webapp Sends to host: workshop".
-    expect(screen.getByRole("dialog")).toHaveAttribute(
-      "aria-labelledby",
-      document.querySelector('[data-slot="sheet-title"]')!.id,
-    );
   });
 });

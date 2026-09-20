@@ -84,14 +84,13 @@ describe("ack-manifest covers every mutating export of lib/api.ts", () => {
     expect(found.length).toBeGreaterThan(10);
     expect(found).toContain("closePane");
     expect(found).toContain("uploadFile");
-    expect(found).toContain("transcribeAudio");
   });
 
   it("never counts a read", () => {
     // The other half of the control: the GET wrappers must stay out, or "set equality" would be
     // satisfied by a manifest that classified the whole file.
     const found = mutatingExportsOf(source);
-    for (const read of ["fetchSnapshot", "fetchPane", "fetchHistory", "fetchConfig", "fetchDevices", "fetchCrew", "getNotifyPrefs"]) {
+    for (const read of ["fetchSnapshot", "fetchPane", "fetchHistory", "fetchConfig", "fetchDevices", "getNotifyPrefs"]) {
       expect(found).not.toContain(read);
     }
   });

@@ -7,8 +7,8 @@
 // ── The rules this file keeps ────────────────────────────────────────────────────────────────────
 //
 //  1. **Every shape is the app's own type.** Nothing here is a loose object literal cast into place:
-//     `AgentView`, `ServerSummary`, `CrewStatusResponse`, `SessionSummary`, `UpdateInfo`,
-//     `HostHealth`, `DevicesData` and `HomeData` are all imported and annotated, so a wire change
+//     `AgentView`, `ServerSummary`, `SessionSummary`, `UpdateInfo`,
+//     `DevicesData` and `HomeData` are all imported and annotated, so a wire change
 //     breaks this file at `tsc` rather than at a confusing render.
 //
 //  2. **It EXTENDS `@/test/handlers`, it does not replace it.** A card that wants to show exactly
@@ -28,13 +28,10 @@
 //     The anchor is captured ONCE, at module load, from the wall clock — see the constant's own
 //     note for why that is the right shape for a page and not a violation of the rule above.
 
-import type { HostHealth } from "@/lib/host-health";
 import type { DevicesData, HomeData } from "@/lib/loaders";
 import type {
   AgentView,
   DeviceAuth,
-  CrewMemberStatus,
-  CrewStatusResponse,
   CacheWatchListEntry,
   CacheWatchState,
   PaneCache,
@@ -42,7 +39,6 @@ import type {
   SessionSummary,
   TabView,
   UpdateInfo,
-  UpdateRunState,
   WorkspaceView,
 } from "@/lib/types";
 
@@ -82,8 +78,6 @@ const MIN = 60 * SEC;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 
-/** Kept under its old name: the crew cards that mount the TEST suite's census need its `ts`. */
-export const FIXTURE_TS = 400_000;
 
 // ── The spaces and tabs the herd lives in ────────────────────────────────────────────────────────
 //
@@ -552,164 +546,6 @@ export const rosterNine: ServerSummary[] = [
   ),
 ];
 
-/**
- * Ten machines, one per host colour — the palette card's roster and nothing else.
- *
- * The ids are CHOSEN, not arbitrary: `hostSlot` hands this exact set slots 0 through 9 with no two
- * colliding, which is the only way to see all ten tints at once. A real crew's colours are whatever
- * its names hash to ({@link rosterFive} lands on 0, 2, 4, 8 and 9), and that is the honest picture —
- * this roster exists to show the palette, not to promise an even spread.
- */
-export const rosterPalette: ServerSummary[] = [
-  lead,
-  ...["shed", "porch", "garage", "pier", "loft", "shop", "attic", "studio", "cellar"].map(
-    (id): ServerSummary => ({
-      id,
-      name: id,
-      isLead: false,
-      reachable: true,
-      protocol: "ok",
-      lastSeenAt: TS - 5 * SEC,
-    }),
-  ),
-];
-
-// ── The census (`GET /api/crew`) ─────────────────────────────────────────────────────────────────
-//
-// One page's worth of paperwork per machine: enrolment, warrant and secret generations, versions.
-// Every timestamp is on the LEAD's clock — the same `TS` as the rosters above, so a card can mount
-// a roster and a census together and the two never disagree about a machine.
-
-const LEAD_VERSION = "0.31.0";
-
-function member(
-  id: string,
-  health: CrewMemberStatus["health"],
-  extra: Partial<CrewMemberStatus> = {},
-): CrewMemberStatus {
-  return {
-    id,
-    name: id,
-    isLead: false,
-    address: `${id}.tail1a2b.ts.net:8787`,
-    enrolledAt: TS - 40 * DAY,
-    health,
-    lastSeenAt: TS - 4 * SEC,
-    version: LEAD_VERSION,
-    secretBehind: false,
-    provisional: false,
-    ...extra,
-  };
-}
-
-const selfMember: CrewMemberStatus = {
-  id: "lodge",
-  name: "lodge",
-  isLead: true,
-  health: "reachable",
-  lastSeenAt: TS - 2 * SEC,
-  version: LEAD_VERSION,
-  secretBehind: false,
-  provisional: false,
-};
-
-const crewMeta = { id: "pk1", name: "kennel", secretGeneration: 4, rotatedAt: TS - 9 * DAY };
-const crewSelf = { id: "lodge", name: "lodge", version: LEAD_VERSION };
-
-/** One machine, leading nobody but itself — the smallest census a lead can serve. */
-export const censusSolo: CrewStatusResponse = {
-  crew: { ...crewMeta, name: "lodge" },
-  self: crewSelf,
-  deputy: null,
-  members: [selfMember],
-  ts: TS,
-};
-
-/** Lead + a named deputy + one ordinary peer. Everything healthy. */
-export const censusTrio: CrewStatusResponse = {
-  crew: crewMeta,
-  self: crewSelf,
-  deputy: { id: "workshop", warrantGeneration: 3 },
-  members: [
-    selfMember,
-    member("workshop", "reachable", { enrolledAt: TS - 120 * DAY }),
-    member("attic", "reachable", { version: "0.30.2" }),
-  ],
-  ts: TS,
-};
-
-/**
- * Five machines and three separate problems, which is the census this page exists to make legible:
- * a peer that has gone quiet, a peer that was enrolled and never once answered, and a peer running a
- * protocol this lead cannot speak — with its refusal quoted word for word.
- */
-export const censusFive: CrewStatusResponse = {
-  crew: crewMeta,
-  self: crewSelf,
-  deputy: { id: "workshop", warrantGeneration: 3 },
-  members: [
-    selfMember,
-    member("workshop", "reachable", { enrolledAt: TS - 120 * DAY }),
-    member("attic", "unreachable", {
-      reason: "connect ECONNREFUSED 100.71.4.9:8787",
-      lastSeenAt: TS - 14 * MIN,
-      version: "0.30.2",
-    }),
-    member("cellar", "unreachable", {
-      reason: "no answer since enrolment",
-      lastSeenAt: 0,
-      enrolledAt: TS - 2 * DAY,
-      version: undefined,
-      provisional: true,
-    }),
-    member("garage", "incompatible", {
-      reason: "crew protocol 2 (this collie speaks 1)",
-      version: "0.34.0",
-      secretBehind: true,
-    }),
-  ],
-  ts: TS,
-};
-
-/** Nine machines. The formation wraps its V; the list below it stays one column. */
-export const censusNine: CrewStatusResponse = {
-  crew: crewMeta,
-  self: crewSelf,
-  deputy: { id: "workshop", warrantGeneration: 3 },
-  members: [
-    selfMember,
-    ...["workshop", "attic", "cellar", "garage", "loft", "shed", "barn", "kennel"].map((id, i) =>
-      member(id, i === 5 ? "unreachable" : "reachable", {
-        lastSeenAt: i === 5 ? TS - 22 * MIN : TS - (3 + i) * SEC,
-        version: i % 3 === 0 ? "0.30.2" : LEAD_VERSION,
-      }),
-    ),
-  ],
-  ts: TS,
-};
-
-/**
- * The loud one: `attic` believes ANOTHER collie leads this crew, under a warrant generation higher
- * than the deputy's. Two collies both convinced they are the lead is not a transient the next poll
- * clears, so the page names it rather than folding it into "unreachable".
- */
-export const censusConflicted: CrewStatusResponse = {
-  crew: crewMeta,
-  self: crewSelf,
-  deputy: { id: "workshop", warrantGeneration: 3 },
-  members: [
-    selfMember,
-    member("workshop", "reachable"),
-    member("attic", "conflicted", {
-      reason: "this member is enrolled in a crew led by cellar",
-      lastSeenAt: TS - 40 * SEC,
-      secretBehind: true,
-      conflict: { leadMemberId: "cellar", warrantGeneration: 7 },
-    }),
-  ],
-  ts: TS,
-};
-
 // ── Snapshots (`HomeData`, as the root loader hands it down) ─────────────────────────────────────
 
 /** A healthy solo snapshot: the full herd, one machine, three sessions. */
@@ -821,68 +657,6 @@ export const updateMajor: UpdateInfo = {
   checkedAt: TS - 6 * MIN,
 };
 
-// ── Update RUNS (the top band's states b, c and d) ───────────────────────────────────────────────
-//
-// The band reads `update.run` off the ordinary snapshot, so a state is a fixture rather than a
-// harness: give it a run record and it says the matching sentence. `updatedAt` is anchored to `TS`
-// (this module's own load time) because a finished run only speaks for ten minutes — see
-// `DONE_WINDOW_MS` in `lib/update-ribbon.ts`.
-
-const RUN_BASE = {
-  schema: 1,
-  from: "0.31.0",
-  to: "0.32.1",
-  startedAt: TS - 40 * SEC,
-  updatedAt: TS - 2 * SEC,
-  pid: 4242,
-  attempt: 1,
-} as const;
-
-/** The lead mid-run. One call per run state — the band counts Fetching → Building → Restarting. */
-export function updateInFlight(state: UpdateRunState): UpdateInfo {
-  return { ...updateRelease, releaseAvailable: false, run: { ...RUN_BASE, state } };
-}
-
-/** The lead is done and one peer is still moving. The band names it and then goes quiet. */
-export const updatePeersFollowing: UpdateInfo = {
-  ...updateRelease,
-  current: "0.32.1",
-  releaseAvailable: false,
-  run: {
-    ...RUN_BASE,
-    state: "done",
-    peers: [{ name: "workshop", state: "restarting", version: "0.31.0" }],
-  },
-};
-
-/** A peer that tried and rolled back. Its reason is deliberately longer than the band's budget, so
- *  the word-boundary cut is the thing this fixture is for. */
-export const updatePeerRolledBack: UpdateInfo = {
-  ...updatePeersFollowing,
-  run: {
-    ...RUN_BASE,
-    state: "done",
-    peers: [
-      {
-        name: "workshop",
-        state: "rolled-back",
-        version: "0.31.0",
-        reason: "health gate timed out after three attempts on the standby door",
-      },
-    ],
-  },
-};
-
-/** The lead is done, and so is the crew. The band has nothing left to say. */
-export const updateCrewLevel: UpdateInfo = {
-  ...updatePeersFollowing,
-  run: {
-    ...RUN_BASE,
-    state: "done",
-    peers: [{ name: "workshop", state: "done", version: "0.32.1" }],
-  },
-};
-
 // ── The write gates ──────────────────────────────────────────────────────────────────────────────
 
 /** A device the fronting proxy named and the bridge does not allowlist. Nothing on the phone fixes it. */
@@ -912,45 +686,6 @@ export const devicesPaired: DevicesData = {
   error: false,
 };
 
-// ── Tier-2 host health ───────────────────────────────────────────────────────────────────────────
-//
-// Hand-built rather than derived: `HostStaleBanner`'s table is keyed on `state` and `writable`
-// TOGETHER, and stating both directly is the only way to put a row of it on screen at will.
-
-export const hostUnreachable: HostHealth = {
-  host: "attic",
-  name: "attic",
-  state: "stale",
-  writable: false,
-  incompatible: false,
-  lastSeenAt: TS - 14 * MIN,
-  lastSeenLabel: "last seen 14m ago",
-  isLead: false,
-};
-
-export const hostNeverSeen: HostHealth = {
-  host: "cellar",
-  name: "cellar",
-  state: "unknown",
-  writable: false,
-  incompatible: false,
-  lastSeenAt: 0,
-  lastSeenLabel: "never seen",
-  isLead: false,
-};
-
-export const hostIncompatible: HostHealth = {
-  host: "garage",
-  name: "garage",
-  state: "stale",
-  writable: false,
-  incompatible: true,
-  protocolDetail: "crew protocol 2 (this collie speaks 1)",
-  lastSeenAt: TS - 6 * SEC,
-  lastSeenLabel: "last seen just now",
-  isLead: false,
-};
-
 // ── Panes ────────────────────────────────────────────────────────────────────────────────────────
 //
 // Each one is a real capture plus the `AgentView` the pane route would have looked up for it out of
@@ -963,9 +698,9 @@ const shellPaneText = [
   `${ESC}[1;32myou@lodge${ESC}[0m:${ESC}[1;34m~/src/collie${ESC}[0m$ bun run test`,
   "",
   `${ESC}[32m✓${ESC}[0m web/src/lib/triage.test.ts (14 tests) 41ms`,
-  `${ESC}[32m✓${ESC}[0m web/src/lib/host-health.test.ts (22 tests) 63ms`,
+  `${ESC}[32m✓${ESC}[0m web/src/lib/triage.test.ts (21 tests) 63ms`,
   `${ESC}[32m✓${ESC}[0m web/src/components/agent-list.test.tsx (9 tests) 118ms`,
-  `${ESC}[31m✗${ESC}[0m web/src/components/crew-formation.test.tsx (11 tests | 1 failed) 92ms`,
+  `${ESC}[31m✗${ESC}[0m web/src/components/status-badge.test.tsx (11 tests | 1 failed) 92ms`,
   `  ${ESC}[31m→ expected 9 nodes, received 8${ESC}[0m`,
   "",
   ` Test Files  ${ESC}[31m1 failed${ESC}[0m | ${ESC}[32m3 passed${ESC}[0m (4)`,
@@ -1026,45 +761,18 @@ export const paneShell: PaneFixture = {
   revision: 96,
 };
 
-// ── Host-tagged panes (HostStaleBanner inside a real pane) ─────────────────────────────────────────
-//
-// `HostStaleBanner` renders inside `AgentChat` off `useHostHealth(agent.host)`, which is derived from
-// `CrewProvider`'s roster — so a pane can only show it mounted on a NON-empty roster, with `host` set
-// to one of that roster's own unhappy members. `rosterFive` (via {@link homeCrew}) already carries
-// three: `attic` unreachable, `cellar` never seen, `garage` incompatible — see the roster's own
-// comments. Re-hosting the SAME real `AgentChat` mount is more honest than hand-building a fourth
-// `HostHealth` value, because it runs the pane through `hostHealth()` itself rather than assuming it.
+// ── The stack (gap 4) ────────────────────────────────────────────────────────────────────────────
 
-/** Mid-tool-run, on `attic` — stale/unreachable: answered once, hasn't since. */
-export const paneHostUnreachable: PaneFixture = {
+/** A mid-tool-run pane on another machine, for the worst-case stack card in sections/pane.tsx. */
+export const paneStack: PaneFixture = {
   pane: onHost(working[0]!, "attic"),
   text: claudeWorking,
   revision: 4_517,
 };
 
-/** Mid-tool-run, on `cellar` — enrolled, never once reached: no last-good screen to show. */
-export const paneHostNeverSeen: PaneFixture = {
-  pane: onHost(working[0]!, "cellar"),
-  text: claudeWorking,
-  revision: 4_517,
-};
-
-/** Mid-tool-run, on `garage` — speaking a crew protocol this lead cannot. */
-export const paneHostIncompatible: PaneFixture = {
-  pane: onHost(working[0]!, "garage"),
-  text: claudeWorking,
-  revision: 4_517,
-};
-
-// ── The stack (gap 4) ────────────────────────────────────────────────────────────────────────────
-
-/** Same pane, same unreachable host, reused by the worst-case stack card in app.tsx. */
-export const paneStack: PaneFixture = paneHostUnreachable;
-
 /** A device the fronting proxy names and the bridge does not allowlist — the OTHER composer lock,
- *  independent of the crew host gate above, both driven at once for the stack card. */
+ *  independent of the read-only gate, both driven at once for the stack card. */
 export const deviceStack: DeviceAuth = deviceRefused;
-
 // ── Prompt cache readings ────────────────────────────────────────────────────────────────────────
 //
 // `CacheChip` reads the live page clock (`lib/cache-clock.ts`'s own `Date.now()`), never a fixture's

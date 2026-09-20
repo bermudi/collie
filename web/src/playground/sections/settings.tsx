@@ -1,16 +1,13 @@
 // Settings section of the states playground. Split out of app.tsx; see that file's header comment
 // for the whole page's rules.
 
-import { CrewProvider } from "@/components/crew-provider";
 import { NotifyPrefsCard } from "@/components/notify-prefs-control";
 import { NewSpaceSheet } from "@/components/new-space-sheet";
 import { SpaceOverview } from "@/components/space-overview";
 import {
   devicesPaired,
   devicesUnpaired,
-  homeCrew,
   homeSolo,
-  rosterFive,
   spacesWithWorktrees,
   watchedPanes,
 } from "../fixtures";
@@ -21,7 +18,7 @@ export const DEF: SectionDef = {
   id: "settings",
   title: "Settings",
   intent:
-    "The whole settings route, mounted twice: once on a solo collie with nothing paired, once on a lead with three paired devices and a crew card to show for it. Then the Updates page it links to, which is where the check, the card, the peers and the one button now live.",
+    "The whole settings route, mounted twice: once on a solo collie with nothing paired, once with three paired devices to show for it.",
 };
 
 export function SettingsSection() {
@@ -41,14 +38,14 @@ export function SettingsSection() {
         </Card>
 
         <Card
-          state="settings-lead-paired"
-          label="settings, lead of a crew, three devices paired"
-          reach="pair a phone with `collie pair`, then open Settings on the lead. The Crew card appears only on a multi-machine roster; the device list names which row is the phone you are holding."
-          note="One Updates row, where three update cards used to stand. Its status line follows the footer chip's old precedence and its chevron says it opens a page."
+          state="settings-paired"
+          label="settings, three devices paired"
+          reach="pair a phone with `collie pair`, then open Settings again. The device list names which row is the phone you are holding."
+          note="One Updates card, where a page of update cards used to stand: the check control confirms an up-to-date result or surfaces a failure, and the footer chip carries the actionable lines."
           span={2}
         >
           <PhoneFrameCard height={760}>
-            <SettingsRouter home={homeCrew} devices={devicesPaired} />
+            <SettingsRouter home={homeSolo} devices={devicesPaired} />
           </PhoneFrameCard>
         </Card>
       </Group>
@@ -75,20 +72,6 @@ export function SettingsSection() {
               />
             </div>
           </Stage>
-        </Card>
-      </Group>
-
-      <Group title="Updates">
-        <Card
-          state="updates-page"
-          label="updates, the page the Settings row opens"
-          reach="tap the Updates row in Settings. The check control on top, then one card carrying the version, the preflight, the run progress, a read-only line per peer, and the single action button."
-          note="No bridge here, so the card's own read of /api/update/check never lands: the versions come from the snapshot and the peer lines stay empty. Against a live lead the same card grows one line per member, worst first."
-          span={2}
-        >
-          <PhoneFrameCard height={760}>
-            <SettingsRouter home={homeCrew} devices={devicesPaired} start="/settings/updates" />
-          </PhoneFrameCard>
         </Card>
       </Group>
 
@@ -136,19 +119,6 @@ export function SettingsSection() {
           </PhoneFrameCard>
         </Card>
 
-        <Card
-          state="new-space-pick-host"
-          label="new space, crew, pick a host"
-          reach="tap + on the spaces list of a lead with peers. On a solo collie this row is not rendered at all and the sheet is the one above."
-          note="The chip that is marked is where the create lands: the machine the list was already showing, or the lead. `attic`, `cellar` and `garage` keep their chips and their names — a machine that cannot take writes is dimmed and says why, never dropped, because a missing row reads as a machine you do not have."
-          span={2}
-        >
-          <PhoneFrameCard height={560}>
-            <CrewProvider servers={rosterFive} ts={homeCrew.ts} pollMs={3_000}>
-              <NewSpaceSheet open onClose={() => {}} onCreate={() => {}} scope={{ host: "workshop" }} />
-            </CrewProvider>
-          </PhoneFrameCard>
-        </Card>
       </Group>
     </Section>
   );

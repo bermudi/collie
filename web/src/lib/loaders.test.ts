@@ -5,7 +5,6 @@ import { server } from "@/test/setup";
 import {
   fixtureAgents,
   fixtureCrewSnapshot,
-  fixtureCrewStatus,
   fixtureSnapshot,
   paneTextWithDraft,
 } from "@/test/handlers";
@@ -880,28 +879,6 @@ describe("cold boot with no network", () => {
       await rootLoader();
       expect(sessionStorage.getItem(SNAPSHOT_KEY)).not.toBeNull();
     });
-  });
-});
-
-describe("crewLoader", () => {
-  it("returns the census a lead serves", async () => {
-    server.use(http.get("/api/crew", () => HttpResponse.json(fixtureCrewStatus)));
-    const { crewLoader } = await import("./loaders");
-    const data = await crewLoader();
-    expect(data.error).toBe(false);
-    expect(data.status?.members.map((m) => m.id)).toEqual(["bluefin", "workshop", "attic"]);
-  });
-
-  // The default handler already refuses with 404, which is what a solo collie and a peer both do.
-  it("reads a 404 as 'there is no crew here', not as a failure", async () => {
-    const { crewLoader } = await import("./loaders");
-    expect(await crewLoader()).toEqual({ status: null, error: false });
-  });
-
-  it("keeps a real refusal apart from that answer", async () => {
-    server.use(http.get("/api/crew", () => new HttpResponse(null, { status: 500 })));
-    const { crewLoader } = await import("./loaders");
-    expect(await crewLoader()).toEqual({ status: null, error: true });
   });
 });
 

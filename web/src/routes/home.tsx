@@ -3,7 +3,6 @@ import { useNavigate } from "react-router";
 
 import { RouteHeader, SettingsGear } from "@/components/app-header";
 import { SessionSwitcher } from "@/components/session-switcher";
-import { ServerSwitcher } from "@/components/server-switcher";
 import { ReadOnlyBanner } from "@/components/read-only-banner";
 import { AgentList } from "@/components/agent-list";
 import { LaunchStrip } from "@/components/launch-strip";
@@ -12,7 +11,6 @@ import { NewSpaceSheet, type WorktreeRepo } from "@/components/new-space-sheet";
 import { StatusArea } from "@/components/status-area";
 import { ToastViewport } from "@/components/ui/toast-viewport";
 import { BuildStamp } from "@/components/build-stamp";
-import { CrewFooterLink } from "@/components/crew-footer-link";
 import { UpdateBanner } from "@/components/update-banner";
 import { useDashPrefs, openForCount } from "@/hooks/use-dash-prefs";
 import { useSpaceActions } from "@/hooks/use-spaces";
@@ -90,13 +88,7 @@ export function HomeRoute() {
         wordmark
         width="column"
         rightLead={
-          <>
-            {/* Host first, then session — outer dimension first, and the two are deliberately
-                different shapes (bordered server pill vs filled layers capsule) so a glance can tell
-                "change machine" from "change session on this machine". Both self-hide. */}
-            <ServerSwitcher servers={data.servers} scope={data.scope} agents={data.agents} />
-            <SessionSwitcher sessions={sessionsHere} scope={data.scope} viewAll={data.viewAll} />
-          </>
+          <SessionSwitcher sessions={sessionsHere} scope={data.scope} viewAll={data.viewAll} />
         }
         rightTrail={<SettingsGear scope={data.scope} />}
       />
@@ -143,10 +135,8 @@ export function HomeRoute() {
           />
         </main>
 
-        {/* The footer is the dashboard's meta zone, in widening order: the crew you're part of, an
-            available update / needed restart, then the build stamp (which bundle you're running,
-            with a stale-cache nudge). The crew line self-hides on a solo install. */}
-        <CrewFooterLink scope={data.scope} className="px-4 pt-3" />
+        {/* The footer is the dashboard's meta zone: an available update / needed restart, then the
+            build stamp (which bundle you're running, with a stale-cache nudge). */}
         <UpdateBanner className="px-4 pt-3" />
         <BuildStamp className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)_+_0.5rem)]" />
       </div>

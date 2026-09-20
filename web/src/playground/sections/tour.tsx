@@ -86,10 +86,8 @@ export function TourSection() {
         >
           <SheetStage
             mux={MUX}
-            host="bluefin"
             panes={0}
             needsYou={0}
-            machines={0}
             pushState={push({ availability: "server-off" })}
           />
         </Card>
@@ -102,10 +100,8 @@ export function TourSection() {
         >
           <SheetStage
             mux={MUX}
-            host="bluefin"
             panes={4}
             needsYou={1}
-            machines={0}
             pushState={pushDone}
           />
         </Card>
@@ -118,30 +114,13 @@ export function TourSection() {
         >
           <SheetStage
             mux={MUX}
-            host="bluefin"
             panes={4}
             needsYou={1}
-            machines={0}
             readOnly
             pushState={pushDone}
           />
         </Card>
 
-        <Card
-          state="first-run-crew"
-          label="three machines in one crew"
-          reach="open Collie for the first time against a lead with two members joined"
-          note="The crew row is the only row that can be absent on a working install, and it is absent below two machines — a solo snapshot carries no `servers` at all."
-        >
-          <SheetStage
-            mux={MUX}
-            host="bluefin"
-            panes={9}
-            needsYou={2}
-            machines={3}
-            pushState={pushDone}
-          />
-        </Card>
       </Group>
 
       <Group title="Two offers">
@@ -153,10 +132,8 @@ export function TourSection() {
         >
           <SheetStage
             mux={MUX}
-            host="bluefin"
             panes={4}
             needsYou={0}
-            machines={0}
             pushState={push()}
           />
         </Card>
@@ -169,10 +146,8 @@ export function TourSection() {
         >
           <SheetStage
             mux={MUX}
-            host="bluefin"
             panes={0}
             needsYou={0}
-            machines={0}
             pushState={pushDone}
             installOffer
           />

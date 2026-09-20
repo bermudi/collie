@@ -1,9 +1,9 @@
 // Thin REST client for the bridge. Everything is same-origin, so credentials/headers are
 // minimal. Each call throws on a non-2xx so callers (route loaders / action handlers) surface errors.
 
-import { parseApiErrorFields, type ApiErrorDetail, type ApiErrorFields } from "./api-error-codes";
+import { parseApiErrorFields, type ApiErrorFields } from "./api-error-codes";
 import { trackBusy } from "./busy";
-import { beginLongUpload, endLongUpload, markLive } from "./connection-health";
+import { markLive } from "./connection-health";
 import { abortSignalAfter, abortSignalAny } from "./env";
 import { asJsonString, parseJsonObject } from "./json";
 import { authHeader, clearNotPaired, markNotPaired, NOT_PAIRED_BODY } from "./pairing";
@@ -13,7 +13,6 @@ import type {
   ActionResponse,
   BridgeConfig,
   CreateResponse,
-  DismissScope,
   DevicesResponse,
   CacheRulesResponse,
   CacheWatchListResponse,
@@ -21,14 +20,10 @@ import type {
   LaunchersResponse,
   NotifyPrefs,
   PaneHistoryResponse,
-  CrewStatusResponse,
   PaneReadResponse,
   PairFailure,
   SnapshotResponse,
-  UpdateCheckResponse,
   UpdateInfo,
-  UpdateRun,
-  UpdateStartResponse,
   UploadResponse,
   WorktreeListResponse,
   WorktreeOpenResponse,
@@ -116,37 +111,6 @@ const GET_TIMEOUT_MS = 10_000;
 const MUTATION_TIMEOUT_MS = 20_000;
 //   - Uploads carry a whole file over the phone's uplink — the most generous budget.
 const UPLOAD_TIMEOUT_MS = 60_000;
-
-// ── THE TRANSCRIPTION DEADLINE IS A FUNCTION OF THE CLIP, NOT A CONSTANT ────────────────────────
-//
-// A flat budget is dishonest for a body whose size is known and varies by two orders of magnitude.
-// A five-second reply is a few kilobytes; a five-minute one is megabytes, and on a phone's uplink
-// those are not the same request. The flat 60 s that shipped in the beta failed the long clip on a
-// mobile connection — reported by a beta tester — while being far more slack than the short one
-// needs.
-//
-// The floor this assumes is a SUSTAINED, PROGRESSING 256 kb/s uplink. It is not a promise of
-// completion: a slower path, or a tunnel that stops mid-body, still fails, and it should — the
-// operator is standing there waiting and would rather be told than watch a spinner. What it does
-// buy is that a clip Collie was willing to RECORD is a clip Collie is willing to WAIT for.
-const STT_UPLINK_BITS_PER_SECOND = 256_000;
-// The bridge's own provider deadline (bridge/stt/openai.ts STT_TIMEOUT_MS), which starts only once
-// the whole body has arrived — so it is added to the upload allowance rather than overlapping it.
-const STT_PROVIDER_BUDGET_MS = 60_000;
-// Request set-up, the bridge's own parse, and the response coming back down. Small and flat: none
-// of it scales with the audio.
-const STT_OVERHEAD_MS = 20_000;
-
-/**
- * The whole-request deadline for one clip of `bytes`, in milliseconds.
- *
- * Exported for the unit test, and for anyone who wants to know what the ceiling actually is: at the
- * 8 MiB maximum (MAX_STT_AUDIO_BYTES) it is a little under six minutes.
- */
-export function sttTimeoutFor(bytes: number): number {
-  const upload = Math.ceil((Math.max(0, bytes) * 8 * 1000) / STT_UPLINK_BITS_PER_SECOND);
-  return upload + STT_PROVIDER_BUDGET_MS + STT_OVERHEAD_MS;
-}
 
 /**
  * Compose the caller's abort signal (a loader's `request.signal`, used to supersede a stale poll)
@@ -776,87 +740,6 @@ export function checkForUpdates(): Promise<UpdateInfo> {
   return req<UpdateInfo>("/api/update/check", { method: "POST" });
 }
 
-/**
- * The update card's read: the same status the snapshot carries, plus the PREFLIGHT that decides
- * whether the update button is live and what it says when it is not (M15/05).
- *
- * A GET, and read-gated: it starts nothing and takes no upstream look, so it is safe to poll. The
- * preflight behind it is cached on the bridge, so polling it costs one `collie update --check` a
- * minute at most.
- */
-export function fetchUpdateState(signal?: AbortSignal): Promise<UpdateCheckResponse> {
-  return req<UpdateCheckResponse>("/api/update/check", signal ? { signal } : undefined);
-}
-
-/**
- * Start an update — one tap plus one confirm, and this is what the confirm sends.
- *
- * `target` is the version the operator READ about on the card. The bridge refuses if that is no
- * longer what it would install, so a card left open overnight cannot consent to a version nobody
- * read about. `major` is the second consent, and only a major crossing takes one (ADR 0020).
- *
- * WRITE-gated, exactly like typing into a pane. A refusal is a throw carrying the bridge's own code
- * (`update.in_progress`, `update.preflight_red`, `update.major_confirm_required`, …) — the caller
- * renders it through `lib/api-error-message.ts` like every other refusal.
- */
-/** The body `POST /api/update` takes. Named, so `peersOnly` has an owner rather than being widened
- *  in at the call site — and so a bridge that predates the field is simply never sent it. */
-interface UpdateStartBody {
-  confirm: true;
-  target: string;
-  major: boolean;
-  peersOnly?: true;
-}
-
-export function startUpdate(a: {
-  target: string;
-  major: boolean;
-  /**
-   * "Retry crew update": a new run whose only legs are the peers (M16/04). Sent only when true, so
-   * the ordinary confirm's body is byte-identical to the one that shipped and a bridge that does
-   * not know the field yet is never handed it.
-   */
-  peersOnly?: boolean;
-}): Promise<UpdateStartResponse> {
-  const body: UpdateStartBody = { confirm: true, target: a.target, major: a.major };
-  if (a.peersOnly === true) body.peersOnly = true;
-  return req<UpdateStartResponse>("/api/update", { method: "POST", body: JSON.stringify(body) });
-}
-
-/** "Remind me next digest" — the card's dismiss. Not a mute: the banner keeps showing. */
-export function snoozeUpdate(): Promise<UpdateInfo> {
-  return req<UpdateInfo>("/api/update/snooze", { method: "POST" });
-}
-
-/**
- * The update band was closed, for the version it named — the band's own dismiss (M17/08).
- *
- * The version goes to the BRIDGE rather than to this browser's storage, so the decision holds
- * wherever the band is read next. `scope` says WHICH band: `offer` is a release available on this
- * machine, and closing it snoozes the digest for that version too; `crew` is the quiet notice about
- * a machine a package manager owns, and closing it touches no push. Not a mute either way — a newer
- * version is a different fact and raises the band again.
- */
-export function dismissUpdate(version: string, scope: DismissScope = "offer"): Promise<UpdateInfo> {
-  return req<UpdateInfo>("/api/update/dismiss", {
-    method: "POST",
-    body: JSON.stringify({ version, scope }),
-  });
-}
-
-/**
- * The run record from the STANDBY door (`GET /standby/update`), for the window in which the front
- * door is not answering because the update is restarting it.
- *
- * Same-origin, because that is the deployment this can help in: a failover proxy publishes
- * `/standby/*` beside the app (CREW_PROTOCOL.md §18.15, and `lib/sw-routes.ts` keeps the service
- * worker's hands off it). Everywhere else it simply fails, which is exactly what the caller already
- * handles — the card treats a failed poll during `restarting` as expected either way.
- */
-export function fetchStandbyRun(signal?: AbortSignal): Promise<UpdateRun> {
-  return req<UpdateRun>("/standby/update", signal ? { signal } : undefined);
-}
-
 // ── Device pairing ───────────────────────────────────────────────────────────────────────────────
 
 /** A successful claim (the token, returned exactly once) or the bridge's named reason for refusing. */
@@ -913,19 +796,6 @@ export function fetchDevices(signal?: AbortSignal): Promise<DevicesResponse> {
 }
 
 /**
- * The crew census (`GET /api/crew`). Read-level, like the snapshot — looking at who is in the crew
- * needs no token; changing it is a CLI verb and has no endpoint here at all.
- *
- * Carries NO scope: the question is "what does this collie lead", and only a lead can answer it. A
- * solo collie and a peer both refuse with 404, which the loader reads as "no crew" rather than as a
- * failure — so this throws for that case exactly as it does for any other refusal, and the branch
- * lives at the one call site that knows what a 404 means here (lib/loaders.ts `crewLoader`).
- */
-export function fetchCrew(signal?: AbortSignal): Promise<CrewStatusResponse> {
-  return req<CrewStatusResponse>("/api/crew", { signal });
-}
-
-/**
  * Revoke a paired device by label, returning the registry as it now stands. WRITE-level, so it needs
  * this device's own token — including when the label being revoked IS this device, which is allowed
  * and self-unpairs (the caller drops the local token afterwards).
@@ -967,76 +837,5 @@ export function uploadFile(paneId: string, file: File, scope?: Scope): Promise<U
       // every non-ok answer threw above.
       return (await res.json()) as UploadResponse;
     })(),
-  );
-}
-
-/**
- * One transcription attempt. A refusal is a VALUE here, not a throw — see {@link transcribeAudio}.
- *
- * The refusal carries the bridge's `code`/`detail` beside its status: the status alone cannot tell
- * "the recording is empty" from "the recording could not be read" (both 400), which is the reason
- * `bridge/stt/http.ts` codes them separately. `status` stays, because it is still what an OLDER
- * bridge — one that sends no code — is judged by.
- */
-export type SttResult =
-  | { ok: true; text: string }
-  | {
-      ok: false;
-      status: number;
-      error: string | null;
-      code?: string;
-      detail?: ApiErrorDetail;
-    };
-
-/**
- * Send one recorded clip to `POST /api/stt` and get its transcript (ADR 0029).
- *
- * The body is RAW AUDIO BYTES and the `Content-Type` names the container — no multipart envelope,
- * because there is exactly one thing to send (bridge/stt/http.ts says the same from its side). It
- * is pane-agnostic: audio is not terminal state, so no scope goes on the wire.
- *
- * Unlike every other call here it RESOLVES on a refusal instead of throwing. Each failure status
- * earns its own operator-facing sentence (lib/stt.ts `sttErrorMessage`), and a thrown ApiError
- * carries its status only inside a formatted message — so the status is returned as a value, and
- * only a transport failure (offline, timeout) still throws.
- */
-export function transcribeAudio(audio: Blob, signal?: AbortSignal): Promise<SttResult> {
-  // Announced to the connection-health store for the whole call, and released in the `finally`
-  // below on every path — success, refusal, abort. While it is in flight the app stops polling and
-  // stops escalating: the link is not failing, it is carrying this (see lib/connection-health).
-  beginLongUpload();
-  return trackBusy(
-    (async () => {
-      const res = await apiFetch("/api/stt", {
-        method: "POST",
-        body: audio,
-        headers: {
-          // The recorder's own container, which is the one thing the bridge needs in order to name
-          // a demuxer. Its codec parameter rides along; the bridge splits it off.
-          "content-type": audio.type || "audio/webm",
-          [XHR_HEADER]: XHR_HEADER_VALUE,
-          ...authHeader(),
-        },
-        signal: withTimeout(signal, sttTimeoutFor(audio.size)),
-      });
-      const detail = await errorDetail(res);
-      notePairing("POST", res.status, res.ok ? undefined : detail);
-      const body = parseJsonObject(detail);
-      const text = body === undefined ? undefined : asJsonString(body.text);
-      if (res.ok && text !== undefined) return { ok: true as const, text };
-      const error = body === undefined ? null : (asJsonString(body.error) ?? null);
-      // The same fields every other refusal now carries, read off the same body — so the composer's
-      // one line can be the translated sentence rather than the bridge's English one.
-      const fields = parseApiErrorFields(detail);
-      // A 200 whose body is not the documented shape is still a failure, and one the operator can do
-      // nothing about — report it as the bridge's own status rather than inventing a transcript.
-      return {
-        ok: false as const,
-        status: res.ok ? 502 : res.status,
-        error,
-        code: fields?.code,
-        detail: fields?.detail,
-      };
-    })().finally(endLongUpload),
   );
 }

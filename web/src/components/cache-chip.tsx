@@ -84,13 +84,6 @@ const TONE_CLASS = {
 interface CacheChipProps {
   cache: PaneCache | undefined;
   /**
-   * Which machine this pane lives on. Stated by every crew call site and read by none: the chip
-   * painted the identity ink until 2026-09-14 and now paints the cache state instead (this file's
-   * header). The prop stays so a caller keeps saying which pane it is describing, and so the ink can
-   * come back on some surface that has no `HostChip` beside it.
-   */
-  host?: string | undefined;
-  /**
    * `row` — plain type in a list's trailing column, not a control, because the whole card is already
    * one button. `button` — the pane screen's header, where a tap opens the sheet.
    */

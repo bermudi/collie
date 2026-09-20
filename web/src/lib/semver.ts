@@ -2,7 +2,7 @@
 //
 // The twin of `compareSemver` in `bridge/update.ts`. The two trees cannot import one another (the web
 // app builds without the Bun server's source tree), so the rule is written twice and pinned once:
-// `bridge/crew-level-contract.test.ts` runs one list of pairs through both and fails when they
+// `bridge/version.test.ts` pins the bridge side of this split, so the two ends cannot drift:
 // disagree. Change one side and that test tells you about the other.
 //
 // Pure and import-free on purpose, so that bridge test can load this file as it is.

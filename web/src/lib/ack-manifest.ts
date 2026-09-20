@@ -156,18 +156,6 @@ export const ACK_MANIFEST = {
     channel: "inline",
     why: "The answer — up to date, an offer, or 'the check itself failed' — is a standing fact about this install that belongs in the card that states it, and it must not fade out from under the operator (components/update-check-control.tsx).",
   },
-  startUpdate: {
-    channel: "inline",
-    why: "The answer is the run itself — a progress state that persists in the card for the length of a restart, or a refusal (a red preflight, a run already going) the operator has to read and act on. Neither survives a floating toast, and both belong beside the button that asked for them (components/update-card.tsx).",
-  },
-  snoozeUpdate: {
-    channel: "silent",
-    why: "\"Remind me next digest\" is answered by the card's own line changing to say so, in the same tap. A second acknowledgement of a dismissal is noise about noise.",
-  },
-  dismissUpdate: {
-    channel: "silent",
-    why: "The acknowledgement is the band leaving the screen, on the same tap. A toast confirming that a band was closed would be a notice about declining a notice, and the state it records is visible in its absence.",
-  },
   pairDevice: {
     channel: "inline",
     why: "A mistyped or expired code is a refusal the operator fixes IN the form, one field away, so the sentence belongs beside the field rather than floating over the page (components/paired-devices.tsx).",
@@ -179,10 +167,6 @@ export const ACK_MANIFEST = {
   uploadFile: {
     channel: "status",
     why: "Success appends a host path to the draft, which is easy to miss in a box the operator was already typing in, so the status line names what just went into it (components/composer.tsx).",
-  },
-  transcribeAudio: {
-    channel: "echo",
-    why: "The mic strip's `transcribing` phase holds while the clip is in flight and the transcript landing in the composer is the outcome; every refusal comes back as a VALUE and is spoken by the composer's onError on the status channel (hooks/use-stt-recorder.ts).",
   },
 // `satisfies`, not an annotation: the KEYS stay known to the compiler (so a typo'd name is a type
 // error at any reader, rather than a silent `undefined`), while every entry is still checked against

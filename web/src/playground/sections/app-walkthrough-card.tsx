@@ -14,23 +14,20 @@ import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
-  crewPath,
   historyPath,
   homePath,
   panePath,
   settingsPath,
   spacePath,
-  updatesPath,
 } from "@/lib/nav";
 import { ALL_PARAM, HOST_PARAM, SESSION_PARAM } from "@/lib/scope";
 import { clearStatus } from "@/lib/status";
-import { clearUpdateStarted } from "@/lib/update-ribbon";
 import { __resetReloadGuard } from "@/lib/reload-guard";
 import { __resetSelfUpdate } from "@/lib/self-update";
 import { markTourSeen } from "@/lib/tour";
 
 import { Card, FullAppRouter, PhoneFrame, createFullAppRouter } from "../harness";
-import { censusTrio, devicesPaired } from "../fixtures";
+import { devicesPaired } from "../fixtures";
 import { SlowStage } from "./motion-harness";
 import {
   WALKTHROUGH_HOST,
@@ -188,8 +185,8 @@ function useWalkthroughTrail(router: ReturnType<typeof createFullAppRouter>): Tr
 /**
  * Leave every module store the routes write behind them clean.
  *
- * The routes below publish a status line (a pane closing under you, a failed action), stamp the
- * update ribbon's "started at", and take reload holds while a composer has text in it. All three
+ * The routes below publish a status line (a pane closing under you, a failed action) and take
+ * reload holds while a composer has text in it. Both
  * outlive an unmount by design, so switching tabs would carry this card's leavings onto every other
  * card on the page. The shared connection clock is deliberately NOT reset: it is the page's own
  * top-bar control, and this card is one of its readers, not its owner.
@@ -198,7 +195,6 @@ function useWalkthroughCleanup(): void {
   useEffect(() => {
     return () => {
       clearStatus();
-      clearUpdateStarted();
       __resetReloadGuard();
       __resetSelfUpdate();
     };
@@ -218,9 +214,7 @@ const MOVES: readonly Move[] = [
   { label: "Space", to: spacePath(WALKTHROUGH_SPACE_ID) },
   { label: "Pane", to: panePath(WALKTHROUGH_PANE_ID) },
   { label: "History", to: historyPath(WALKTHROUGH_PANE_ID) },
-  { label: "Crew", to: crewPath() },
   { label: "Settings", to: settingsPath() },
-  { label: "Updates", to: updatesPath() },
 ];
 
 function meterLine(meter: Meter | null): string {
@@ -238,7 +232,6 @@ export function AppWalkthroughCard() {
     return createFullAppRouter({
       home: walkthroughHome,
       screenFor: walkthroughScreen,
-      crew: { status: censusTrio, error: false },
       devices: devicesPaired,
       history: walkthroughHistory,
     });
@@ -249,8 +242,8 @@ export function AppWalkthroughCard() {
   return (
     <Card
       state="app-walkthrough"
-      label="the app, walked (dashboard, space, pane, history, crew, settings)"
-      reach="the app itself. Any tap that changes the screen: an agent row, a space, the header's back arrow, a strip chip, the crew link in the footer."
+      label="the app, walked (dashboard, space, pane, history, settings)"
+      reach="the app itself. Any tap that changes the screen: an agent row, a space, the header's back arrow, a strip chip."
       note={`Real: every route component, the shell around them (the band, the one header, the 240ms ScreenTransition), the route ids the app reads its data by, the loaders' result shapes, the address in the query, and the poll loop the root layout runs. Not real: the loaders themselves, which return fixtures instead of fetching. Every pane in this snapshot lives on ${WALKTHROUGH_HOST}, the lead, so the space and tab strips are complete: the space navigator is lead-local by design, and the two peers in the roster hold no panes here. Switching host or session is a change of address, so it lands on that machine's dashboard, and the line above says so when it happens. /api answers 503 in the playground, so the connection state you see is the page's own top-bar clock control, and there is no service worker here. The frame meter samples this tab's main thread, not a phone's, and every other card on this page shares that thread.`}
       span={2}
     >

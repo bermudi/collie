@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { vi } from "vitest";
 
-import { CrewProvider } from "@/components/crew-provider";
 import { ROOT_ROUTE_ID, type HomeData } from "@/lib/loaders";
 import {
   fixtureAgents,
@@ -53,19 +52,9 @@ function renderHome(data: HomeData, initialPath?: string) {
         id: ROOT_ROUTE_ID,
         path: "/",
         loader: () => data,
-        element: withHeaderHost(
-          <CrewProvider
-            servers={data.servers}
-            sessions={data.sessions}
-            ts={data.ts}
-            pollMs={1500}
-          >
-            <HomeRoute />
-          </CrewProvider>,
-        ),
+        element: withHeaderHost(<HomeRoute />),
       },
       { path: "/pane/:paneId", element: <div data-testid="pane" /> },
-      { path: "/crew", element: <div data-testid="crew" /> },
     ],
     { initialEntries: [initialPath ?? (data.scope.host ? `/?h=${data.scope.host}` : "/")] },
   );
@@ -92,14 +81,6 @@ const solo = () =>
     sessions: fixtureSessions,
   });
 
-const packed = () =>
-  homeData({
-    agents: fixtureCrewAgents,
-    shellPanes: fixtureCrewShellPanes,
-    sessions: fixtureCrewSessions,
-    servers: fixtureServers,
-  });
-
 describe("the dashboard on ONE machine is untouched", () => {
   it("renders no host switcher and no host chip anywhere", async () => {
     renderHome(solo());
@@ -119,50 +100,6 @@ describe("the dashboard on ONE machine is untouched", () => {
   });
 });
 
-describe("the dashboard across machines", () => {
-  it("grows a host switcher beside the session switcher, and keeps ONE herd list", async () => {
-    renderHome(packed());
-    expect(await screen.findByRole("button", { name: /switch host/i })).toBeInTheDocument();
-    // Sessions are per-host: the switcher offers this host's, not a flat merge of both "default"s.
-    // Three buttons now, not two — "All sessions" leads the list. It is not a session and does not
-    // pretend to be one: it answers "do I have to choose at all", which is why it stands above the
-    // rows rather than among them.
-    const sessionTrigger = screen.getByRole("button", { name: /switch session/i });
-    await userEvent.click(sessionTrigger);
-    const sheet = screen.getByRole("list");
-    const rows = within(sheet).getAllByRole("button");
-    expect(rows).toHaveLength(3);
-    expect(rows[0]).toHaveTextContent("All sessions");
-  });
-
-  it("labels each row with its machine — a label, never a split", async () => {
-    renderHome(packed());
-    await settled();
-    expect(screen.getAllByLabelText("Host: bluefin").length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText("Host: workshop").length).toBeGreaterThan(0);
-    // No per-host heading anywhere: hosts do not carve the list up.
-    const headings = screen.getAllByRole("heading").map((h) => h.textContent ?? "");
-    expect(headings.some((h) => /workshop|bluefin/i.test(h))).toBe(false);
-  });
-
-  it("opens a PEER's row addressed to the peer, not to the machine the URL points at", async () => {
-    // The unforgivable failure this milestone exists to prevent: `w1:p1` exists on both machines, and
-    // the merged list shows both. Tapping the peer's must not open the lead's identically-named pane.
-    const router = renderHome(packed());
-    await settled();
-    const [peerRow] = within(groupSection("moonward")).getAllByRole("button");
-    await userEvent.click(peerRow!);
-    await waitFor(() => expect(url(router)).toBe("/pane/w1%3Ap1?h=workshop"));
-  });
-
-  it("opens the LEAD's row with no host param — absent still means the lead", async () => {
-    const router = renderHome(packed());
-    await settled();
-    const [leadRow] = within(groupSection("webapp")).getAllByRole("button");
-    await userEvent.click(leadRow!);
-    await waitFor(() => expect(url(router)).toBe("/pane/w1%3Ap1"));
-  });
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The space navigator, addressed at a peer (#209). The loader's `ambientSpaces` narrows
@@ -195,85 +132,6 @@ describe("the space navigator on a crew, addressed at a peer (#209)", () => {
     // Keyed on the LEAD instead, this row's status lookup misses entirely and shows no dot at all —
     // the bug this test pins.
     expect(within(spaceRow).getByText(/needs you/i)).toBeInTheDocument();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TIER 2 on the dashboard (M5/03). The milestone's counsel constraint: the agent you opened the app
-// to unblock is exactly the one on the machine that just went quiet. It stays where it is.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** The same crew, with the machine holding the blocked peer agent gone quiet. */
-const packedWithQuietPeer = () =>
-  homeData({
-    agents: fixtureCrewAgents,
-    shellPanes: fixtureCrewShellPanes,
-    sessions: fixtureCrewSessions,
-    servers: fixtureServers.map((s) => {
-      if (s.id !== "workshop") return s;
-      // Mutate a clone rather than spread in the map body — one copy, and the two fields being
-      // changed are the whole point of the fixture.
-      const quiet = structuredClone(s);
-      quiet.reachable = false;
-      quiet.lastSeenAt = 1_000;
-      return quiet;
-    }),
-    ts: 60_000, // the lead's clock, well past the 3 × 1500ms tolerance
-  });
-
-describe("a machine going quiet does not hide what is on it", () => {
-  it("keeps the unreachable host's blocked pane in its workspace group, labelled — never dropped or demoted", async () => {
-    renderHome(packedWithQuietPeer());
-    await settled();
-    // The peer's blocked row is present in its own workspace group, still carries its host label,
-    // and the group heading still lights up for it — never silently demoted.
-    const section = groupSection("moonward");
-    const rows = within(section).getAllByRole("button");
-    expect(rows.length).toBeGreaterThan(0);
-    expect(within(rows[0]!).getByLabelText(/Host: workshop \(unreachable\)/i)).toBeInTheDocument();
-    // The heading's own count, not the row's sr-only status word (which reads the same "needs you").
-    expect(within(section).getByLabelText("1 needs you")).toBeInTheDocument();
-  });
-
-  it("raises no app-wide connection chrome — the lead answered, so the phone is not offline", async () => {
-    renderHome(packedWithQuietPeer());
-    await settled();
-    // Tier 1's copy, none of which belongs to a peer outage.
-    expect(screen.queryByText(/not connected/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/reconnecting/i)).not.toBeInTheDocument();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// The dashboard footer's crew line — the third way into /crew. Same hide rule as every other piece
-// of host chrome, and the solo half of the pair is the one that matters: the footer must look
-// exactly as it did before the crew existed.
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe("the crew line in the dashboard footer", () => {
-  it("is absent on a solo install — the footer keeps its shipped shape", async () => {
-    renderHome(solo());
-    await settled();
-    expect(screen.queryByLabelText(/open the crew overview/i)).not.toBeInTheDocument();
-  });
-
-  it("names the roster from the snapshot alone — no second fetch to caption a footer", async () => {
-    renderHome(packed());
-    const link = await screen.findByLabelText(/open the crew overview/i);
-    expect(link).toHaveTextContent(/3 machines/i);
-    expect(link).toHaveTextContent(/2 reachable/i);
-  });
-
-  it("navigates to the census, carrying the scope's host so back lands where you were", async () => {
-    const router = renderHome(homeData({ agents: fixtureCrewAgents, servers: fixtureServers }, { host: "workshop" }));
-    await userEvent.click(await screen.findByLabelText(/open the crew overview/i));
-    await waitFor(() => expect(url(router)).toBe("/crew?h=workshop"));
-  });
-
-  it("omits `?h=` when the scope is the lead — a bare path, exactly like every other helper", async () => {
-    const router = renderHome(packed());
-    await userEvent.click(await screen.findByLabelText(/open the crew overview/i));
-    await waitFor(() => expect(url(router)).toBe("/crew"));
   });
 });
 
@@ -311,14 +169,6 @@ describe("the dashboard across sessions", () => {
     renderHome(widened(), "/?all=1");
     await settled();
     expect(rows().length).toBe(2);
-  });
-
-  it("marks the row that is NOT in the primary session, and only that one", async () => {
-    renderHome(widened(), "/?all=1");
-    await settled();
-    expect(screen.getByLabelText("In session: work")).toBeInTheDocument();
-    // The primary needs no mark: an absent `?s=` already means it.
-    expect(screen.queryByLabelText("In session: default")).toBeNull();
   });
 
   it("opens each row in its OWN session", async () => {

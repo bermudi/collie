@@ -253,12 +253,7 @@ export function AgentCard({
                 the name, never before it, and its slot is reserved on a flat row so the name
                 truncates at one width whether the mark is drawn or not. */}
             <UnseenMark on={unseen} reserve={flat} className="ml-2" />
-            <PaneMeta
-              host={agent.host}
-              cache={agent.cache}
-              session={agent.session}
-              className="ml-auto self-baseline"
-            />
+            <PaneMeta cache={agent.cache} className="ml-auto self-baseline" />
           </div>
 
           {/* Only rendered when there's something to say — a pane with neither a tab nor a name of

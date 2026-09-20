@@ -16,13 +16,11 @@
 import {
   fetchDevices,
   fetchHistory,
-  fetchCrew,
   fetchPane,
   fetchSnapshot,
   isApiErrorStatus,
 } from "@/lib/api";
 import { parseAnsi } from "@/lib/ansi";
-import { noteUpdateRun } from "./self-update";
 import { splitLines } from "@/lib/blocks";
 import { type CacheHold, holdCacheReadings } from "@/lib/cache-hold";
 import { isLostLatched } from "@/lib/connection-health";
@@ -50,7 +48,6 @@ import type {
   AgentView,
   BridgeStatus,
   DeviceAuth,
-  CrewStatusResponse,
   PairedDeviceWire,
   PaneHistoryResponse,
   PaneReadResponse,
@@ -226,10 +223,6 @@ function toHomeData(
   error: boolean,
   lastSeenAt?: number,
 ): HomeData {
-  // Where the Collie UPDATE run is, on every snapshot — the self-updater must not reload the bundle
-  // out from under a running update, and it must reload once that run is done (M15/05). Stamped here
-  // rather than in the card so the hold applies on every route, not only where the card is mounted.
-  noteUpdateRun(snap.update?.run?.state);
   // THE CACHE READING HOLDS ACROSS A POLL THAT ARRIVED WITHOUT ONE (lib/cache-hold.ts). The reading is
   // a measurement, not a field of the pane, and the bridge drops one for a poll on several ordinary
   // paths — a failed `stat`, a harness session id that has not resolved yet, another Herdr session's
@@ -548,37 +541,6 @@ export async function devicesLoader({ request }: { request?: Request } = {}): Pr
     if (isAbortError(e)) throw e; // superseded revalidation — let React Router drop it
     // A failed read says nothing about pairing, so the latch is left exactly as it was.
     return { enforced: false, current: null, devices: [], error: true };
-  }
-}
-
-// ── The crew census (the /crew overview) ─────────────────────────────────────
-//
-// The crew route's own loader, shaped exactly like `devicesLoader`: it rides the poll loop while the
-// page is open (so a member going quiet shows up here without a reload), and a failure DEGRADES —
-// it never throws, because a page that answers "how is my crew doing?" with an error boundary has
-// answered the question badly.
-//
-// The 404 is not a failure and must not be rendered as one. Only a lead serves `/api/crew`; a solo
-// collie and a peer refuse, and that refusal is the truthful answer "there is no crew here". So it
-// is folded to `status: null, error: false`, and the route says so in one honest card. Every OTHER
-// refusal — a real outage, a 500 — keeps `status: null` but sets `error`, because "I could not ask"
-// and "there is nothing to ask about" are different sentences and the operator's next move differs.
-
-export interface CrewData {
-  /** The census, or `null` when this collie leads no crew (404) or the fetch failed. */
-  status: CrewStatusResponse | null;
-  /** True only for a fetch that FAILED — a 404 is an answer, not an error. */
-  error: boolean;
-}
-
-export async function crewLoader({ request }: { request?: Request } = {}): Promise<CrewData> {
-  try {
-    return { status: await fetchCrew(request?.signal), error: false };
-  } catch (e) {
-    if (isAbortError(e)) throw e; // superseded revalidation — let React Router drop it
-    // Solo or peer: there is no crew to report, and that is a complete answer.
-    if (isApiErrorStatus(e, 404)) return { status: null, error: false };
-    return { status: null, error: true };
   }
 }
 

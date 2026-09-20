@@ -55,9 +55,6 @@ import { PaneActionsSheet } from "@/components/pane-actions-sheet";
 import { PaneSettingsSheet } from "@/components/pane-settings-sheet";
 import { CompactStripLabels, STRIP_TAP_TARGET_SQUARE } from "@/components/ui/labelled-strip";
 import { ReadOnlyBanner } from "@/components/read-only-banner";
-import { HostStaleBanner } from "@/components/host-stale-banner";
-import { useHostHealth } from "@/components/crew-provider";
-import { writeRefusal } from "@/lib/host-health";
 import { StatusArea } from "@/components/status-area";
 import { ToastViewport } from "@/components/ui/toast-viewport";
 import { StatusDot } from "@/components/status-badge";
@@ -73,7 +70,6 @@ import { locateReply } from "@/lib/latest-reply";
 import { canGrowRequestedLines, growRequestedLines } from "@/lib/loaders";
 import { paneName, panePlaceParts } from "@/lib/pane-name";
 import { useMuxCapability } from "@/lib/mux-capability";
-import { hasJournalAdapter } from "@/lib/journal-agents";
 import { paneRowKey } from "@/lib/hosts";
 import { historyPath, spacePath } from "@/lib/nav";
 import { isReadOnly, statusLabel } from "@/lib/types";
@@ -247,31 +243,15 @@ export function AgentChat({
   // ReadOnlyBanner names which.
   const { refused: notPaired } = usePairing();
   const readOnly = isReadOnly(device) || notPaired;
-  // TIER 2: is the machine THIS pane lives on still answering the lead? Read off the pane's own host
-  // — never the ambient scope — because the pane row is what carries the truth about where it lives;
-  // `scope.host` is the fallback for a pane the snapshot has already dropped (an absent `?h=` is the
-  // lead, which `useHostHealth` resolves through the roster).
-  //
-  // Two separate answers, deliberately: `hostHealth` drives PRESENTATION (the mirror below is
-  // last-good, and says so), while `hostBlock` — the §10.3 refusal — drives WRITES. They differ by
-  // §10.2's tolerance, so a single missed sweep never flashes a banner, but a member the lead
-  // currently believes unreachable is refused the instant it says so. Neither one touches the global
-  // clock: the lead answered, so this poll was live, and the ConnectionBanner stays silent.
-  const hostHealth = useHostHealth(agent?.host ?? scope?.host);
-  const hostBlock = writeRefusal(hostHealth);
   /**
    * The ONE reason this pane currently refuses a write, or undefined when it accepts them. Every
    * write handler below starts with it, so there is a single place that decides both which gates
    * exist and in what order they speak — the device gate first (it is about YOU and holds on every
-   * machine), then the host gate (it is about ONE machine and clears on the next poll).
-   *
-   * Deliberately a function of both gates rather than two checks per handler: five handlers × two
-   * gates is exactly the shape where the sixth handler gets written with one of them missing, and a
-   * missing host gate here means keys typed at a terminal the lead can't reach.
+   * machine).
    */
   const refuseWrite = useCallback(
-    (): string | undefined => (readOnly ? t("chat.status.readOnly") : hostBlock),
-    [readOnly, hostBlock],
+    (): string | undefined => (readOnly ? t("chat.status.readOnly") : undefined),
+    [readOnly],
   );
 
   // Drawers/sheets are mutually exclusive — at most one open. A single value makes that invariant
@@ -697,21 +677,6 @@ export function AgentChat({
   // loud. Hiding it is what leaves someone wondering whether Collie is broken.
   const sessionLog = useMuxCapability("agentSessionRef", scope);
   const historyAvailable = Boolean(agent?.hasSession) && sessionLog.capable;
-  // A FOURTH state, and the per-pane sibling of the third (#137). `hasSession` folds two facts into
-  // one flag bridge-side — "this pane named a session" AND "this agent has a journal adapter" — so
-  // its absence alone cannot say which half failed, and the two want opposite words. On an agent
-  // with no journal adapter there is nothing to explain and nothing renders. On one that HAS a
-  // journal adapter, an absent session means the agent never reported a session ref to Herdr, which
-  // is what the `herdr integration install <agent>` hook does at agent session start — missing or
-  // outdated, it hides both history affordances with no explanation anywhere.
-  //
-  // It EXPLAINS, it never offers: this decides no button and does not touch `historyAvailable` (a
-  // pane with no session still has no transcript to open, and a tap that fetched nothing would be
-  // the worse answer). `sessionLog.capable` is required as well, because when the MULTIPLEXER keeps
-  // no agent session log the note above already says so in the adapter's own words — and telling
-  // the operator to reinstall a hook that could never help would contradict it.
-  const noSessionReported =
-    sessionLog.capable && hasJournalAdapter(agent?.agent) && !agent?.hasSession;
   // Scrollback has its own capability, and it is a genuinely different one: a multiplexer can keep
   // screen history while knowing nothing about agents. Hidden rather than explained when absent —
   // "there is nothing older to load" is not a fact anyone comes looking for.
@@ -1468,7 +1433,6 @@ export function AgentChat({
                     {workspace}
                   </span>
                   <PaneMeta
-                    host={agent.host}
                     cache={agent.cache}
                     onOpenCache={() => setCacheSheetOpen(true)}
                     // The one descendant that takes its taps back from the surface under these lines.
@@ -1569,12 +1533,6 @@ export function AgentChat({
           <Collapse open={!zen}>
             {/* Read-only notice when this device isn't allowlisted (the composer below is disabled too). */}
             <ReadOnlyBanner device={device} />
-
-            {/* The pane's MACHINE is not answering the lead — the mirror below is last-good and the
-                composer is locked. Its tier-1 twin (the app-wide ConnectionBanner) lives up in
-                RootLayout; this one is scoped to the pane because the phone's link is fine. Renders
-                nothing on a solo install, or while the host is live. */}
-            <HostStaleBanner health={hostHealth} className="mx-3 mt-1.5" />
 
             {/* THE TWO STRIPS, AND THE THIN BAR THAT STANDS IN FOR THEM — one band that morphs, not
                 two rows taking turns. `CollapseSwap` is nested inside zen's `Collapse`, so zen still
@@ -1822,16 +1780,6 @@ export function AgentChat({
                       {sessionLog.note}
                     </p>
                   )}
-                  {/* The same rule one level down, per PANE rather than per multiplexer (#137): this
-                      agent CAN keep a session log, and this pane reported none. A muted line and not
-                      a control — there is nothing here to open, and a button that fetched nothing
-                      would be the worse answer. The remedy is the operator's own, on the machine the
-                      agent runs on, so the sentence names it and stops. */}
-                  {noSessionReported && (
-                    <p className="mb-2 px-2 py-1 text-center text-xs leading-snug text-muted-foreground">
-                      {t("chat.scrollback.noSessionReported", { agent: agent?.agent ?? "" })}
-                    </p>
-                  )}
                   {/* The newest reply in full, standing IN PLACE OF the rows it covers (the mirror
                       below starts after it — see hideLeadingLines). It appears above a bottom-pinned
                       scroller, which ChatMessageList's child-list observer re-pins, so the live tail
@@ -2049,10 +1997,6 @@ export function AgentChat({
                   composing={composing}
                   gone={gone}
                   readOnly={readOnly}
-                  // §10.3's pre-flight refusal, as a disabled state AND as the placeholder copy: the
-                  // composer must not invite a reply it already knows the lead will refuse, and "which
-                  // machine am I typing into" has to be answerable without tapping Send to find out.
-                  hostBlock={hostBlock}
                   dialogPresent={dialogPresent}
                   text={text}
                   terminalDraft={terminalDraft}
@@ -2117,7 +2061,6 @@ export function AgentChat({
                   }
             }
             launching={launching}
-            launchRefusal={hostBlock}
             launchOpen={openForCount(dash.prefs.launchOpen, launchers.length)}
             onLaunchOpenChange={dash.setLaunchOpen}
             className="px-0 py-1"
@@ -2143,12 +2086,7 @@ export function AgentChat({
         {/* The rule behind the header chip's number: its source, the date it was last checked, and on a
             peer's pane the sentence that says why the source is not quoted. A reading, with no control
             in it — the only lever is `cache-rules.toml` on the machine that computed the number. */}
-        <CacheSheet
-          open={cacheSheetOpen}
-          onClose={() => setCacheSheetOpen(false)}
-          cache={agent?.cache}
-          host={agent?.host}
-        />
+        <CacheSheet open={cacheSheetOpen} onClose={() => setCacheSheetOpen(false)} cache={agent?.cache} />
         <PaneActionsSheet
           open={drawer === "paneMenu"}
           onClose={closeDrawer}

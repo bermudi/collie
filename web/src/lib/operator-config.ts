@@ -8,7 +8,6 @@ import type {
   OperatorCommand,
   OperatorKeyRow,
   OperatorQuickReplyRow,
-  SttCapability,
   UploadCapability,
 } from "@/lib/types";
 
@@ -55,7 +54,6 @@ let currentMux: MuxConfig | null = null;
 // `null` until a read succeeds AND on every bridge whose operator configured no provider — the two
 // are the same value on purpose, because both mean "there is no microphone here" (ADR 0029). Absent
 // is the feature being off, so nothing has to distinguish them.
-let currentStt: SttCapability | null = null;
 // `null` until a read succeeds AND on every bridge older than the field. The two are the same value
 // on purpose: both mean "nothing said otherwise", and lib/attachments.ts answers both with the
 // contract that shipped before attachments existed — 10 MB, images only.
@@ -85,7 +83,6 @@ export function loadOperatorCommands(): Promise<void> {
       // emits less CSS than the mirror did, which is how the removal takes effect.
       applyOperatorFonts(currentFonts, designPrefs().font);
       currentMux = cfg.mux ?? null;
-      currentStt = cfg.stt ?? null;
       currentUpload = cfg.upload ?? null;
       loaded = true;
       emit();
@@ -180,15 +177,6 @@ export function loadHostMuxConfig(host: string): Promise<void> {
  */
 export function getHostMuxConfig(host: string): MuxConfig | null {
   return hostMux.get(host) ?? null;
-}
-
-/**
- * The speech-to-text block, or `null` when nothing said otherwise (no read yet, a failed read, or a
- * bridge with no provider configured). Consumers go through lib/stt.ts, which owns the rule that
- * turns this plus the browser's own microphone support into "draw the button or don't".
- */
-export function getSttCapability(): SttCapability | null {
-  return currentStt;
 }
 
 /**
@@ -287,7 +275,6 @@ export function __resetOperatorCommands(): void {
   currentReplies = [];
   currentFonts = [];
   currentMux = null;
-  currentStt = null;
   currentUpload = null;
   inflight = null;
   loaded = false;

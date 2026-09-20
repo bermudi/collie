@@ -18,7 +18,6 @@ import {
   paneStack,
   paneUploadDraft,
   paneWorking,
-  updateRelease,
   uploadedImagePath,
 } from "../fixtures";
 import {
@@ -132,16 +131,14 @@ export function PaneSection() {
         <Card
           state="pane-every-notice-at-once"
           label="worst case, every notice live at once"
-          reach="never all six at once by accident, but never impossible either: a stale proxy session
-            (401), a release on offer, a status toast, a device this proxy doesn't allowlist,
-            and a peer that has gone quiet — all independent facts that can coincide on one pane."
-          note="GENUINE together: the real StripHost band with both of RootLayout's strip features
-            registering into it — UpdateRibbon and ConnectionBanner — wrapping the real
-            StatusArea/ReadOnlyBanner/HostStaleBanner/mirror inside the real AgentChat, the exact
-            nesting routes/root.tsx uses. THE BAND SHOWS ONE OF THEM, and that is the point of the
-            card rather than a gap in it: the refusal is AUTH and the offer is UPDATE, so the refusal
-            takes the band and the offer waits (lib/strip-priority.ts). The worst case at the top of
-            this app is therefore ONE strip plus the header, never two strips plus the header — which
+          reach="never all five at once by accident, but never impossible either: a stale proxy session
+            (401), a status toast, a device this proxy doesn't allowlist, and a connection trouble —
+            all independent facts that can coincide on one pane."
+          note="GENUINE together: the real StripHost band with RootLayout's strip feature
+            (ConnectionBanner) registering into it, wrapping the real
+            StatusArea/ReadOnlyBanner/mirror inside the real AgentChat, the exact
+            nesting routes/root.tsx uses. The worst case at the top of
+            this app is therefore ONE strip plus the header — which
             is also why the safe-area inset is reserved once, by the band while it is open and by the
             header when it is not. The offer is not lost while it waits: /settings/updates carries it,
             and it takes the band the moment the refusal clears. STAGED: the five causes are independently
@@ -279,7 +276,7 @@ function StackHarness() {
       </button>
       <div className="min-h-0 flex-1">
         <PaneStackRouter
-          home={{ ...homeCrew, update: updateRelease }}
+          home={homeCrew}
           fixture={paneStack}
           device={readOnly ? deviceStack : deviceStackAllowed}
         />

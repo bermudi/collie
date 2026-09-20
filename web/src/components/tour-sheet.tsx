@@ -17,7 +17,7 @@ import { promptInstall, useInstallOffer } from "@/lib/install";
 import { reasonText } from "@/lib/push-copy";
 import type { EnableResult, PushState } from "@/lib/push";
 import type { HomeData } from "@/lib/loaders";
-import { leadHost, hostName, paneScope } from "@/lib/hosts";
+import { paneScope } from "@/lib/hosts";
 import { useMuxName } from "@/lib/mux-capability";
 import { homePath, pairedDevicesPath, panePath } from "@/lib/nav";
 import { triage } from "@/lib/triage";
@@ -77,17 +77,9 @@ export interface TourSheetProps {
    * than printing "under unknown" (lib/mux-capability.ts states that rule for every read of it).
    */
   mux: string;
-  /**
-   * The lead machine's own crew label, or undefined on a solo install — where the snapshot carries
-   * no `servers` at all and there is therefore no machine name to print. Deliberately NOT
-   * `location.hostname`: on a served install that is a long DNS name nobody calls the machine.
-   */
-  host?: string;
   /** How many agent panes this snapshot holds, and how many of them are blocked on you. */
   panes: number;
   needsYou: number;
-  /** Machines in the crew. Below two there is no crew and the row is absent. */
-  machines: number;
   /** Pairing is enforced and this device is not paired. The screen still shows; two rows change. */
   readOnly?: boolean;
   /** `null` means the first push read has not resolved yet — say nothing rather than guess. */
@@ -112,10 +104,8 @@ export function TourSheet({
   open,
   onClose,
   mux,
-  host,
   panes,
   needsYou,
-  machines,
   readOnly = false,
   pushState,
   pushBusy = false,
@@ -155,13 +145,8 @@ export function TourSheet({
   }, [open]);
 
   // The claim's second sentence, in the most specific form the facts support. No placeholder is ever
-  // invented: an unknown multiplexer and a solo install each drop their own clause instead.
-  const lead =
-    mux === ""
-      ? t("tour.leadNoMux")
-      : host === undefined
-        ? t("tour.leadNoHost", { mux })
-        : t("tour.lead", { mux, host });
+  // invented: an unknown multiplexer simply drops its own clause.
+  const lead = mux === "" ? t("tour.leadNoMux") : t("tour.lead", { mux });
 
   // Push is "off on this phone" only where it could be on: a bridge with no keys, a plain-HTTP
   // origin and a browser without the API are all cases where the sentence would be an accusation.
@@ -269,7 +254,6 @@ export function TourSheet({
                   ? `${tn("tour.setup.panes", panes)}, ${tn("tour.setup.needsYou", needsYou)}`
                   : tn("tour.setup.panes", panes)}
             </SetupRow>
-            {machines > 1 && <SetupRow>{tn("tour.setup.machines", machines)}</SetupRow>}
             <SetupRow>{readOnly ? t("tour.setup.readOnly") : t("tour.setup.canType")}</SetupRow>
             {pushOffer && <SetupRow>{t("tour.setup.pushOff")}</SetupRow>}
           </ListGroup>
@@ -334,7 +318,6 @@ const CAN_KEYS = [
   "tour.can.type",
   "tour.can.harness",
   "tour.can.session",
-  "tour.can.crew",
 ] as const;
 
 /** One row inside the "Your setup" group. The padding is `ui/list-group.tsx`'s stated 14px, so a row
@@ -452,9 +435,6 @@ function FirstRunLive({ home, onClosed }: { home: HomeData; onClosed: () => void
   // what stops this button and the list under it disagreeing about which pane is the urgent one.
   const needs: readonly AgentView[] = triage(home.agents)[0]?.agents ?? [];
   const blocked: AgentView | undefined = needs[0];
-  // The lead's own crew label. Solo installs emit no `servers` at all, so this is undefined there and
-  // the claim simply drops its "on {host}" clause.
-  const host = hostName(home.servers, leadHost(home.servers));
 
   const exit = (reason: TourExit) => {
     onClosed();
@@ -479,10 +459,8 @@ function FirstRunLive({ home, onClosed }: { home: HomeData; onClosed: () => void
         open={!spaceOpen}
         onClose={exit}
         mux={mux}
-        host={host}
         panes={home.agents.length}
         needsYou={needs.length}
-        machines={home.servers.length}
         readOnly={isReadOnly(home.device)}
         pushState={state}
         pushBusy={busy}

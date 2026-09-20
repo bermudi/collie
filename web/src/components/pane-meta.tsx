@@ -1,6 +1,4 @@
 import { CacheChip } from "@/components/cache-chip";
-import { HostChip } from "@/components/host-chip";
-import { SessionChip } from "@/components/session-chip";
 import type { PaneCache } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -55,12 +53,8 @@ import { cn } from "@/lib/utils";
 // same as the header's own workspace line.
 
 interface PaneMetaProps {
-  /** Which machine this pane lives on. Undefined = this one, and the tag says nothing. */
-  host: string | undefined;
   /** How long this pane's prompt cache stays warm, or undefined when nothing has been measured. */
   cache: PaneCache | undefined;
-  /** Which Herdr session on that machine. The dashboard's widened list passes it; the header does not. */
-  session?: string | undefined;
   /**
    * Given: the cache reading becomes a BUTTON that opens the rule behind the number. Omitted: it is
    * a plain span, because the dashboard card is already one button and may not hold a second.
@@ -69,14 +63,12 @@ interface PaneMetaProps {
   className?: string;
 }
 
-export function PaneMeta({ host, cache, session, onOpenCache, className }: PaneMetaProps) {
+export function PaneMeta({ cache, onOpenCache, className }: PaneMetaProps) {
   return (
     <div
       data-slot="pane-meta"
       className={cn("flex h-3 shrink-0 items-baseline gap-1.5", className)}
     >
-      <HostChip host={host} variant="bare" />
-      <SessionChip session={session} />
       {/* THE SEPARATOR IS THE CSS'S TO DECIDE, NOT A PREDICATE'S. The dot belongs between the
           address and the reading and nowhere else, and asking "is the host shown?" here would be a
           second copy of a hide rule that already lives inside each chip (host-chip.tsx says so in
@@ -88,7 +80,6 @@ export function PaneMeta({ host, cache, session, onOpenCache, className }: PaneM
       <span className="flex items-baseline gap-1.5 before:text-muted-foreground/60 before:content-['·'] first:before:content-none empty:hidden">
         <CacheChip
           cache={cache}
-          host={host}
           // A control on the header, a plain span anywhere that does not offer the rule behind the
           // number — the same one difference the two callers already have.
           variant={onOpenCache === undefined ? "row" : "button"}

@@ -155,15 +155,15 @@ describe("RootLayout — the document itself never scrolls", () => {
 
 // THE NOTCH IS PAID FOR ONCE, IN BOTH STATES, AND THIS IS THE REPORTED BUG.
 //
-// Three rows at the top of this app each set `env(safe-area-inset-top)` for themselves — the update
-// ribbon, the connection bar and the header — every one of them written when it was, or might have
-// been, the first thing on the screen. Any two of them showing at once therefore reserved the notch
-// twice, and on an iPhone that is a tall dead band above the notice. Ribbon + header is the everyday
-// case and the one that was reported.
+// The rows at the top of this app each set `env(safe-area-inset-top)` for themselves — the
+// connection band and the header — every one of them written when it was, or might have been, the
+// first thing on the screen. Any two of them showing at once therefore reserved the notch twice,
+// and on an iPhone that is a tall dead band above the notice. Band + header is the everyday case
+// and the one that was reported.
 //
-// It is asserted HERE, on the whole layout, and not in the three components' own files, because it
-// is exactly the kind of fault that hides from per-component tests: each row was individually
-// correct, and the total was wrong. So the assertion is a count over the rendered tree.
+// It is asserted HERE, on the whole layout, and not in the components' own files, because it is
+// exactly the kind of fault that hides from per-component tests: each row was individually correct,
+// and the total was wrong. So the assertion is a count over the rendered tree.
 describe("RootLayout — the safe-area inset is reserved exactly once", () => {
   function renderLayout(data: HomeData) {
     const router = createMemoryRouter(
@@ -173,20 +173,8 @@ describe("RootLayout — the safe-area inset is reserved exactly once", () => {
     return render(<RouterProvider router={router} />);
   }
 
-  const offered: HomeData = {
-    ...home(AFTERNOON),
-    error: false,
-    update: {
-      current: "1.4.1",
-      latest: "1.5.0",
-      latestUrl: null,
-      releaseAvailable: true,
-      majorAvailable: null,
-      majorUrl: null,
-      bridgeStale: false,
-      checkedAt: 0,
-    },
-  };
+  /** A strip is showing: the auth refusal paints the connection banner red off its props alone. */
+  const refused: HomeData = { ...home(AFTERNOON), error: true, authError: true };
 
   /** Every element reserving the top inset, anywhere in the app's column. */
   function reservations(container: HTMLElement) {
@@ -194,8 +182,8 @@ describe("RootLayout — the safe-area inset is reserved exactly once", () => {
   }
 
   it("gives it to the band while a strip is showing, and not to the header as well", async () => {
-    const { container } = renderLayout(offered);
-    await waitFor(() => expect(screen.getByText(/Collie 1.5.0 available/)).toBeInTheDocument());
+    const { container } = renderLayout(refused);
+    await waitFor(() => expect(container.querySelector("header")).not.toBeNull());
 
     expect(reservations(container)).toHaveLength(1);
     // And it is the band's, above the header — not the header's.

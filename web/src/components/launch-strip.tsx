@@ -1,10 +1,8 @@
 import { Loader2 } from "lucide-react";
 
-import { useCrew } from "@/components/crew-provider";
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/section-header";
 import { openForCount } from "@/hooks/use-dash-prefs";
-import { writeRefusal } from "@/lib/host-health";
 import { useLaunchers } from "@/lib/launchers";
 import type { Scope } from "@/lib/scope";
 import { shortenHome } from "@/lib/shorten-home";
@@ -36,11 +34,6 @@ interface LaunchStripProps {
 export function LaunchStrip({ open, onOpenChange, scope }: LaunchStripProps) {
   const { launchers, home } = useLaunchers(scope);
   const { launch, launching } = useSpaceActions();
-  // TIER 2 (§10.3): a crew row still shows when its host refuses writes — a departed/incompatible
-  // member's rows are exactly as informative as its panes are — but the row itself is disabled with
-  // the reason, same as any other write to that host.
-  const { health } = useCrew();
-  const refusal = scope?.host === undefined ? undefined : writeRefusal(health.get(scope.host));
 
   // Nothing declared → no affordance at all, not an empty section. Worth a comment because an early
   // return like this reads as a forgotten empty state, when it is the intended default for every
@@ -66,7 +59,7 @@ export function LaunchStrip({ open, onOpenChange, scope }: LaunchStripProps) {
             // shell to draw before typing), so the row says so and refuses a second tap; its
             // neighbours stay live, because another launcher is another intention.
             const pending = launching.has(launcher.command);
-            const disabled = pending || refusal !== undefined;
+            const disabled = pending;
             // Pinned → the folder, shortened under home. Absent → nothing: from the dashboard the
             // implied folder is already home, so a suffix would say nothing the label didn't
             // (contrast the switcher's "here", which opens beside a specific pane instead).
@@ -80,8 +73,6 @@ export function LaunchStrip({ open, onOpenChange, scope }: LaunchStripProps) {
                 variant="outline"
                 size="lg"
                 disabled={disabled}
-                aria-label={refusal}
-                title={refusal}
                 // Undimmed while pending, like the Quick dock's tapped reply: the busy row is the
                 // one to look at, not the one to lose.
                 className={cn("h-auto flex-col items-start gap-0 py-1.5", pending && "disabled:opacity-100")}

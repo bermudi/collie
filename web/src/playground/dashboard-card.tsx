@@ -19,9 +19,9 @@ import type { HomeData } from "@/lib/loaders";
 import { triage } from "@/lib/triage";
 import type { AgentView } from "@/lib/types";
 import { dashboardLive } from "./fixtures/dashboard-live";
-import { Card, PackedRootRouter, PhoneFrame } from "./harness";
+import { Card, RootRouter, PhoneFrame } from "./harness";
 
-/** The captured snapshot as the root loader's own shape, so `PackedRootRouter` and the real
+/** The captured snapshot as the root loader's own shape, so `RootRouter` and the real
  *  `CrewProvider` inside it derive host health from it exactly as the app would. */
 const home: HomeData = {
   bridge: dashboardLive.bridge,
@@ -57,10 +57,9 @@ export function DashboardRowsCard() {
       note="Eleven REAL panes off this machine's bridge (src/playground/fixtures/dashboard-live.ts), in the home route's own triage order, in the real ListGroup the flat sections use. Held dark regardless of the page theme, because that is the dress the row is judged in. Two widths: the reference phone at 390px, and 360px, where a row breaks first."
       span={2}
     >
-      {/* ONE router for both frames, not one each. `PackedRootRouter` mounts the real `CrewProvider`,
-          which is what `HostChip` reads for the crew census and the per-host tint — and that is a
-          fact about the SNAPSHOT, identical in both. */}
-      <PackedRootRouter data={home}>
+      {/* ONE router for both frames, not one each. `RootRouter` mounts the real root route element,
+          so the rows render exactly as the home route would. */}
+      <RootRouter data={home}>
         {/* `color-scheme` is what index.css's light-dark() tokens actually read, and it INHERITS —
             so this one declaration puts every real component below into the app's dark half without
             touching the page's own theme control. `text-foreground` re-resolves the inherited colour under it: without it the rows keep the LIGHT page's near-black text, resolved once at `body`, and paint it on the dark ground. The `dark` class rides with it for the handful of
@@ -69,7 +68,7 @@ export function DashboardRowsCard() {
           <Frame width={390} />
           <Frame width={360} />
         </div>
-      </PackedRootRouter>
+      </RootRouter>
     </Card>
   );
 }

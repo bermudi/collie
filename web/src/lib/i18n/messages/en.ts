@@ -46,12 +46,6 @@ export const en = {
   "settings.zen.auto.hint": "Rotate the phone sideways to open zen automatically; rotate back to close it.",
 
   // --- settings.handsFree ---
-  "settings.handsFree.title": "Hands-free voice",
-  "settings.handsFree.description":
-    "Send the transcript immediately instead of putting it in the message box. Off by default — you normally read what was heard before it reaches the terminal.",
-  "settings.handsFree.ariaLabel": "Hands-free voice: send transcript immediately",
-
-  // --- settings.push ---
   "settings.push.title": "Push notifications",
   "settings.push.description": "Get a notification when an agent needs you.",
   "settings.push.reason.insecure": "Push needs an HTTPS connection.",
@@ -163,7 +157,6 @@ export const en = {
   "settings.update.error": "Couldn't check.",
   "settings.update.upToDate": "Up to date",
   "settings.updateBanner.restart": "Bridge restart needed",
-  "settings.updateBanner.restartNeeded": "Collie was replaced on disk. Restart it.",
   "settings.updateBanner.releaseAvailable": "Collie {version} available",
   "settings.updateBanner.majorAvailable": "Collie {version} — a new major",
   "settings.updateBanner.copyAria": "Copy command: {command}",
@@ -233,15 +226,6 @@ export const en = {
   "composer.placeholder.direct": "Type into the terminal…",
   "composer.placeholder.shell": "Type a shell command…",
   "composer.placeholder.reply": "Type a reply…",
-  "composer.mic.unavailable": "Voice input is unavailable",
-  "composer.mic.stopAria": "Stop recording",
-  "composer.mic.recordAria": "Record a voice message",
-  "composer.mic.transcribing": "Transcribing…",
-  "composer.mic.recording": "Recording {elapsed}",
-  "composer.mic.handsFreeHint": "will send when you stop",
-  "composer.mic.manualHint": "lands in the message box",
-  "composer.mic.stop": "Stop",
-  "composer.mic.discardAria": "Discard recording",
   "composer.attach.aria": "Attach file",
   "composer.attach.title": "Attach",
   "composer.attach.photos": "Photos",
@@ -262,7 +246,6 @@ export const en = {
   "composer.discard.confirmKeys.one": "Tap again to discard {count} queued key",
   "composer.discard.confirmKeys.other": "Tap again to discard {count} queued keys",
   "composer.destructive.confirm": "Destructive: {reason} — tap Send again to confirm",
-  "composer.destructive.confirmOnHost": "Destructive: {reason} on {host} — tap Send again to confirm",
   "composer.upload.success": "File added, path in message",
   "composer.upload.tooLarge": "That file is bigger than {max} MB, the limit on this collie.",
   "composer.upload.badType": "Collie can't attach {name}.",
@@ -310,8 +293,6 @@ export const en = {
   "chat.scrollback.showHistory": "Show entire history",
   "chat.scrollback.loadOlder": "Load older",
   "chat.scrollback.loading": "Loading…",
-  "chat.scrollback.noSessionReported":
-    "{agent} has not reported a session to Herdr. Install or update the Herdr integration for it, then restart the agent in this pane.",
   "chat.fullReply.title": "Full reply",
   "chat.fullReply.fromTranscript": "from transcript",
   "chat.fullReply.showingTerminal": "showing the terminal",
@@ -368,7 +349,6 @@ export const en = {
   "paneActions.title.fallback": "Pane",
   "paneActions.settings.label": "Pane settings",
   "paneActions.readOnly": "Read-only — this device isn't authorised to rename or close panes.",
-  "paneActions.hostBlockSuffix": "{hostBlock} — rename and close are unavailable until it answers.",
   "paneActions.rename.label": "Rename",
   "paneActions.rename.placeholder": "name this pane",
   "paneActions.close.label": "Close pane",
@@ -473,7 +453,6 @@ export const en = {
   "space.tab.titleFallback": "Tab",
   "space.tab.titleWithLabel": "Tab {label}",
   "space.tab.readOnly": "Read-only — this device isn't authorised to rename or close tabs.",
-  "space.tab.hostBlockSuffix": "{hostBlock} — rename and close are unavailable until it answers.",
   "space.tab.rename": "Rename",
   "space.tab.close": "Close tab",
   "space.tab.closing": "Closing…",
@@ -543,31 +522,6 @@ export const en = {
   "connection.withLastSeen": "{cause} — last seen {time}",
   "connection.readOnly.notPaired": "Not paired — pair this device in Settings to type into agents.",
   "connection.readOnly.device": "Read-only — this device isn’t authorised to type into agents{deviceSuffix}.",
-  "connection.host.lastSeen": "last seen {time}",
-  "connection.host.neverSeen": "never seen",
-  "connection.host.unreachablePlain": "unreachable",
-  "connection.host.unreachableSuffix": "unreachable · {label}",
-  "connection.host.incompatible": "incompatible",
-  "connection.host.lead": "lead",
-  "connection.host.onPrefix": "on",
-  "connection.host.ariaSends": "Sends to host: {name}{unreachable}",
-  "connection.host.ariaHost": "Host: {name}{unreachable}",
-  "connection.host.ariaUnreachableSuffix": " (unreachable)",
-  // The parenthesis form is the LOCALE's, not this file's: a Chinese bundle writes full-width
-  // brackets and no leading space. So the punctuation is one key and the word inside it is the same
-  // word the eye reads, rather than a second translation of it that could drift.
-  "connection.host.ariaSuffix": " ({word})",
-  // ── §10.2's PRESENTATION SPLIT, IN WORDS (M22/05) ─────────────────────────
-  // Two situations used to share the word above. "reconnecting" is the lead still trying, inside its
-  // budget, and it asks nothing of the operator; "needs attention" is the lead unable to fix it by
-  // trying again. The pair only earns its keep if the two never read as the same thing, so the
-  // action sentences say the difference out loud rather than leaving it to a colour.
-  "connection.host.reconnecting": "reconnecting",
-  "connection.host.attention": "needs attention",
-  "connection.host.reconnectingSuffix": "reconnecting · {label}",
-  "connection.host.attentionSuffix": "needs attention · {label}",
-  "connection.host.reconnectingAction": "The lead is still trying. Nothing to do.",
-  "connection.host.attentionAction": "Trying again will not fix this. Check this machine.",
   "connection.stale.incompatible": "{name} is running an incompatible Collie",
   "connection.stale.unreachable": "{name} is unreachable · {label}",
   "connection.stale.nothingCached": "Nothing cached for this machine yet.",
@@ -579,7 +533,6 @@ export const en = {
   "connection.session.aria": "Session: {name}. Switch session",
   "connection.session.primary": "primary",
   "connection.session.unreachable": "unreachable",
-  "connection.session.ariaIn": "In session: {name}",
   "connection.session.all": "All sessions",
   "connection.session.allDescription": "Every session on this machine, in one list",
   "connection.session.allAria": "Showing every session. Switch session",
@@ -587,47 +540,6 @@ export const en = {
   "connection.server.aria": "Host: {name}. Switch host",
 
   // --- crew (the read-only /crew census; role names stay English, ADR 0030) ---
-  "crew.title": "Crew",
-  "crew.nav.back": "Back",
-  "crew.entry.title": "Crew overview",
-  "crew.entry.description": "How every machine in the crew is doing.",
-  "crew.footer.label": "Crew · {machines} · {reachable}",
-  "crew.footer.aria": "Open the crew overview",
-  "crew.summary.counts": "{machines} · {reachable}",
-  "crew.summary.machines.one": "{count} machine",
-  "crew.summary.machines.other": "{count} machines",
-  "crew.summary.reachable": "{count} reachable",
-  "crew.summary.deputy": "Deputy",
-  "crew.summary.noDeputy": "no deputy named",
-  "crew.summary.warrant": "warrant {generation}",
-  "crew.summary.secret": "Secret",
-  "crew.summary.secretValue": "generation {generation} · rotated {time}",
-  "crew.member.health": "State",
-  "crew.member.reason": "Reason",
-  "crew.member.conflict": "Conflict",
-  "crew.member.conflictValue": "{lead} also leads · warrant {generation}",
-  "crew.member.conflictNoWarrant": "{lead} also leads · no warrant",
-  "crew.member.version": "Version",
-  "crew.member.versionDiffers": "differs from lead",
-  "crew.member.address": "Address",
-  "crew.member.enrolled": "Enrolled",
-  "crew.member.secretBehind": "Has not picked up the current secret.",
-  "crew.member.provisional": "Enrolled but never reached.",
-  "crew.health.reachable": "reachable",
-  "crew.health.unreachable": "unreachable",
-  "crew.health.incompatible": "incompatible",
-  "crew.health.conflicted": "conflicted",
-  "crew.role.deputy": "deputy",
-  "crew.sheet.goTo": "Go to this machine",
-  "crew.formation.aria": "Crew formation: {machines}",
-  "crew.node.aria": "{name}, {role}, {health}",
-  "crew.node.ariaPlain": "{name}, {health}",
-  "crew.solo.title": "This collie is not leading a crew",
-  "crew.solo.description": "A crew is created and changed from the command line.",
-  "crew.error.title": "Could not load crew status",
-  "crew.error.description": "The bridge did not answer. Collie tries again on the next poll.",
-
-  // --- error (boot splash, route-level error recovery) ---
   "error.boot.connecting": "Connecting to the herd…",
   "error.boot.title": "Not connected",
   "error.boot.body": "Can’t reach Collie — check your connection to the host, then try again.",
@@ -748,21 +660,6 @@ export const en = {
   "promptAction.feedback.notArrived": "The feedback didn't arrive — nothing was submitted",
 
   // --- stt (speech-to-text errors, lib/stt.ts + hooks/use-stt-recorder.ts) ---
-  "stt.error.busy": "Busy — another recording is still transcribing. Try again in a moment.",
-  "stt.error.tooLong": "That recording is too long — record a shorter one.",
-  "stt.error.badFormat": "This browser recorded a format Collie can't send on.",
-  "stt.error.unconfigured": "Speech-to-text isn't configured on this collie.",
-  "stt.error.timeout": "The transcriber didn't answer in time — try again.",
-  "stt.error.unreachable": "The transcriber couldn't be reached — try again.",
-  "stt.error.generic": "Transcription failed — record again to retry.",
-  "stt.error.networkFailure": "Couldn't reach Collie to transcribe that — try again.",
-  "stt.error.recordingFailed": "Recording failed — nothing was captured.",
-  "stt.error.noSpeechHeard": "Nothing was heard in that recording.",
-  "stt.error.nothingRecorded": "Nothing was recorded.",
-  "stt.error.unsupportedBrowser": "This browser can't record audio.",
-  "stt.error.micRefused": "Microphone access was refused.",
-
-  // --- directTyping (the composer's "Type into terminal" mode, hooks/use-direct-typing.ts) ---
   "directTyping.status.draftPending": "Send or clear the draft before typing into the terminal.",
   "directTyping.status.armed": "Typing into the terminal — keys send as you type.",
   "directTyping.status.disarmed": "Back to sending replies",
@@ -847,7 +744,6 @@ export const en = {
   "space.new.tab.plain": "Space",
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "Repository",
-  "space.new.host.label": "Host",
   "worktree.orOpenExisting": "Or open one that already exists",
   // --- apiError.update (POST /api/update refusals, M15/05) ---
   "apiError.update.confirm_required": "That update needed a confirm, so nothing was started.",
@@ -861,168 +757,6 @@ export const en = {
   "apiError.update.packaged": "Updates come from your package manager. Collie won't replace this install's files.",
   "apiError.update.start_failed": "The update couldn't be started: {reason}",
   // --- settings.updateCard (the update card, M15/05) ---
-  "settings.updateCard.title": "Update Collie",
-  "settings.updateCard.running": "Running {current}",
-  "settings.updateCard.newest": "Newest {version}",
-  "settings.updateCard.upToDate": "Up to date. Nothing to do.",
-  "settings.updateCard.unknownLatest": "The newest release isn't known yet.",
-  "settings.updateCard.includes": "One update folds in {versions}.",
-  "settings.updateCard.action": "Update to {version}",
-  "settings.updateCard.majorAction": "Cross to {version}",
-  "settings.updateCard.majorNote": "{version} is a new major.",
-  "settings.updateCard.dismiss": "Remind me next digest",
-  "settings.updateCard.dismissed": "Dismissed until the next digest.",
-  "settings.updateCard.checking": "Checking this machine…",
-  "settings.updateCard.details": "Details",
-  "settings.updateCard.summary.checks.one": "{count} check",
-  "settings.updateCard.summary.checks.other": "{count} checks",
-  "settings.updateCard.summary.red.one": "{count} red",
-  "settings.updateCard.summary.red.other": "{count} red",
-  "settings.updateCard.summary.amber.one": "{count} amber",
-  "settings.updateCard.summary.amber.other": "{count} amber",
-  "settings.updateCard.summary.peers.one": "{count} peer",
-  "settings.updateCard.summary.peers.other": "{count} peers",
-  "settings.updateCard.preflightUnavailable": "The preflight couldn't be run on this machine.",
-  "settings.updateCard.packageManaged": "Your package manager updates this install. Collie won't take it from here.",
-  "settings.updateCard.remedy": "Fix: {command}",
-  "settings.updateCard.confirmTitle": "Update to {version}?",
-  "settings.updateCard.confirmBody": "Your terminal session stays alive. The phone view drops for up to 30 seconds.",
-  // THE SENTENCE ABOUT THE CREW LINK (M27/06), whole. It lives in the CARD's namespace because the
-  // card is where it is read: above the confirm, with room for both halves of it — what changes,
-  // and what to do about it. The band prints `updateRibbon.linkChangeShort` instead, held to the
-  // row's forty characters like every other band string. The digest push carries this same English
-  // from `LINK_CHANGE_SENTENCE` in `bridge/update.ts`, which has no locale to read.
-  //
-  // Generic on purpose: it is printed off a wire-version DIFFERENCE, never off a release name, so
-  // the release after the next one carries it with no string edited.
-  // THE URGENT LABEL (ADR 0046). A label and nothing more: the sentence beside it is the release's
-  // own English, read from its `collie-release.json`, so it is printed as it was written and is
-  // never translated. An urgent release keeps the DAILY digest cadence even when the delta is
-  // patches only; the label is how the operator sees that on the card.
-  "settings.updateCard.urgent": "Urgent",
-  // THE SAME LABEL WHEN THE URGENT RELEASE IS NOT THE ONE ON OFFER (ADR 0046). An urgent 1.9.1 with
-  // a quiet 1.9.2 above it offers 1.9.2, and a bare "Urgent" would read as a claim about that
-  // release. Naming the version says what is true: the fix is in the pile, and taking the offer
-  // takes it.
-  "settings.updateCard.urgentSince": "Urgent since {version}",
-  "settings.updateCard.linkChange": "Changes the crew link. Update the lead first, members follow.",
-  "settings.updateCard.confirmAction": "Yes, update",
-  "settings.updateCard.majorConfirmTitle": "Cross the major to {version}?",
-  "settings.updateCard.majorConfirmBody": "{version} is a new major, so it is consented to on its own and never folded into a routine update. Read its release notes first. Your terminal session stays alive. The phone view drops for up to 30 seconds.",
-  "settings.updateCard.majorConfirmAction": "Yes, cross to {version}",
-  "settings.updateCard.cancel": "Cancel",
-  "settings.updateCard.starting": "Starting…",
-  "settings.updateCard.startingSlow": "Still starting. The host has not reported the run yet.",
-  "settings.updateCard.state.preflight": "Checking this machine…",
-  "settings.updateCard.state.staging": "Staging {version}…",
-  "settings.updateCard.state.restarting": "Restarting. This is not an outage.",
-  "settings.updateCard.phaseOf": "Step {step} of {total}",
-  "settings.updateCard.state.restartingSlow": "This restart is taking longer than expected. Check the service on that machine.",
-  "settings.updateCard.state.verifying": "Verifying the new build…",
-  "settings.updateCard.state.done": "Updated to {version}.",
-  "settings.updateCard.state.rolledBack": "Rolled back. This machine is still on {version}.",
-  "settings.updateCard.state.stuck": "The update is stuck. Run this in a terminal:",
-  "settings.updateCard.state.interrupted": "The update stopped before it finished. Nothing was left half-installed.",
-  "settings.updateCard.progressNote": "Keep this screen open. Your terminal session is untouched.",
-  "settings.updateCard.retry": "Retry",
-  "settings.updateCard.logTail": "Log tail",
-  "settings.updateCard.versionUnknown": "an unknown version",
-
-  // --- settings.updateCard, the crew half (M16/01) ---
-  "settings.updateCard.actionCrew": "Update crew to {version}",
-  "settings.updateCard.retryCrew": "Retry crew update",
-  "settings.updateCard.retryNow": "Retry now",
-  "settings.updateCard.crewConfirmTitle": "Update the crew to {version}?",
-  "settings.updateCard.crewConfirmBody": "This machine goes first. Each member then levels itself to the same release, checks its own health and rolls back on its own if it fails.",
-  "settings.updateCard.crewConfirmAction": "Yes, update the crew",
-  "settings.updateCard.retryConfirmTitle": "Retry the crew update?",
-  "settings.updateCard.retryConfirmBody": "This machine is already current, so only the peers run. Each one gets one more attempt.",
-  "settings.updateCard.retryConfirmAction": "Yes, retry",
-  "settings.updateCard.peers.label": "Crew members",
-  "settings.updateCard.crewPatience": "No action needed, this finishes on its own.",
-  "settings.updateCard.peer.versionUnknown": "version unknown",
-  "settings.updateCard.peer.unknownReason": "we could not check this machine",
-  "settings.updateCard.peer.asOf": "checked {ago}",
-  "settings.updateCard.peer.movingFor": "for {elapsed}",
-  "settings.updateCard.peer.verdict.green": "ready",
-  "settings.updateCard.peer.verdict.amber": "warnings",
-  "settings.updateCard.peer.verdict.red": "red",
-  "settings.updateCard.peer.verdict.unknown": "unknown",
-  "settings.updateCard.peer.state.waiting": "waiting",
-  "settings.updateCard.peer.state.updating": "updating",
-  "settings.updateCard.peer.state.unreachable": "unreachable",
-  "settings.updateCard.peer.state.preflight": "checking",
-  "settings.updateCard.peer.state.staging": "staging",
-  "settings.updateCard.peer.state.restarting": "restarting",
-  "settings.updateCard.peer.state.verifying": "verifying",
-  "settings.updateCard.peer.state.done": "updated",
-  "settings.updateCard.peer.state.rolledBack": "rolled back",
-  "settings.updateCard.peer.state.packageManaged": "waits for the package manager",
-  "settings.updateCard.peer.state.stuck": "stuck",
-  "settings.updateCard.peer.state.interrupted": "stopped",
-  "settings.updateCard.peer.state.idle": "waiting",
-
-  // --- updates (the page, and the Settings row that opens it), M16/01 ---
-  "updates.title": "Updates",
-  "updates.nav.back": "Back",
-  "updates.entry.title": "Updates",
-  "updates.entry.description": "Update Collie, and the crew with it.",
-  "updates.entry.status.updating": "Updating…",
-  "updates.entry.status.peersBehind.one": "{count} peer behind",
-  "updates.entry.status.peersBehind.other": "{count} peers behind",
-  "updates.entry.status.available": "{version} available",
-  "updates.entry.status.upToDate": "Up to date",
-
-  // --- updateRibbon (the ONE top-of-app update band), M16/02 ---
-  // Every string in this block is held to a 40-CHARACTER BUDGET in all six locales, enforced by
-  // `update-ribbon-i18n.test.ts`. One truncating row on a phone is about forty characters wide, and
-  // a line that overflows it in German or Japanese is a line nobody can read. The budget is measured
-  // with the slots filled: a version, a peer name, a count. `{reason}` is a peer's own prose of
-  // unbounded length, so it is cut on a word boundary before it ever reaches a string here and the
-  // Updates page carries it whole.
-  "updateRibbon.starting": "Starting update…",
-  "updateRibbon.fetching": "Updating to {version}. Fetching",
-  "updateRibbon.building": "Updating to {version}. Building",
-  "updateRibbon.restarting": "Updating to {version}. Restarting",
-  "updateRibbon.updated": "Updated to {version}. Tap to reload.",
-  "updateRibbon.peers.one": "Updating {count} peer: {names}",
-  "updateRibbon.peers.other": "Updating {count} peers: {names}",
-  "updateRibbon.peersSlow.one": "Updating {count} peer: {names}, {elapsed}",
-  "updateRibbon.peersSlow.other": "Updating {count} peers: {names}, {elapsed}",
-  "updateRibbon.underAMinute": "less than a minute",
-  "updateRibbon.minutes.one": "{count} min",
-  "updateRibbon.minutes.other": "{count} min",
-  "updateRibbon.packageManaged.one": "{names} waits for its package manager",
-  "updateRibbon.packageManaged.other": "{names} wait for their package manager",
-  "updateRibbon.peerFailed": "Could not update {name}: {reason}.",
-  "updateRibbon.seeUpdates": "See Updates.",
-  // THE BAND'S OWN CUT OF IT. One truncating row is about forty characters wide, which the whole
-  // sentence is not, so the band states WHAT changes and the tap lands on the card, where the rest
-  // of it sits above the confirm. Held to the budget like every other band string.
-  // THE BAND'S HALF OF IT (ADR 0046). The label alone, because the release's sentence is prose of
-  // unbounded length and this row is forty characters. The tap lands on the card, which prints it.
-  "updateRibbon.urgent": "Urgent.",
-  "updateRibbon.linkChangeShort": "Changes the crew link.",
-  "updateRibbon.available": "Collie {version} available.",
-  // A packaged host cannot take the tap — its updates come from its package manager (ADR 0035) — so
-  // the band STATES the fact and names the manager. It does not instruct: the phone cannot run
-  // pacman, and a line that told the operator to would be telling them to go somewhere else.
-  "updateRibbon.availablePackaged": "Collie {version} available via {manager}.",
-  // The same host under a prefix Collie does not recognise: there is no manager to name, so the band
-  // states the version and points at the page that carries the boundary sentence.
-  "updateRibbon.availablePackagedUnnamed": "Collie {version} available.",
-  // The band's own control in the states that can also be PUT DOWN. `ui/notice.tsx` forbids a
-  // whole-row tap beside a dismiss X (a button may not hold a button), so those states name the
-  // tap instead of being one. It opens /settings/updates, where the confirm lives; it starts nothing.
-  "updateRibbon.view": "View",
-  "updateRibbon.dismiss": "Dismiss this version",
-  // The close on the two QUIET crew states. Not "dismiss this version": what is put down there is a
-  // notice about another machine, and this host's own offer is untouched by it.
-  // ── The prompt-cache chip and its sheet (M28/02) ──────────────────────────
-  // A rule's `label`, its source title and its publisher are NOT here: those are another vendor's
-  // words about their own product, the same carve-out ADR 0030 makes for slash-command descriptions.
-  // The countdown itself is a number and a unit letter, which is the compact convention `timeAgoShort`
-  // already follows across every locale.
   "cache.warm": "Prompt cache warm",
   "cache.expiring": "Prompt cache expiring",
   "cache.cold": "cold",
@@ -1051,12 +785,6 @@ export const en = {
   "cache.confidence.reported": "reported",
   "cache.confidence.inferred": "inferred",
   "cache.confidence.observed": "measured",
-  "updateRibbon.hideNotice": "Hide this notice",
-
-  // --- tour (the first-run screen, web/src/components/tour-sheet.tsx) ---
-  // ONE scrolling screen, shown once per device and then only when the operator asks in Settings.
-  // The English here is the source of truth; the six other catalogs carry it verbatim until it is
-  // translated. Raise TOUR_VERSION (lib/tour.ts) when a CLAIM below changes, never for polish.
   "tour.skip": "Skip",
   "tour.title": "Collie shows the agents in your terminal.",
   // The claim's second sentence, in the three forms the facts can support. {mux} is the
@@ -1064,8 +792,6 @@ export const en = {
   // is dropped rather than filled with a placeholder.
   "tour.lead":
     "It mirrors the panes running under {mux} on {host}. It shows what is on those screens, and it never runs a terminal of its own.",
-  "tour.leadNoHost":
-    "It mirrors the panes running under {mux}. It shows what is on those screens, and it never runs a terminal of its own.",
   "tour.leadNoMux":
     "It mirrors the panes running in your terminal multiplexer. It shows what is on those screens, and it never runs a terminal of its own.",
 
@@ -1076,8 +802,6 @@ export const en = {
   "tour.setup.needsYou.one": "{count} needs you",
   "tour.setup.needsYou.other": "{count} need you",
   "tour.setup.noPanes": "No panes yet",
-  "tour.setup.machines.one": "{count} machine in your crew",
-  "tour.setup.machines.other": "{count} machines in your crew",
   "tour.setup.canType": "This device can type",
   "tour.setup.readOnly": "This device can read only",
   "tour.setup.pushOff": "Notifications are off on this phone",
@@ -1105,9 +829,6 @@ export const en = {
   "tour.can.type": "Type a reply, or send Esc, Tab and Ctrl keys.",
   "tour.can.harness": "Set model and effort from the actions row.",
   "tour.can.session": "Read the whole session, past the scrollback.",
-  "tour.can.crew": "Watch every machine in your crew from one URL.",
-
-  // The footer's one button. The first spelling opens the blocked pane; the second closes the sheet.
   "tour.done.pane": "Open the pane that needs you",
   "tour.done.dashboard": "Show the dashboard",
 
@@ -1115,69 +836,7 @@ export const en = {
   "settings.tour.title": "Show the first screen again",
   "settings.tour.description": "What Collie does, and what this install looks like.",
   "settings.tour.button": "Show",
-
-  // --- updateScreen (M28/01) ---
-  // The sheet a running update takes the screen with: one row per machine, one for this device's own
-  // download, and a way out of every state that can stall. `components/update-screen.tsx` renders it;
-  // `lib/update-screen.ts` decides every state it can be in. Short words — these rows are read on a
-  // phone while a machine is being rebuilt underneath them.
-  "updateScreen.dialogAria": "Update in progress",
-  "updateScreen.title": "Updating Collie",
-  "updateScreen.close": "Close",
-  "updateScreen.rows.label": "Machines",
-  "updateScreen.thisMachine": "This machine",
-  "updateScreen.versionUnknown": "an unknown version",
-  "updateScreen.reasonUnknown": "no reason given",
-  "updateScreen.seeUpdates": "See Updates",
-  "updateScreen.keepWaiting": "Keep waiting",
-  // The one sentence of truth, small and last: the run is on the machines, and this screen only shows
-  // it. An operator who thinks closing the phone stops the update will not close the phone.
-  "updateScreen.truth": "The update runs on the machines. This screen only shows it, and closing the app does not stop it.",
-  // The badge, on a device that did not start the run. One line, so it truncates rather than wraps.
-  "updateScreen.badge.moving": "{name}: {word}",
-  "updateScreen.badge.downloading": "Downloading the new app",
-  "updateScreen.badge.generic": "Update in progress",
-  // A row's state, in the fewest words that are still true. The lead's four in-flight states say what
-  // the machine is DOING; a peer reports `updating` for all four, because the lead cannot see inside.
-  "updateScreen.state.preflight": "checking",
-  "updateScreen.state.staging": "building",
-  "updateScreen.state.restarting": "restarting, back in a moment",
-  "updateScreen.state.verifying": "checking the new version",
-  "updateScreen.state.done": "done",
-  "updateScreen.state.rolledBack": "back on {version}",
-  "updateScreen.state.stuck": "stuck",
-  "updateScreen.state.interrupted": "interrupted",
-  "updateScreen.state.idle": "idle",
-  "updateScreen.state.waiting": "waiting",
-  "updateScreen.state.updating": "updating",
-  "updateScreen.state.unreachable": "no answer",
-  "updateScreen.state.packageManaged": "package-managed",
-  "updateScreen.state.current": "already up to date",
-  "updateScreen.peer.lastSeen": "last seen {ago} ago",
-  "updateScreen.peer.packageManagedNote": "Its package manager owns this machine, so the run leaves it alone.",
-  // The run ended and it did not arrive. The sentence names what happened and the reason the host gave.
-  "updateScreen.failed.rolledBack": "The update rolled back. This machine is still on {version}: {reason}",
-  "updateScreen.failed.stuck": "The update is stuck: {reason}",
-  "updateScreen.failed.interrupted": "The update was interrupted: {reason}",
-  // The lead has held one state longer than a whole build, restart and verify takes. Keep waiting, with
-  // the app back in your hands — never a cancel, and never a forced reload.
-  "updateScreen.lead.stalled": "Still working. Nothing is wrong yet, and waiting is the whole job.",
-  "updateScreen.lead.crewOnly": "This run updates only the members. This machine stays as it is and does not restart.",
-  // THIS device, which is not a machine in the crew: it is the phone fetching the bundle the machines
-  // now serve. Counted in FILES, because per-file is the only thing the service worker reports.
-  "updateScreen.device.title": "This device",
-  "updateScreen.device.downloading": "Downloading the new app, {done} of {total} files",
-  "updateScreen.device.downloadingUnknown": "Downloading the new app",
-  "updateScreen.device.switching": "Switching to the new app",
-  "updateScreen.device.progressAria": "Files downloaded",
-  "updateScreen.device.hung": "Still downloading. Keep using the app you have, and it will switch over when it lands.",
-  "updateScreen.device.keepUsing": "Keep using the app",
-  // The end, through the status channel every other confirmation uses. A solo install names the MACHINE,
-  // because there is no crew to name.
-  "updateScreen.done.crew": "Crew updated to {version}",
-  "updateScreen.done.solo": "{machine} updated to {version}",
-  "updateScreen.done.members": "Members updated to {version}",
-} as const;
+};
 
 /** Every key that exists, as a union of string literals. The completeness contract. */
 export type MessageKey = keyof typeof en;

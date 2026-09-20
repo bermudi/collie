@@ -16,8 +16,6 @@ import {
   sendKeys,
   sendReply,
   uploadFile,
-  sttTimeoutFor,
-  transcribeAudio,
   withTimeout,
   XHR_HEADER,
   XHR_HEADER_VALUE,
@@ -216,30 +214,6 @@ describe("api client — request timeouts", () => {
 // A transcription deadline is a function of the clip, not a constant. The beta shipped a flat 60s,
 // which failed a five-minute recording on a mobile uplink while being far more slack than a
 // five-second one ever needs.
-describe("api client — the transcription deadline scales with the clip", () => {
-  it("a longer clip earns a longer deadline, always", () => {
-    const small = sttTimeoutFor(64 * 1024);
-    const large = sttTimeoutFor(8 * 1024 * 1024);
-    expect(large).toBeGreaterThan(small);
-  });
-
-  it("an 8 MiB clip — the largest Collie will record — is allowed a little under six minutes", () => {
-    const budget = sttTimeoutFor(8 * 1024 * 1024);
-    expect(budget).toBeGreaterThan(5 * 60_000);
-    expect(budget).toBeLessThan(6 * 60_000);
-  });
-
-  it("a short clip still keeps the whole fixed allowance the provider and the round trip need", () => {
-    // 80s of provider deadline + overhead, before a single byte of audio is counted.
-    expect(sttTimeoutFor(0)).toBe(80_000);
-    expect(sttTimeoutFor(20 * 1024)).toBeGreaterThan(80_000);
-  });
-
-  it("a nonsense size cannot produce a deadline shorter than the fixed allowance", () => {
-    expect(sttTimeoutFor(-1)).toBe(80_000);
-  });
-});
-
 // The browser URL uses the short `?h=` / `?s=`; on the wire every scoped endpoint takes the long
 // names `host=` and `session=`, in that fixed order. A named host/session must append its param
 // (composing correctly with fetchPane's `?lines=`); the lead's primary session (both undefined) must
@@ -508,15 +482,6 @@ describe("api client — identity proxy refusals", () => {
     Object.defineProperty(response, "type", { value: "opaqueredirect" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
     await expect(fetchSnapshot()).rejects.toThrow(/401.*requires sign-in/);
-  });
-
-  // The fourth bridge call site. It bypasses `req` like the other two and, unlike them, returns its
-  // refusal as a value instead of throwing — so a proxy 3xx has to arrive here as a plain 401 too,
-  // or the composer prints a transport error where the sign-in sentence belongs.
-  it("turns a fronting proxy 3xx on the transcribe POST into a 401 result", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 302 }));
-    const result = await transcribeAudio(new Blob(["x"], { type: "audio/webm" }));
-    expect(result).toMatchObject({ ok: false, status: 401 });
   });
 });
 
