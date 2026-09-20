@@ -33,11 +33,8 @@ export type ConfigSection =
   | "push"
   | "uploads"
   | "journal"
-  | "crew"
-  | "standby"
   | "update"
-  | "serve"
-  | "stt";
+  | "serve";
 
 /** The sections in file order — the order `config init` writes and `config show` prints. */
 export const CONFIG_SECTIONS: readonly ConfigSection[] = [
@@ -48,11 +45,8 @@ export const CONFIG_SECTIONS: readonly ConfigSection[] = [
   "push",
   "uploads",
   "journal",
-  "crew",
-  "standby",
   "update",
   "serve",
-  "stt",
 ];
 
 /** One line per section, printed as the banner comment `config init` writes above it. */
@@ -64,11 +58,8 @@ export const SECTION_DOC = {
   push: "Web Push (VAPID). All three are needed before a phone can be notified.",
   uploads: "The attachment size cap and the extra text types the upload route accepts.",
   journal: "Where each harness keeps its own session log, per harness.",
-  crew: "The budgets a lead gives a member, and whether a peer keeps its own browser.",
-  standby: "The deputy's second door: its port, its bind address and when it arms.",
   update: "Where releases come from, how many old versions stay, and the health budget.",
   serve: "The managed front door: whether Collie publishes it, and on what.",
-  stt: "Speech-to-text, which is absent until `collie stt setup` writes it.",
 } satisfies Record<ConfigSection, string>;
 
 /**
@@ -525,61 +516,8 @@ export const CONFIG_SETTINGS: readonly ConfigSetting[] = [
   },
 
   // ── crew ───────────────────────────────────────────────────────────────────
-  {
-    key: "crew_timeout_ms",
-    env: "COLLIE_CREW_TIMEOUT_MS",
-    section: "crew",
-    kind: "int",
-    default: 1200,
-    min: 1,
-    doc: "How long a member has to answer a lead's poll. Clamped to 0.8 of poll_ms.",
-  },
-  {
-    key: "crew_hello_timeout_ms",
-    env: "COLLIE_CREW_HELLO_TIMEOUT_MS",
-    section: "crew",
-    kind: "int",
-    default: 5000,
-    min: 1,
-    doc: "How long a hello probe may take before the lead calls a member gone.",
-  },
-  {
-    key: "peer_browser",
-    env: "COLLIE_PEER_BROWSER",
-    section: "crew",
-    kind: "bool",
-    default: false,
-    doc: "Keep this peer's own browser front door up. Peer mode only.",
-  },
 
   // ── standby ────────────────────────────────────────────────────────────────
-  {
-    key: "standby_port",
-    env: "COLLIE_STANDBY_PORT",
-    section: "standby",
-    kind: "int",
-    default: 0,
-    min: 1,
-    max: 65_535,
-    doc: "The deputy's standby door. Absent means no door is bound at all.",
-  },
-  {
-    key: "standby_host",
-    env: "COLLIE_STANDBY_HOST",
-    section: "standby",
-    kind: "string",
-    default: "127.0.0.1",
-    doc: "Where the standby door binds.",
-  },
-  {
-    key: "standby_arm_ms",
-    env: "COLLIE_STANDBY_ARM_MS",
-    section: "standby",
-    kind: "int",
-    default: 0,
-    min: 1,
-    doc: "How long the lead may be silent before the door arms. Empty uses the formula.",
-  },
 
   // ── update ─────────────────────────────────────────────────────────────────
   {
@@ -587,8 +525,8 @@ export const CONFIG_SETTINGS: readonly ConfigSetting[] = [
     env: "COLLIE_UPDATE_REPO",
     section: "update",
     kind: "string",
-    default: "AltanS/collie",
-    doc: "The owner/repo releases are taken from. Set it only when you run a fork on purpose.",
+    default: "bermudi/collie",
+    doc: "The owner/repo releases are taken from; this fork defaults to its own tags.",
   },
   {
     key: "keep_versions",
@@ -640,64 +578,6 @@ export const CONFIG_SETTINGS: readonly ConfigSetting[] = [
   },
 
   // ── stt ────────────────────────────────────────────────────────────────────
-  {
-    key: "stt_provider",
-    env: "COLLIE_STT_PROVIDER",
-    section: "stt",
-    kind: "enum",
-    values: ["openai-compatible", "codex"],
-    default: "",
-    doc: "Which speech-to-text provider to build. Absent leaves the feature off.",
-  },
-  {
-    key: "stt_url",
-    env: "COLLIE_STT_URL",
-    section: "stt",
-    kind: "string",
-    default: "",
-    doc: "The OpenAI-compatible API base, its version prefix included and no trailing slash.",
-  },
-  {
-    key: "stt_model",
-    env: "COLLIE_STT_MODEL",
-    section: "stt",
-    kind: "string",
-    default: "gpt-transcribe",
-    doc: "The transcription model that endpoint understands.",
-  },
-  {
-    key: "stt_key",
-    env: "COLLIE_STT_KEY",
-    section: "stt",
-    kind: "secret",
-    default: "",
-    doc: "The bearer credential for that endpoint. A file holding it must be mode 600.",
-  },
-  {
-    key: "stt_lang",
-    env: "COLLIE_STT_LANG",
-    section: "stt",
-    kind: "string",
-    default: "",
-    doc: "The language you speak, as ISO-639-1. Empty lets the model detect it.",
-  },
-  {
-    key: "stt_wire_identity",
-    env: "COLLIE_STT_WIRE_IDENTITY",
-    section: "stt",
-    kind: "enum",
-    values: ["honest", "codex-cli"],
-    default: "honest",
-    doc: "Which identity the codex provider wears on the wire.",
-  },
-  {
-    key: "codex_bin",
-    env: "COLLIE_CODEX_BIN",
-    section: "stt",
-    kind: "string",
-    default: "codex",
-    doc: "The codex binary the codex provider borrows your session from.",
-  },
 ];
 
 /** Every environment name the table answers to, aliases included. Built once. */

@@ -22,7 +22,7 @@ import {
 // setting in from another branch is one row away from green.
 
 const REPO_ROOT = join(import.meta.dir, "..");
-const SCANNED_DIRS = ["bridge", "cli"];
+const SCANNED_DIRS = ["bridge"];
 
 /**
  * Names that are NOT settings, each with the reason it can never be one. An entry here is a
@@ -30,21 +30,9 @@ const SCANNED_DIRS = ["bridge", "cli"];
  */
 const EXEMPT = {
   // Decide WHICH config is read, so they cannot be set by it.
-  COLLIE_INSTANCE: "picks the config dir, so a file inside that dir cannot name it",
   COLLIE_CONFIG: "names the base config file itself",
-  COLLIE_CONFIG_DIR: "forwarded to the detached update runner; it names where config lives",
   // The launcher's statement about this process, not the operator's about this Collie.
   COLLIE_PLUGIN_ROOT: "the checkout this binary runs from, injected by the launcher",
-  COLLIE_SUPERVISOR: "which service manager is in front of this process",
-  // Template tokens and test switches, never read from an environment at all.
-  COLLIE_VERSION: "a token `collie docs` substitutes into a page",
-  COLLIE_DOCS_TABLE: "a token `collie docs` substitutes into a page",
-  COLLIE_REGEN_SOLO_BASELINE: "a switch that regenerates a test fixture",
-  COLLIE_STDIN__: "a marker in the remote script `cli/remote.ts` writes",
-  COLLIE_PAYLOAD__: "a marker in the remote script `cli/remote.ts` writes",
-  COLLIE_TAG: "install.sh's version pin, named in the line `crew add` prints for a commitless lead",
-  COLLIE_PACK_SECRET:
-    "named only in the update runner's redaction list, so it is a name to scrub and not a value read",
 } satisfies Record<string, string>;
 
 /** Just the names, so a lookup by a grepped string does not need an index signature. */
@@ -85,7 +73,7 @@ function scan(): Found[] {
 }
 
 describe("the schema names every setting", () => {
-  test("every COLLIE_* name in bridge/ and cli/ has a row or a named exemption", () => {
+  test("every COLLIE_* name in bridge/ has a row or a named exemption", () => {
     const missing = scan()
       .filter((f) => !EXEMPT_NAMES.has(f.env) && settingByEnv(f.env) === undefined)
       .map((f) => `${f.env} (read in ${f.file})`);
@@ -99,9 +87,9 @@ describe("the schema names every setting", () => {
 
   test("the exemption list is live — every entry is still a name the tree uses", () => {
     const found = new Set(scan().map((f) => f.env));
-    // `COLLIE_CONFIG` and `COLLIE_REGEN_SOLO_BASELINE` are named here for the reader; the first is
-    // read by `bridge/config-source.ts` and the second only by a test, so neither is required.
-    const optional = new Set(["COLLIE_CONFIG", "COLLIE_REGEN_SOLO_BASELINE"]);
+    // `COLLIE_CONFIG` is named here for the reader; it is read by `bridge/config-source.ts`, so
+    // it is not required.
+    const optional = new Set(["COLLIE_CONFIG"]);
     const stale = Object.keys(EXEMPT).filter((env) => !found.has(env) && !optional.has(env));
     expect(stale).toEqual([]);
   });
