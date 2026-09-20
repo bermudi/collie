@@ -109,9 +109,9 @@ describe("the import.meta.dir ban", () => {
     return out;
   }
 
-  test("no shipped bridge/ or cli/ module resolves a path from its own directory", () => {
+  test("no shipped bridge/ module resolves a path from its own directory", () => {
     const offenders: string[] = [];
-    for (const file of [...sources(join(ROOT, "bridge")), ...sources(join(ROOT, "cli"))]) {
+    for (const file of sources(join(ROOT, "bridge"))) {
       const lines = readFileSync(file, "utf8").split("\n");
       lines.forEach((line, i) => {
         const hit = line.indexOf("import.meta.dir");

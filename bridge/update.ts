@@ -135,7 +135,7 @@ export function shouldNotify(a: {
  *  all we need — any content edit changes size or mtime, and a pull/rebuild touches the changed files. */
 export function stampOf(entries: { path: string; mtimeMs: number; size: number }[]): string {
   return [...entries]
-    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+    .toSorted((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
     .map((e) => `${e.path}:${e.mtimeMs}:${e.size}`)
     .join("\n");
 }
@@ -184,10 +184,14 @@ export function githubTagsFetcher(repo: string): () => Promise<string[]> {
       signal: AbortSignal.timeout(TAGS_TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`github tags: HTTP ${res.status}`);
-    const data = (await res.json()) as unknown;
+    const data: unknown = await res.json();
     if (!Array.isArray(data)) return [];
     return data
-      .map((t) => (typeof (t as { name?: unknown }).name === "string" ? (t as { name: string }).name : ""))
+      .map((t) => {
+        // SAFETY: `t` is untrusted JSON; the typeof guard is the whole check before the read.
+        const name = (t as { name?: unknown }).name;
+        return typeof name === "string" ? name : "";
+      })
       .filter(Boolean);
   };
 }
@@ -206,6 +210,8 @@ export class UpdateStateStore {
 
   async load(): Promise<void> {
     try {
+      // SAFETY: this file is written by UpdateStateStore.save alone; the cast names its shape and
+      // the typeof line below is the actual check.
       const raw = (await Bun.file(this.file).json()) as { lastNotified?: unknown };
       this.lastVersion = typeof raw.lastNotified === "string" ? raw.lastNotified : null;
     } catch {

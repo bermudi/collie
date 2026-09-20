@@ -1,683 +1,773 @@
 # Changelog
 
-This file tracks all notable changes to Collie, ordered newest version first. The project follows
-[Semantic Versioning](https://semver.org/). From 1.6.0 on, a version's changes are grouped under
-`### Added`, `### Changed`, `### Fixed`, `### Packaging` and `### Docs`, in that order and only
-where there is content, and every bullet opens with a short bold lead sentence, which is the line
-the GitHub Release page prints. Older versions carry a single flat list. Every entry links to its commit and credits the contributor where there is one. The
-`## [Unreleased]` section contains merged work waiting for release. The release
-commit renames this heading to `## [x.y.z] - YYYY-MM-DD`, adds the commit hashes, and adds a new
-empty `## [Unreleased]` section above it. The newest numbered `## [x.y.z]` heading (excluding the
-Unreleased heading) **must** match the `version` field in `herdr-plugin.toml`, `package.json`,
-and `web/package.json`, which `scripts/check-version.sh` checks. See [`CLAUDE.md`](./CLAUDE.md) →
-*Versioning* for the bump policy.
+All notable changes to Collie are recorded here. The format follows
+[Keep a Changelog](https://keepachangelog.com/), and the project uses
+[Semantic Versioning](https://semver.org/). The newest `## [x.y.z]` heading **must** match the
+`version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
+`scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
-## Upgrading
+## [0.48.0] - 2026-09-20
 
-**Already on 1.x?** Run `collie update`, or run
-`herdr plugin action invoke update --plugin herdr.collie`. Check the result with
-`bin/collie version` (or `herdr plugin action invoke version --plugin herdr.collie`). It shows the
-newest tag. The phone PWA updates itself within about a minute; no reload needed.
-Running a crew? Update the lead first; members follow on their own. Details:
-`docs/crew.md` → *Updating from 1.7.0*.
-
-**Coming from 0.x?** Upgrade with one command. Do not use `collie update`. From the Herdr
-plugin: `herdr plugin action invoke update-major --plugin herdr.collie`. From a checkout you can
-reach: `bin/collie update --major`. Fresh install:
-`curl -fsSL https://colliepwa.dev/install.sh | sh`. Neither upgrade path assumes a `collie` on your
-PATH. Details and rollback: [`docs/upgrading.md`](./docs/upgrading.md) → *Upgrading from 0.x to
-1.0*.
-
-## [Unreleased]
-
-## [1.11.0-rc.1] - 2026-09-20
+The re-branch ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)): Pup now tracks [`AltanS/collie`](https://github.com/AltanS/collie) wholesale (base: their 1.11.0-rc.1) and stays there as a strip-fork — upstream work arrives by ordinary merges from here on, and the per-commit port rounds of 0.32→0.47 are retired.
 
 ### Added
+- **The prompt-cache chip and the cache watch.** Each agent pane shows how long its prompt cache stays warm, sourced-claim rules (`cache-rules.toml`) can override it, and you can ask to be warned before a pane's cache goes cold. The countdown is measured, not guessed.
+- **The multiplexer seam: tmux and zellij adapters.** Herdr stays the default; a tmux or zellij host can now be mirrored too. (Their panes read as shells — the agent-identifying beacon hooks live in upstream's CLI, which Pup does not carry.)
+- **Typed-dictionary translations.** The UI ships in six locales behind a typed dictionary — carried rather than re-stripped, because stripping it was the adaptation tax that made port rounds expensive.
+- **Device pairing** (`bridge/pairing.ts`): an optional second write gate — a bearer credential a paired device holds — composing by AND with the device-header gate.
+- **The browser tier in CI** (Playwright, chromium + webkit) and the oxlint lint gate — both run on GitHub's runners, never the laptop.
+- **Everything upstream shipped 0.32→1.11** that earlier rounds ported piecemeal: the 1.9 dashboard redesign, pane history from journals, images in the mirror, adaptive polling, the switcher sheet, launchers, uploads, Muse panes, and the frame-search/capture-corpus keystroke work of 1.10.
 
-- **Releases ship an Intel Mac binary.** A `macos-x64` payload joins the release, built on GitHub's last Intel runner image, so an Intel Mac installs and updates from a binary instead of building from source. Contributed by [@ryands17](https://github.com/ryands17) ([#239](https://github.com/AltanS/collie/pull/239)) ([abd1d1bd](https://github.com/AltanS/collie/commit/abd1d1bd))
-- **The pane switcher now shows each row's cache time.** The Layers sheet already named the pane and its place; the same warm, expiring or cold reading that rides the dashboard row now trails the name here too, so you can tell a warm pane from a cold one without leaving the sheet. ([20d2bada](https://github.com/AltanS/collie/commit/20d2bada))
-- **Muse panes get their own adapter, so you can answer Muse from the phone.** Muse's command approval, its single-choice and multi-choice questions (with the review screen), and its workspace trust prompt show as buttons, and the command or folder they concern stays on screen above them. Collie also takes Muse's input box and status row off the mirror, shows a draft left in the box, and checks each reply against the box before it sends. A dialog quoted in the transcript, or one above a box that holds a draft, stays text, so a tap can never send a draft. Contributed by [@jpcarranza94](https://github.com/jpcarranza94) ([#244](https://github.com/AltanS/collie/pull/244)) ([d634d025](https://github.com/AltanS/collie/commit/d634d025), [c99a863d](https://github.com/AltanS/collie/commit/c99a863d), [c7e5c8e8](https://github.com/AltanS/collie/commit/c7e5c8e8))
-- **The cache chip turns cold when an action drops the cache.** A `/model` switch to another model, an effort change, a compaction and `/reload-plugins --force` make the next turn rebuild the cached prefix, and the chip kept counting down over it. Collie now reads these actions from Claude Code's transcript as they happen, and a model change or a compaction from opencode, and shows the chip cold with the clock still running. The cache sheet names the action, or the one that most likely made the last turn miss, and the cache watch stays quiet on a pane that is already cold. Every rule carries its source, and plain `/reload-plugins`, which keeps the cache, ships as a rule too ([#236](https://github.com/AltanS/collie/issues/236)) ([da555bc8](https://github.com/AltanS/collie/commit/da555bc8))
+### Changed
+- **Pack/crew/HA** — leads, deputies, warrants, takeover, the standby door, the crew wire: none of it compiles here. A solo bridge is the only bridge.
+- **Speech-to-text** — no audio in Pup's bridge; the phone keyboard's own microphone remains the voice path.
+- **The TypeScript `cli/`** — Pup's operating surface stays `scripts/collie-ctl.sh` (build / restart / update / doctor / serve) and the fork's `herdr-plugin.toml` actions. The bridge's update path is the check-only banner watching this fork's tags; `update --major` remains the consented crossing (ADR 0020).
+- **Agent beacons** — without the CLI that installs them, the markers could never be written.
+
+### Fixed
+- **Android/Firefox viewport repairs** — stale height after keyboard dismiss, the CSS dvh rule, the single scroll container — and the sheet's isolated paint and early-settling dim.
+- **Devin: the command catalog** (20 synced commands), the pinwheel brand mark, clipped two-label composer rules.
+- **The opencode pane-scoped web adapter** ([ADR 0050](./.adr/0050-opencode-sessions-are-pane-scoped.md)).
+- **Shift+Tab arrives as one raw BackTab** (`ESC [ Z`).
+- **Hermes reads the schema that is actually on disk**; pi's composer prompt is bounded before the wire; `~` expands and new-space directories are validated (`~/build` no longer opens `$HOME`); multi-select attach.
+- **Box-drawing tables render as tables in transcripts**; the Kitty placeholder cards are gone again and blank runs collapse ([ADR 0052](./.adr/0052-the-mirror-does-not-guess-images.md)).
+
+## [0.47.0] - 2026-09-17
+
+Port of the upstream 1.10.0/1.10.1 dashboard and harness work. Pup keeps its own compact
+tab-strip look; the cell-level behavior (names, marks, spoken names) tracks upstream.
 
 ### Changed
 
-- **A crew-only update takes the screen on the phone that started it.** "Retry crew update", and levelling the members while the lead is already current, left the app live with no sheet, because such a run writes no record on the lead. The phone that tapped it now gets the same sheet as a full update: the app behind is blocked until the members finish, the lead's row says it is already up to date and does not restart, and the end reads `Members updated to <version>`. A member that could not update leaves the sheet open on that phone with its reason. Every other device shows the badge, as it does for a full update. The "Still working" way out appears when no member has moved for three minutes. ([5f5c44c9](https://github.com/AltanS/collie/commit/5f5c44c9))
+- **The dashboard keeps every pane where it sits.** Panes stay in their workspace group in the multiplexer's own order, whatever their status; a pane that needs you or finished unseen is no longer pulled to the top. Urgency shows in place instead: a wash on the row, a lit workspace heading, and one summary line that counts every state in words while each heading shows the same counts as numbers.
+- **A strip of workspace chips filters the dashboard.** Tap a workspace to see it alone, tap it or All to see everything; long-press to hide a workspace, and its chip stays in the strip, dimmed, still showing its status. The choice is kept per device.
+- **An unseen reply is marked with a square.** A finished pane you have not opened carries a small square after its name, on the summary line, on its workspace heading and on its chip, instead of a white dot and a green wash that read as one more status.
+- **The switcher mark shows a red dot when another pane needs you.** The layers mark at the belt's right end carries a red dot as soon as any pane other than the one on screen is waiting on you, and its spoken name says so. Only a pane that needs you lights it.
+- **A named tab that holds one pane names that pane.** The header, the belt, the dashboard and a push now say the tab name you gave, ahead of the title Claude writes itself, which moves to the dashboard row's second line. A `/rename` and a pane label still come first.
+- **The tab belt names the pane.** A tab that holds one pane shows that pane's name, so the open tab and the header read the same word, and the belt's spoken names follow what a cell draws. (Pup keeps its outlined-pill belt; upstream's underline treatment stays theirs.)
 
 ### Fixed
 
-- **Claude's background agents show on the phone again.** The list Claude draws under its statusline (`● main` and one row per agent) left the mirror with the input box, and nothing showed it anywhere. It now sits under the statusline as its own row: the first agent and a count of the rest, and a tap shows every row. Reported by [@leiyangyou](https://github.com/leiyangyou) ([#242](https://github.com/AltanS/collie/issues/242)) ([588f4694](https://github.com/AltanS/collie/commit/588f4694))
-- **Codex Astra's starfield no longer blocks sends or poses as a draft.** Astra models paint sparkles around Codex's input line. Rows of sparkles between the input line and the status row made the phone think a dialog was up, and it refused to send. Sparkles on an empty input line showed up as a stranded draft. Collie now finds the input line by its own marks and reads past the sparkles. Reported by [@dondiegorivera](https://github.com/dondiegorivera) ([#245](https://github.com/AltanS/collie/issues/245)) ([12e168cd](https://github.com/AltanS/collie/commit/12e168cd))
-- **`crew add` and `crew update` on a lead from install.sh say what to do instead of reporting a broken checkout.** Both commands push the lead's own git commit, and a standalone install has none, so both stopped with "is not a git checkout" after a full probe of the far machine. They now stop before the first ssh connection. `crew add` prints the manual path with the lead's release pinned, and `crew update` names the phone's Updates page and `collie update --to-tag` on each member. `crew add` on a packaged lead gets the same answer. Reported by [@fonnesbeck](https://github.com/fonnesbeck) ([#248](https://github.com/AltanS/collie/issues/248)) ([ad3171bf](https://github.com/AltanS/collie/commit/ad3171bf))
-- **The cache chip and History follow a Claude Code session hand-over.** Claude Code can move a live conversation into a new session file and leave a `continued-in` record at the end of the old one, while Herdr keeps naming the old session. The chip then counted down on a file nobody writes to, and History could stay on it too. Collie now follows that record to the live file, up to eight hops and never outside the projects folder it started in, and ignores it once the old session writes a new turn after it ([#236](https://github.com/AltanS/collie/issues/236)) ([1e9d1a36](https://github.com/AltanS/collie/commit/1e9d1a36))
-- **The crew update button goes away once every member runs the lead's version.** "Update crew" and "Retry crew update" could stay on the Updates page over a crew that was already level. A member that had moved past the lead counted as behind, and a member that failed a run kept counting after it updated itself. The phone and the lead now apply one rule: a member counts as behind only when its version is lower than the lead's, and a failed member stops counting once it reports the lead's version or a newer one. The band's "Could not update" line clears at the same moment. A member whose version is unknown still counts, and a member whose package manager owns it never counts, awake or asleep. ([4f4f3be5](https://github.com/AltanS/collie/commit/4f4f3be5), [78d581bb](https://github.com/AltanS/collie/commit/78d581bb))
-- **A crew update refused over a packaged member says so.** A member whose package manager owns it cannot be levelled from the phone (ADR 0035), and a start that found only such a member behind was refused with "there is no newer release to take", which is not what happened. It now names the member and its package manager. ([24f3d37c](https://github.com/AltanS/collie/commit/24f3d37c))
-- **`collie doctor` can read its own bridge again when a tailnet login is required.** With `COLLIE_TRUSTED_USER` set and `tailscale serve` in front, the bridge refuses a read that carries no identity, so `doctor` could not reach its own `/api/snapshot` and called a healthy bridge one that was down. It now shows the login it is configured with, and a refusal that still comes back is reported as a refusal, not as a bridge to go and start. Reported by [@ubuntudroid](https://github.com/ubuntudroid) ([#238](https://github.com/AltanS/collie/issues/238)) ([a94d41a0](https://github.com/AltanS/collie/commit/a94d41a0), [1ae0dde2](https://github.com/AltanS/collie/commit/1ae0dde2))
-- **The close button on a failed update sheet closes it.** A failed update leaves its sheet open with the reason, and the sheet offered a close that did nothing, so it covered the app until the page reloaded. The close now puts it away on that device, and a later failure shows again. ([5f5c44c9](https://github.com/AltanS/collie/commit/5f5c44c9))
+- **Claude's input box is found by its own frame.** A slash popup with a clipped command name, a stale box echoed above a dialog, or a statusline mark near the box no longer hides the composer or masquerades as one: the guard refuses screens it cannot read instead of guessing, and a stalled send on an 82-column pane is now a pinned regression.
+- **Faint "suggested next prompt" text is no longer read as a draft.** Claude's ghost suggestion is painted dim; treating it as typed text could recover a draft you never wrote and vouch for a send that never landed. It is now classified out at the single place a draft is derived.
+- **The whole input-box walk is pinned by a capture corpus.** Sixty real-screen captures at four widths run on every test pass, so a detection change shows up as a diff instead of as a stall on the phone.
+- **A summary count never splits across two lines.** When five states do not fit the phone's width, whole counts wrap; a count never breaks inside itself.
 
-## [1.10.2] - 2026-09-19
+## [0.46.1] - 2026-09-16
 
 ### Fixed
 
-- **`collie update` works again when your home directory is a git repository.** A dotfiles repository whose working tree sits at `~` made Collie read a binary install as a source checkout. `collie update` then refused to run and pointed you at your own dotfiles remote. Collie now counts a directory as a checkout only when the repository starts there. Reported by [@krishkumar](https://github.com/krishkumar) ([#243](https://github.com/AltanS/collie/issues/243)) ([d43f8fd1](https://github.com/AltanS/collie/commit/d43f8fd1))
-- **A checkout whose git data is unreadable is never mistaken for a binary install.** A corrupt or unreadable `.git` made git refuse to answer, and Collie then read the folder as a binary install, which `collie update` moves aside. Collie now stops, says the git data cannot be read, and tells you to repair it. ([0091f5ec](https://github.com/AltanS/collie/commit/0091f5ec))
-- **Collie no longer asks git about the wrong repository.** If `GIT_DIR` or one of its siblings was set in your shell, or Collie ran from a git hook, every git question it asked was answered about that other repository instead of its own. No Collie process passes those variables to anything it starts now. ([ADR 0049](https://github.com/AltanS/collie/blob/main/.adr/0049-no-child-inherits-a-relocated-repository.md), [dcd313b1](https://github.com/AltanS/collie/commit/dcd313b1))
+- Devin's two-label input-box rules (cwd + mode, queue strip) clip to one row instead of wrapping into stacked fragments on the phone (421044a1)
 
-## [1.10.1] - 2026-09-17
+## [0.46.0] - 2026-09-15
+
+The upstream **1.9.0 redesign round**, ported whole onto Pup: the composer's actions belt, the
+dashboard's workspace grouping, and the one-name rule — on a branch first, so the herd on the phone
+can try it before it becomes Pup's face. The cache subsystem, config.toml, crew machinery, and the
+mux abstraction the redesign upstream rides on are **not** part of this port; see Declined.
+
+### Bridge
+
+- **One name rule, one place rule, mirrored bridge-side.** `bridge/pane-name.ts` is the push's half
+  of the rule the screens use: NAME — paneLabel, else sessionName, else a non-stale terminalTitle,
+  else the agent word; PLACE — `space › tab`. Shared fixtures (`pane-name.fixtures.json`) run on both
+  sides, so a rule changed on one side alone turns red. A multi-agent push digest names the panes
+  instead of reading "claude, claude, claude", appending the place only when two panes would read
+  the same; a single alert's body is the place, not `workspace · absolute-path`. (upstream 6e8eeafc,
+  15f9db67)
+- **Panes arrive in the multiplexer's own arrangement.** The bridge no longer tie-breaks panes by
+  pane id (an opaque string whose alphabetical order nobody can see); space, then tab, then pane
+  position all read off Herdr's listing order, and a poll caught mid-create sorts last. (upstream
+  6e8eeafc, on Herdr's listing — Pup does not port the mux layer upstream built this on)
+- `terminalTitleStale` is declared on the wire type for the mirrored rule to read; Herdr reports no
+  foreground command, so on this bridge it is never set. Known limit: Claude `/rename` session
+  names are already sniffed and ride the wire as before.
+- **Workspaces carry their repo.** Herdr's `workspace.list` already reports `worktree.repo_root`
+  and `is_linked_worktree` (live-probed on this herd: 11 spaces, 2 with repos); the wire type now
+  declares the pair and the snapshot carries it, so the web can nest a worktree under the space
+  holding its repo. (upstream 6e8eeafc's worktree half)
+
+### Web — the names pass and the dashboard's second axis
+
+- **One name and one place, on every screen.** A pane is called the same thing everywhere — your
+  label, else the session's `/rename` name, else the terminal title, else the agent word — and
+  `space › tab` sits beneath it as the second line, never as the first. The fork's project-first
+  row titles are superseded by this on the branch. A numbered tab reads `tab 2` in a lighter ink
+  everywhere it renders alone. `lib/pane-name.ts` carries the rule once; `paneDisplayName` is
+  gone. (upstream 6e8eeafc, 583e561d)
+- **Rows keep the multiplexer's arrangement.** Triage buckets no longer re-sort by activity — a
+  row moves only when it changes bucket, never while you reach for it. The space list keeps
+  Herdr's own workspace order (same as the strip), recency sort deleted; the row still shows its
+  time. Worktrees nest one step under the space holding their repo, a filtered list stays flat.
+  (upstream 6e8eeafc)
+- **The dashboard asks two questions, in order.** Needs-you and Ready·unseen stay pinned on top
+  by urgency; everything else sits under its WORKSPACE, one counted group per space, shells
+  joining their tab after its agents. An urgent pane is pulled out of its group, never copied.
+  Working/Recent headings, Recent's fold and its sort toggle are gone — no clock is left in the
+  order to reverse. Every row is the one 44px two-line form (name + dot and mark inline, place
+  beneath), urgent rows in the same framed list shape as workspace rows, and a finished-unseen
+  pane carries a small dot after its name. (upstream 64b6f499, 10cd0557, 458876bf, cd70aa30)
+- Pup-shaped omissions: no host or cache chips on the name line (no crew, no cache subsystem),
+  and Pup has no i18n layer, so upstream's locale strings are the literals they rendered to.
+
+### Web — the compact strips and the pane header
+
+- **The tab row and the pane row get compact, one continuous band.** Tabs draw as 32px plain cells
+  (11px text) that still answer a 44px tap through a transparent hit-area extension; the open tab
+  is an outlined pill on the row's own ground, there is no horizontal rule and nothing under the
+  tab row, and the pane pills beneath shrink to 24px on the same band (`--chrome`, a new token for
+  the ground chrome stands on when it cannot stand on the page). A numbered tab reads `tab N` in
+  the lighter ink on the strip too. (upstream c2a16502, 02ac7a53, 0ded2d2e, 583e561d)
+- **The raw pane id is gone from every pill.** `p3` is Herdr's coordinate, not a name; a pill is
+  numbered only when a neighbour would otherwise read the same, and the number is its 1-based
+  place in the row — the thing the reader is actually looking at. (upstream 2eefd38e, new
+  `lib/pane-ordinal.ts`)
+- **The pane header follows the one name rule.** Line 1 is the pane's name with the agent's mark
+  on it; line 2 names the workspace alone (the tab strip below already names the open tab), and
+  the cwd left the header — it lives on the dashboard's tab-scoped rows and in History. The title
+  block keeps its 44px tap to the space overview. (upstream 6e8eeafc, b14ffd49)
+- New `ui/labelled-strip.tsx` / `ui/section-label.tsx` primitives (the strip row's shared recipe:
+  tap floor, scroller padding, above-label) and `ui/list-group.tsx` (the framed flat-row region)
+  arrive with them, as upstream ships them. Pup drops upstream's per-tab agent tile on the strip.
+
+### Web — the actions belt
+
+- **One row of actions above the keyboard, with the running agent's own commands in it.** Keys,
+  Type, Quick, Agent and the display gear share a single scrolling belt with the harness's
+  commands, which sit in a segment tinted with that harness's brand colour (Claude's orange, omp's
+  purple; Codex and pi are monochrome by design and take the muted ground) and carry an icon each.
+  Every button sends its bare command and the harness paints its own picker in the mirror, so the
+  list of models or effort levels never lives in Collie. The old Controls row and the 30px
+  swipe-handle band are gone; a bare Layers mark pinned at the belt's right end opens the pane
+  switcher, a drag up from anywhere on the band opens the same sheet, and the composer keeps its
+  row back. Settings gains a per-device "Harness shortcuts" switch (on by default).
+  (upstream fc8d1be9, 9b530786, 5e7f626c, 63513aee, 931f857a, adaa1fb3 + the belt's follow-ups,
+  ported as the end state)
+- **Operators add or replace the segment with `bar = true` in `commands.toml`**, with an optional
+  `bar_label` (twelve characters kept whole). The replacement rule is per surface (ADR 0018's
+  posture, applied to the bar alone): bar rows never blank the Agent palette, and a shipped
+  dangerous command's two-tap confirm is inherited as a floor. (upstream fc8d1be9)
+- **Pup-shaped limits, stated:** the belt carries no host tag and no cache reading (no crew, no
+  cache subsystem); the composer's verified-paste transport, guarded submit, draft previews and
+  docks are untouched — only the row that held their toggles changed shape; omp's Tree button
+  stays off the bar until this repo holds an `omp--tree.txt` capture to vouch for it (upstream
+  cc38c2de's own rule, followed rather than shortcut).
+
+### Web — the keys tray
+
+- **A compact seven-column Keys pad.** One fixed grid, two rows — Esc/Tab/⇧/Ctrl/Alt/Up/⏎, then
+  Ctrl C / a 3-wide Space / ← ↓ → with Down under Up — replaces the Keys/123 segmented toggle and
+  the stacked rows. The digits, the Ctrl presets and F1–F12 fold behind one row of accordion
+  chips (123 / Presets / F keys, one panel open at a time). The tray's resting height drops from
+  ~275px to ~119px at 390px with every key still ≥36px tall; Enter and Shift draw glyphs with the
+  full word as the accessible name. A composed key queue still dies with its dock (ADR 0005) and
+  still survives switching to the digit grid mid-chord. (upstream e12b4334)
+
+### Declined (this round, with reasons)
+
+- **The prompt-cache subsystem** (~6,400 lines upstream): countdown chips, cold-cache push
+  warnings, dated vendor TTL claims, `cache-rules.toml`. A feature, not a fix, and still settling
+  upstream (six follow-up fixes in the days after 1.9.0). Revisit once quiet.
+- **config.toml + `collie config show/check/init`** (~3,000 lines): a config layering machine for a
+  single-user install that has `.env`.
+- **The crew/mux substrate**: protocol floors and compat removals, host-keyed grouping, the mux
+  adapter layer the redesign upstream rides on, tmux auto-rename. Pup is one host on Herdr.
+- **The first-launch screen**: onboarding for a fresh install, shaped around crews.
+- **Screen slide transitions, tour, playground, i18n**: polish and scaffolding Pup doesn't carry.
+  Upstream's locale strings landed as the literals they rendered to.
+- **omp's Tree bar button**: waits on an `omp--tree.txt` capture in this repo's corpus (the same
+  rule upstream held it to before their capture existed).
 
 ### Fixed
 
-- **The dashboard summary no longer splits a count across two lines.** On a phone with all five states, each count stays in one piece, and whole counts move to a second line when the row is too wide. ([45084e9e](https://github.com/AltanS/collie/commit/45084e9e))
-- **A send no longer stalls when Claude's slash menu cuts a command name.** On a narrow pane Claude shortens a long command name with a leading `…`, and Collie then lost sight of the input box, typed the text and held back Enter, so the message needed a second send. Collie now finds the input box by its own frame and reads the shortened names; rows under the box that it cannot name stay visible on the mirror. Names cut onto a hyphen and names that print an alias in brackets are read too. ([67387a7e](https://github.com/AltanS/collie/commit/67387a7e), [56f2846b](https://github.com/AltanS/collie/commit/56f2846b))
-- **A send can no longer land on Claude's background-agents screen.** That screen has a typing field of its own, and Collie read it as the ordinary message box: a send from the phone pressed Enter there and started an agent task. Collie now recognises the screen and holds the send until you leave it. ([67387a7e](https://github.com/AltanS/collie/commit/67387a7e), [56f2846b](https://github.com/AltanS/collie/commit/56f2846b))
+- **Devin panes get their mark.** A devin pane rendered the generic "DE" initials tile on every
+  surface (dashboard row, pane header, switcher) — the brand table had no entry and the resolver
+  no rule, so it fell through to the fallback. Devin's own pinwheel mark now rides a black tile
+  with a white fill, monochrome like Codex's and pi's (no belt accent — its absence is a real
+  answer for a monochrome brand). Source: the SVG Logos collection (CC0), rescaled from its
+  256×294 viewBox to 24×24 and centred; verified rasterized at render time — ink box dead-centre,
+  53–61% tile coverage, no clipping. Tried from the phone on day one of the redesign trial.
 
-## [1.10.0] - 2026-09-16
+- **Sheets no longer pick up stale terminal paint while sliding in.** Both floating panels (the
+  switcher and Agent commands) showed bands of terminal output across their surface during the
+  entrance, gone the next frame — the animated sheet shared its paint with the filtered mirror
+  layers beneath. The panel is now one isolated paint boundary, promoted for the life of the
+  sheet (f770a73d); and the dim settles before the slide — a 150ms ease-out scrim on its own
+  compositor layer, so the panel moves against a stable ground instead of a dim still mid-fade
+  (7fbfad84). Found on the phone during the redesign trial.
+
+### Fixed (upstream round, ported 2026-09-16)
+
+- **A plugin action resolves the service's state directory** (upstream #226, d07ec4c4). Herdr
+  injects `HERDR_PLUGIN_STATE_DIR` into every plugin action; the systemd service never receives
+  it. Honouring it split one install in two: push-test, pairing and devices — every verb that
+  reads or writes state through an action — read `~/.local/state/herdr/plugins/herdr.collie`,
+  found no subscriptions, and failed, while the service kept them under `~/.local/state/collie`.
+  `resolveStateDir` (now pure and exported, like `defaultSocketPath`) reads `COLLIE_STATE_DIR`,
+  else the user state dir, and ignores Herdr's variable on purpose.
+- **A finished agent that Herdr reports as `idle` reaches Ready · unseen** (upstream #222,
+  769cdaa8). Herdr 0.9's API says `idle` for an agent whose turn ended; only its own client
+  projects `done`. `isUnseen` now accepts either settled status, gated by our own read receipts
+  and excluding bare shells; and only a turn that ends (`working`/`blocked` → idle/done) counts
+  as new work, so Herdr's own acknowledgement and detection flicker never re-mark a read pane.
+  The ledger wiring moved to `bridge/activity-tracking.ts` so the gate has one home. ADR 0003
+  and HERDR_API.md carry the compatibility note.
+- **Light fills match by luminance, not by one observed value** (upstream #224, 6fb0f1f5 +
+  ebd63ffd). Codex's submitted-message band was matched against the literal `rgb(240,240,240)`,
+  and a 0.154.0 pane paints `rgb(244,244,244)` — four levels apart, so the whole band inverted
+  to a black bar again. The rule moved to `lib/harness/light-fill.ts` (Rec. 709 luma, Codex's
+  floor 220, omp's 180), shared by both adapters; a real 0.154.0 capture pins the shape. omp's
+  belt of pastel card fills now gets the same marking on Pup for the first time — upstream has
+  marked them since before the fork point; Pup's raw-only omp path just never carried it.
+- **The belt stands at 40px, and the field's focus ring clears it** (upstream a0ae39e7). The
+  belt's scroller reads `py-1` — 40px on the phone instead of a thin 32px strip; the harness
+  section grows to `h-10` with `-my-1` so its tint still runs rule to rule; and the field row's
+  `pt-1` is the one place that puts the focus ring's 4px reach inside the row rather than on the
+  belt's bottom edge.
+
+## [0.45.0] - 2026-09-12
 
 ### Changed
 
-- **The dashboard keeps every pane where it sits.** Panes stay in their workspace group in the multiplexer's own order, whatever their status, and the Needs you and Ready · unseen sections at the top are gone. What needs you now shows where the pane sits: a red wash on its row, a red dot on its workspace heading, and one summary line at the top that counts every state in words, which a tap takes you to. Each heading shows the same counts as numbers. ([a039e277](https://github.com/AltanS/collie/commit/a039e277))
-- **A strip of workspace chips filters the dashboard.** Tap a workspace to see it alone, tap it or All to see everything. Long-press a chip to hide that workspace, and long-press it again to bring it back; a hidden chip stays in the strip, dimmed and struck through, still showing its status. The choice is kept on each device, by workspace name. ([a039e277](https://github.com/AltanS/collie/commit/a039e277))
-- **An unseen reply is marked with a square.** A finished pane you have not opened carries a small square after its name, on the summary line, on its workspace heading and on its chip, instead of a white dot and a green wash that read as one more status. ([a039e277](https://github.com/AltanS/collie/commit/a039e277))
-- **A tab you named that holds one pane names that pane.** If you named a tab and it holds a single pane, the header, the belt, the dashboard and push notifications now use that tab name ahead of the title Claude writes itself, which moves to the dashboard row's second line. A `/rename` and a pane label still come first, and a tmux window keeps its automatic name out of it. ([8962e695](https://github.com/AltanS/collie/commit/8962e695))
-- **The switcher mark shows a red dot when another pane needs you.** While you are in one pane, the layers icon at the end of the bottom belt carries a red dot as soon as any other pane is waiting on you, and its spoken name says so. Only a pane that needs you lights it. ([eb7470d1](https://github.com/AltanS/collie/commit/eb7470d1))
-- **The tab belt names the pane and underlines the open tab.** A tab that holds one pane shows that pane's name, so the open tab and the header read the same word. The open tab is underlined, every other tab reads in near full ink, and the brand tile and the dashed desktop-focus ring are gone from the cells. ([a039e277](https://github.com/AltanS/collie/commit/a039e277))
+- **The mirror no longer guesses at terminal images; the black box is gone.** The Kitty
+  placeholder→journal-image cards only ever worked for harnesses that print placeholder characters
+  into the grid (omp does; pi paints a direct `a=T` placement that reaches the pane read as blank
+  rows). For pi that meant a tall black void and dead machinery; for omp it meant a picture matched
+  by order, never verified. The mirror now renders only what the read contains: runs of four or
+  more blank lines collapse to a single `[N blank lines]` row — which is exactly what a pi image
+  reservation looks like — and History keeps the exact journal images it always had
+  (.adr/0041). Deleted: `useMirrorImages`, `mirror-images`, the `images`/`onImageClusterCount`
+  props, the `[Image]` badge and cards. (c50fc562)
+
+## [0.44.1] - 2026-09-12
 
 ### Fixed
 
-- **A Herdr plugin action reads the same state as the running service.** Herdr puts its own plugin state directory into every action it runs, and Collie used it, so the `push-test` action found no subscriptions and an update started from the `update` or `update-major` action kept its progress record where the phone could not see it. Collie now ignores that directory; `COLLIE_STATE_DIR` still moves the state. Thanks @lighcen (#226). ([d07ec4c4](https://github.com/AltanS/collie/commit/d07ec4c4))
-- **An update that finds its target already live stages nothing and records nothing.** Such a run used to leave its update record at `staging`, and the phone reported an interrupted update about an install that was fine; it now ends before the record opens and before it asks for Bun. Thanks @foreverrrree (#231). ([a18827d5](https://github.com/AltanS/collie/commit/a18827d5))
-- **A Muse pane's hard line breaks read as soft wraps on the phone.** The 2-column row gutter and the full-width row padding Muse draws are trimmed from its native mirror, so paragraphs no longer show a stray indent or blank stub lines. Detectors still read the untrimmed screen. Thanks @jpcarranza94 (#230). ([d67f48b5](https://github.com/AltanS/collie/commit/d67f48b5))
-- **A Muse pane's light mirror stands on Herdr's own light background.** The native ground moves from the page grey to `#fffbf8`, so Muse's prompt fill and other authored tones keep their contrast. Thanks @jpcarranza94 (#229). ([cc76e9bf](https://github.com/AltanS/collie/commit/cc76e9bf))
-- **An update checks Bun can run before it touches the checkout.** A managed or staged update now asks `bun --version` first and stops with the checkout unchanged when Bun cannot answer. A machine whose Bun is installed but cannot run now refuses its update instead of warning: the update check shows red rather than amber, which also blocks a crew update until that Bun is fixed. The compile step runs in a private folder under `bin/`, so Bun's scratch file no longer lands in the checkout root; `bin/` must be a real directory, not a symlink. Thanks @en-ver (#232). ([53e2f462](https://github.com/AltanS/collie/commit/53e2f462))
+- **Review hardening of the 0.44.0 port round: the Hermes adapter reads the schema that is
+  actually on disk.** A real `~/.hermes/state.db` on this host carries a `messages` table with
+  none of the four optional columns upstream's SELECT names (`reasoning_content`, `active`,
+  `compacted`, `display_kind` — upstream's own fixture builds its table from the adapter's
+  SELECT, so their tests cannot see the drift either; report pending). The SELECT is now built
+  from the database's own column list, both observed schemas read, and an unknown schema throws
+  out of `load` — the history route answers an error instead of an empty page that looks like
+  "no history". `resolve` stays tolerant per root (an unreadable `sessions` table disqualifies
+  the root, not the request). The read-only open is pinned twice in tests (no-create on an empty
+  root; a 0444 database still reads), and `scripts/journal-probe.ts` learned the hermes branch —
+  without it the mandated drift check could not see the sixth adapter, which is exactly how the
+  drift shipped. Live probe on this host: `hermes ✓ 2 turns` off the real database.
 
-## [1.9.1] - 2026-09-15
+## [0.44.0] - 2026-09-12
 
 ### Added
 
-- **An urgent patch keeps the daily update cadence.** A fix operators must take today, data loss, a security hole, a broken update path, carries one `**Urgent.**` line under its changelog heading. The release publishes that line in its `collie-release.json` sidecar and on its release page, and the phone then tells you at the release or at the next 09:00 after it, instead of folding the fix into the weekly patch digest. The push opens with the release's own sentence, the update card prints it beside a short Urgent label, and the band carries the label. One urgent release makes the whole waiting train daily; the version stays an ordinary patch. ([53dbaaa2](https://github.com/AltanS/collie/commit/53dbaaa2))
+- **Hermes panes get transcript history.** The sixth journal adapter reads Hermes' one SQLite
+  SessionDB (`~/.hermes/state.db`, `COLLIE_HERMES_ROOT` to relocate) through the exact Herdr
+  session id — never the newest row — including compressed parent sessions, walked depth-first
+  and capped at 32 generations. The database is opened read-only and the fixed filename is
+  confined to the configured root before opening; Collie never writes Hermes state. The SELECT is
+  built from the database's own column list, so both observed on-disk schemas read
+  (live-verified against the real thing), and an unknown schema fails loudly instead of serving
+  an empty history page. `omp` stays an alias of pi, not an adapter. (upstream 85e0da5e,
+  33f54224, 801f879a, with a review fix for a schema drift upstream's tests cannot see)
+
+### Fixed
+
+- **A second tap escapes the update that keeps coming back stale.** When the eight-second guard
+  behind "new build — tap to update" reloads the page and the phone comes back on the same old
+  bundle, the next tap now unregisters the service worker and reloads from the bridge instead of
+  repeating the identical cycle. The caches go first and nothing waits on the worker (unregister
+  queues behind the very job that is stuck); the escape fires only while the page is provably
+  stale and the bridge answered within the last 20 s, so an offline install keeps its precache
+  and its stale bundle rather than landing on an error page. (upstream bb095e3a, web side only —
+  the Playwright suite stays behind)
+- **`collie serve` no longer refuses to publish when it cannot read the HTTPS status.** A
+  `tailscale status --json` that fails or does not parse is "can't tell", never "no HTTPS": the
+  publish proceeds with a warning naming the admin console. A readable status with no CertDomains
+  still refuses, exactly as before. (upstream 0062b91, adapted to the shell door)
+- **A long strip reveals its active tab.** The tab, pane, and space strips are hidden-scrollbar
+  scrollers; the active chip could sit scrolled out of view with no affordance. All three now
+  scroll the active chip to the nearest edge on selection change — never on a manual scroll, and
+  `auto` (not `smooth`) under reduced motion. (upstream 8a774cc4; the `labelled-strip` hunk has
+  no target in Pup — Pup's strips own their scroller directly)
+- **The footer build stamp stops re-fetching `/api/config` on every dashboard open.** The mount
+  effect now checks whether the build is already known before fetching; a known build needs no
+  second look. (upstream e3c7816e)
+
+## [0.43.2] - 2026-09-10
+
+### Fixed
+
+- Multi-select attach: the picker's two inputs now declare `multiple` and the composer uploads the
+  whole batch — one POST per file (the bridge's existing contract), each landed path appended to
+  the draft in picker order — so attaching six images is one gallery trip instead of six. A mixed
+  batch attaches the good files and names the refused ones in one status line (identical refusal
+  phrases collapse; the error tone persists until tapped). Pasting several files at once rides the
+  same path. This was never a PWA/Firefox/Android limitation: the phone's pickers have offered
+  multi-select all along — the page just never asked (`multiple` absent, and the change handler
+  read `files[0]` and dropped the rest).
+
+## [0.43.1] - 2026-09-09
+
+### Fixed
+
+- Review hardening of the 0.42.0/0.43.0 port round: the pi-shaped omp editor's prompt region is
+  bounded to its trailing rows (an unbounded ~101-row region on a wide pane would exceed the
+  bridge's 8192-char `expected_prompt` cap and fail-closed the submit of a long reply — upstream
+  carries the same latent bug); `imageSrc`'s refusal of remote/malformed image references now has
+  its own test, as do transcript journal images (anchor affordance + refused-ref-renders-nothing);
+  `resolveBlobPath` uses the single-root containment spelling files.ts documents for paths built
+  from a root; and the registry's alias doc no longer claims a frontend mirror list Pup never had.
+
+## [0.43.0] - 2026-09-09
+
+### Added
+
+- Images in the mirror: an agent's terminal graphics (screenshots it took or was shown, drawn with
+  the Kitty protocol on a capable terminal) now render in the pane in place of the placeholder
+  block. Read from the agent's own session log, on demand — never on the poll. Matched by order
+  from the end; a cluster with no match gets an "[Image]" badge, a failed load falls back to it,
+  and every card says the match is by order (upstream fd28d018, fbae4cf6, 8e8cf78a, ba8e19a0,
+  797318d6).
+- `GET /api/blobs/<hash>` serves the content-addressed image bytes out of pi/omp's blob store:
+  16 MiB cap, magic-byte content sniffing (the digest filename carries no extension), the hash as
+  ETag, immutable caching, and containment-checked paths. A journal image reference is only ever
+  this bridge's blob path or inline `data:image/` bytes — an `http(s)` URL in an agent's log is
+  refused on both the bridge and the web side.
+- omp panes have journal history: omp writes pi's own session format under
+  `~/.omp/agent/sessions`, so the pi adapter reads it (an alias, not a sixth adapter), and pi's
+  default roots now cover both homes.
+- History and the Full-reply card render journal images — attachments, spoken pictures, and
+  tool-output screenshots — as anchors with alt text.
+
+## [0.42.0] - 2026-09-09
+
+### Added
+
+- The pane shows the agent's newest reply in full when the terminal clipped its opening: read from
+  the agent's own session log, rendered in place of the rows it covers (everything below — tool
+  calls, dialogs, the cursor — untouched), collapsible per message, off via "Full latest reply" in
+  the ⚙ View dock (upstream 46d2fe6).
+
+### Fixed
+
+- omp panes drawn with `composer.shape=pi` (OMP 18.1.13) verify again: the pi-shaped editor is
+  recognised for drafts, status and prompt binding, Korean and multiline drafts extract correctly,
+  and an unaccepted inline completion stays out of the live draft (upstream 47369fb).
+- Long omp replies travel as small verified pastes instead of one opaque chip: omp collapses big
+  pastes into `📄 #N` chips that carry no content evidence, so the reply guard now plans ≤512-char /
+  4-line chunks, verifies each on screen before the next goes out, and only the complete reply can
+  authorise Enter — a dropped final chunk stalls, never submits (upstream 47369fb).
+- A link inside a clipped terminal row (a labelled rule carrying a URL) no longer re-wraps that row
+  on Firefox: the clip span now outranks the link style's `break-all` (residue of upstream PR #168,
+  4b995f8).
+
+## [0.41.1] - 2026-09-09
+
+### Fixed
+
+- The pi command palette was missing `/thinking` — pi's built-in command list has 23 entries, the
+  shipped catalog had 22, and the one gap was the thinking-level switch. Now surfaced as a common
+  row (one tap opens pi's fuzzy picker), next to `/model`.
+- The Devin catalog drifted behind the current docs (docs.devin.ai/cli/reference/commands): 20
+  newer commands were absent (`/fast`, `/fork`, `/steps`, `/revert`, `/title`, `/btw`, `/mcp`,
+  `/context`, `/usage`, `/session-stats`, `/theme`, `/autonomous`, `/shortcuts`, `/config`,
+  `/org`, `/copy`, `/feedback`, `/mouse`, `/login-status`, `/cloud-sessions`). All added; `/fast`
+  joins the common set, `/revert` gets the two-tap confirm (it rewrites files and the
+  conversation). Deliberately still out: `/rm-session` (irreversible) and pure aliases
+  (`/rename-session`, `/remove-dir`, `/stats`, `/yolo`…). `/thinking` stays out too — Devin has
+  no such command (the thinking trace is Ctrl+O, a keybinding). `/handoff` stays in: it fell off
+  the docs' reference table, but the CLI changelog still ships changes to it.
+
+## [0.41.0] - 2026-09-08
+
+Three upstream viewer changes ported fix-first, plus a durable porting ledger. Declined with
+reasons: the rename tab/pane sheet keyboard-folding fix (93373ce) patches a strips-auto-fold-on-
+keyboard subsystem Pup never adopted, so the bug cannot manifest here. See `PORTING.md` for the
+full porting record.
+
+### Added
+
+- Adaptive mirror polling (upstream d2cb8a3): the poll cadence is now resolved from what the
+  operator is doing, not what the herd is doing — a 300ms burst after a send, 1.5s while following
+  a moving pane, 4s on a busy home screen, 6s when nothing is being watched. A tap reads as
+  immediate, and a quiet pane nobody is looking at backs off. The burst bookkeeping lives in a
+  new `lib/poll-intent.ts` (pure, tested in isolation); send stamps land in the composer's Send,
+  `pressKeys`, and the prompt-option handler, and the pane loader reports whether the mirror
+  changed. The `changed` verdict is pane-scoped so a poll from pane B can't leak into pane A's
+  cadence.
+- The omp (oh-my-pi) π mark (upstream 17386ef): omp now renders its official three-stop gradient
+  on a `#0F0A14` tile instead of falling back to a generic initials chip. Per-mounted SVG
+  gradient IDs via `useId()` keep a dashboard column of tiles from colliding.
 
 ### Changed
 
-- **The actions belt stands at 40px, and the reply field's focus ring has room to breathe.** The belt under the pane read as a thin strip on the phone at the pill's own 32px; it now carries 4px above and below the pills, and the harness section's tint still runs from rule to rule. The reply field's focus ring used to land on the belt's bottom edge; the field row now keeps 4px above the field, so the ring clears the belt above and the chrome below by the same margin. ([a0ae39e7](https://github.com/AltanS/collie/commit/a0ae39e7))
+- The fresh-install mirror font default is 10px, down from 12px (upstream 4b005aa), for phone
+  readability. Existing devices keep their saved preference — the storage key is unchanged.
 
-### Fixed
+## [0.40.0] - 2026-09-07
 
-- **A finished agent no longer hides in Recent on Herdr 0.9.** Herdr 0.9 says `idle` on its API for an agent whose turn ended, and only its own client turns that into `done`, so a completion sat in Recent with no mark and Ready · unseen looked empty. Collie now counts a settled pane, `idle` or `done`, as unseen when its last turn ended after you last opened it, shells excluded. Only a turn that ends counts as new work, so Herdr's own acknowledgement and detection flicker do not re-mark a pane you have read, and an agent that exits takes its unread history with it. On tmux and zellij the same rule lifts a beacon-reported pane into Ready · unseen when its turn ends. After the update, a pane that finished earlier and was never opened may show as unseen once; opening it clears it. Thanks @magoz (#222). ([769cdaa8](https://github.com/AltanS/collie/commit/769cdaa8))
-- **Muse panes render natively in light mode.** The mirror no longer inverts Muse's mid-tone palette into a 2:1 grey-on-white; the pane sits on the page ground with only bright foregrounds resolved dark, and dark rendering is unchanged. Thanks @jpcarranza94 (#220, ADR 0047). ([7e521c6d](https://github.com/AltanS/collie/commit/7e521c6d))
-- **A Codex pane stops painting a black bar again when Codex changes its fill.** The mirror's light-fill rule reads luminance instead of one exact colour, so the band Codex 0.154.0 paints four levels off the reported value is caught like the original, and the next one will be too. The rule is one module shared with omp; each adapter names its own floor. Thanks @foreverrrree (#224, follow-up to #144).
-
-### Docs
-
-- **The install page opens with Install, Update and Uninstall, each spelled for a Herdr plugin and for a standalone install.** A table at the top says how to tell the two kinds apart, how their verbs are spelled, and where each keeps its config and state. Packages get one line per manager in those three sections and keep their long notes further down. Uninstall is now three steps, service, program, own files, with the paths that stay behind. ([ef776e9b](https://github.com/AltanS/collie/commit/ef776e9b))
-
-## [1.9.0] - 2026-09-14
+The upstream 1.5.5–1.6.0 round, ported fix-first (no pack, no packaging, no new surfaces of
+theirs). Declined with reasons: the exe-replacement check (this fork runs Bun from source, so
+the source-stamp staleness witness already answers it), the multi-instance plugin-id fix (no
+instances here), the dismissed-version memory, and the zen / latest-reply / AnchoredMenu /
+Collapse / update-card subsystems the fork never had.
 
 ### Added
 
-- **One row of actions above the keyboard, with the running agent's own commands in it.** Keys, Type, Quick, Agent and the display gear share a single scrolling row with the harness's commands, which sit in a segment tinted with that harness's brand colour and carry an icon each. Claude Code panes get Model, Effort, Compact and Resume; Codex, pi and omp get their own. Every button sends its bare command and the harness paints its own picker in the mirror, so the list of models or effort levels never lives in Collie. Operators add or replace the segment with `bar = true` in `commands.toml`; Settings, Harness shortcuts, hides it per device. ([fc8d1be9](https://github.com/AltanS/collie/commit/fc8d1be9))
-- **A config file carries every setting.** `~/.collie/config.toml` sets any Collie setting in TOML for the whole machine, and a `config.toml` beside your `.env` overrides it for one instance; the environment and your `.env` still win over both, and a broken key never stops the bridge from starting. ([1df9edd4](https://github.com/AltanS/collie/commit/1df9edd4))
-- **Three verbs for that file.** `collie config init` writes a commented file with every setting and its default, `collie config check` validates one, and `collie config show` prints both file paths and every setting with its effective value and where it came from. ([95a2f7b1](https://github.com/AltanS/collie/commit/95a2f7b1))
-- **Cache rules are dated, sourced claims, and `collie doctor` says when one goes stale.** Every TTL carries the vendor page it was read on and the date it was read; a claim older than 180 days is a doctor warning, and one older than a year fails the build. ([49484669](https://github.com/AltanS/collie/commit/49484669))
-- **`cache-rules.toml` moves a TTL your provider changed.** It sits beside `commands.toml`, overrides one rule id, and must carry the page you read and the date you read it. ([74004b6c](https://github.com/AltanS/collie/commit/74004b6c))
-- **Every agent pane shows how long its prompt cache stays warm.** A chip on the dashboard card and in the pane header counts down from the harness's last request: green while the window is wide, red in its last quarter, and blue once the cache goes cold. A tap on the pane screen opens the rule, its source and the date it was last checked. ([f12f7a63](https://github.com/AltanS/collie/commit/f12f7a63))
-- **The first launch is one screen that says what Collie does and what this install looks like.** It names the multiplexer and the machine it mirrors, counts the panes and the ones blocked on you, says whether this device may type and how many machines are in your crew, offers at most two things to do about it, and closes with the six things you can do here. Shown once per device; Settings shows it again. ([a9c6c22f](https://github.com/AltanS/collie/commit/a9c6c22f))
-- **A push warns you before a pane's prompt cache goes cold.** Switch it on for one pane from its settings sheet, or for every pane under Settings → Notify when, where the panes you watched one by one are listed. The warning fires once per warm cycle, honours the snooze, and `COLLIE_CACHE_WARN_SECONDS` moves its 300-second window. ([eeedfabf](https://github.com/AltanS/collie/commit/eeedfabf))
-- **omp's harness bar has a Tree button.** It sits between Compact and Resume, the order pi's bar already uses, and opens omp's own session tree in the mirror. `/tree` joins the omp command palette with it. ([cc38c2de](https://github.com/AltanS/collie/commit/cc38c2de))
+- The attach button asks Photos or Files behind a two-row sheet: one `accept` cannot carry
+  `image/*` and the text extensions at once, or both Android and iOS drop the camera roll. A
+  photos-only host opens the roll directly, and every tap gets a buzz plus a pressed tone
+  (9fa55a7; the AnchoredMenu refinement has nothing to anchor to here)
+
+### Fixed
+
+- Codex's inline queue/context footer reads as a live composer again, so the guarded reply stops
+  stalling there (0ad4f2f)
+- OMP 18.1.6's borderless rule composer is recognized by its own tail-choreography scanner, so
+  replies, drafts and the statusline survive the new shape (72fbfec + 67b72e3)
+- The guarded submit carries the verified prompt region, so a dialog that takes focus between
+  typing and Enter is refused instead of answered (e7c1c78; the bridge binding already existed)
+- A failed notification setup refreshes and releases the switch instead of wedging it busy, with
+  the error beside the switch and a retry; plus a 30s cap on stalled phone operations,
+  registration through the API client, and an unreachable config reading as retryable (6fa2694)
+- The https door refuses before teardown on a tailnet with no HTTPS, naming the admin console or
+  plain-HTTP mode, instead of hanging on a hidden prompt (da8afeb)
+- The session-name scrape skips panes whose content revision hasn't moved: O(claude_panes) pane
+  reads per poll becomes O(changed) (198fe20)
+
+## [0.39.0] - 2026-09-07
+
+The two operator features from the upstream 1.4.0–1.5.4 round, fork-shaped (single host, no
+pack, no i18n). Both are off until the operator declares them — an install with neither file is
+byte-for-byte the dashboard and headers it had.
+
+### Added
+
+- Text-file attachments: the composer paperclip takes `.md`/`.txt`/`.json`/`.yaml`/`.toml` as
+  well as images, within `COLLIE_MAX_UPLOAD_MB` (default 10) and `COLLIE_UPLOAD_EXTRA_TYPES`
+  (8c8845d, upstream e1493f4 + 9833ba3)
+- Your own launchers, declared in `launchers.toml`: one tap opens a new Space, types the row's
+  command into its fresh shell and sends Enter. The file is the allowlist — `POST /api/launch`
+  matches the command string exactly before herdr is touched, and a failed send rolls the
+  half-born Space back. Rows appear as a folding Launch section on the dashboard and behind the
+  rocket button in the Space and pane headers (see README → Your own launchers)
+
+## [0.38.0] - 2026-09-07
+
+The upstream 1.4.0–1.5.4 viewer round, ported fix-first (no pack, no staged updates, no mux
+switch, no i18n). The two operator features from that round — text attachments and launchers —
+ship in 0.39.0, below.
+
+### Fixed
+
+- A notification tap opens the app again on Android after the 1.x service-worker rewrite regressed it (c34004c, upstream ecee7c2)
+- Release tag reads stay on HTTPS when git rewrites them to SSH: `update`'s version check uses an `https::` transport prefix for GitHub remotes (48f6bd3, upstream b3bd127)
+- The new-tab and new-Space controls show they heard you, and a second tap is refused while the first create is in flight (a4dc8fb, upstream d03ccd7)
+- An over-drag on the mirror list can no longer chain into the page behind it: the list contains its own overscroll (4fec3eb, upstream 7b77d7c list half)
+- A truncated connection error opens on a tap, with the whole message and a copy button (0bcb730, upstream 747afaa)
+- One classifier clips a labelled terminal rule whatever harness drew it, and codex's submitted rows stop reading as black bars on a phone (d406962, upstream 0104d27 + d980f37)
 
 ### Changed
 
-- **A crew member too old to speak the current protocol is now a red preflight, not a silent link.**
-  The lead's `collie update --check` walk names a protocol floor: 1.8.0 is the oldest build that
-  speaks crew protocol 2. A member below it, under a lead at 1.9.0 or newer, reds the `version`
-  check with both versions and the remedy, which blocks the crew update instead of starting a roll
-  that cannot finish. A version the lead cannot parse stays amber, as before. A state directory that
-  still carries 1.7.0's `pack-*.json` names is now named at start, with the two hand edits printed
-  in full. ([6e97194c](https://github.com/AltanS/collie/commit/6e97194c))
-- **The crew link speaks one version again: the 1.7.0 compatibility layer is gone.** 1.8.0 kept the
-  old `/pack/v1/*` paths, the `COLLIE_PACK_*` timeout keys, the `pack-*.json` state-file rename, the
-  `/api/pack` redirect and every `packId` reader alive for one release so a 1.7.0 member could
-  follow the update roll. All of it is removed. Bring every member to 1.8.x before you move the lead
-  to 1.9.0: a member still on 1.7.0 now shows red on the lead's preflight, naming both versions and
-  the remedy, and reads as `incompatible` in `crew status`. The `collie pack` command alias, `collie
-  docs pack` and the app's `/pack` address are untouched and stay until 2.0.0. ([fe8eec0b](https://github.com/AltanS/collie/commit/fe8eec0b))
-- **The config schema names the cache warn window.** `COLLIE_CACHE_WARN_SECONDS` has its row, so `collie config show` and `config init` carry it. ([44317201](https://github.com/AltanS/collie/commit/44317201))
-- **The config schema forgets the 1.7.0 pack keys.** The two `COLLIE_PACK_*` timeout aliases left with the crew wire overlap, so `collie config show` no longer lists them. ([cdafe05a](https://github.com/AltanS/collie/commit/cdafe05a))
-- **The agent card drops the relative-time chip.** The prompt-cache countdown next to it says what matters; the extra number read as a session clock and confused. ([cd70aa30](https://github.com/AltanS/collie/commit/cd70aa30))
-- **The dashboard row carries its machine and cache reading on the name line.** The host chip and the cache countdown ride at the end of the pane's name, on every row of the dashboard, and the second line is the place alone, so a row is two lines and never three; an empty reading leaves its space, so nothing slides. ([cc5965d3](https://github.com/AltanS/collie/commit/cc5965d3))
-- **The cache countdown carries an hourglass mark in one quiet ink per state.** The chip on the dashboard row and in the pane header opens with one fixed hourglass glyph, so the number reads as a cache reading beside the host chip's server mark rather than as a loose word. The hourglass is green while the window is wide, red in its last quarter, and blue once the cache goes cold; the machine's identity tint is left to the host chip beside it. ([d3a52e25](https://github.com/AltanS/collie/commit/d3a52e25))
-- **The key rail fades and shows a chevron on the edge that still hides content.** The scrolling row of harness shortcuts above the keys says which way it scrolls, so a rail wider than the screen no longer looks like it ends at the last visible button. ([abccd401](https://github.com/AltanS/collie/commit/abccd401))
-- **The actions row is a belt.** One full-bleed band sits above the input, flush under the mirror: Collie's own controls run on a scrolling track tinted with the brand colour, and the harness's commands sit in a section tinted with the harness's colour. The fixed Switch cell sits at the right, on the composer's own ground, behind a hairline. The track's right edge carries exactly one constant fade and no chevron, and the last pill always scrolls fully into view; the Switch pill's tap area ends at its own hairline. Every pill is an icon and a word, so Collie's controls and the harness's commands read as one family. ([9b530786](https://github.com/AltanS/collie/commit/9b530786))
-- **The pane's status word leaves the composer.** The thin line above the controls that named the machine and the pane's state is gone; the state now stays on the header's dot and on the dashboard. ([adaa1fb3](https://github.com/AltanS/collie/commit/adaa1fb3))
-- **A bare Switch mark at the end of the actions belt opens the pane switcher.** The belt's right end carries the layers glyph above Send, behind a hairline and with no word or border of its own; a drag up from anywhere on the belt also opens the switcher, a sideways drag still scrolls it, and the 30px handle band above the composer is gone. ([931f857a](https://github.com/AltanS/collie/commit/931f857a))
-- **The machine's name moves into the pane header, onto the path line.** The header's second line names the workspace, and on a crew the host name and the cache countdown ride at its end. The pane menu stands alone in the corner; place and meta stand on one baseline; the actions belt no longer carries the name. ([931f857a](https://github.com/AltanS/collie/commit/931f857a))
-- **One name on every screen.** A pane is called the same thing on the dashboard, in the switcher, on its own header, on its pill and in a push: the name you gave it, else the name the agent gave its session, else the title the pane's program prints, else the word for the agent running there. The pane header no longer leads with the space and tab, and no screen falls back to a directory for a name. ([6e8eeafc](https://github.com/AltanS/collie/commit/6e8eeafc))
-- **The place is the second line, and only the second line.** `space › tab` sits under the name on the dashboard row, in the switcher row and in a push; the pane header shows the workspace alone, because the tab strip under it already names the open tab. A card already grouped under its tab keeps the directory there instead, since its place is the heading above it. ([6e8eeafc](https://github.com/AltanS/collie/commit/6e8eeafc))
-- **A tab the multiplexer only numbered reads its position, not nothing.** A multiplexer labels an unnamed tab by position, "1" or "Tab #2"; that number now reads as `tab 2` in a lighter ink on every surface, the tab strip, the pane header's crumb and the dashboard rows alike, instead of a dot. A tab with no label at all still shows nothing, and a screen reader still hears the raw label. ([583e561d](https://github.com/AltanS/collie/commit/583e561d))
-- **Rows keep their order.** The bridge sends every pane in the multiplexer's own arrangement, space then tab then the pane's place in that tab, and the dashboard, the switcher and the pane strip keep it rather than re-sorting by activity or by pane id. A row moves when it changes section, not while you reach for it, and the dashboard's list of spaces now runs in the same order as the space strip. ([6e8eeafc](https://github.com/AltanS/collie/commit/6e8eeafc))
-- **The dashboard's rows sit under the workspace they live in.** What needs you stays on top, by urgency, listed once and never again under its workspace group; every other pane now sits under a heading that names its workspace and counts what is inside it, in the multiplexer's own machine and workspace order. Each row carries its tab on a second line, or `tab 2` when the tab has only a number. The name sits in the middle of the row when the tab has neither, and every row of a group is the same height. Bare shells join their tab's group after its agents. The Working and Recent headings are gone with them, and so are Recent's fold and its sort toggle. ([64b6f499](https://github.com/AltanS/collie/commit/64b6f499))
-- **The tab row and the pane row under the header get compact.** Tab row 32px, pane pills 24px, text 11px, the size of the header's path line; every pill still answers a 44px tap. The tab row draws no horizontal rule and no hairlines between tabs; the open tab is an outlined pill on the row's own ground. The tab row and the pane row beneath it are one continuous band, sharing one ground rather than falling through to the page's ambient black. ([c2a16502](https://github.com/AltanS/collie/commit/c2a16502))
-- **A tmux window tmux named itself shows its folder, not its program.** With automatic-rename on, the tab's name is the last folder of the window's active pane; a window you named keeps its name. ([f90b7410](https://github.com/AltanS/collie/commit/f90b7410))
-- **The dashboard's attention rows are as compact as the workspace rows.** "Needs you" and "Ready · unseen" used to be tall standalone cards above a list of short rows, two shapes for one kind of thing; every row now shares the 44px form in one framed list, and a finished pane you have not opened yet carries a small dot after its name. ([10cd0557](https://github.com/AltanS/collie/commit/10cd0557))
-- **The composer's belt is a third shorter, and its scroll fade is twice as long.** The belt now stands at the pill height, 32px instead of 44px, the Switch mark narrows from 44 to 32px, and the fade under it runs over 64px so the belt reads as a strip that keeps going. The belt also no longer scrolls vertically under a thumb, in Safari either. ([5e7f626c](https://github.com/AltanS/collie/commit/5e7f626c), [63513aee](https://github.com/AltanS/collie/commit/63513aee))
+- Tables in the mirror pan as one unit inside the wrap, keeping find and link coordinates (3792b68, upstream 8d079ff)
+- The Switch-pane sheet rises from the handle and follows the thumb, with a haptic tick past the dismiss line (a6d2248, upstream 5bfa631 sheet half)
+- The pane and history screens sit in a centred column above phone width — 768px for the 80-column mirror — instead of stretching full-bleed (858f0c8, upstream 28255ae + 3870c1c)
 
-### Fixed
+## [0.37.0] - 2026-09-03
 
-- **A pane's cache countdown survives a `/compact`.** A transcript probe that finds no turn inside its 128 KB window now keeps the last reading and lets it age, instead of dropping the pane's countdown for good. ([05065d54](https://github.com/AltanS/collie/commit/05065d54))
-- **A measured cache window cites the rule it was really measured on.** A Claude pane on a subscription measures the one-hour window, so the sheet now quotes the subscription page and date instead of the five-minute API page the tier guess had picked. ([068e2e28](https://github.com/AltanS/collie/commit/068e2e28))
-- **A member serving plain HTTP no longer reads as a rejected certificate.** `collie doctor` and `crew status` said "the TLS certificate was not accepted" for a member that answered with no TLS at all, which sent the operator to a pin that was never consulted; the reason now says the address answers over plain HTTP, the same sentence `collie join` already gives. ([80e262d7](https://github.com/AltanS/collie/commit/80e262d7))
-- **A URL the pane wrapped is one whole link again.** A URL longer than the pane was cut at the column edge, so only its first row became a link, and that link opened a truncated URL. On Herdr the bridge now reads the same rows with soft wraps undone when a URL runs to a row's end, and every row of that URL opens the whole URL. Thanks @thelinuxlich (#212). ([e44d35c8](https://github.com/AltanS/collie/commit/e44d35c8))
-- **A wrapped Codex question card is recognised instead of falling back to raw.** A long question, a description, or the `esc to interrupt` hint can each wrap onto their own row, and `ask.ts` now joins a wrapped row back into the question or description it belongs to, accepting a continuation only when it starts at or beyond that description's own column. The digit recipe is unchanged. Thanks @alvinycheung (#201). ([e44d35c8](https://github.com/AltanS/collie/commit/e44d35c8))
-- **The history view reads in the chosen terminal font.** The full-transcript reading page ignored Settings → Terminal font and always rendered in the shipped default face; it now applies the same font to its own `ChatMessageList`, matching the live pane mirror. Thanks @fjse (#216). ([e44d35c8](https://github.com/AltanS/collie/commit/e44d35c8))
-- **A multi-agent push notification names the panes, not the agent kind.** With several agents blocked at once the body read `claude, claude, claude`; it now shows each pane's own label, falling back to its folder name and then its agent kind, and adds the workspace when two panes still match. Thanks @caioreis123 (#215). ([15f9db67](https://github.com/AltanS/collie/commit/15f9db67))
-- **A peer's own space gets its blocked dot and recency back on the dashboard and in the space strip.** Both matched a space by workspace id alone, or kept keying it to the lead regardless of `?h=`, so a peer's identically-numbered space showed no dot and no order, and the lead's own blocked agent could colour a peer's chip. Both now key off the addressed host, the same one the loader already narrows a peer's spaces and tabs to. Thanks @namseokyoo (#209). ([2fc6a3a0](https://github.com/AltanS/collie/commit/2fc6a3a0))
-- **`hooks install` writes through a symlinked `~/.claude`, and still refuses a symlinked settings file.** Stow, chezmoi and similar tools point the whole config directory elsewhere; the write now follows that link instead of refusing it, while a settings file that is itself a symlink (home-manager's read-only profile) is still refused, with a worded error rather than a raw write failure for a dangling or unwritable link. Thanks @cryptiklemur (#190). ([ae078d89](https://github.com/AltanS/collie/commit/ae078d89))
-- **An update tapped on a Mac phone no longer leaves the service unloaded.** On macOS neither `systemd-run` nor a `setsid` binary exists, so the bridge started the update runner inside the launchd job's process group; restarting the job killed the runner before it could load the job again. The bridge now spawns that runner in a session of its own on every tier except `systemd-run`, which stays as it was. If a phone update has already left the service unloaded, `collie restart` loads it again. Thanks @PhillipChaffee (#213). ([eeadde63](https://github.com/AltanS/collie/commit/eeadde63))
-- **`collie doctor` no longer credits a commented-out cache rule.** The `cache-env` check read the example file's commented rows as a live override; it now counts only rows that validate, and a `retrieved` date in the future is rejected like any other bad row. ([8f8d149f](https://github.com/AltanS/collie/commit/8f8d149f))
-- **The cache countdown no longer blinks between polls.** A refresh that arrived without a reading unmounted the chip for a frame and put it back on the next poll; the last reading now holds until a new one, or an explicit cold, replaces it, and it is dropped when the pane goes away. ([d777c559](https://github.com/AltanS/collie/commit/d777c559))
-- **The pane title no longer shows a raw pane id.** A tab with several unnamed panes appended the multiplexer's `p3` to the title and printed it on every pill of the switcher; the title names the tab now, and a pill carries its place in the row only when a pill beside it would otherwise read the same. ([2eefd38e](https://github.com/AltanS/collie/commit/2eefd38e))
-- **A second Herdr session no longer wipes the first one's cache readings.** The bridge's cache tracker forgot every reading a session's poll did not name, including the other session's, so each poll dropped and re-probed every pane; a poll now forgets only its own session's departed panes, and a transient probe failure keeps the last reading. ([22c79342](https://github.com/AltanS/collie/commit/22c79342))
-- **The cold-cache push now fires for panes on a five-minute cache.** Codex, OpenCode, pi and omp all default to a 300-second TTL, no longer than the configured warn window, so the push skipped them outright; it now warns at half the pane's own cache lifetime whenever that is shorter than the configured window, about two and a half minutes before those panes go cold. ([d2811bc9](https://github.com/AltanS/collie/commit/d2811bc9))
-
-## [1.8.2] - 2026-09-12
-
-### Fixed
-
-- **The service worker precaches only its own channel's icons.** A release build's precache no longer carries the dev build's or the playground's icon files, and vice versa: entries dropped from 37 (1660.11 KiB) to 28 (1485.71 KiB) in a same-channel build. ([d43fcf80](https://github.com/AltanS/collie/commit/d43fcf80))
-- **Static files ship gzipped, so an update downloads in a quarter of the time.** Only JSON API replies were compressed; the app bundle, the stylesheet and the service worker went out raw, so a phone precaching an update pulled the whole thing over the tailnet and showed the app as offline until it finished. Every text asset is now compressed when the browser offers `gzip`, and a compressed asset is cached in memory so the work is done once per build rather than once per request. The main chunk goes from 869 kB to 250 kB; images and fonts are untouched, since they are already compressed. ([9b484bdb](https://github.com/AltanS/collie/commit/9b484bdb))
-- **The update band waits for the new bundle instead of reloading early.** Tapping "tap to reload" while the new version was still downloading reloaded the phone onto the old app shell, which then asked for a chunk that no longer existed, so the loading dog ran forever and only a second manual reload fixed it. The page now reloads only once the new service worker is in control, the band says the new version is downloading for as long as that takes, and the eight-second guard fires only when nothing is on its way in. ([44b7afb1](https://github.com/AltanS/collie/commit/44b7afb1))
-- **The downloading band can be closed, and the app stays usable meanwhile.** A download that never finishes, on a link that has gone away, is now one you can put down: the row closes, the app on screen goes on working from the bundle it already has, and nothing is declined — the install carries on in the background and the page still reloads itself once the new version takes over. ([5646f7e6](https://github.com/AltanS/collie/commit/5646f7e6))
-
-## [1.8.1] - 2026-09-12
+Ported from upstream 1.x (fix-first; no pack/HA, no ASR, no new front door).
 
 ### Added
 
-- **Opening a pane now slides the screen in, and going back slides it back.** The arriving screen enters from the right on the way into a pane and from the left on the way back, 240ms and eased, with the band, the header and the Collie mark holding still. Every other navigation is silent, including a poll revalidation and a machine or session switch: this is a plain entrance animation on the route region, not the View Transitions API removed in 0.10.0 for flickering the page on every poll. Reduced motion gets the new screen in place, with no slide. ([d24a4d73](https://github.com/AltanS/collie/commit/d24a4d73))
-- **The playground has Notices and Motion tabs.** Notices shows the notice family, the strip band, the connection recovery flash, the update ribbon and the status toast. Motion shows the collapse and swap primitives, loading states, sheets, menus, and pending and pulsing controls. Every card carries a Replay control, and the ones that swap between states also carry a Slow toggle. Motion opens with a walkthrough of the real app, every route on fixture data inside a phone frame, with the live route, shortcut buttons and a frame meter for each move. ([9429bd61](https://github.com/AltanS/collie/commit/9429bd61))
-- **A dev build wears an orange icon, and the playground a red one.** A build whose HEAD isn't the release tag now installs as "Collie (dev)" with orange favicons and manifest tiles, so it is never mistaken for the release build on the same home screen; the states playground gets its own red favicon set. The release build's `index.html` and manifest are unchanged. ([c7c4cc9e](https://github.com/AltanS/collie/commit/c7c4cc9e))
-
-### Changed
-
-- **The states playground is now a tabbed page instead of one long scroll.** The tab list and the theme/clock/typeface/accent controls sit in a sidebar on wide screens and a top bar on narrow ones; only the selected section mounts, so switching sections no longer means scrolling past several of them to reach one. The tabs open with Dashboard, then Pane, Crew and Settings, then Boot & connection, Idle & resume and Brand, then Notices and Motion. The selected tab lives in the URL hash (`#pane`, or `#pane/<card-handle>` to also scroll to a card), remembered in `localStorage` between visits. Within a tab, cards are grouped under a small labelled `Group`, ordered from the everyday state to the rare one, so a tab with a dozen cards can be skimmed by its group titles. `app.tsx` (1600+ lines) is split into one file per section under `src/playground/sections/`, registered in a small `SECTIONS` table. ([9429bd61](https://github.com/AltanS/collie/commit/9429bd61))
-- **The Keys tray is less than half its old height.** One seven-column pad replaces the old Keys/123 toggle and stacked rows, with Space in the middle of the bottom row, and 123, Presets and F keys now sit behind one row of chips instead of two separate disclosures. Measured at a 390px-wide viewport: 275px tall before, 119px tall now, every key still at least 36px tall. ([e12b4334](https://github.com/AltanS/collie/commit/e12b4334))
+- Claude's slash-command completion popup is lifted out of the mirror and rendered as a list — it used to hide the input box from the box walk, so every send stalled with "Message didn't reach the input box" (b17964e)
 
 ### Fixed
 
-- **The playground's crew fixtures named real machines, not fictional ones.** The lead and deputy are now `lodge` and `workshop`, matching the fixture set's own outbuilding theme (attic, cellar, garage, loft, shed, barn, kennel). These fixtures mount into colliepwa.dev's feature screens, so this stops the real names from reaching new builds of the public site; a dead re-export of the unit-test fixtures was also dropped from this file's public surface, since it carried the same two names and nothing read it. ([260dbe46](https://github.com/AltanS/collie/commit/260dbe46))
-- **The dashboard-row playground card named real machines, a real username and real clients.** `dashboard-live.ts`'s frozen snapshot carried the real host id and host name a dozen-odd times (now `lodge`/`workshop`, matching the crew fixtures' outbuilding theme), plus the operator's real OS username and several real client/project codenames throughout its `cwd`, label and session fields — a bigger exposure than the hostnames, now swapped for same-shape fakes. This card is dev-only and was never imported by colliepwa.dev, so nothing public was showing these names, but a future import could have carried them out unnoticed; the website repo now runs a build-time check against exactly that (`bun run build:app`), so a real name reaching `public/app/` fails the build instead of shipping quietly. ([4269ae2d](https://github.com/AltanS/collie/commit/4269ae2d))
-- **The top of the app no longer reserves the iPhone notch three times over.** The update ribbon, the connection bar and the header each set `env(safe-area-inset-top)` for themselves, each written when it was the first thing on the screen, so any two of them at once left a tall dead band above the notice — the everyday ribbon-plus-header case on iOS. The band above the header now shows one strip at a time and owns the inset while it is open; the header reserves it only while the band is empty, and the handover rides the band's own 240ms open and close, so nothing jumps. The update offer and the connection bar are `ui/notice.tsx` strips now, which also ends two copies of the tint recipe, two hand-rolled collapse animations, and two rows that asked a screen reader to be assertive and polite at once. The offer's states that carry a ✕ trade their row-wide tap for a named View button, since a button may not hold a button. ([59c77fc3](https://github.com/AltanS/collie/commit/59c77fc3))
-- **The update ribbon's text no longer says "Tap to update".** The dismissible ribbon states navigate through the View button beside the ✕, so the row itself no longer taps, and the copy in all seven locales now says only that the version is available. ([15bd0bbd](https://github.com/AltanS/collie/commit/15bd0bbd))
-- **The "tap to update" band is a named button again.** The band's text sits in a live region, which does not name the button around it; the button now names itself from that text. ([93a4ecc2](https://github.com/AltanS/collie/commit/93a4ecc2))
-- **A long tab row scrolls its active tab into view.** On arrival and on every selection change, the Spaces, Tabs and Panes strips now carry their active item to the nearest visible edge: instant on arrival, smoothly afterwards, and a workspace with many tabs no longer opens on a tab that's scrolled off-screen. ([8a774cc4](https://github.com/AltanS/collie/commit/8a774cc4))
-- **The "Collie on" header line no longer flickers on the dashboard.** The header identity stays mounted across routes and only hides inside a pane, so the multiplexer's logo is fetched once per page instead of once per dashboard open. Over a tailnet that fetch left the logo box blank for a round trip every time you came back from a pane. ([1b3939cf](https://github.com/AltanS/collie/commit/1b3939cf))
-- **Opening the dashboard no longer re-reads the bridge config.** The footer build stamp asked for it on every mount and threw the answer away once the build was known. ([e3c7816e](https://github.com/AltanS/collie/commit/e3c7816e))
-- **A checkout on an untagged release commit builds as dev.** The channel now reads the tags the checkout holds; a tree with no git and a shallow install with no tags still build as release. ([ee3338a2](https://github.com/AltanS/collie/commit/ee3338a2))
-- **The top of the app is no longer blurred on iOS 27.** iOS 27 blurs the top edge of a Home Screen web app whose status bar is translucent, into the header. The status bar is opaque now; the header already paints the page colour under it, and iOS 26 and later colour the bar from that. iOS reads the style once, when you add the app to the Home Screen, so an install made before this change stays blurred until you remove it and add it again. Thanks @bendrucker (#203). ([1907ce2e](https://github.com/AltanS/collie/commit/1907ce2e))
-- **A light fill in an omp pane no longer reads as a black bar.** The phone renders the mirror dark and inverts it, so a light ANSI background came through as a solid black block with the text lost inside it. omp's light fills now carry the same `mobileTransparentBg` hint the codex adapter already uses, and the phone drops the fill and keeps the text. Which fills count is decided by luminance rather than by a theme palette, so dark fills, diff colours among them, are unchanged. Thanks @tenngoxars (#206). ([64f0d698](https://github.com/AltanS/collie/commit/64f0d698))
-- **A peer's space now lists its own panes instead of every tab reading empty.** In a crew, the space screen grouped panes on the machine leading the crew rather than on the machine the space is on, so opening a peer's space drew "(empty tab)" under every tab while the header still counted the panes. Refs #209. ([5784191b](https://github.com/AltanS/collie/commit/5784191b))
+- Boxed TUI rows (`/model` pickers, panel borders) stay on one clipped line on a narrow phone instead of wrapping into a scrambled frame; `tree` output and prose still wrap (12f1aba)
+- The mirror no longer freezes when the soft keyboard or Keys dock shrinks the pane: a scroll arriving with a changed container height is layout, not the user leaving the bottom (4fd91e0)
+- A notification tap on Android opens the deep-linked pane again when the Collie tab had been discarded (12bfbb6)
+- Android push shows a proper small badge glyph and a full-size mark instead of a grey block (b40cc11)
+- omp ghost suggestions are read by relative colour, so a WORKING pane (where omp 18 colours the whole draft) no longer stalls every send; OMP 18.1.2's clipped `╰─ <draft>` composer shape is recognized (3bbba93)
+- Codex: a dim one-segment status row is recognized (4f9eda0); a draft wrapped onto an indented continuation row locates its composer (763c754)
 
-### Docs
-
-- **The docs show how to install and update the PWA itself, not just the host.** `docs/install.md` gains two screenshots of the Install card at the top of Settings — the button Chrome and Edge offer, and the share-sheet hint iOS shows instead — since neither existed anywhere before. The Updates screenshots in `docs/upgrading.md` are regenerated too: two still read "Update pack to" and "Retry pack update" from before the crew rename, and one named a real Tailscale hostname (`minibuch`) in its rolled-back-peer example. `scripts/docs-screens.sh`, which generates this whole set, carried both and is what's actually fixed; the images are just its output. ([22d20160](https://github.com/AltanS/collie/commit/22d20160))
-- **`scripts/docs-screens.sh` no longer races its own screenshots.** Every capture now scrolls its target flush to the top before the shot, not just the two newest ones: the previous `agent-browser scrollintoview` call centres an element and can still be mid-animation when the screenshot fires, silently cropping the top off. Also tightens the two install-path Notes in `docs/install.md` to open with the platform they apply to, so a reader can tell at a glance which one is theirs. ([1f444d6d](https://github.com/AltanS/collie/commit/1f444d6d))
-- **The omp fixture corpus now covers the tool-approval dialog.** That screen was the corpus's one known gap, and the adapter's own comments said so: the claim that Collie refuses to type into it rested on inference, not on a capture. Three captures close it — a `bash` approval and a `write` approval in both selection states, taken against omp v18.1.17 — and the suite now asserts raw-only blocks and `composerReady === false` on them. The prose and the modal counts in `omp/chrome.ts`, `omp/index.ts` and `omp/markers.ts` are corrected to match. Thanks @christensenjames (#204). ([3a4f68db](https://github.com/AltanS/collie/commit/3a4f68db))
-
-## [1.8.0] - 2026-09-09
-
-### Added
-
-- **A real browser opens the app on every push.** CI gained a second job that builds the web bundle, serves it, answers the API from the same fixtures the unit tests use, and opens the app in Chromium at a phone size and a tablet size. It runs beside the existing typecheck and test job, so a browser failure and a lint failure both report in one run, and it uploads a screenshot and a trace when something fails. Nothing about the shipped app changes; the release path downloads no browser. ([051b30e2](https://github.com/AltanS/collie/commit/051b30e2))
-- **Thirteen checks that were run by hand now run themselves.** `web/e2e/issue-180.spec.ts` holds seven browser cases for terminal graphics in the mirror, from a placeholder run that shows the journal's picture to a search highlight that has to land on the right character below one. `web/e2e/m24-crew.spec.ts` holds six for the crew page, the `/pack` to `/crew` redirect, the Settings and footer entries, and the Japanese locale. `web/e2e/fixtures/mirror.ts` builds the screen those cases read, the journal turn behind it, and the three answers a blob can give, each one a patch on a fixture the unit suite already uses. ([1448b1a7](https://github.com/AltanS/collie/commit/1448b1a7))
-- **Hermes panes get transcript history.** Collie reads Hermes SessionDB through the exact Herdr session ID, including compressed parent sessions, without writing to Hermes state. ([85e0da5e](https://github.com/AltanS/collie/commit/85e0da5e))
-- **The update notice says when a release changes the crew link.** An install that is part of a crew reads the new `collie-release.json` asset every release now publishes, sees that the release ahead speaks a different crew wire version, and says so on the band, above the confirm on the Updates card and in the daily push: update the lead first, the members follow. The reading is a number, not a release name, so the release after this one says it too. A solo install says nothing, the confirm button keeps its wording, and every release before 1.8.0 published no asset and reads as no change. ([f39cbddc](https://github.com/AltanS/collie/commit/f39cbddc))
-- **Seven browser cases pin the update path from one bundle to the next.** The browser tier now builds the web bundle twice and serves either build from a swappable path, so a page holding the precached shell of one build can be handed the other, which is what a deploy looks like to a phone. The cases cover the footer chip, the automatic check, a tap during an install, a proxy sign-in path the precache must never answer, and the three paths that fit the 2026-09-09 stall: a failed worker-script fetch, three taps on one installing worker, and the stuck guard reloading onto the stale build. ([bb095e3a](https://github.com/AltanS/collie/commit/bb095e3a))
-
-### Changed
-
-- **Update the lead first: the crew wire moves to protocol version 2.** This completes the rename that 1.7.0 began: 1.7.0 changed what you read, 1.8.0 changes what the machines read. The paths become `/crew/v1/*`, the headers `X-Crew-*`, the signing contexts `collie-crew-warrant-v2` and `collie-crew-dial-v2`, and `CREW_PROTOCOL_VERSION` is 2. A 1.8.0 lead keeps answering `/pack/v1/*` in the version 1 shapes for one release, and a 1.8.0 member falls back to that prefix once against a lead still on 1.7.0 and writes one journal line per lead saying it did, so a crew can be rolled lead first with no member cut off. The fallback fires on the answer a 1.7.0 collie really gives an unknown path, the app shell served with `Content-Type: text/html`, as well as on a `404`, a `403` and a version 1 header. The crew id in a warrant, in a standby-device sync and in the enroll answer is written `crewId` and read under either spelling, so no signature and no stored file changes meaning. Both halves of that overlap are removed in 1.9.0, from when a 1.7.0 member no longer talks to a newer lead. ([305c3291](https://github.com/AltanS/collie/commit/305c3291))
-- **Every state card in the playground carries a stable handle.** The dev-only states page now renders a `data-state` id on each card, flat kebab-case and unique across the page, so a browser test can address "the update band with a run in flight" without matching the card's prose label. The handle is a required prop, so a new card cannot be added without one, and a unit test refuses a repeat. The controls that switch a card between two states gained accessible names for the same reason. Nothing changes in the shipped bundle: the playground stays out of `web/dist`. ([48286a70](https://github.com/AltanS/collie/commit/48286a70))
-- **The crew's own files and identifiers say crew.** `bridge/pack/` is now `bridge/crew/`, `cli/pack.ts` is `cli/crew.ts`, the phone's crew route and its four components follow, and every `Pack…` type, function and constant is spelled `Crew…`, as are the `pack.*` translation keys. Nothing moves on the wire, on disk or in the environment: the `/pack/v1/*` paths, the `X-Pack-*` headers, `PACK_PROTOCOL_VERSION`, `COLLIE_PACK_*`, the three `pack-*.json` state files, the `[pack]` journal prefix, `/api/pack` and the `collie pack` alias all keep their names in this change. The commit-hook hatch is now `SKIP_CREW_WIRE_CHECK=1`. ([12c746f7](https://github.com/AltanS/collie/commit/12c746f7))
-- **The environment keys, the state files, the journal and the census say crew.** Reading the crew's own names: `COLLIE_CREW_TIMEOUT_MS` and `COLLIE_CREW_HELLO_TIMEOUT_MS` replace the `COLLIE_PACK_*` pair, `~/.local/state/collie/pack-trust.json`, `pack-ops.json` and `pack-runtime.json` are renamed to `crew-trust.json`, `crew-ops.json` and `crew-runtime.json` on the first start, the journal prefix is `[crew]`, a forwarded write is audited as `via: "crew"`, the phone reads the census at `/api/crew`, and the crew's update rows on `/api/update/check` and inside every `collie update --check --json` document are `crew` rather than `pack`, with `dismissedCrewVersion` for `dismissedPackVersion` in `update-state.json`. Nothing is lost and nothing has to be edited today: each old name still works for this one release, an old state file is moved rather than copied, the old inner keys (`pack`, `packId`) are read once and written back as `crew` and `crewId`, a preflight document printed by a member still on 1.7.0 is read under either spelling, the old dismiss key is read once and written back under the new one, `/api/pack` answers a 308 to `/api/crew`, and one warning line at start names any old environment key still in use. Every one of those overlaps is removed in 1.9.0, so rename the two keys in your own `.env` before then. On a journal that spans the update, grep for both prefixes. If you have a script that greps `[pack]`, reads `pack-trust.json` or calls `/api/pack`, it needs the crew names now; `/api/pack` answers 308 for one release, the rest does not. ([c529e3fd](https://github.com/AltanS/collie/commit/c529e3fd))
+## [0.36.2] - 2026-09-03
 
 ### Fixed
 
-- **A reply on OMP's Pi composer could be sent before Enter had actually confirmed it, or with a completion the user never accepted.** The guard now reads the draft back and verifies it before sending, so an unconfirmed line is not silently dropped or included as if it had been typed. A ghost completion Pi offered but the user did not accept is stripped before send. A multiline reply now goes out in verified parts, not as one unchecked block. The paste chip is treated as opaque, since it never showed what would actually be pasted, so it can no longer count as evidence that Enter worked. Thanks SeongQ kim (#192), closes #34. ([47369fb4](https://github.com/AltanS/collie/commit/47369fb4))
-- **A stale member record made `collie crew update <member>` impossible to fix.** The preflight walked every member over ssh using the route the ops file remembered, and it ran before `--host`, `--path` and `--port` were used against a machine. A record pointing at a checkout that had moved therefore went red with a remedy naming those exact flags, and passing them changed nothing. The overrides now reach the walk, so the printed remedy clears the red on the next run. ([03eb7a87](https://github.com/AltanS/collie/commit/03eb7a87))
-- **A second tap escapes the update that keeps coming back stale.** When the eight-second guard behind "new build, tap to update" reloads the page and the phone comes back on the same old bundle, the next tap now unregisters the service worker and reloads from the bridge instead of starting the identical wait again. It only does that while the bridge is still answering the ordinary poll, so an offline install keeps its precache and its stale bundle rather than landing on an error page. This is the 1.6.0 to 1.7.0 stall on the release lane, where every tap cost a reload and the new bundle took about three minutes to arrive. ([bb095e3a](https://github.com/AltanS/collie/commit/bb095e3a))
+- The update banner watches this fork's tags, not upstream's — upstream's new 1.x major was advertised with a remedy the fork's `update` verb can never take, and every future Pup release was invisible to it (upstream 0.x is frozen at their 0.36.1) (7f07174)
+- `update`'s non-git-checkout remedy and the README install commands point at `bermudi/collie`, not upstream (7f07174)
 
-### Docs
-
-- **The new browser suite has a place in the docs.** `CLAUDE.md` says how to run each tier and how to add a case, `CONTRIBUTING.md` tells a contributor CI runs it and they need not, and the workspace README documents `make e2e`. ([2221ae8c](https://github.com/AltanS/collie/commit/2221ae8c))
-
-## [1.7.0] - 2026-09-09
-
-### Added
-
-- **The fetch and the build of an update report themselves.** A run record is written when staging begins instead of when it ends, and the steps are appended to a small file the bridge reads and folds into that record, so the phone shows what is happening over the longest part of an update instead of saying "Starting…" for a minute. A staging that gives up says so at once, rather than leaving a run that looks live for ten minutes with the button locked, and a second update started beside a live one no longer writes over the live one's record. ([90fc363a](https://github.com/AltanS/collie/commit/90fc363a))
-- **A running update proves it is running.** The Updates page shows which of the four steps it is on and a clock that ticks every second on the phone's own time, so it keeps moving through the restart when the bridge is unreachable and every poll fails. The page also polls fast while a run is in flight instead of every six seconds, and it dropped one of its three pollers. Past ninety seconds the restart stops saying it is not an outage and says what to check. The phase name and the moving counter are new in this release; seeing them during an update is expected. ([90fc363a](https://github.com/AltanS/collie/commit/90fc363a), [bd3adc5f](https://github.com/AltanS/collie/commit/bd3adc5f))
-- **An AI coding agent in your terminal can read Collie's own manual with `collie skill` and `collie docs`.** `collie skill` prints a brief on how Collie works, and `collie docs` prints the operator pages, both out of the compiled binary rather than off disk, so a packaged install answers exactly what a checkout does and neither needs the network. `collie docs` lists the ten pages, `collie docs <name>` prints one, and `collie docs --all` prints every one behind a marker an agent can split on. `collie --skill` is the flag spelling of the first. ([3edb9667](https://github.com/AltanS/collie/commit/3edb9667), [bd3adc5f](https://github.com/AltanS/collie/commit/bd3adc5f))
-- **A crew can be renamed.** `collie crew rename <name>` on the lead rewrites the crew's name and restarts the bridge, so `collie crew status` and the phone's crew page show it at once. The name is display data the lead hands out once at enrollment, so nothing is sent to a member: a machine that joins after the rename gets the new name, and the members already there keep the old string in a field nobody reads. It refuses on a peer and on a machine in no crew. A crew created without `--name` is called "collie crew". ([4d2f3f5b](https://github.com/AltanS/collie/commit/4d2f3f5b))
-- **`crew add` offers the hosts this machine already knows.** `collie crew add` with no target now lists candidates instead of printing the usage line: the `Host` entries in your `~/.ssh/config`, and the machines `herdr machine list --json` reports. One machine is one row, merged on the ssh target each name resolves to with `ssh -G`, which never connects. Each row says whether the name came from your ssh config, from herdr, or from both, and a row this lead already leads carries that member's id and is not offered. An `Include` is followed one level deep and only under `~/.ssh/`. Nothing is added until you pick a row, and the confirm still runs. With a target the verb behaves exactly as before. ([e54780ab](https://github.com/AltanS/collie/commit/e54780ab))
-- **A peer link tells reconnecting apart from needing you.** A member the lead cannot reach used to read one way whether it was a timeout or a wrong pack secret. The lead now says which it is: reconnecting means it is retrying and there is nothing for you to do, and it is no longer red, while needs attention means retrying will not fix it, and the crew page adds the sentence that says which. The lead also stamps every dial with a counter, so a slow answer from a dial it has already re-made is dropped and logged instead of overwriting a newer one. ([bd3adc5f](https://github.com/AltanS/collie/commit/bd3adc5f))
-- **Each machine in a crew answers for its own multiplexer.** A control on a member's pane used to be shown or hidden by what the lead's multiplexer can do, which is the wrong machine's answer whenever the two differ. Every member now reports its own capabilities to the lead over the pack link, and the lead answers `/api/config` per host from what it already holds, so it dials nobody to answer a page load. A member that says nothing keeps the lead's answer, which is exactly what it got before, so a peer running an older build changes in no way. ([bd3adc5f](https://github.com/AltanS/collie/commit/bd3adc5f))
-- **The mux conformance set can be run against a peer, through the lead.** `bun scripts/pack-mux-probe.ts --lead <url> --host <member>` points the read-only checks at a member's multiplexer over the pack link, with no host ever reaching a mux adapter. It reports what the pack surface cannot express instead of scoring those checks green: four port verbs have no forwardable route, the pane read fixes the grid request shape, and a capability that is a write is never sent across a live link. It has been run against a tmux member and a zellij member under a herdr lead, and both scored the same, so what fails is the route table and not the multiplexer. `MUX_CONTRACT.md` says which check is gradable on which side. ([bd3adc5f](https://github.com/AltanS/collie/commit/bd3adc5f))
-- **Images from an Oh My Pi or pi agent show up on the phone.** The picture the live mirror draws beside a graphics placeholder is matched to it by ORDER, so it is usually but not always the right one; the card says so on its face, and the pane's History is exact. History renders a picture the agent attached and a screenshot one of its tools returned, instead of dropping both, and in the mirror the black box becomes an image card, or an "[Image]" badge where the ordering had no image left to give. Only a journal blob or inline image bytes are loaded, never a web address out of the agent's log. A member's images are served by the machine whose journal named them and come through the lead, and a peer on an older build shows the badge rather than a broken picture. Thanks @Codder13 (#181, #193), reported in #180. ([fd28d018](https://github.com/AltanS/collie/commit/fd28d018), [fbae4cf6](https://github.com/AltanS/collie/commit/fbae4cf6), [8e8cf78a](https://github.com/AltanS/collie/commit/8e8cf78a), [ba8e19a0](https://github.com/AltanS/collie/commit/ba8e19a0), [797318d6](https://github.com/AltanS/collie/commit/797318d6))
-- **`omp` panes get a transcript.** Oh My Pi writes pi's own format, so `omp` is read as a second name for the pi journal, and `~/.omp/agent/sessions` joins `~/.pi/agent/sessions` as a default root. This touches every pi user: a machine with an `~/.omp` folder now has those sessions read too, and `COLLIE_PI_ROOT` still overrides both roots. Thanks @Codder13 (#181, #193), reported in #180. ([fd28d018](https://github.com/AltanS/collie/commit/fd28d018), [fbae4cf6](https://github.com/AltanS/collie/commit/fbae4cf6), [8e8cf78a](https://github.com/AltanS/collie/commit/8e8cf78a), [ba8e19a0](https://github.com/AltanS/collie/commit/ba8e19a0), [797318d6](https://github.com/AltanS/collie/commit/797318d6))
-
-### Changed
-
-- **The group of machines is called a crew, and the word you type changed with it.** The command is `collie crew` and the web page is `/crew`, with the same verbs, arguments and exit codes as before; `collie pack` and `/pack` keep working and go away in 2.0.0. `collie pack` prints a one-line note on a terminal and nothing in a pipe: the note goes to stderr, so a script that reads status output on stdout sees exactly what it saw before. Nothing on the wire, in the env or on disk changes: the protocol paths, the headers, `COLLIE_PACK_*` and the state files keep their names, so a 1.6.0 member keeps talking to a 1.7.0 lead while you level them one at a time. The docs page moved from `collie docs pack` to `collie docs crew`, and the old name still prints it. A crew created without `--name` is now called "collie crew"; a crew you already have keeps the name it was given ([ADR 0038](./.adr/0038-the-group-is-a-crew-the-wire-keeps-pack.md)). ([15f1f987](https://github.com/AltanS/collie/commit/15f1f987), [db6f9a5e](https://github.com/AltanS/collie/commit/db6f9a5e))
-- **The list of sessions on one machine now comes from the multiplexer you run, not from Herdr's layout.** The last switch in the bridge that read the multiplexer's name is gone. An adapter now declares whether this machine runs other instances of it and hands back the endpoint for each, and a multiplexer that keeps no such list refuses the question instead of being assumed to have nothing. Herdr declares it and still fronts every named session under your config root, exactly as before. tmux and zellij decline it, each for a reason written into the capability table: tmux has no command that lists servers and leaves a dead server's socket on disk, and zellij answers every read with a process rather than over a socket, so one Collie there drives the one session you pointed it at. `COLLIE_MULTI_SESSION` keeps its meaning as your own off switch. ([bd3adc5f](https://github.com/AltanS/collie/commit/bd3adc5f))
+## [0.36.1] - 2026-08-29
 
 ### Fixed
 
-- **The release page lists what changed, grouped, and drops GitHub's own list.** The update command still sits at the top, unfolded, and below it the page now prints the changelog's own lead sentences under Added, Changed, Fixed, Packaging and Docs, then the version's changelog section for the commits and a compare link against the previous tag. GitHub's generated list only knew merged pull requests, and most of Collie's history lands as direct commits, so it read as an almost empty release. ([fc98468b](https://github.com/AltanS/collie/commit/fc98468b))
-- **A missing protocol header means the lead learned nothing, not that the peer is foreign.** An answer with no `X-Pack-Protocol` header, from a proxy in front of a peer that is restarting, from a wrong path, or from a machine that is not in a crew at all, is now unreachable and keeps the normal dial cadence. The reason names the HTTP status and how long it has been saying nothing. Only a header that names another version, or a peer that refuses us for skew, is incompatible and goes on the thirty second, two minute, ten minute ladder. The rule is bounded in time, not in answers: a member that has been headerless for over a minute falls back onto that ladder, and any answer that names a version closes the window. ([90fc363a](https://github.com/AltanS/collie/commit/90fc363a))
-- **A crew update always ends.** While a run is levelling a peer, that peer is dialled on every sweep whatever backoff it is on, so a peer that answers three dials as incompatible no longer hides a run for ten minutes. A leg that has not changed state for twenty minutes fails, the run settles the moment every leg is terminal, and a run left behind by a crash is not resumed twenty minutes later. ([90fc363a](https://github.com/AltanS/collie/commit/90fc363a))
-- **A leg the wall clock failed stays failed.** The twenty minute clock reached the right verdict and the next sweep, one second later, wrote it straight back to waiting, because a leg is minted fresh from the member's own facts every sweep and those facts do not change when a clock runs out. The run was then queued again and could not end, which is the one thing this work is for. What clears the failure now is the member reaching the release, and nothing else. ([90fc363a](https://github.com/AltanS/collie/commit/90fc363a))
-- **A peer that speaks to its lead is dialled again at once.** Any request that passes the pack link's two factors clears the backoff the lead was holding against that machine, and the next sweep dials it. Bounded to one reset per member every ten seconds, and to five resets before the lead's own ladder stands again. ([90fc363a](https://github.com/AltanS/collie/commit/90fc363a))
-- **The update band asks for a reload with a reload mark.** Not with the up-arrow that means a new version is on offer, so a band that wants a tap no longer reads as a second update. A tap is also never swallowed by an automatic reload that already ran: the two share a guard against navigating twice, and a reload that does not actually leave the page gives the tap back three seconds later. ([90fc363a](https://github.com/AltanS/collie/commit/90fc363a))
-- **The update button on the Updates page holds one position.** The peer list and the preflight now open below it instead of above, so the button no longer moves 368 pixels down the screen when they arrive, and the confirm that replaces it stays inside a phone viewport. The button also stays disabled, and says it is checking, until the preflight has answered. ([90fc363a](https://github.com/AltanS/collie/commit/90fc363a))
-- **A peer's version on the Updates page refreshes on its own.** It refreshes after a crew update, with no pull to refresh. A run that levels only the peers writes no record on the lead, and the page used to drop that run entirely and stop asking for a fresh census. ([90fc363a](https://github.com/AltanS/collie/commit/90fc363a))
-- **A peer that will not level itself says why, on its own journal.** A peer decides eight times before it self-levels, and it used to decide in silence: the lead's leg then sat on "waiting" for the whole twenty minute wall clock and failed with a reason that named no cause. The peer now writes one line naming the guard that stopped it, and only while the lead's turn names that machine, so the line appears where an operator is asking why and not on every sweep of every day. Nothing new goes over the pack link. ([90fc363a](https://github.com/AltanS/collie/commit/90fc363a))
-- **The Updates page keeps up with a peer while you are looking at it.** The page reads the members' progress out of the answer it just polled, instead of out of a copy of an older run it fetched when it opened. The band would say a member could not be updated, or that another was still going, over a page that showed the run before it, until you reloaded. A peers-only retry now moves the rows within one poll, and the band and the page go quiet together. ([90fc363a](https://github.com/AltanS/collie/commit/90fc363a))
-- **The update band and the Updates page read one function.** They can no longer disagree about whether the crew is still moving. A peer that is still updating keeps the band up however long it takes, instead of going quiet after ten minutes over a page that was still counting. Past two minutes the band names the elapsed time and the page says no action is needed. A peer that could not be updated says so in one sentence on both, carries a Retry now button, and can be put down. ([90fc363a](https://github.com/AltanS/collie/commit/90fc363a))
-- **An update tapped on the phone reaches its runner.** On a linked-clone or a binary install the staging process handed the swap to a detached `systemd-run` and exited at once, and exiting killed the client before the user manager had started the runner, so the run record sat at `staging` for ten minutes with the lock held and the old version still serving. The handoff now waits for the manager to accept the job, for at most fifteen seconds, and prints "handed off" only after it has. A handoff the manager refused is an abort carrying the tier, the exit code or the word timeout and the manager's own first line, so the phone shows the failure within one poll and the retry is not refused. A launch tier with no manager to ask now declines to start from inside a service instead of dying mid-swap. A machine already stuck at `staging` is cleared by hand, and `docs/troubleshooting.md` carries the steps under "an update started from the phone stays at staging". ([c7191904](https://github.com/AltanS/collie/commit/c7191904), [bd3adc5f](https://github.com/AltanS/collie/commit/bd3adc5f))
-
-- **A tab on zellij counts the panes you can reach, and a launcher beside a zellij pane runs.** Two things a zellij session showed for the first time when one was put under a lead. A tab's pane count came off zellij's own listing, which counts zellij's tab bar, status bar and any floating overlay, so a tab with two shells in it said three. And zellij reports no working directory for a pane, so a launcher row started beside one asked zellij to open a tab in a directory called nothing and zellij refused the whole launch. Counts are now counted off the panes Collie publishes, and a blank working directory means "wherever you would have opened it" on all three multiplexers rather than being passed down as a path. A launch onto a member no longer times out on the lead's poll budget either: a forwarded write gets its own 5 s deadline, so a launch that spawns a process on the far machine comes back as the tab it made instead of an outcome the phone could not confirm. ([bd3adc5f](https://github.com/AltanS/collie/commit/bd3adc5f))
-
-- **The all-sessions view follows the machine you are looking at.** `?all=1` widened the collie your phone is connected to, whatever host the page was scoped to, so the switch and the machine picker disagreed about which machine was on screen. They compose now: with a member selected the view widens that member. The lead also asks every member for all of its sessions on the sweep it already makes, and narrows the answer per request, so a pane in a member's second session is reachable at all, which it was not before. A member running one session sends and shows exactly what it sent and showed before, and nothing about the pack protocol version changes. ([bd3adc5f](https://github.com/AltanS/collie/commit/bd3adc5f))
-
-- **The skew warning names the remedy that matches the direction.** `collie crew status` told you to run `collie crew update <member>` for any version difference, including one where the lead was the older machine — and that command pushes the lead's build outwards, so it would have taken a newer member backwards. The line now says which side is behind: a member behind this lead gets the `crew update` it always got, a member ahead of it gets `collie update` here instead, and two different strings for the same version name no command at all. ([bd3adc5f](https://github.com/AltanS/collie/commit/bd3adc5f))
-- **The service check no longer calls a healthy systemd unsupervised.** `systemctl --user show-environment` needs `XDG_RUNTIME_DIR` or `DBUS_SESSION_BUS_ADDRESS`, and a Herdr plugin action passes neither, so `collie update --check` reported "no service manager on this host" on a machine where the bridge was running under `systemd --user` all along, and pushed the update handoff to a tier ADR 0037 refuses from inside a service. A failed probe now retries once with a derived `XDG_RUNTIME_DIR`, never overriding a value already set, and a container with no user manager still reads as unsupervised (reported by @lloydsilvertwo in #194). ([c7191904](https://github.com/AltanS/collie/commit/c7191904), [bd3adc5f](https://github.com/AltanS/collie/commit/bd3adc5f))
-- **A binary install's restart recognises its own bridge across a version flip.** The pidfile guard compared the old bridge's command line with the path of the version now executing, and the two never agree after a flip, so the old process was never stopped, kept the port, and every update on an unsupervised binary install rolled back. The guard now ignores the version directory on both sides and still refuses a bridge from a different install root. Thanks @chernesk (#195). ([f3c3c22c](https://github.com/AltanS/collie/commit/f3c3c22c), [9975839a](https://github.com/AltanS/collie/commit/9975839a))
-
-### Docs
-
-- **A Herdr machine list is not a crew.** Herdr 0.9.0 keeps saved ssh machines in its own client, for its own window, on the machine you are sitting at. A crew runs Collie on every machine, reached from your phone through the lead, and handles uploads, the journal, the audit log, updates, and failover on each machine; it also runs under tmux and zellij, which keep no machine list. The two lists stay separate on purpose, and [ADR 0036](.adr/0036-the-map-of-machines-is-collies-a-mux-reports-one-machine.md) records why. [`docs/crew.md`](./docs/crew.md) compares them row by row, and `collie crew add` offers Herdr's machines as candidates so you never type a host twice. ([bd3adc5f](https://github.com/AltanS/collie/commit/bd3adc5f))
-
-## [1.6.0] - 2026-09-08
-
-### Added
-
-- **mise installs Collie on Linux and macOS.** `mise use -g github:AltanS/collie@<version>` fetches the release tarball for that platform, and the install page documents it beside the Arch and Nix routes. mise owns updates on such a tree, with `mise upgrade --bump` and a `collie restart` to move the service off the old version directory, whether that service is a systemd unit or a launchd agent. `collie update` declines there without naming a package manager, because a mise tree is neither a checkout nor a packaged install, and the page says so. ([0febef5](https://github.com/AltanS/collie/commit/0febef5), [0062b91](https://github.com/AltanS/collie/commit/0062b91))
-- **`collie doctor` and `collie update` find their tools on Windows.** The tool search finds `git`, `herdr`, `python3` and `bun`: it reads `PATH` with the Windows separator, tries the `PATHEXT` suffixes, and reads the variable under either spelling, so a Windows host no longer reports every tool as missing and the Updates page gets a real preflight. Windows stays a source-only platform that we do not test on hardware. The search can also find a `.cmd` or `.bat` shim that Collie then cannot start, because it spawns these tools without a shell, so a Windows host needs the `.exe` builds of `git`, `herdr`, `bun` and `python3` on `PATH`. Thanks to @jz-wilson (#175). ([d80ebbe](https://github.com/AltanS/collie/commit/d80ebbe), [daa5bdb](https://github.com/AltanS/collie/commit/daa5bdb), [0062b91](https://github.com/AltanS/collie/commit/0062b91))
-- **A Claude pane is read only when its screen has changed.** A herd of idle agents no longer costs one socket read per pane per poll, because the pane is read for its session name only after a change. This uses Herdr's pane revision; tmux and zellij panes are read as before. Thanks to @sd2k (#189). ([198fe20](https://github.com/AltanS/collie/commit/198fe20), [258341b](https://github.com/AltanS/collie/commit/258341b))
-- **Turning the phone to landscape opens zen.** Turning it back closes it, and a zen you opened yourself stays open through both. This works when zen is enabled. The switch sits under Zen in Settings, off until you turn it on, and it acts only while zen itself is on. Desktops and tablets are landscape all day and are not affected. Thanks @enieuwy (#182). ([36d7b97](https://github.com/AltanS/collie/commit/36d7b97), [3e1033d](https://github.com/AltanS/collie/commit/3e1033d), [5af27c9](https://github.com/AltanS/collie/commit/5af27c9), [4bf3696](https://github.com/AltanS/collie/commit/4bf3696))
-- **A reply that scrolled off the terminal is shown in full.** The reply comes from the agent's own log, in place of the rows it covers, and Settings → View → Full latest reply turns it off. Thanks @sd2k (#185). ([46d2fe6](https://github.com/AltanS/collie/commit/46d2fe6), [d433ce8](https://github.com/AltanS/collie/commit/d433ce8))
-- **Collie recognises OMP's `rule` composer.** A phone reply reaches an OMP 18.1.10 pane configured with `composer.shape: rule` instead of stalling with "the message did not reach the input box". Thanks @taiansu (#160). ([72fbfec](https://github.com/AltanS/collie/commit/72fbfec), [67b72e3](https://github.com/AltanS/collie/commit/67b72e3))
-
-### Fixed
-
-- **Every command Collie prints for Herdr names its own plugin id.** This holds for every restart and update command, and names the plugin id of the instance that printed it. A host running a second Collie under `COLLIE_INSTANCE` used to be told to invoke `herdr.collie`, which is the host's first Collie and not the one asking, so following the line restarted the wrong service. ([68bb345](https://github.com/AltanS/collie/commit/68bb345))
-- **A binary replaced under the running service is noticed.** A package upgrade is caught even when the version does not move: `collie doctor` reports `restart-pending` against the executable itself and names `collie restart`, and the phone raises the same notice. `pacman` replaces the files and restarts nothing, and the check used to say something else did. ([4cb544e](https://github.com/AltanS/collie/commit/4cb544e))
-- **`collie pack update` on a packaged lead names the boundary.** It no longer reports a broken checkout. It used to fail with "is not a git checkout" about `/opt/collie`, which pacman owns and which carries no commit to push; it now says updates come from the package manager and sends the operator to the phone's Updates page, where the members still level to the version the lead is running. ([187a0dd](https://github.com/AltanS/collie/commit/187a0dd))
-- **`collie serve` stops when the tailnet has no HTTPS.** It says so instead of looking hung. Tailscale asks for HTTPS to be enabled and waits for the answer, and Collie captured that question until the command returned, which is the one case where it never does. Collie now reads the tailnet's certificate domains first and names the admin console, `collie doctor` reports the same tailnet, and the publish runs on the operator's own terminal so anything tailscale prints while it waits is visible. Thanks @nikolauska (#172). ([da8afeb](https://github.com/AltanS/collie/commit/da8afeb))
-- **Turning on notifications no longer sticks on "setting up".** A configuration read that fails leaves the switch retryable instead of disabling it, every service worker and PushManager wait is bounded at 30 seconds, registration goes through the shared API client so a sign-in redirect or a server error is reported beside the switch, and the phone reads as subscribed only after the bridge acknowledged the endpoint this device registered. Thanks @Shujakuinkuraudo (#178, #179). ([6fa2694](https://github.com/AltanS/collie/commit/6fa2694))
-- **`collie serve` says when it cannot read the HTTPS status.** It publishes anyway. A `tailscale status --json` this build cannot read means "can't tell", never "no HTTPS", so the refusal above stays off that path; the line names the admin console in case the publish does stop and wait after all. ([0062b91](https://github.com/AltanS/collie/commit/0062b91))
-
-### Packaging
-
-- **`collie-bin` is not on the AUR yet.** The install page says so. The AUR has paused new account registration, so the Arch route is a clone of this repository and `makepkg -si` in `packaging/aur`, with the `paru -S collie-bin` line kept below it under "Once it is on the AUR". ([d7dd6d9](https://github.com/AltanS/collie/commit/d7dd6d9))
-- **The Arch package installs to `/opt/collie`.** That is the layout Omarchy's package repository expects, and the package ships the metadata that repository uses to follow Collie's releases; a host under `/opt/collie` is told `sudo pacman -Syu collie-bin` like one under `/usr/lib/collie`. ([4480964](https://github.com/AltanS/collie/commit/4480964))
-- **The Arch package prints what to do next.** This covers installing, upgrading or removing it. pacman names `collie start` and the `COLLIE_MUX=herdr` form a host with two multiplexers needs, says the running service keeps the old build until `collie restart`, warns before a removal that the `systemd --user` unit and the tailscale serve mapping stay unless `collie uninstall` ran first, and afterwards names the directories left behind. Omarchy's repository carries the same file. ([187a0dd](https://github.com/AltanS/collie/commit/187a0dd))
-- **The Arch package trims `depends` and files its docs.** It no longer names `systemd` in `depends`, which is the init of every Arch and Omarchy host anyway, and it offers `herdr` and `tmux` as optional dependencies, one per multiplexer Collie can drive on such a host. `README.md`, `CHANGELOG.md` and `docs/` now install to `/usr/share/doc/collie-bin/` and the licence to `/usr/share/licenses/collie-bin/`, instead of sitting in the install root where nothing reads them at run time. ([4480964](https://github.com/AltanS/collie/commit/4480964))
-
-### Docs
-
-- **A packaged install can be linked into Herdr.** `herdr plugin link /opt/collie` registers Collie's action buttons there, and Herdr never finds the package on its own because it does not scan `/opt`. The install page used to say there is no `herdr plugin link` step at all, and the plugin's `update` and `update-major` actions declining on a packaged tree is the design, not a fault. ([e4e7e9f](https://github.com/AltanS/collie/commit/e4e7e9f))
-
-## [1.5.6] - 2026-09-07
-
-- Collie carries its own package recipes: `packaging/aur` for Arch (`collie-bin`, not yet on the AUR) and `packages.<system>.collie` from this repository's flake for Nix. Both wrap the release tarball, neither builds anything, and neither updates itself, because the package manager owns that folder. ([bb46def](https://github.com/AltanS/collie/commit/bb46def), [43a23a2](https://github.com/AltanS/collie/commit/43a23a2))
-- The flake's default package is Collie, so `nix run github:AltanS/collie` runs it. The pinned Bun the release is built with is still there, as `packages.<system>.bun`. ([43a23a2](https://github.com/AltanS/collie/commit/43a23a2))
-- The update band remembers a dismissal on the host instead of in one browser, the quiet pack notice can be put down on its own, and a host whose updates come from its package manager reads "Collie 1.6.0 available via pacman." instead of an offer to tap. ([23b5934](https://github.com/AltanS/collie/commit/23b5934), [2be3547](https://github.com/AltanS/collie/commit/2be3547), [f630c1c](https://github.com/AltanS/collie/commit/f630c1c))
-- A Mac or an arm64 Linux host on 1.5.4 or 1.5.5 gets a binary that starts again. A host whose binary will not start reinstalls with `curl -fsSL https://colliepwa.dev/install.sh | COLLIE_TAG=v1.5.6 sh`; a host still on 1.5.3 updates as usual, and linux-x64 was never affected. Those two releases were compiled on the build environment's patched Bun, so the Mac binary loaded ICU out of `/nix/store` and the arm64 Linux binary named a `/nix/store` program interpreter. The release now compiles on the upstream Bun archive the flake pins and refuses any binary whose loader inputs point outside the system's own library roots, thanks @rapporbit (#184). ([33df273](https://github.com/AltanS/collie/commit/33df273), [9d07868](https://github.com/AltanS/collie/commit/9d07868))
-- The pack journal names each peer's leg change, each incompatible verdict with the reason and the backoff it earns, and the moment a run settles. A run that sits waiting on a peer is now read out of `journalctl --user -u collie` instead of inferred from the arithmetic. ([3ea0108](https://github.com/AltanS/collie/commit/3ea0108))
-
-## [1.5.5] - 2026-09-07
-
-- The pack treats a packaged member as a quiet member instead of failing it, the phone says which host waits for its package manager, and a package swap under a running bridge asks for a restart. ([1df2451](https://github.com/AltanS/collie/commit/1df2451))
-- The attach button asks Photos or Files, so the camera roll is on offer again: one `accept` cannot carry `image/*` and thirty text extensions without a phone hiding the gallery. ([9fa55a7](https://github.com/AltanS/collie/commit/9fa55a7))
-- The attach button answers a tap at once, with a haptic tick and a filled tone, and its picker opens above the button rather than over it. A bottom sheet covered that button 42ms after the tap, so nothing drawn there to acknowledge the tap could be seen at all. ([9fa55a7](https://github.com/AltanS/collie/commit/9fa55a7), [495b9c7](https://github.com/AltanS/collie/commit/495b9c7))
-- The Updates card holds its place while it checks and stays put for the whole run: the preflight and the peer lines arrive through a `Collapse`, the action button is disabled from the tap onward instead of vanishing, and it says what it is waiting for. ([689dcb2](https://github.com/AltanS/collie/commit/689dcb2))
-- Codex prints its queue hint and its context metric on one footer row while a turn is active, and the parser now knows that shape, so a reply there stops reporting that it never reached the input box, thanks @stekman08 (#176). ([0ad4f2f](https://github.com/AltanS/collie/commit/0ad4f2f))
-- The guarded submit is bound to the prompt the verifying read saw, so a dialog that takes focus between the typing and the Enter is refused instead of answered, thanks @stekman08 (#177). ([e7c1c78](https://github.com/AltanS/collie/commit/e7c1c78))
-- `Collapse` waits for a painted frame before it opens, so content that arrives late slides in instead of jumping. Every enter whose child mounted and opened together was a jump before this, which is every late arrival the primitive exists for. ([bffe062](https://github.com/AltanS/collie/commit/bffe062))
-- New `AnchoredMenu` primitive: a small menu that opens above its trigger instead of over it, for a control near the bottom edge that a bottom sheet would cover. ([ffd89b0](https://github.com/AltanS/collie/commit/ffd89b0))
-
-## [1.5.4] - 2026-09-07
-
-- Confirming a pack update on the phone levels the peers on an ordinary checkout install, instead of updating only the lead and leaving "Retry pack update" to be tapped by hand. That install kind never recorded the run the lead's turn queue is rebuilt from after its own restart. ([d9eb459](https://github.com/AltanS/collie/commit/d9eb459))
-- `collie update` hands off to `systemd-run` only when the systemd user bus is reachable, not just when the binary exists, so a container with systemd installed but not running no longer wedges every update in staging, thanks @chernesk (#174). ([cdbd1a9](https://github.com/AltanS/collie/commit/cdbd1a9))
-- Collie recognises an install its package manager owns, declines to update it, and names that manager's command instead, on the terminal and on the phone, thanks @mikebenner (#171). ([8fe3180](https://github.com/AltanS/collie/commit/8fe3180))
-- The release tarball carries `scripts/collie-ctl.sh`, the shim every action in its own `herdr-plugin.toml` names, thanks @mikebenner (#171). ([6eb2d17](https://github.com/AltanS/collie/commit/6eb2d17))
-- The upload cap is a setting, `COLLIE_MAX_UPLOAD_MB`, and `COLLIE_UPLOAD_EXTRA_TYPES` adds text types the shipped list misses. ([e1493f4](https://github.com/AltanS/collie/commit/e1493f4))
-- The pack lead's oversize refusal is named `upload_too_large`, not `image_too_large`, now that it is not only about images. ([e1493f4](https://github.com/AltanS/collie/commit/e1493f4))
-- The composer attaches text files as well as images — markdown, code, config and logs — behind a paperclip in place of the picture icon. ([9833ba3](https://github.com/AltanS/collie/commit/9833ba3))
-- A truncated error in the header opens on a tap, showing the whole message with a copy button. ([747afaa](https://github.com/AltanS/collie/commit/747afaa))
-- The update preflight and the update itself both look for Bun where the shim looks, `$BUN_INSTALL` included, so a Bun off your PATH is green with the path it will run rather than a red that blocks the update, and a file that cannot be executed is no longer taken for a Bun (#169). ([547b198](https://github.com/AltanS/collie/commit/547b198), [77b3f1e](https://github.com/AltanS/collie/commit/77b3f1e))
-- `flake.nix` pins the tools a release is built with — Bun, Node, git, tmux and zellij — and the release workflow builds inside that flake, so a published binary names the toolchain that produced it. ([7636222](https://github.com/AltanS/collie/commit/7636222))
-- A pre-commit guard refuses a `flake.lock` that moves outside a release commit, so the pinned toolchain and the version move together or not at all. ([b00afe1](https://github.com/AltanS/collie/commit/b00afe1))
-
-## [1.5.3] - 2026-09-06
-
-- Release checks and tag fetches stay on HTTPS when a git `insteadOf` rule rewrites GitHub URLs to SSH, so a service without an SSH key can update again, thanks @magoz (#170). ([b3bd127](https://github.com/AltanS/collie/commit/b3bd127))
-
-## [1.5.2] - 2026-09-05
-
-- STT releases its admission slot immediately when a recording is cancelled, thanks @en-ver (#163). ([43c9cfe](https://github.com/AltanS/collie/commit/43c9cfe))
-- Labelled terminal rules now fit on a single line across all harnesses, and only the rule glyphs are dimmed, thanks @en-ver (#168). ([d980f37](https://github.com/AltanS/collie/commit/d980f37))
-- Collie speaks Traditional Chinese, thanks @lekoOwO (#165). ([1cec9ea](https://github.com/AltanS/collie/commit/1cec9ea))
-- The pane and history screens now widen with the window on a desktop, up to 1400px, so a wide terminal mirror stops wrapping (#166). ([3870c1c](https://github.com/AltanS/collie/commit/3870c1c))
-
-## [1.5.1] - 2026-09-04
-
-- Docs carry phone screenshots of the update flow. ([23dfb1a](https://github.com/AltanS/collie/commit/23dfb1a))
-- The refusal and `collie doctor` now spell the fix as `COLLIE_MUX=<mux> collie start`, and name the file it lands in. ([1d458f6](https://github.com/AltanS/collie/commit/1d458f6))
-- `COLLIE_MUX=tmux collie start` now writes the choice to `.env`, so the next plain `start` and the supervised unit both see it. ([1d458f6](https://github.com/AltanS/collie/commit/1d458f6))
-- The installed app no longer locks to portrait, so a tablet can run Collie in landscape, thanks @edwinhu (#162); the pane and history screens sit in a centred column above phone width, like every other screen. ([28255ae](https://github.com/AltanS/collie/commit/28255ae))
-- Release pages link to the version's changelog section instead of copying it, and carry GitHub's generated list of pull requests, contributors and the compare link. ([cd6feaa](https://github.com/AltanS/collie/commit/cd6feaa))
-- `collie pair` prints a QR code beside the code; scanning it opens Settings on the phone with the code filled in. ([8c516b4](https://github.com/AltanS/collie/commit/8c516b4))
-
-## [1.5.0] - 2026-09-04
-
-- Pane detail: dragging the status line strip above the switcher handle no longer scrolls the composer out of view. ([7b77d7c](https://github.com/AltanS/collie/commit/7b77d7c))
-- Tapping a push notification opens the app again on Android; the tap no longer waits on a discarded tab before it may open a window (regression since 1.2.0). ([ecee7c2](https://github.com/AltanS/collie/commit/ecee7c2))
-- Updates page at `/settings/updates`: the check, the update card, a read-only line per pack member, and one action button. ([9ab65bc](https://github.com/AltanS/collie/commit/9ab65bc))
-- Settings keeps one "Updates" row with a status line and a chevron; the footer update chip and the update card left the page. ([9ab65bc](https://github.com/AltanS/collie/commit/9ab65bc))
-- An update push now opens the Updates page. The wire value is unchanged, so an old service worker still lands on Settings. ([9ab65bc](https://github.com/AltanS/collie/commit/9ab65bc))
-- Every pack member reports its own update preflight over the link, and `GET /api/update/check` answers with a dated `pack` row per member. ([4667c8a](https://github.com/AltanS/collie/commit/4667c8a))
-- `collie pack update` prints each member's peer-reported verdict beside its SSH one and names a disagreement. ([9913b5a](https://github.com/AltanS/collie/commit/9913b5a))
-- `collie update --to-tag v<x.y.z>` pins an update to one exact release; it refuses a prerelease, a downgrade and a major crossing. Plumbing, not an operator verb. ([7c42d2f](https://github.com/AltanS/collie/commit/7c42d2f))
-- One top-of-app update band, replacing the self-update row: release on offer, confirm just tapped, run in flight, new bridge, and peers following. ([ff4bf25](https://github.com/AltanS/collie/commit/ff4bf25))
-- A peer follows its lead: it levels itself to the release its lead is running, taking the exact tag from GitHub over anonymous HTTPS, behind its own preflight, health gate and rollback. The lead grants one turn at a time and states nothing while it is mid-run. ([0f8c337](https://github.com/AltanS/collie/commit/0f8c337))
-- The Updates page and the band report each peer's leg of a pack-wide run: waiting, updating, updated, rolled back or unreachable. ([07d305e](https://github.com/AltanS/collie/commit/07d305e))
-- `POST /api/update` accepts `peersOnly: true`, the Updates page's "Retry pack update": a new run whose only legs are the peers. ([bbfa7c1](https://github.com/AltanS/collie/commit/bbfa7c1))
-- Known gap: a lead rolled back by hand after its peers have levelled leaves them ahead of it. No peer is ever stepped down over the pack link; the remedy is `collie pack update <member>` from the lead. ([f61a246](https://github.com/AltanS/collie/commit/f61a246))
-- The snapshot and `GET /api/update/check` compose the update status from one place, so the band and the Updates page can never disagree about a run. ([dcaa51d](https://github.com/AltanS/collie/commit/dcaa51d))
-- One confirm on the phone updates a whole pack: the lead first under its own health gate, then each peer, one at a time. ([e4d12af](https://github.com/AltanS/collie/commit/e4d12af))
-- Every pack member reports its running version on the sweep, so the lead no longer shows a peer's version as blank and a peer that finished updating is marked done and hands on its turn. ([94308d9](https://github.com/AltanS/collie/commit/94308d9))
-
-## [1.4.1] - 2026-09-03
-
-- Update card says "Up to date. Nothing to do." at the top and folds the preflight details unless a check is red or an update is available. ([235ab1b](https://github.com/AltanS/collie/commit/235ab1b))
-- The phone's update preflight checks this instance only (`update --check --local`), so an unreachable pack peer no longer turns the lead's card red. ([fd4be21](https://github.com/AltanS/collie/commit/fd4be21))
-- The preflight lists release tags over anonymous HTTPS when `origin` is a GitHub SSH URL, and quotes git's own error, so a missing SSH agent no longer reads as a dead remote. ([fd4be21](https://github.com/AltanS/collie/commit/fd4be21))
-- The update card no longer says "the newest release isn't known yet" right after a restart, its first read now waits briefly for the delayed startup poll instead of answering with a stale null. ([203dd07](https://github.com/AltanS/collie/commit/203dd07))
-
-## [1.4.0] - 2026-09-03
-
-- Operator launchers: your own commands, declared in `launchers.toml`, tapped to start. They live on the dashboard and in the "Switch pane" sheet, not in a pane or Space header. (#125) ([12dd5e8](https://github.com/AltanS/collie/commit/12dd5e8))
-- Update notifications are a digest: at most one push a day, naming every release it folded, never before 09:00. A patch-only delta rides a weekly digest instead, or a minor that arrives first. ([f05b4de](https://github.com/AltanS/collie/commit/f05b4de))
-- `POST /api/update/snooze` dismisses the current update digest until a newer release and a fresh window. ([f05b4de](https://github.com/AltanS/collie/commit/f05b4de))
-- `pack update --path '~/…'` expands the tilde on the remote's own `$HOME`, not this machine's. ([f05b4de](https://github.com/AltanS/collie/commit/f05b4de))
-- `pack update --host` remembers the ssh route as soon as the probe proves it, not only after a
-  fully successful run. ([f05b4de](https://github.com/AltanS/collie/commit/f05b4de))
-- `collie update --check [--json]`, a read-only preflight over doctor, disk, bun, the tracked-file tree, upstream and the service unit, plus every pack member on a lead. ([8c9e5d4](https://github.com/AltanS/collie/commit/8c9e5d4))
-- A linked checkout updates by staging: `collie update` builds a release into a `versions/vX.Y.Z` git worktree and flips the `current` symlink, so a failed build never touches the running install and `collie update --rollback` works on a checkout (ADR 0006, amended) ([7845c87](https://github.com/AltanS/collie/commit/7845c87))
-- `bun run test` no longer exits 0 when a test fails: a probe script called process.exit on import. ([b2a86cf](https://github.com/AltanS/collie/commit/b2a86cf))
-- `collie update` stages, then hands the swap to a detached updater: it flips `current`, restarts, polls `/api/health` for 30 s (`COLLIE_UPDATE_HEALTH_TIMEOUT_MS`), and rolls back once by itself if the new version does not answer. Watch it with `collie update --status`. ([d569ffc](https://github.com/AltanS/collie/commit/d569ffc))
-- `collie pack update` is one sequence: preflight every machine, update the lead first, then each peer in turn, health-gated. The first failure stops the run and leaves the rest untouched, with the recovery command named. ([fa57012](https://github.com/AltanS/collie/commit/fa57012))
-- Update Collie from the phone: a settings card with the version, the newest release, the preflight per check and its state, behind `POST /api/update`: same gate as a send, one confirm, and its own confirm for a major. ([3f4caf9](https://github.com/AltanS/collie/commit/3f4caf9))
-- `collie update --check` no longer turns red, and the phone's Update button no longer disables, on a lead whose peer has no ssh record: that fact still shows red on the member, but updating the lead needs no route to a peer, so the top verdict is amber. ([08c0b0b](https://github.com/AltanS/collie/commit/08c0b0b))
-- A table in the mirror pans in its own scroller while the prose around it keeps wrapping, so Wrap no longer has to be turned off to read one. A box-drawn table pans as one unit; a framed row outside a table still does not wrap. (#5, #158) ([8d079ff](https://github.com/AltanS/collie/commit/8d079ff))
-- Codex on a phone: submitted-message rows no longer render as solid black bars in the light theme, and a labelled `─ Worked for … ───` separator stays on one line. (#144) ([0104d27](https://github.com/AltanS/collie/commit/0104d27))
-- A launcher's `cwd` is optional: pin one and it wins everywhere, leave it out and it means "here", your home dir from the dashboard, that pane's own folder from the switcher. ([7efad18](https://github.com/AltanS/collie/commit/7efad18))
-- Tapped from a pane, a launcher opens a tab beside it instead of a new Space; tapped from the dashboard, a Space, as before. ([7efad18](https://github.com/AltanS/collie/commit/7efad18))
-- Launcher rows read live per host, so on a pack they come from the machine whose row you tapped, never the lead's own file. ([7efad18](https://github.com/AltanS/collie/commit/7efad18))
-- The new-tab and new-Space controls show a spinner and ignore a second tap while the create is in flight; the pane list catches up within a poll burst after any create or close. ([d03ccd7](https://github.com/AltanS/collie/commit/d03ccd7))
-- The "Switch pane" sheet rises from its handle and follows the thumb as you drag, instead of appearing at the screen's bottom edge only on release, and it opens with a haptic tick. ([5bfa631](https://github.com/AltanS/collie/commit/5bfa631))
-- On the pane screen a status now shows in the header title instead of floating over the tab strip's own controls. ([5bfa631](https://github.com/AltanS/collie/commit/5bfa631))
-
-## [1.3.0] - 2026-09-03
-
-- Mirror no longer freezes when the soft keyboard or Keys dock shrinks the pane: a scroll that arrives with a changed container height is layout, not the user leaving the bottom (#155) ([1862276](https://github.com/AltanS/collie/commit/1862276))
-- Boxed TUI rows (a `/model` picker, a panel border) stay on one line on a narrow phone mirror instead of wrapping into a scrambled frame; `tree` output and prose still wrap, thanks @alexlee2046 (#156) ([d7a4276](https://github.com/AltanS/collie/commit/d7a4276))
-- Releases publish a linux-arm64 build, so a Raspberry Pi installs instead of 404ing; the from-source docs call the bootstrap script with bash, which it is (#157) ([64c7d7e](https://github.com/AltanS/collie/commit/64c7d7e))
-- Mirror polling follows what you do: 300ms bursts after a key or a message while the screen keeps changing, 1.5s while you follow a working agent, 4s on the home screen while an agent works, 6s when nothing says you are watching (#156) ([d2cb8a3](https://github.com/AltanS/collie/commit/d2cb8a3))
-- Pairing no longer logs `could not stamp lastSeenAt: ENOENT` once a minute: concurrent stamps from one poll tick raced on a shared temp file; writes are serialized and temp names are unique now (#159) ([d4bd3f9](https://github.com/AltanS/collie/commit/d4bd3f9))
-
-## [1.2.0] - 2026-09-02
-
-- oh-my-pi panes show omp's own π mark, painted with its official three-stop gradient, instead of the initials tile; the brand table now says every mark must be painted, thanks @enieuwy (#151) ([17386ef](https://github.com/AltanS/collie/commit/17386ef))
-- The OMP adapter recognises the open-ended `╰─ <draft>` composer row and standalone status row that OMP 18.1.2 paints on a wide pane; the closed OMP 17 box and the corner-to-corner modal rule are unchanged, thanks @ImArtisann (#149, #150) ([6081520](https://github.com/AltanS/collie/commit/6081520))
-- A notification tap on Android opens the deep-linked pane again when the Collie tab had been discarded; navigate before focus, and fall through to a new window when no tab survives. (#147) ([18cd9cb](https://github.com/AltanS/collie/commit/18cd9cb))
-- A functional commit now records one line under `## [Unreleased]` instead of bumping the version; the pre-commit hook enforces both halves, and only the `chore(release):` commit bumps and dates the heading. ([f6805cb](https://github.com/AltanS/collie/commit/f6805cb))
-- `collie stt test` now sends the two containers a phone actually records, webm/opus and mp4, after the wav probe, and fails with guidance when the provider refuses one; Voxtral on OpenRouter refuses both, whisper-large-v3-turbo accepts them (#148) ([d6d7a1c](https://github.com/AltanS/collie/commit/d6d7a1c))
-- A refused transcription names the upstream status and the container it was sent as, so the phone's error says which format the provider rejected (#148) ([d6d7a1c](https://github.com/AltanS/collie/commit/d6d7a1c))
-- The mirror's default font size is 10px, down from 12; a device that already picked a size keeps it ([4b005aa](https://github.com/AltanS/collie/commit/4b005aa))
-- Android push notifications show a proper small badge glyph and a full-size Collie mark; the maskable home-screen tile was doing both jobs and rendered as a grey block on the notification ([177a8a9](https://github.com/AltanS/collie/commit/177a8a9))
-- Renaming a tab or pane from its sheet works on the phone again; the rename field's own keyboard used to fold the strip band and unmount the sheet mid-edit ([93373ce](https://github.com/AltanS/collie/commit/93373ce))
-- Dashboard rows lead with the pane title beside a small agent tile, with the space and tab as the address beneath; the big tile, the bold space name and its truncation are gone ([c442429](https://github.com/AltanS/collie/commit/c442429))
-
-## [1.1.0] - 2026-09-01
-
-- The "Side by side" instructions moved out of `docs/upgrading.md` into their own `docs/deployment.md` section. ([0231500](https://github.com/AltanS/collie/commit/0231500))
-- The read-only strip links to Settings → Paired devices. ([defec91](https://github.com/AltanS/collie/commit/defec91))
-- Per-host colour on the server glyph in pack mode, ten stable hues. ([e3db22d](https://github.com/AltanS/collie/commit/e3db22d))
-- Pull-to-refresh; polling already keeps the view fresh. ([86e8d78](https://github.com/AltanS/collie/commit/86e8d78))
-- The new-space sheet picks the host in pack mode; unreachable or incompatible members are shown but disabled. ([af22f6d](https://github.com/AltanS/collie/commit/af22f6d))
-- **Claude's slash-command autocomplete no longer hides the input box.** The completion list is taller than the statusline window the chrome walk allows, so the box went undetected: the pane fell back to the raw mirror and every send stalled with "Message didn't reach the input box". The popup is now read as its own block and rendered as a list. ([c265d3e](https://github.com/AltanS/collie/commit/c265d3e))
-
-## [1.0.2] - 2026-09-01
-
-- `docs/deployment.md` ends with one footer instead of two. A plain-text `← back to the README` line sat above the real link, and the site footer strip matches only the link, leaving the plain line as a dangling sentence. ([e880281](https://github.com/AltanS/collie/commit/e880281))
-- **The working status dot no longer pings; it breathes.** It uses a 2.4 s opacity cycle without a ring or scaling, applied only to the pane chip and the pane header. The dot stays static on the tab, space, card and overview chips, where several at once would read as a strobe rather than as "alive". `prefers-reduced-motion` still disables it. ([a2ee186](https://github.com/AltanS/collie/commit/a2ee186))
-- **A lead is no longer deposed by unprovable claims.** At boot, only a warrant signed and verified by this lead can depose it. If a peer reports a higher warrant generation or refuses with no warrant, the lead logs the event once and ignores it. Stale fields from an old pack no longer take down the new lead's front door. ([bd7e3b5](https://github.com/AltanS/collie/commit/bd7e3b5))
-- `collie pack leave` clears the deputy designation, warrant, standby roster, and `standby-devices.json`, preventing old pack state from leaking into the next pack. ([bd7e3b5](https://github.com/AltanS/collie/commit/bd7e3b5))
-- `collie pack remove <member>` drops the deputy designation if it names that member, keeping `pack status` and `pack deputy --revoke` in agreement. ([bd7e3b5](https://github.com/AltanS/collie/commit/bd7e3b5))
-- Stored warrants stamped with another pack's id are discarded at boot, logging the source pack name. ([bd7e3b5](https://github.com/AltanS/collie/commit/bd7e3b5))
-
-## [1.0.1] - 2026-09-01
-
-- **`collie pack join bluefin` works in a terminal**: an address without a scheme or port uses port 8787, the command prompts for the token, and a lead answering over plain HTTP requests confirmation instead of requiring `--insecure` ([6e3dfca](https://github.com/AltanS/collie/commit/6e3dfca))
-- `collie pack invite` prints the short join command first, followed by the stdin form for scripts ([6e3dfca](https://github.com/AltanS/collie/commit/6e3dfca))
-- `--label` defaults to the local hostname, so a joining peer uses its host name instead of `collie-8f3a2b1c` ([6e3dfca](https://github.com/AltanS/collie/commit/6e3dfca))
-- `collie pack join` and `collie pack leave` are the canonical commands; `collie join` and `collie leave` remain as aliases ([6e3dfca](https://github.com/AltanS/collie/commit/6e3dfca))
-- **The install and update docs lead with the two shapes an install actually has**, and neither assumes a bare `collie` on your PATH: a Herdr-managed install spells every verb as a plugin action, a standalone one as `bin/collie <verb>`. `docs/install.md` is two ways in rather than four, and ends with the update command it never carried; `docs/upgrading.md` opens on the update instead of the uninstall, folds the two 0.x sections into one crossing, and drops the finished v1 beta train.
-- **`DEPLOYMENT.md` is now [`docs/deployment.md`](./docs/deployment.md), and colliepwa.dev publishes it.** The site serves the files the README's documentation table lists, so every link to a front door other than the default used to leave the site. Each variant keeps its anchor; in-code pointers name the new path, including the `COLLIE_SKIP_SERVE` warning and `collie doctor`'s serve finding.
-- The post-update hooks nudge swallows a spawn failure of the new binary (ENOEXEC/EACCES) instead of failing an update that already succeeded — the silence its own comment promised.
-- `collie restart` decides the multiplexer before it stops the bridge, so a refusal no longer leaves the bridge down.
-- The refusal lists each multiplexer on its own line, points at the one the environment already names, and prints the exact line to append.
-- `collie join` with only a lead address says that the token is missing and shows how to pass it, instead of a bare usage line.
-
-## [1.0.0] - 2026-09-01
-
-**This release is the whole `1.0.0-alpha` / `1.0.0-beta` line in one entry**, grouped once; the
-per-release detail lives in the linked commits and the git history. Coming from 0.x, read
-[`docs/upgrading.md`](./docs/upgrading.md) → *Upgrading from 0.x to 1.0* first.
-
-**Upgrading, in one line each.** From the Herdr plugin:
-`herdr plugin action invoke update-major --plugin herdr.collie`. From a checkout you can reach:
-`bin/collie update --major`. Fresh install: `curl -fsSL https://colliepwa.dev/install.sh | sh`.
-Neither upgrade path assumes a `collie` on your PATH. Details and rollback:
-[`docs/upgrading.md`](./docs/upgrading.md).
-
-- **A pack brings several machines to one phone.** A lead merges its peers' spaces, tabs and panes and proxies every read and write byte for byte; `collie pack invite | join | add | update | leave | status | rotate | remove | promote | reconnect | set-address` are the verbs ([9f5d91e](https://github.com/AltanS/collie/commit/9f5d91e), [c5a810f](https://github.com/AltanS/collie/commit/c5a810f))
-- **A lead is demoted only against a live approval minted on itself: `collie pack approve-promote <member>`.** Ten minutes, single use, `--cancel`, fingerprint-bound; `pack rotate` still has no grace window and now warns that it has none ([5667c8f](https://github.com/AltanS/collie/commit/5667c8f))
-- **`scripts/collie-ctl.sh` is a bootstrap shim and nothing else.** Every verb is spelled `bin/collie <verb>` and the shim no longer sources `.env`, so a `BUN_INSTALL` set only there must move to the environment ([cfc09d5](https://github.com/AltanS/collie/commit/cfc09d5))
-- **`collie doctor` — one read-only pass over the traps that fail silently.** Bind, ACL, front door, `web/dist`, the multiplexer, the beacon hooks and pack health, each finding naming the verb that fixes it, warnings exiting 0 and `--json` making the report scriptable ([8590086](https://github.com/AltanS/collie/commit/8590086), [3e5b4c1](https://github.com/AltanS/collie/commit/3e5b4c1))
-- **Device pairing.** `collie pair` mints a one-time code the phone spends for a bearer token, every write needs that token while any device is paired, and `collie devices list | revoke <label>` are the other half ([506be94](https://github.com/AltanS/collie/commit/506be94))
-- **Collie drives tmux and zellij, not only Herdr.** `COLLIE_MUX=tmux` or `COLLIE_MUX=zellij` picks the multiplexer behind one Collie-owned port, where each adapter declares its capabilities and the UI reads them from `GET /api/config` rather than from a name ([2feb1aa](https://github.com/AltanS/collie/commit/2feb1aa), [4d6787f](https://github.com/AltanS/collie/commit/4d6787f))
-- **A peer's panes render on the phone again.** The lead no longer re-declares `Content-Encoding: gzip` over a body Bun already decompressed; the saving came back as a transform on the lead→phone hop ([9a17dda](https://github.com/AltanS/collie/commit/9a17dda))
-- **Agents name themselves through their own hooks.** `collie hooks install claude` writes the guarded Claude emitter and `collie beacon emit` gives a pane its agent's name, status and session ref ([b17e8c5](https://github.com/AltanS/collie/commit/b17e8c5), [cb7eb7b](https://github.com/AltanS/collie/commit/cb7eb7b))
-- **A deputy takes over when the lead goes dark, on the operator's tap.** `collie pack deputy <member>` mints a signed, generational warrant and arms a standby door on `COLLIE_STANDBY_PORT`; there is no automatic election ([86c4510](https://github.com/AltanS/collie/commit/86c4510), [a696e94](https://github.com/AltanS/collie/commit/a696e94))
-- **`url`, `status`, `serve` and `qr` defer to `COLLIE_PUBLIC_URL`** wherever it is set, instead of printing the bare tailnet name (#122) ([d1e671e](https://github.com/AltanS/collie/commit/d1e671e))
-- **Voice input — a microphone in the composer, and hands-free.** Off until `collie stt setup`, round-tripped by `collie stt test | status | off`, served by the `openai-compatible` or `codex` provider, with `--lang` / `COLLIE_STT_LANG` for the spoken language ([14575b3](https://github.com/AltanS/collie/commit/14575b3), [ca5564a](https://github.com/AltanS/collie/commit/ca5564a))
-- **The loopback gates fail closed.** Host validation is on, `COLLIE_TRUSTED_USER` rejects an absent login as well as a wrong one, a non-loopback bind refuses to start behind the opt-outs `COLLIE_ALLOW_ANY_HOST=1`, `COLLIE_TRUSTED_USER_OPTIONAL=1` and `COLLIE_ALLOW_NON_LOOPBACK_BIND=1`, uploads are typed by magic bytes, and `.env` is held to owner-only and announces every variable it shadows ([b0f6711](https://github.com/AltanS/collie/commit/b0f6711), [d941de1](https://github.com/AltanS/collie/commit/d941de1))
-- **Collie's UI in six languages.** English, Deutsch, Español, 한국어, 日本語 and 中文, picked in Settings per device from a typed dictionary, with every bridge refusal carrying a stable `code` and named `detail` ([42949cf](https://github.com/AltanS/collie/commit/42949cf))
-- **A pack overview page at `/pack`.** One read-only card per machine — health, version, secret pickup, deputy — fed by `GET /api/pack` and hidden unless this collie is in a pack ([0634d4b](https://github.com/AltanS/collie/commit/0634d4b))
-- **A new mark and a new icon family, and they move.** The mark drifts at rest and turns one full round whenever the app has something to tell you, `prefers-reduced-motion` stops it, the favicons and tiles were redrawn to match — the 16px tab favicon refilled and its eye held open, so it no longer reads as a horse — and every mutating call must name the channel that acknowledges it (`lib/ack-manifest.ts`) ([526c313](https://github.com/AltanS/collie/commit/526c313), [e0aeb7b](https://github.com/AltanS/collie/commit/e0aeb7b), [1b248af](https://github.com/AltanS/collie/commit/1b248af), [b836958](https://github.com/AltanS/collie/commit/b836958))
-- **Zen mode, and chrome that gets out of the way.** Settings → Zen mode takes every Collie surface off the screen and leaves the mirror alone, and short of that a chevron folds the tab and pane strips into one 24px bar of beads (#139 — thanks @abosnjakovic) ([a8bf60a](https://github.com/AltanS/collie/commit/a8bf60a), [f60d009](https://github.com/AltanS/collie/commit/f60d009))
-- **Four agent-parser fixes carried over from the 0.x line.** Codex's one-dim-segment status row, a Codex draft wrapped onto an indented line, oh-my-posh 18's ghost suggestion read as your text, and the Windows bridge now running under `conhost.exe --headless` ([c6ba534](https://github.com/AltanS/collie/commit/c6ba534), [89cbbe0](https://github.com/AltanS/collie/commit/89cbbe0), [d4a9030](https://github.com/AltanS/collie/commit/d4a9030), [baf04ac](https://github.com/AltanS/collie/commit/baf04ac))
-- **Work you used to walk back to the desk for.** Worktrees created through the multiplexer (#135 — thanks @broven), "All sessions" as one triage list, "Show in terminal" on your tap, and `quick-replies.toml` for your own Quick dock (#131 — thanks @fucx) ([50e0e42](https://github.com/AltanS/collie/commit/50e0e42), [0296391](https://github.com/AltanS/collie/commit/0296391))
-- **The app's typeface is yours — Settings → Typeface, per device.** System, Space Grotesk or Aldrich, applied before first paint; `theme.toml` adds your own faces, and Settings → Terminal font (13–16, default 14) sizes the draft field separately ([edfe042](https://github.com/AltanS/collie/commit/edfe042), [e6e9142](https://github.com/AltanS/collie/commit/e6e9142))
-- **Aldrich is the shipped default face, and no face is faked bold any more.** Every default mechanism moved with it, and `font-synthesis-weight: none` stops the engine inventing weights a face does not ship ([a960f1f](https://github.com/AltanS/collie/commit/a960f1f))
-- **`collie join` refuses an `http://` lead address unless `--insecure` is passed**, and an invite without the lead's certificate fingerprint is refused outright ([0029881](https://github.com/AltanS/collie/commit/0029881))
-- **A peer can reach its own lead.** The lead is dialled unpinned, because its front door terminates TLS and the pinned certificate can never be on the wire, while a witness stays pinned ([33fa455](https://github.com/AltanS/collie/commit/33fa455))
-- **Two upgrade guides that did not exist before.** `docs/upgrading.md` gains *Upgrading from 0.x to 1.x* for an operator and *You run a fork* for a checkout whose `origin` is not this repo, which `collie update` now refuses instead of force-detaching ([e9e4f85](https://github.com/AltanS/collie/commit/e9e4f85), [05a4b23](https://github.com/AltanS/collie/commit/05a4b23))
-- **Collie ships binaries, and installs with one command.** Every `v*` tag publishes checksummed per-platform tarballs, `install.sh` verifies one and links it onto PATH without sudo, and `collie update` fetch-verify-swaps with auto-rollback (`--rollback`, `--major`, `COLLIE_TAG` to pin one release) ([73402b5](https://github.com/AltanS/collie/commit/73402b5), [d2706d9](https://github.com/AltanS/collie/commit/d2706d9))
-- **Collie introduces itself as its own product, CLI-first.** The tagline, descriptions and manifest call it a phone UI for the agents in your terminal, the README became a hub plus nine `docs/` pages, and `collie start` probes for a multiplexer instead of assuming Herdr ([4261c03](https://github.com/AltanS/collie/commit/4261c03), [4fc83ec](https://github.com/AltanS/collie/commit/4fc83ec))
-- **tmux is parsed and driven correctly on the versions people run.** tmux 3.4's escaped field separator is un-escaped, a listing that parses to zero rows on non-empty output is refused as an error, and a create under a `manual` `window-size` refuses rather than segfault tmux < 3.7 ([30add9a](https://github.com/AltanS/collie/commit/30add9a), [b58cb61](https://github.com/AltanS/collie/commit/b58cb61))
-- **The five non-English translations read like native product copy.** 1851 German, Spanish, Japanese, Korean and Chinese strings were rewritten in an idiomatic register with placeholders verified key by key, English untouched, and the docs went through the same pass ([c516276](https://github.com/AltanS/collie/commit/c516276), [f7c38f7](https://github.com/AltanS/collie/commit/f7c38f7))
-- **Collie collects nothing, and that is written down.** No install events, usage statistics, crash reporting or analytics; the one unprompted outbound call is the anonymous update check, recorded in `docs/security.md` and [ADR 0034](.adr/0034-collie-collects-nothing-and-opt-in-is-the-ceiling.md) ([31d18dc](https://github.com/AltanS/collie/commit/31d18dc))
+- New space/tab directory: `~/…` now expands against home and the path must exist — `~/build` used to silently open `$HOME` (96e94d8)
 
 ## [0.36.0] - 2026-08-28
 
-- **AGY: a bare `>` transcript row is never taken for the composer** — only the boxed composer counts, so an echoed message cannot authorise a reply into a running turn (530057f)
-- **Sign-in banner instead of "Can't reach Collie" behind a forward-auth proxy** — an expired session answered with a 3xx is read as a 401, and Authentik's `/outpost.goauthentik.io/` start/callback paths bypass the PWA cache — thanks @lekoOwO (#130) (e59135e)
-- **AGY (Antigravity CLI) first-class harness adapter** — `ask_question` menus, permission, plan and trust dialogs lifted into native buttons, the boxed composer stripped with its status row re-surfaced, a slash-command palette and the brand icon — thanks @Kryvonis (#99) (b9a14e2)
-- **Codex CLI 0.150.1 is recognised again, on both of its status rows** — the `Context`-bearing shape with `Context` directly after the model (thanks @fbserg, #134, 75a865a), and the two-field default that carries no `Context` field at all, now keyed on the row's renderer paint (dim ` · ` separators between coloured fields) and never on field names (ddf7272); pinned by five byte-faithful 0.150.1 captures (52cf214)
-- **Codex: a large send is verified through `[Pasted Content N chars]`** — the exact character count is the evidence Enter waits for, per ADR 0010 — thanks @memset0 (#132) (1b76371)
-- **Codex: the dim `Ask Codex to do anything` placeholder is empty; the same words typed are a draft** — thanks @memset0 (#132) (d3a0c53)
-- **Codex: destructive writes bind to the whole wrapped draft**, not only the first `›` row — a message that wraps past the bridge's tail window no longer 409s every pre-clear sweep — thanks @memset0 (#132) (35a5e33)
-- Known limit: Codex keeps only the first 1,024 characters of one send: a longer message shows as `[Pasted Content 1024 chars]` and the guard refuses to press Enter rather than submit a cut message. Herdr delivers every byte (probe in `HERDR_API.md`, b227ba5), so the limit is Codex's own, and a send is never chunked (ADR 0010)
-- Known limit: While a Codex turn runs, the composer paints a `»` marker the adapter does not yet recognise, so a mid-turn reply is refused, never mis-sent; a byte-faithful capture of that state is wanted (see the #132 thread)
-
-## [0.35.0] - 2026-08-26
-
-**BREAKING — read before updating.**
+**Merges upstream 0.36.0 and upstream 0.35.0's security hardening — read the BREAKING block before updating.**
 
 - `COLLIE_PUBLIC_HOSTS` is now **required** on every reverse-proxy or tunnel install (Variant C/E) — Host validation fails closed.
 - With `COLLIE_TRUSTED_USER` set, a request carrying no `Tailscale-User-Login` is now rejected; tagged nodes used to pass.
 - A non-loopback `COLLIE_HOST` refuses to start.
 - Opt-outs, one per gate: `COLLIE_ALLOW_ANY_HOST=1`, `COLLIE_TRUSTED_USER_OPTIONAL=1`, `COLLIE_ALLOW_NON_LOOPBACK_BIND=1`.
 
-- Uploads are typed by magic bytes, not the client-supplied Content-Type — `__proto__` and `constructor` used to pass the MIME lookup (b0f6711)
-- `collie-ctl.sh` parses `.env` as key=value instead of sourcing it — a `.env` with `$(…)` or backticks ran as the operator on every verb; an unquoted trailing `# comment` is now stripped (b0f6711, 743218f)
-- An unversioned managed checkout pins `update` to the newest release tag, never origin HEAD (b0f6711, 4440c05)
-- Host-header validation is on by default and fails closed; `collie-ctl.sh` injects the tailnet name and IPs, `COLLIE_ALLOW_ANY_HOST=1` opts out (b0f6711) — thanks @bartholomewtj (#129)
-- `COLLIE_TRUSTED_USER` rejects a missing `Tailscale-User-Login` as well as a mismatch; `COLLIE_TRUSTED_USER_OPTIONAL=1` restores the old pass (b0f6711)
-- A non-loopback `COLLIE_HOST` refuses to start unless `COLLIE_ALLOW_NON_LOOPBACK_BIND=1`; non-loopback TCP peers are rejected (b0f6711)
-- **`quick-replies.toml`: your own Quick-dock groups** (title + items + optional `scope`), live-reloaded, replacing the shipped phrases on the panes they address per ADR 0018, shell panes reachable via `scope = "shell"` (0296391) — thanks @fucx (#131)
-- A failed `tailscale status` no longer writes an empty host allowlist into the unit — the unit keeps the hosts it had, and says so (743218f)
+### Added
+
+- **AGY (Antigravity CLI) first-class harness adapter** — ask_question menus, permission, plan and trust dialogs lifted into native buttons, boxed composer stripped with status row re-surfaced, slash-command palette, brand icon (4285457)
+- **Codex: large sends verified through the `[Pasted Content N chars]` placeholder** — the exact character count is the evidence Enter waits for, per ADR 0010 (1ca57f1)
+- **`quick-replies.toml`: your own Quick-dock groups** (title + items + optional `scope`), live-reloaded, replacing the shipped phrases on the panes they address per ADR 0018, shell panes reachable via `scope = "shell"` (eb1e92f) — thanks @fucx (#131)
+
+### Changed
+
+- Host-header validation is on by default and fails closed; `collie-ctl.sh` injects the tailnet name and IPs, `COLLIE_ALLOW_ANY_HOST=1` opts out (5f01bf7) — thanks @bartholomewtj (#129)
+- `COLLIE_TRUSTED_USER` rejects a missing `Tailscale-User-Login` as well as a mismatch; `COLLIE_TRUSTED_USER_OPTIONAL=1` restores the old pass (5f01bf7)
+- A non-loopback `COLLIE_HOST` refuses to start unless `COLLIE_ALLOW_NON_LOOPBACK_BIND=1`; non-loopback TCP peers are rejected (5f01bf7)
+
+### Fixed
+
+- **Sign-in banner instead of “Can't reach Collie” behind a forward-auth proxy** — an expired session answered with a 3xx is read as a 401, and Authentik's `/outpost.goauthentik.io/` paths bypass the PWA cache (4ca1462)
+- **Codex CLI 0.150.1 recognized again on both status rows** — Context-bearing and two-field default shapes, keyed on the row's renderer paint, never field names (0ed3fd5, ffbc995)
+- **Codex destructive writes bind to the whole wrapped draft**, not only the first `›` row — no more 409s on pre-clear sweeps for wrapped drafts (47410a1)
+- **Codex: the dim “Ask Codex to do anything” placeholder is empty**; the same words typed are a draft (c58ba36)
+- **AGY: a bare `>` transcript row is never taken for the composer** — only the boxed composer counts, so an echoed message cannot authorise a reply into a running turn (8c02522)
+- Uploads are typed by magic bytes, not the client-supplied Content-Type — `__proto__` and `constructor` used to pass the MIME lookup (5f01bf7)
+- `collie-ctl.sh` parses `.env` as key=value instead of sourcing it — a `.env` with `$(…)` or backticks ran as the operator on every verb; an unquoted trailing `# comment` is now stripped (5f01bf7, 9195e00)
+- An unversioned managed checkout pins `update` to the newest release tag, never origin HEAD (5f01bf7, 4440c05)
+- A failed `tailscale status` no longer writes an empty host allowlist into the unit — the unit keeps the hosts it had, and says so (9195e00)
+
+### Known limits
+
+- Codex keeps only the first 1,024 characters of one send: a longer message shows as `[Pasted Content 1024 chars]` and the guard refuses to press Enter rather than submit a cut message; a send is never chunked (ADR 0010)
+- While a Codex turn runs, the composer paints a `»` marker the adapter does not yet recognise, so a mid-turn reply is refused, never mis-sent
+
+## [0.35.2] - 2026-08-26
+
+### Fixed
+
+- **Box-drawing tables render instead of shredding** — TUI tables (`┌─┬┐`) from any agent lift out of the mirror into a pan-instead-of-wrap region, and the transcript's markdown parser now reads them as real tables; verified on a live Devin pane at phone width (ca46ffe)
+
+## [0.35.1] - 2026-08-25
+
+### Fixed
+
+- **opencode adapter handles far footer (Tip + cwd)** — throw-away `1.18.22` pane kept `~/build/collie:main` 22 rows below the `╹▀▀` box, outside the 8-row tail window, so `locateComposer` returned null and the red `input box isn't on screen` banner stayed (92cf018)
+
+## [0.35.0] - 2026-08-25
+
+### Added
+
+- **opencode first-class harness adapter (Tier-1)** — composer chrome stripped with Build/status re-surfaced, draft extraction (single + wrapped), idle/draft/working/done fixtures (Pup) (92cf018)
 
 ## [0.34.0] - 2026-08-24
 
-- `COLLIE_SERVE_PORT`: publish the https front door on a chosen tailnet port — several Collies per host (#98) (f008b75)
+### Added
 
-## [0.33.0] - 2026-08-24
+- `COLLIE_SERVE_PORT`: publish the https front door on a chosen tailnet port — several Collies per host (#98) (c02e3ea)
+- **Codex CLI first-class harness adapter** — boxless composer chrome stripped with the status row re-surfaced, folder-trust prompt, exec approvals and `request_user_input` question cards lifted into native buttons (by @kennymcavoy) (e5fab3a)
+- **Grok Build first-class harness adapter** — composer chrome stripped with the status strip re-surfaced, permission cards, `ask_user_question` radios/wizards and plan approval lifted into native buttons, plus a Grok session-journal adapter (by @kennymcavoy) (bd01e51)
+- **Devin harness slash catalog** — `/Agent` palette + `AGENT_FAMILIES` (Pup) (0c58737)
+- **`doctor` phone-setup check** — VAPID/host-filter/push/ Herdr socket + 5-step phone checklist as `herdr plugin action invoke doctor` (Pup) (b39656a)
+- **Collie Pup fork charter** — `herdr-plugin.toml` display name `Collie Pup`, `AGENTS.md` stable-fork charter (Pup) (50931a2 / 3000ce2)
 
-- **Codex CLI first-class harness adapter** — boxless composer chrome stripped with the status row re-surfaced, folder-trust prompt, exec approvals and `request_user_input` question cards lifted into native buttons (by @kennymcavoy) (801c5a3)
-- **omp replies no longer stall on an inline completion suggestion** — the ghost omp paints after the typed text is dropped from the draft the send guard verifies (by @enieuwy) (024a63b)
-- **Codex adapter review fixes** — drafts wrapping past 8 rows keep the composer, and the persistent "don't ask again" approval row stays visible in the mirror (375f5b1)
-- **`journal-probe` checks each root on its own** — a populated healthy root can no longer hide a broken sibling (by @kennymcavoy) (12b65e6)
-- **Grok Build first-class harness adapter** — composer chrome stripped with the status strip re-surfaced, permission cards, `ask_user_question` radios/wizards and plan approval lifted into native buttons, plus a Grok session-journal adapter (by @kennymcavoy) (6f6b9e5)
+### Fixed
+
+- **omp replies no longer stall on an inline completion suggestion** — the ghost omp paints after the typed text is dropped from the draft the send guard verifies (by @enieuwy) (bdfac02)
+- **Codex adapter review fixes** — drafts wrapping past 8 rows keep the composer, and the persistent "don't ask again" approval row stays visible in the mirror (d469507)
+- **`journal-probe` checks each root on its own** — a populated healthy root can no longer hide a broken sibling (by @kennymcavoy) (6f68677)
+- **Shift+Tab sends BackTab `ESC [ Z`** instead of bare Tab `0x09` (Pup) (3bfd767)
+- **Single scroll container + Firefox viewport fix** — `html/body/#root overflow:hidden`, `ViewportFrame` skips VisualViewport hack on Firefox and scrolls only the list inner `overflow-y-auto` — eliminates double scroll / header clip / white gap (Pup) (4cec1bc / 8fc4ae0)
+- **Web Push default-on** — `ensure_push_keys` auto-generates VAPID on first start and `shouldAutoRepairPush` repairs when permission granted (Pup) (e760720)
 
 ## [0.32.1] - 2026-08-23
 
-- **`url` (and `status`/`qr`) honour `COLLIE_PUBLIC_URL`** instead of always inferring the bare tailnet name with no port (#122) (d4e7380)
+### Fixed
+
+- **`url` (and `status`/`qr`) honour `COLLIE_PUBLIC_URL`** instead of always inferring the bare tailnet name with no port (#122) (859610d)
 
 ## [0.32.0] - 2026-08-19
 
-- **The update banner says which kind of behind you are** — an in-major release, or a pending new major with the consent command (ce9dcd8)
-- **F1–F12 in the Keys tray, behind an "F keys" disclosure** — chords with armed modifiers included (#119 by @martin-tahli) (f3d5845)
+### Added
+
+- **F1–F12 in the Keys tray, behind an "F keys" disclosure** — chords with armed modifiers included (#119 by @martin-tahli) (09b0571)
+- **`keys.toml`: your own Keys-tray preset rows** (label + chords + optional `danger`), live-reloaded, replacing the shipped presets on the panes they address per ADR 0018 (c02ab19)
+- **The update gate (ADR 0020)**: a routine `update` follows release tags within the installed major; crossing a major takes explicit consent — `update --major`, wired as the `update-major` plugin action (633b2a1)
+- **The update banner says which kind of behind you are** — an in-major release, or a pending new major with the consent command (a38df8c)
+
+### Fixed
+
 - **A cold boot with no network renders the cached last screen**, dated "last seen HH:MM" — never a false "No agents" (0f4c651, c473aa0)
-- **A stale pane mirror is dated by its own stamp, not the herd's** (20cc1e1)
-- **The update gate (ADR 0020)**: a routine `update` follows release tags within the installed major; crossing a major takes explicit consent — `update --major`, wired as the `update-major` plugin action (1b7ccfb)
-- **The linked-clone major gate judges the branch's own upstream (`@{u}`), not the remote default branch** (142d2aa)
-- **`keys.toml`: your own Keys-tray preset rows** (label + chords + optional `danger`), live-reloaded, replacing the shipped presets on the panes they address per ADR 0018 (a22da1a)
+- **A stale pane mirror is dated by its own stamp, not the herd's** (1042fe0)
+- **The linked-clone major gate judges the branch's own upstream (`@{u}`), not the remote default branch** (99910cf)
 
 ## [0.31.1] - 2026-08-18
 
-- **A long request survives socket backpressure** — Bun's socket accepts fewer bytes than it is handed under pressure and queues nothing; the dialer now parks the tail and resumes from `drain`, so a big request can no longer silently truncate and die on the timeout (55274e7). Probed while fixing: herdr drops any request line of 1 MiB or more — now in `HERDR_API.md`
-- In-code pointers name `DEPLOYMENT.md` now that variants B–E live there (ab182f7); `COLLIE_MULTI_SESSION` spelled `on`/`off` everywhere; `push-keys`/`push-test` listed in the Commands table (6948a0f)
+### Fixed
+
+- **A long request survives socket backpressure** — Bun's socket accepts fewer bytes than it is handed under pressure and queues nothing; the dialer now parks the tail and resumes from `drain`, so a big request can no longer silently truncate and die on the timeout (cc810c9). Probed while fixing: herdr drops any request line of 1 MiB or more — now in `HERDR_API.md`
+
+### Changed
+
+- In-code pointers name `DEPLOYMENT.md` now that variants B–E live there (cd2f1f8); `COLLIE_MULTI_SESSION` spelled `on`/`off` everywhere; `push-keys`/`push-test` listed in the Commands table (ee64069)
 
 ## [0.31.0] - 2026-08-18
 
-- **Your own slash commands in the palette, declared in `commands.toml`** — on a pane your rows address they replace the shipped catalog (ADR 0018); `confirm = true` adds a two-tap; edits are live, no restart (#109, 35da673, 28bdf5a) — thanks @enieuwy
-- **Direct typing no longer owes a "mode stopped" notice to the next pane**, and the blur it schedules is settled by cancellation instead of racing a re-arm (#108, 452da20, 1a2ca49) — thanks @enieuwy
+### Added
+
+- **`push-keys` generates the VAPID keypair and writes it into the right `.env`** — Web Push setup is now three plugin actions (`push-keys` → `restart` → subscribe), no manual key wrangling (85f0454)
+- **"Tap to type" can be turned off** — a display setting stops the mirror volunteering the keyboard on a tap; on by default (357b86f)
 - **`COLLIE_AUDIT_CONTENT=none` keeps the audit trail and drops the bodies** — a fail-closed allowlist keeps action parameters legible while anything operator- or screen-originated redacts (#107, 5dda876, cdad445) — thanks @shuangwangnyc
-- **`push-keys` generates the VAPID keypair and writes it into the right `.env`** — Web Push setup is now three plugin actions (`push-keys` → `restart` → subscribe), no manual key wrangling (84abe28)
-- **"Tap to type" can be turned off** — a display setting stops the mirror volunteering the keyboard on a tap; on by default (1fbba59)
-- **⚠ A paste too big to persist no longer restores an older, shorter draft after a remount** — oversize drafts now ride an in-memory tier whole, never truncated and never swapped for stale text; they survive pane switches but not closing the app, and the composer says so (7830c80)
+- **Your own slash commands in the palette, declared in `commands.toml`** — on a pane your rows address they replace the shipped catalog (ADR 0018); `confirm = true` adds a two-tap; edits are live, no restart (#109, 35da673, 28bdf5a) — thanks @enieuwy
+
+### Fixed
+
+- **⚠ A paste too big to persist no longer restores an older, shorter draft after a remount** — oversize drafts now ride an in-memory tier whole, never truncated and never swapped for stale text; they survive pane switches but not closing the app, and the composer says so (7965674)
 - **A half-arrived long send is no longer accepted as send evidence** — when the input box ends in literal text it must be the end of what was sent, or the guard refuses to press Enter (#110, 27f4cdf)
+- **Direct typing no longer owes a "mode stopped" notice to the next pane**, and the blur it schedules is settled by cancellation instead of racing a re-arm (#108, 452da20, 1a2ca49) — thanks @enieuwy
+
+### Changed
+
 - **README cut to ~60% of its length, how-first** — deployment variants B–E now live in `DEPLOYMENT.md`, and troubleshooting entries are findable by the words you'd actually search (9464c14, c52d4af)
 
 ## [0.30.0] - 2026-08-16
 
+### Added
+
 - **A password prompt says what it is and offers the control that works.** `sudo`, an SSH passphrase and `gpg` echo nothing, so Send's verification can never arrive — the refusal now names that and hands off to **Type** in one tap, instead of "a menu or dialog is probably up" (#103, 1334540)
+
+### Fixed
+
 - **A password typed into the composer is no longer kept for 48 hours** — recognising the prompt drops the stored draft and stops persisting keystrokes; the write-through had stored it before any send was attempted (#103, 1334540)
 
 ## [0.29.0] - 2026-08-16
 
+### Added
+
 - **The plan dialog's feedback row has a route from the phone.** Row 3/4 is a text input, not an option: Collie now models it, locks the other buttons while the terminal owns it, and sends feedback through the guarded choreography — digit, verified paste, bound Enter (#95, c0ce09e, 967e94d, 64de1d4) — thanks @navidkashani
 - **A pane is named by what its process says it is doing** — its OSC title, glyph-stripped and dropped when it only repeats the agent or project — so a project's herd stops reading as N identical rows (#100, 9dbc0fe) — thanks @praneetrohida
+
+### Fixed
+
 - **A long plan-feedback value re-flows across lines instead of windowing** — the value is rebuilt from continuation lines and the footer gap widened, so a 355-char value no longer makes the whole dialog vanish (#95, 64de1d4)
 - **A shell's `user@host:cwd` title is a locator, not a name** — it no longer replaces the row's cwd with a longer restatement of it (#100, 982b8e1)
 - **A push re-subscribe replaces the row it supersedes**, and each row records when and from which browser it was made — Apple keeps answering 201 for an orphaned endpoint, so this is what stops `push-subscriptions.json` growing forever (#104, 0021300)
 
 ## [0.28.0] - 2026-08-12
 
+### Added
+
 - **omp gets a harness adapter (Tier 1)** — read-only blocks by construction, its own composer chrome stripped, a slash palette sourced from its captures — a reply stops confirming its pickers (#93, b98b90d) — thanks @qaz74107410
-- **The destructive pre-clear sweep now fires only after a live read positively sees the composer**, bound to the prompt it saw — a dialog opening in the gap can no longer eat the burst (#93, 6c8332f)
-- **Update-available pushes to Apple devices never arrived — broken since 0.11.0.** The Web Push topic was an impossible base64 length and APNs refused it; herd alerts were unaffected (#90, 19572d7) — thanks @ojulean
 - **Every `COLLIE_*_ROOT` (including `COLLIE_TRANSCRIPT_ROOT`) takes a comma-separated list**, so pane history works across multiple `CLAUDE_CONFIG_DIR` profiles (#92, b549101)
 - **`contrib/windows/`** — a community-maintained Task Scheduler lifecycle for Windows (#71, 8572e49) — thanks @Pimpmuckl
 
+### Fixed
+
+- **Update-available pushes to Apple devices never arrived — broken since 0.11.0.** The Web Push topic was an impossible base64 length and APNs refused it; herd alerts were unaffected (#90, 19572d7) — thanks @ojulean
+- **The destructive pre-clear sweep now fires only after a live read positively sees the composer**, bound to the prompt it saw — a dialog opening in the gap can no longer eat the burst (#93, 6c8332f)
+
 ## [0.27.0] - 2026-08-10
+
+### Added
+
+- **`collie-ctl.sh qr` prints the tailnet URL as a scannable code**, so a phone doesn't have to type a MagicDNS name — opt-in as its own subcommand, since a PWA only needs the URL once. Corrects two defects in the renderer it uses: its filled glyph is a *light* module, so the compact output inverts on a light terminal, and its quiet zone is 1–2 modules where the spec asks 4 (#88, ff84538) — thanks @adrgarcha
+- **`start` and `status` say when this node's packet filter admits no peer**, instead of printing the tailnet URL under a green ✓ that no other device can open — the local probe only ever sees loopback, which never touches the filter. Best-effort and deliberately unsure: it speaks up only on a total deny, and stays silent whenever it can't tell (#87, 82bbe0e) — thanks @adrgarcha
+
+### Fixed
 
 - **Idle Claude panes no longer scroll up and snap back on every poll** — the session-name sniffer read `recent`, which on a pane shorter than the read makes Herdr scroll a full-screen agent to reach the rows above it; it reads the visible grid now (#85, dab122e) — thanks @OowhitecatoO
 - **A lapsed session behind a redirecting identity proxy shows the Sign-in banner** rather than "can't reach Collie" — API requests now carry `X-Requested-With`, so a proxy answers 401 instead of a 302 that `fetch` follows into an opaque CORS failure with no status to classify (#86, 0dc852e) — thanks @ojulean
-- **`start` and `status` say when this node's packet filter admits no peer**, instead of printing the tailnet URL under a green ✓ that no other device can open — the local probe only ever sees loopback, which never touches the filter. Best-effort and deliberately unsure: it speaks up only on a total deny, and stays silent whenever it can't tell (#87, 82bbe0e) — thanks @adrgarcha
-- **`collie-ctl.sh qr` prints the tailnet URL as a scannable code**, so a phone doesn't have to type a MagicDNS name — opt-in as its own subcommand, since a PWA only needs the URL once. Corrects two defects in the renderer it uses: its filled glyph is a *light* module, so the compact output inverts on a light terminal, and its quiet zone is 1–2 modules where the spec asks 4 (#88, ff84538) — thanks @adrgarcha
 
 ## [0.26.0] - 2026-08-10
 
+### Added
+
+- **Type into terminal** — a toggle beside Keys in the Controls row sends what you type straight to the pane as keystrokes, no trailing Enter, so a TUI that wants bare letters (`b`, `q`) can be driven from a phone. Ordered and batched, so a slow tailnet grows the next batch instead of scrambling characters; it never survives a pane switch, a lock, a hidden page or a failed batch (#74, 7dea503) — thanks @aspiers
 - **GFM tables render as tables** in Conversation history instead of collapsing into one run-on paragraph — recognised by their delimiter row, alignment and ragged rows included. A table nested in a list or blockquote still collapses: the block parser is flat, and agents put tables at the top level (#72, d82ef1b)
 - **Nerd Font symbol glyphs stop rendering as tofu** — two subset woff2 faces ship with the app, fetched only when a pane actually paints a private-use glyph (`unicode-range`) and deliberately kept out of the precache (#70, d31d97d)
-- **The ctl test suite re-initialised the repository it was run from** — git exports `GIT_DIR` into hooks, which overrides discovery for every git command including `-C`, so the sandbox's `git init` landed on the developer's own checkout (d12b522)
-- **The ctl suite failed on a Homebrew Mac** — `resolve_bun`'s absolute-path fallback escaped the sandbox PATH and brought the real `tailscale` back with it, defeating the missing-CLI case (b9cf620) — thanks @tyamanak
 - **A quick Ctrl+C in the nav tray's Esc/Up gap** — one tap, without opening Presets (#75, d139b1b) — thanks @Jarva
-- **Sends stalled on a narrow pane with "Message didn't reach the input box"** — the guard located Claude's input box by a run of 20 rule glyphs, which is a hidden assumption that the pane is at least 20 columns wide; it now measures display cells, and the wrapped-draft scan reaches past a long CJK draft (#76, de88b38) — thanks @tyamanak
+
+### Changed
+
 - **A long terminal rule clips at the mirror edge** instead of wrapping into several rows; its full text stays in the DOM, and ordinary output keeps wrapping normally (#79, 4480019) — thanks @en-ver
-- **Type into terminal** — a toggle beside Keys in the Controls row sends what you type straight to the pane as keystrokes, no trailing Enter, so a TUI that wants bare letters (`b`, `q`) can be driven from a phone. Ordered and batched, so a slow tailnet grows the next batch instead of scrambling characters; it never survives a pane switch, a lock, a hidden page or a failed batch (#74, 7dea503) — thanks @aspiers
-- **The composer row reads its own state** — an open dock or an armed mode carries a light-sky tint instead of a grey surface, the attach button moves inside the text field, and the "Controls" tag floats above the row so four labelled toggles fit a 390px phone unclipped (5f9d5ee)
+- **The composer row reads its own state** — an open dock or an armed mode carries a light-sky tint instead of a grey surface, the attach button moves inside the text field, and the "Controls" tag floats above the row so four labelled toggles fit a 390px phone unclipped (57080f5)
+
+### Fixed
+
+- **Sends stalled on a narrow pane with "Message didn't reach the input box"** — the guard located Claude's input box by a run of 20 rule glyphs, which is a hidden assumption that the pane is at least 20 columns wide; it now measures display cells, and the wrapped-draft scan reaches past a long CJK draft (#76, de88b38) — thanks @tyamanak
+- **The ctl test suite re-initialised the repository it was run from** — git exports `GIT_DIR` into hooks, which overrides discovery for every git command including `-C`, so the sandbox's `git init` landed on the developer's own checkout (51fce21)
+- **The ctl suite failed on a Homebrew Mac** — `resolve_bun`'s absolute-path fallback escaped the sandbox PATH and brought the real `tailscale` back with it, defeating the missing-CLI case (5c48721) — thanks @tyamanak
 
 ## [0.25.0] - 2026-08-07
 
-- **A subscription that keeps failing is retired** after 5 consecutive failures, so stale duplicates (PWA reinstalls) stop accumulating and re-logging every cycle — counted only when a sibling on the same push service succeeded that round, so a service-wide rejection never costs a live device (#68, dcc4f48) — thanks @alshedivat
-- **Push failures log the status and the service's reason** instead of web-push's constant "Received unexpected response code", which named neither (dcc4f48)
+### Added
+
+- **A subscription that keeps failing is retired** after 5 consecutive failures, so stale duplicates (PWA reinstalls) stop accumulating and re-logging every cycle — counted only when a sibling on the same push service succeeded that round, so a service-wide rejection never costs a live device (#68, 2ea3e61) — thanks @alshedivat
+
+### Fixed
+
+- **Push failures log the status and the service's reason** instead of web-push's constant "Received unexpected response code", which named neither (2ea3e61)
 
 ## [0.24.2] - 2026-08-06
 
+### Fixed
+
 - **A wrapped CJK reply stalled unsubmitted** — the input box folds its wrapped lines with a space, fabricating one the send never had (CJK has no spaces to wrap at), so the guard's slice check could never match; each seam is now judged on its own, and only a gap the fold itself could have made is loosened (#66, 6def208) — thanks @tyamanak
-- **The guard feature-detects `Intl.Segmenter`** and falls back to code points, so an engine without it (Firefox < 125, Safari < 14.1) loses grapheme precision instead of white-screening the app at boot (1a37e29)
+- **The guard feature-detects `Intl.Segmenter`** and falls back to code points, so an engine without it (Firefox < 125, Safari < 14.1) loses grapheme precision instead of white-screening the app at boot (46a85d1)
 
 ## [0.24.1] - 2026-08-06
 
-- **Long/multi-line replies to Claude panes stalled unrecoverably** — the send guard now reads Claude's `[Pasted text #N +M lines]` placeholder as send evidence when consistent with the sent message (ADR 0010) (29bca11)
-- **Stranded-draft preview withdraws "Take over" when the line holds only Claude's paste placeholder** (29bca11)
+### Fixed
+
+- **Long/multi-line replies to Claude panes stalled unrecoverably** — the send guard now reads Claude's `[Pasted text #N +M lines]` placeholder as send evidence when consistent with the sent message (ADR 0010) (e9f1a33)
+- **Stranded-draft preview withdraws "Take over" when the line holds only Claude's paste placeholder** (e9f1a33)
 
 ## [0.24.0] - 2026-08-05
 
-- **Buttons for Claude's `/model` picker, and any modal like it** — a last-resort grammar reads the footer's `<key> to <verb>` hints and renders them, with the arrows the screen advertised, over the mirrored region (dfff364)
-- **A generically-detected menu never synthesises a digit** — in the `/model` picker a digit confirms *and* saves your default for new sessions; [ADR 0009](.adr/0009-a-generic-menu-is-driven-by-the-keys-it-names.md) records why (dfff364)
-- **A send is refused before it types when the agent's input box isn't on screen** — the draft is kept, and a second Send is a deliberate "Type anyway?" that still never fires the submit key blind (bf7ea38)
-- **A reply is no longer typed into a full-screen picker** — the original `/model` bug: no grammar claimed the screen, so the message fed the picker and came back "stalled" (bf7ea38, dfff364)
-- **The stalled message says a key answer probably landed** — the part that made the original report confusing (bf7ea38)
-- **A half-written reply survives leaving the pane** — drafts are kept per pane (48h, localStorage, so an OS-killed PWA doesn't lose one) instead of dying with the composer when you step over to another tab (50dccc0)
-- **The ←/→ pair says what it adjusts** — the picker's live value ("◐ Medium effort") sits between the arrows and in their accessible names (4d23e63)
-- **Modal menus are a documented harness contract** — the model and its footer/key grammar are harness-neutral, so a future codex/pi/opencode adapter implements them from types plus a conformance leg, not from Claude's internals (a3e0820)
-- **Every dialog model is a harness contract, not a Claude internal** — the prompt-select, wizard, preview and multi-select payloads join menus in harness-neutral modules, so the AST and the renderers no longer point at one agent's grammar (a7d45f4)
-- **One race guard for every dialog, run through the pane's own adapter** — no more re-deriving through Claude's detectors; an adapter that emits a block kind gets the guard for free, and no adapter fails closed (211cd07)
-- **The conformance suite pins the signature + identity contract for every block kind** — not just menus: a constant signature, or a comparator that passes a screen that changed, now fails CI (3385193)
+### Added
+
+- **Buttons for Claude's `/model` picker, and any modal like it** — a last-resort grammar reads the footer's `<key> to <verb>` hints and renders them, with the arrows the screen advertised, over the mirrored region (5392ac7)
+- **The ←/→ pair says what it adjusts** — the picker's live value ("◐ Medium effort") sits between the arrows and in their accessible names (d872490)
+- **A send is refused before it types when the agent's input box isn't on screen** — the draft is kept, and a second Send is a deliberate "Type anyway?" that still never fires the submit key blind (c4ffe45)
+
+### Fixed
+
+- **A half-written reply survives leaving the pane** — drafts are kept per pane (48h, localStorage, so an OS-killed PWA doesn't lose one) instead of dying with the composer when you step over to another tab (9d41411)
+- **A reply is no longer typed into a full-screen picker** — the original `/model` bug: no grammar claimed the screen, so the message fed the picker and came back "stalled" (c4ffe45, 5392ac7)
+- **The stalled message says a key answer probably landed** — the part that made the original report confusing (c4ffe45)
+
+### Changed
+
+- **Modal menus are a documented harness contract** — the model and its footer/key grammar are harness-neutral, so a future codex/pi/opencode adapter implements them from types plus a conformance leg, not from Claude's internals (0c9dace)
+- **A generically-detected menu never synthesises a digit** — in the `/model` picker a digit confirms *and* saves your default for new sessions; [ADR 0009](.adr/0009-a-generic-menu-is-driven-by-the-keys-it-names.md) records why (5392ac7)
+- **Every dialog model is a harness contract, not a Claude internal** — the prompt-select, wizard, preview and multi-select payloads join menus in harness-neutral modules, so the AST and the renderers no longer point at one agent's grammar (3b5cf7c)
+- **One race guard for every dialog, run through the pane's own adapter** — no more re-deriving through Claude's detectors; an adapter that emits a block kind gets the guard for free, and no adapter fails closed (79ebc0c)
+- **The conformance suite pins the signature + identity contract for every block kind** — not just menus: a constant signature, or a comparator that passes a screen that changed, now fails CI (b78aa0f)
 
 ## [0.23.3] - 2026-08-04
 
-- **The idle lock no longer ambushes you on the way back in** — a hidden page never locks and returning to the foreground auto-resumes, so it can only appear when Collie is left open, visible and untouched (799ece0)
-- **A pause no longer eats an in-progress reply** — the cover sits over a still-mounted router instead of replacing it, so draft, scroll position and open sheets survive it (799ece0)
-- **The lock screen is glass, marked, and honestly worded** — the herd stays legible underneath, the Collie mark says whose screen it is, and there's no lock glyph or "for safety": it gates nothing, and [ADR 0007](.adr/0007-the-idle-lock-is-a-pause-not-a-gate.md) records why (799ece0, c7430a7)
-- **`ARCHITECTURE.md` no longer lists the idle timeout as a security measure** — it never implemented one (799ece0)
-- **Resuming shows the catch-up instead of handing back a frozen screen** — the cover holds through the refetch, badge swapped for the gallop, and releases when it settles (c7430a7)
+### Fixed
+
+- **The idle lock no longer ambushes you on the way back in** — a hidden page never locks and returning to the foreground auto-resumes, so it can only appear when Collie is left open, visible and untouched (746ce87)
+- **A pause no longer eats an in-progress reply** — the cover sits over a still-mounted router instead of replacing it, so draft, scroll position and open sheets survive it (746ce87)
+- **Resuming shows the catch-up instead of handing back a frozen screen** — the cover holds through the refetch, badge swapped for the gallop, and releases when it settles (4ffce3c)
+
+### Changed
+
+- **The lock screen is glass, marked, and honestly worded** — the herd stays legible underneath, the Collie mark says whose screen it is, and there's no lock glyph or "for safety": it gates nothing, and [ADR 0007](.adr/0007-the-idle-lock-is-a-pause-not-a-gate.md) records why (746ce87, 4ffce3c)
+- **`ARCHITECTURE.md` no longer lists the idle timeout as a security measure** — it never implemented one (746ce87)
 
 ## [0.23.2] - 2026-08-04
 
-- **Agent alerts now send at high urgency** — at web-push's default (`normal`) Android was free to defer them by Doze / App Standby bucket, so pushes were accepted by FCM and never delivered (90e42af)
+### Fixed
+
+- **Agent alerts now send at high urgency** — at web-push's default (`normal`) Android was free to defer them by Doze / App Standby bucket, so pushes were accepted by FCM and never delivered (79f30e6)
 
 ## [0.23.1] - 2026-08-03
 
-- `update` now works in a `herdr plugin install` checkout — it is detached and shallow, so `git pull --ff-only` could never run there (#63) (00fd82c)
-- `update` no longer re-links a Herdr-managed checkout, which would re-register it as local and block `herdr plugin install` (00fd82c)
+### Fixed
+
+- `update` now works in a `herdr plugin install` checkout — it is detached and shallow, so `git pull --ff-only` could never run there (#63) (aeeddcd)
+- `update` no longer re-links a Herdr-managed checkout, which would re-register it as local and block `herdr plugin install` (aeeddcd)
 
 ### Upgrading — `herdr plugin install` users must reinstall once
 
@@ -694,43 +784,71 @@ Installs from a `git clone` + `herdr plugin link` were never affected — use `i
 
 ## [0.23.0] - 2026-08-03
 
-- **Every key press and quick reply now answers you.** A nav-tray press was silent on success and deferred to a mirror that can be ~2s behind, so tapping Enter felt like nothing happened; the pressed button now fills on the tap (synchronous, no network wait) and shows a ✓ once the bridge accepts it. Quick replies echo on the tapped button and the dock outlives the send, closing after the ✓ instead of on the tap (79682b5)
-- **The pane's two control rows are now one.** Wrap, raw terminal and text size moved behind a ⚙ into a labelled panel — the raw-terminal escape hatch had been a bare `>_` glyph whose only explanation was a `title` attribute no phone ever shows, and it now says what it does. Find moved to the header, where its find bar already takes over the row. The mirror gets ~85px back (79682b5) — general direction from @simonallfrey in #49, whose "consolidate the terminal toolbar" proposal is what started this; thank you
-- A single key press revalidates on the leading edge instead of sitting out the full 300ms burst window before its refetch even started; bursts still coalesce into one trailing refetch (79682b5)
-- **Hold an arrow key to repeat it** — driving a long TUI menu no longer means tapping ↓ fifteen times. Repeats accumulate locally and flush as one batched `send_keys` array with exactly one call in flight, because ordering across two concurrent one-shot RPCs is unguaranteed. Arrows only, by whitelist; a hold while composing stages one chip, not fifteen (df40373)
-- **Haptics** — a short buzz on press, toggleable in Settings, silently absent where the platform has no `vibrate` (df40373)
-- **Quick replies follow the pane kind:** a shell gets `y`/`n` instead of "commit and push" and "skip", which mean nothing at a bash prompt (df40373)
-- Closing the Keys dock on a composed key queue takes a second tap. The queue is still discarded rather than persisted — one surviving into a later open would let Send fire yesterday's chord into today's TUI state — and the guard sits on the drawer transition, since the Keys toggle and the Quick/Agent/Display buttons unmount the tray just as effectively as the ✕ (df40373)
+### Added
+
+- **Every key press and quick reply now answers you.** A nav-tray press was silent on success and deferred to a mirror that can be ~2s behind, so tapping Enter felt like nothing happened; the pressed button now fills on the tap (synchronous, no network wait) and shows a ✓ once the bridge accepts it. Quick replies echo on the tapped button and the dock outlives the send, closing after the ✓ instead of on the tap (3be4934)
+- **Hold an arrow key to repeat it** — driving a long TUI menu no longer means tapping ↓ fifteen times. Repeats accumulate locally and flush as one batched `send_keys` array with exactly one call in flight, because ordering across two concurrent one-shot RPCs is unguaranteed. Arrows only, by whitelist; a hold while composing stages one chip, not fifteen (e7ada40)
+- **Haptics** — a short buzz on press, toggleable in Settings, silently absent where the platform has no `vibrate` (e7ada40)
+- **Quick replies follow the pane kind:** a shell gets `y`/`n` instead of "commit and push" and "skip", which mean nothing at a bash prompt (e7ada40)
+
+### Changed
+
+- **The pane's two control rows are now one.** Wrap, raw terminal and text size moved behind a ⚙ into a labelled panel — the raw-terminal escape hatch had been a bare `>_` glyph whose only explanation was a `title` attribute no phone ever shows, and it now says what it does. Find moved to the header, where its find bar already takes over the row. The mirror gets ~85px back (3be4934) — general direction from @simonallfrey in #49, whose "consolidate the terminal toolbar" proposal is what started this; thank you
+- Closing the Keys dock on a composed key queue takes a second tap. The queue is still discarded rather than persisted — one surviving into a later open would let Send fire yesterday's chord into today's TUI state — and the guard sits on the drawer transition, since the Keys toggle and the Quick/Agent/Display buttons unmount the tray just as effectively as the ✕ (e7ada40)
+- A single key press revalidates on the leading edge instead of sitting out the full 300ms burst window before its refetch even started; bursts still coalesce into one trailing refetch (3be4934)
 
 ## [0.22.0] - 2026-08-03
 
-- **A multiselect question inside a wizard is now a tappable dialog**, not raw terminal text. It was owned by no grammar — wizards refuse checkboxes (a wizard digit selects *and* advances; a checkbox digit only toggles) and multi-select only knew the single-question form. It now carries the wizard's step chips, navigates with the wizard's own Left/Right keys, and reads the advance row's label ("Next" / "Submit") from the pane by position, never by assumption (#51, bdf4c26) — thanks @konpyl
-- **A preview dialog whose option label wraps no longer falls to the raw mirror.** The grammar required numbered rows on consecutive lines, but the ~30-column gutter wraps longer labels onto continuation rows; a contiguity walk anchored on the label column replaces adjacency (#51, bdf4c26) — thanks @konpyl
-- `multi-select-action.ts` no longer carries a literal NUL byte (git classified it binary and hid its diffs from review); `.gitattributes` keeps any future stray byte from costing reviewability (#51, bdf4c26)
-- `ReadSource`'s unwrapped variant matches the wire: `recent_unwrapped`, snake_case — the kebab spelling was rejected by Herdr and nothing had ever called it. HERDR_API.md records the probed contract, including that the source is a byte-identical no-op for Claude panes (alt screen + renderer-hard-wrapped prose), which is what closed #53 part 2 by measurement (45cc23e)
+### Added
+
 - **OpenCode panes get Conversation history.** OpenCode ≥1.x keeps every session in one SQLite database (no per-session log), so its journal adapter reads `opencode.db` readonly with bound parameters, touches only the three transcript tables (the same file holds auth tokens), and serves all sessions through a per-session cache key. Needs `herdr integration install opencode` once, then restart OpenCode in the pane (#61, 539cdf4) — reported by @xabilarra
+- **A multiselect question inside a wizard is now a tappable dialog**, not raw terminal text. It was owned by no grammar — wizards refuse checkboxes (a wizard digit selects *and* advances; a checkbox digit only toggles) and multi-select only knew the single-question form. It now carries the wizard's step chips, navigates with the wizard's own Left/Right keys, and reads the advance row's label ("Next" / "Submit") from the pane by position, never by assumption (#51, bdf4c26) — thanks @konpyl
+
+### Fixed
+
+- **A preview dialog whose option label wraps no longer falls to the raw mirror.** The grammar required numbered rows on consecutive lines, but the ~30-column gutter wraps longer labels onto continuation rows; a contiguity walk anchored on the label column replaces adjacency (#51, bdf4c26) — thanks @konpyl
+- `ReadSource`'s unwrapped variant matches the wire: `recent_unwrapped`, snake_case — the kebab spelling was rejected by Herdr and nothing had ever called it. HERDR_API.md records the probed contract, including that the source is a byte-identical no-op for Claude panes (alt screen + renderer-hard-wrapped prose), which is what closed #53 part 2 by measurement (bddded3)
+- `multi-select-action.ts` no longer carries a literal NUL byte (git classified it binary and hid its diffs from review); `.gitattributes` keeps any future stray byte from costing reviewability (#51, bdf4c26)
 
 ## [0.21.0] - 2026-07-31
 
-- **Sending no longer stalls under a tall statusline** (the run may be 8 rows, was 3). A taller run made `locateInputBox` miss the input box, so a send typed the text and then withheld Enter — with no stranded-draft preview and no pre-clear sweep, so retries stacked duplicates in the pane. Reproduced on a 3-row statusline sitting one wrapped line from the cliff (#54, #56, fe8e548) — thanks @stekman08
-- The pi journal fixture is portable to macOS, where `containedRealpath` resolves `/var` → `/private/var` by design and the backend suite couldn't run at all (7e99645)
-- ADR 0004 records that the statusline-run bound guards less than it looks: a dialog below the input box is refused by the border checks and by the blank line above its footer hint, never by the row count (48b3ede)
+### Added
+
 - **macOS supervises the bridge with launchd.** `start` installs a LaunchAgent (`~/Library/LaunchAgents/herdr.collie.plist`), so the bridge comes back at login and restarts on failure — the parity with the `systemd --user` unit that macOS never actually had (#55, #57, a0be73d) — thanks @darieldatoon
-- `launchctl bootstrap` is retried across launchd's teardown window, so `restart` — and therefore `update` — can't end with the bridge down (3776845)
-- **The mirror wraps by default.** Herdr spawns panes at the desktop terminal's width against a phone's ~45–50 columns, so panning was the common case, not the exception; column-faithful no-wrap stays one tap away in View. Display prefs reset to defaults on first load (storage key v4), so a pinned font size needs setting again (#53, 273d886, 73cc7da) — reported by @waynehoover
 - **The statusline strip shows every row of the run, in the agent's own colour.** Model, cwd, git branch and permission mode live on rows 2+ and were surfaced nowhere; the strip renders them stacked, in the mirror's colour space (#60, 61db7a5, ac3c62d)
-- A Mac that can't bootstrap (no console login, so no `gui/<uid>`) keeps an unsupervised bridge instead of exiting with nothing running; `status` reports that degraded tier (05f8f48)
+
+### Fixed
+
+- **Sending no longer stalls under a tall statusline** (the run may be 8 rows, was 3). A taller run made `locateInputBox` miss the input box, so a send typed the text and then withheld Enter — with no stranded-draft preview and no pre-clear sweep, so retries stacked duplicates in the pane. Reproduced on a 3-row statusline sitting one wrapped line from the cliff (#54, #56, fe8e548) — thanks @stekman08
+- `launchctl bootstrap` is retried across launchd's teardown window, so `restart` — and therefore `update` — can't end with the bridge down (b1ebb83)
+- A Mac that can't bootstrap (no console login, so no `gui/<uid>`) keeps an unsupervised bridge instead of exiting with nothing running; `status` reports that degraded tier (5b5106c)
+- The pi journal fixture is portable to macOS, where `containedRealpath` resolves `/var` → `/private/var` by design and the backend suite couldn't run at all (a7d8f9a)
+
+### Changed
+
+- **The mirror wraps by default.** Herdr spawns panes at the desktop terminal's width against a phone's ~45–50 columns, so panning was the common case, not the exception; column-faithful no-wrap stays one tap away in View. Display prefs reset to defaults on first load (storage key v4), so a pinned font size needs setting again (#53, 273d886, 73cc7da) — reported by @waynehoover
+- ADR 0004 records that the statusline-run bound guards less than it looks: a dialog below the input box is refused by the border checks and by the blank line above its footer hint, never by the row count (36c78c7)
+
+### Upgrading
+
 - **macOS installs migrate on the next `update` or `start`**: the old unsupervised bridge is stopped and replaced by the LaunchAgent. It's a *LaunchAgent*, so it starts at **login**, not at boot — and a Mac administered purely over SSH has no `gui/<uid>` to bootstrap into, so it stays on the unsupervised bridge with a warning until someone logs in at the console once.
 
 ## [0.20.2] - 2026-07-30
 
+### Fixed
+
 - `herdr plugin action invoke update` no longer dies with `bun not found on PATH` — Herdr spawns actions with no login shell, so Bun is now found in its install locations too, not just on `PATH`. A failed run had already fast-forwarded the checkout, leaving the old `web/dist` being served (#52, 08f44f6) — thanks @konpyl
-- Only an absolute Bun path is prepended to `PATH`, so a `bun` shell function in the plugin `.env` can't put the CWD in front of `git` / `systemctl` / `tailscale`; the control script's Bun resolution now has test coverage (a50240a)
+- Only an absolute Bun path is prepended to `PATH`, so a `bun` shell function in the plugin `.env` can't put the CWD in front of `git` / `systemctl` / `tailscale`; the control script's Bun resolution now has test coverage (4841e37)
 
 ## [0.20.1] - 2026-07-29
 
-- Journal rotation-following re-checks containment, so a sibling symlinked out of the Claude projects root can no longer be served as a pane's history (389618c)
-- Dependency versions must be 7 days old before they install, via `bunfig.toml` (`.npmrc` for npm users) (3a16f31)
+### Fixed
+
+- Journal rotation-following re-checks containment, so a sibling symlinked out of the Claude projects root can no longer be served as a pane's history (e8b1357)
+
+### Changed
+
+- Dependency versions must be 7 days old before they install, via `bunfig.toml` (`.npmrc` for npm users) (bf38d45)
 
 ## [0.20.0] - 2026-07-29
 
@@ -739,214 +857,279 @@ dashboard (#42) and tappable URLs in the mirror (#45), landed via #46/#47/#48 wi
 top. Thank you: measured rather than estimated, with the reasoning written down where it will be
 argued about again.
 
-- **The space and tab chip rows overlapped each other on the space screen** — both strips were missing `shrink-0` inside the route's flex scroller, so they collapsed to 16px around 32px chips and the tab row painted over the space row. Pre-dates this release (5e10bb0)
-- **Light and system themes.** Collie follows your phone's appearance by default; pin Light or Dark from **Settings → Appearance**. Per device, and documented under [Dark mode / light mode](./docs/configure.md#dark-mode--light-mode) (#41, cd47bba, df47112)
-- ANSI slots 0–15 are now CSS variables (`--ansi-*`), so indexed terminal colour is defined in one place and reaches the mirror through both `31m` and `38;5;1` spellings (cd47bba)
-- Three `role="alert"` warnings (incomplete multi-select, wizard, preview) used a hardcoded yellow that measured ~2:1 on white; they use the status palette now (cd47bba)
-- An off notification switch was unreadable in light — a white thumb on a 1.09:1 track, legible only by its shadow. It carries an outline now (cd47bba)
-- Focus rings were drawn at half strength, 1.77:1 in light and 1.87:1 in dark; both are full strength now (cd47bba)
-- Small muted text (section labels, the build stamp, the terminal status line, the `(n)` counts) fell under 3:1 in light — light `--muted-foreground` had no headroom left for the `/70` and `opacity-60` modifiers stacked on it, so it was darkened and the modifiers dropped (cd47bba)
-- Header controls had 20px touch targets; the Settings gear and the Settings back button are both 44px now, with no change to how they look (cd47bba)
-- In light, the page is a step off white with cards staying white, so the dashboard's hierarchy no longer rests on a single hairline — and the mirror's edge stops showing a seam (cd47bba)
-- The pane mirror renders in dark space under every theme and light mode inverts it, because agents emit truecolor almost exclusively and no palette can re-theme an absolute colour — [ADR 0002](.adr/0002-invert-the-light-terminal-mirror.md) (26db8f1)
-- **Ready · unseen** — agents that finished while you weren't looking. Opening one clears it, on every device (4a03951)
-- The bridge keeps two timestamps per pane (`activeAt`, `seenAt`) in `activity.json`, because Herdr reports none (4a03951)
-- **The dashboard is triaged, not listed.** Needs you → Ready · unseen → Working → Recent; the first three are pinned, Recent sorts by when you last used each pane (#42, 2c5f971)
-- Recent and Spaces fold and remember it; fold both and the page is the triaged herd and nothing else (2c5f971)
-- Spaces are ordered by last used and filterable — 45 of them are now three keystrokes, not a scroll (2c5f971)
-- **Agent rows are titled `project · tab`, not "claude".** The pane's own name moves to the second line; the agent stays in the avatar (2c5f971)
-- Spaces moved BELOW every agent section — it's a navigator, not a work queue (2c5f971)
-- Only Collie's own reads count as seeing a pane; a Herdr focus at the desk does not — [ADR 0003](.adr/0003-one-shared-seen.md) (659c9d4)
-- Marking a pane seen had made a read-level GET mutate state, so a cross-site `<img>` at a guessed pane id could silently clear your unseen agents. Only a request carrying the app's own header counts now — caught in this release's security review, never shipped (336c4c6)
-- The swipe-up **Switch pane** sheet folds its long tails too — Recent, and the bare **Shells** group that buried the agents underneath it (90e1894)
-- Titles truncated away the tab — the only part that identifies a row — leaving several panes rendering the same `moonward_os · t…` (f5e1e77)
-- Section headings rendered at two different sizes and cases, because a `<button>` doesn't inherit `text-transform` from its `<h2>` (f5e1e77)
-- A hollow status ring on the avatar's corner read as a notch cut out of the logo (16b01c8)
-- **Light `--accent` was byte-identical to `--background`**, so "this is the current one" showed nothing in light mode — the open pane in the switcher, the current session, every `hover:bg-accent`. Predates this release; found by the UX sweep (b6850b4)
-- **Tab and space chips carry a status dot** — blocked / ready / working / idle, in the herd list's own palette. They only ever showed a dot for blocked before, so every other state read the same as every other (bddf4cc)
-- **URLs in the pane mirror are tappable** — `http(s)://` text becomes a link that opens in a new tab, keeping the colour the agent printed and marked by an underline (#45, e231ab4)
-- Trailing prose punctuation is trimmed with paren balance respected, so `Fetch(https://x.dev/a)` links the URL and not the paren; a find hit inside a URL still highlights, and a URL that changes colour mid-way stays one link (e231ab4)
-- The boot splash stepped from white to the page colour when React took over, and its caption measured 3.45:1 — it used `#ffffff`/`#8a8a8a` under a comment claiming they matched `--background`/`--muted-foreground`, which rasterize to `#f5f5f5`/`#5d5d5d`. Same fix for the light `theme-color` meta, so Android's URL bar matches the page (b02b800)
-- Inverse-video segments in the mirror emitted theme tokens while the muted glyphs beside them used literals; the mirror keeps one spelling now (identical pixels — the literals are those tokens' dark halves) (b02b800)
-- A space row and its chip could disagree about what a colour meant — the row still ranked by `STATUS_RANK` while the chip used the triage classifier, so a space holding one working agent and one unseen-done agent showed "working" on the dashboard and "ready" in the strip. Both route through `bucketOf` now, in one pass rather than spaces x agents per render (35c7f90)
-- `aria-controls` on a collapsed section pointed at an element that isn't rendered — exactly when a screen-reader user is deciding whether to expand it (35c7f90)
-- A status dot passed a smaller size only resized its wrapper, so chip dots rendered at the wrong size (35c7f90)
-- The Settings page rearranged itself a frame after opening — Notify-when and Snooze mounted only once push state resolved, inserting ~400px into the middle of the page, and Notify-when then grew another ~180px waiting on its own prefs. Both render from the first frame now, switches disabled until their values land (87b875d)
-- Herd and space rows had a border radius with no border to own it, so a rounded hover fill sat under a straight `divide-y` hairline. Rows without a border are square; the ones with a real border keep their radius (87b875d)
-- The pane row ran straight into terminal output with no edge between them, so the chrome and the mirror read as one surface (e791330)
-- Only a request that will actually be served marks a pane seen — one falling through to 405 no longer clears an alert (6b89899)
+### Added
+- **Light and system themes.** Collie follows your phone's appearance by default; pin Light or Dark from **Settings → Appearance**. Per device, and documented under [Dark mode / light mode](./README.md#dark-mode--light-mode) (#41, 59bcfe1, df47112)
+- ANSI slots 0–15 are now CSS variables (`--ansi-*`), so indexed terminal colour is defined in one place and reaches the mirror through both `31m` and `38;5;1` spellings (59bcfe1)
+- **The dashboard is triaged, not listed.** Needs you → Ready · unseen → Working → Recent; the first three are pinned, Recent sorts by when you last used each pane (#42, da4f44c)
+- **Ready · unseen** — agents that finished while you weren't looking. Opening one clears it, on every device (2f4d691)
+- Recent and Spaces fold and remember it; fold both and the page is the triaged herd and nothing else (da4f44c)
+- The swipe-up **Switch pane** sheet folds its long tails too — Recent, and the bare **Shells** group that buried the agents underneath it (4cca8db)
+- Spaces are ordered by last used and filterable — 45 of them are now three keystrokes, not a scroll (da4f44c)
+- The bridge keeps two timestamps per pane (`activeAt`, `seenAt`) in `activity.json`, because Herdr reports none (2f4d691)
+- **Tab and space chips carry a status dot** — blocked / ready / working / idle, in the herd list's own palette. They only ever showed a dot for blocked before, so every other state read the same as every other (22d4a5f)
+- **URLs in the pane mirror are tappable** — `http(s)://` text becomes a link that opens in a new tab, keeping the colour the agent printed and marked by an underline (#45, cc38351)
+- Trailing prose punctuation is trimmed with paren balance respected, so `Fetch(https://x.dev/a)` links the URL and not the paren; a find hit inside a URL still highlights, and a URL that changes colour mid-way stays one link (cc38351)
+
+### Changed
+- The pane mirror renders in dark space under every theme and light mode inverts it, because agents emit truecolor almost exclusively and no palette can re-theme an absolute colour — [ADR 0002](.adr/0002-invert-the-light-terminal-mirror.md) (78425bd)
+- In light, the page is a step off white with cards staying white, so the dashboard's hierarchy no longer rests on a single hairline — and the mirror's edge stops showing a seam (59bcfe1)
+- **Agent rows are titled `project · tab`, not "claude".** The pane's own name moves to the second line; the agent stays in the avatar (da4f44c)
+- Spaces moved BELOW every agent section — it's a navigator, not a work queue (da4f44c)
+- Only Collie's own reads count as seeing a pane; a Herdr focus at the desk does not — [ADR 0003](.adr/0003-one-shared-seen.md) (6786ca1)
 - MINOR, not MAJOR: pre-1.0, purely additive, no config or API break. Defaulting to your phone's appearance is the feature working as designed and Settings pins it either way; an older bridge reports no activity timestamps and simply renders the previous dashboard, minus the one section that would be empty
+
+### Fixed
+- **The space and tab chip rows overlapped each other on the space screen** — both strips were missing `shrink-0` inside the route's flex scroller, so they collapsed to 16px around 32px chips and the tab row painted over the space row. Pre-dates this release (636b7af)
+- Three `role="alert"` warnings (incomplete multi-select, wizard, preview) used a hardcoded yellow that measured ~2:1 on white; they use the status palette now (59bcfe1)
+- An off notification switch was unreadable in light — a white thumb on a 1.09:1 track, legible only by its shadow. It carries an outline now (59bcfe1)
+- Focus rings were drawn at half strength, 1.77:1 in light and 1.87:1 in dark; both are full strength now (59bcfe1)
+- Small muted text (section labels, the build stamp, the terminal status line, the `(n)` counts) fell under 3:1 in light — light `--muted-foreground` had no headroom left for the `/70` and `opacity-60` modifiers stacked on it, so it was darkened and the modifiers dropped (59bcfe1)
+- Header controls had 20px touch targets; the Settings gear and the Settings back button are both 44px now, with no change to how they look (59bcfe1)
+- The boot splash stepped from white to the page colour when React took over, and its caption measured 3.45:1 — it used `#ffffff`/`#8a8a8a` under a comment claiming they matched `--background`/`--muted-foreground`, which rasterize to `#f5f5f5`/`#5d5d5d`. Same fix for the light `theme-color` meta, so Android's URL bar matches the page (7f0189d)
+- Inverse-video segments in the mirror emitted theme tokens while the muted glyphs beside them used literals; the mirror keeps one spelling now (identical pixels — the literals are those tokens' dark halves) (7f0189d)
+- Marking a pane seen had made a read-level GET mutate state, so a cross-site `<img>` at a guessed pane id could silently clear your unseen agents. Only a request carrying the app's own header counts now — caught in this release's security review, never shipped (f9000cb)
+- Only a request that will actually be served marks a pane seen — one falling through to 405 no longer clears an alert (f7e616b)
+- **Light `--accent` was byte-identical to `--background`**, so "this is the current one" showed nothing in light mode — the open pane in the switcher, the current session, every `hover:bg-accent`. Predates this release; found by the UX sweep (dab7e05)
+- Titles truncated away the tab — the only part that identifies a row — leaving several panes rendering the same `moonward_os · t…` (8a8a4c9)
+- Section headings rendered at two different sizes and cases, because a `<button>` doesn't inherit `text-transform` from its `<h2>` (8a8a4c9)
+- A hollow status ring on the avatar's corner read as a notch cut out of the logo (5c04453)
+- A space row and its chip could disagree about what a colour meant — the row still ranked by `STATUS_RANK` while the chip used the triage classifier, so a space holding one working agent and one unseen-done agent showed "working" on the dashboard and "ready" in the strip. Both route through `bucketOf` now, in one pass rather than spaces x agents per render (e024f48)
+- `aria-controls` on a collapsed section pointed at an element that isn't rendered — exactly when a screen-reader user is deciding whether to expand it (e024f48)
+- A status dot passed a smaller size only resized its wrapper, so chip dots rendered at the wrong size (e024f48)
+- The Settings page rearranged itself a frame after opening — Notify-when and Snooze mounted only once push state resolved, inserting ~400px into the middle of the page, and Notify-when then grew another ~180px waiting on its own prefs. Both render from the first frame now, switches disabled until their values land (3d5b191)
+- The pane row ran straight into terminal output with no edge between them, so the chrome and the mirror read as one surface (e208408)
+- Herd and space rows had a border radius with no border to own it, so a rounded hover fill sat under a straight `divide-y` hairline. Rows without a border are square; the ones with a real border keep their radius (3d5b191)
 
 ## [0.19.0] - 2026-07-29
 
-- **Journal (pane history) is now per-harness, with Codex and pi support.** Reading an agent's own session log is an adapter keyed on the pane's agent (`bridge/journal/`), so a new harness is an adapter rather than a fork of the reader — Codex reads its date-partitioned `rollout-*.jsonl`, pi its per-cwd session log. Raised in #40 by @simonallfrey, who asked where to implement journaling for Codex (1bccb8e)
-- **`scripts/journal-probe.ts`** probes every adapter against the real logs on the host — the format-drift check unit tests can't make. It caught Codex 0.145 adding a `developer` message role the parser would have rendered as operator speech (1bccb8e)
-- **pi could never have had history.** pi reports its session as a kind-`path` ref (an absolute path) and the bridge kept only kind-`id` refs, so a pi pane arrived with no session at all. Both kinds are kept now; a path ref is confined to that harness's root after symlink resolution (1bccb8e)
-- **A pane relaunched as a different agent served the previous agent's session ref.** Herdr keeps reporting the last session announced for a pane — a pane running pi still advertised a `herdr:claude` id. The ref is dropped unless its own `agent` matches the pane's (1bccb8e)
-- **A pane's session reference no longer goes to the browser.** `/api/snapshot` sends `hasSession` instead — for pi the reference is a filesystem path, and the History affordance only ever needed "may this pane have history?". It is now also gated on the harness actually having an adapter (1bccb8e)
+### Added
+- **Journal (pane history) is now per-harness, with Codex and pi support.** Reading an agent's own session log is an adapter keyed on the pane's agent (`bridge/journal/`), so a new harness is an adapter rather than a fork of the reader — Codex reads its date-partitioned `rollout-*.jsonl`, pi its per-cwd session log. Raised in #40 by @simonallfrey, who asked where to implement journaling for Codex (7e3b2bd)
+- **`scripts/journal-probe.ts`** probes every adapter against the real logs on the host — the format-drift check unit tests can't make. It caught Codex 0.145 adding a `developer` message role the parser would have rendered as operator speech (7e3b2bd)
+
+### Fixed
+- **pi could never have had history.** pi reports its session as a kind-`path` ref (an absolute path) and the bridge kept only kind-`id` refs, so a pi pane arrived with no session at all. Both kinds are kept now; a path ref is confined to that harness's root after symlink resolution (7e3b2bd)
+- **A pane relaunched as a different agent served the previous agent's session ref.** Herdr keeps reporting the last session announced for a pane — a pane running pi still advertised a `herdr:claude` id. The ref is dropped unless its own `agent` matches the pane's (7e3b2bd)
+
+### Changed
+- **A pane's session reference no longer goes to the browser.** `/api/snapshot` sends `hasSession` instead — for pi the reference is a filesystem path, and the History affordance only ever needed "may this pane have history?". It is now also gated on the harness actually having an adapter (7e3b2bd)
 
 ## [0.18.0] - 2026-07-28
 
-- **Approvals are bound server-side to the prompt they were decided against.** `/keys` and `/reply` accept an optional `expected_prompt`; the bridge re-reads the pane immediately before writing and refuses with `409 prompt_changed` if the dialog moved. Shrinks the guard window from human latency to two local RPCs — a mitigation, not a guarantee, until herdr gains a conditional-input primitive (#29) — thanks @Optic00 (7ae589c)
-- **`/auth/` is reserved for a fronting proxy's sign-in page**, and the service worker always passes it to the network. An installed PWA could not reach a proxy page at all before — the precache answered every navigation, reload included — so operators had to squat a page inside `/api/`. The refusal banner now links there (#31) — thanks @Optic00 (ee246d3)
+### Added
+- **Approvals are bound server-side to the prompt they were decided against.** `/keys` and `/reply` accept an optional `expected_prompt`; the bridge re-reads the pane immediately before writing and refuses with `409 prompt_changed` if the dialog moved. Shrinks the guard window from human latency to two local RPCs — a mitigation, not a guarantee, until herdr gains a conditional-input primitive (#29) — thanks @Optic00 (6afaf5b)
+- **`/auth/` is reserved for a fronting proxy's sign-in page**, and the service worker always passes it to the network. An installed PWA could not reach a proxy page at all before — the precache answered every navigation, reload included — so operators had to squat a page inside `/api/`. The refusal banner now links there (#31) — thanks @Optic00 (1a5972b)
 
 ## [0.17.0] - 2026-07-27
 
+### Fixed
 - **A reply sent while an agent dialog was focused answered the dialog instead.** The submit key approved whatever option was highlighted (Claude defaults to "Yes") and the message was destroyed, while the bridge reported success. Sending now refuses outright while a dialog is up, and otherwise types first and only submits once the text is verified in the input box (#34) — thanks @maikschuheida-spec
+
+### Changed
 - Free-text replies on harnesses with a block grammar (Claude) are two steps — type, verify, submit — so "Sent ✓" now means the text was seen in the input box. Harnesses without an adapter keep the previous one-shot send
 
 ## [0.16.1] - 2026-07-27
 
-- `/api/config` is now gated like every other endpoint — it was the one route that skipped the same-origin check and `COLLIE_PUBLIC_HOSTS`, noted by @Optic00 in #32 (629348e)
+### Fixed
+- `/api/config` is now gated like every other endpoint — it was the one route that skipped the same-origin check and `COLLIE_PUBLIC_HOSTS`, noted by @Optic00 in #32 (a54afd9)
 
 ## [0.16.0] - 2026-07-27
 
-- `scripts/collie-ctl.test.sh` — first lifecycle coverage for the control script, wired into the pre-push hook (a004449, c323610)
+### Added
+- Bring-your-own-tunnel deployment path documented as **Variant E** — NetBird, ZeroTier, Cloudflare Tunnel (6550041)
+- `scripts/collie-ctl.test.sh` — first lifecycle coverage for the control script, wired into the pre-push hook (a004449, 65889da)
+
+### Fixed
 - `unserve`/`uninstall` no longer remove a `tailscale serve` mapping Collie didn't create, and `start` no longer replaces one (a004449, thanks @iamtimmy)
-- A front door that fails to publish no longer aborts `start` before the status banner (c323610)
-- Bring-your-own-tunnel deployment path documented as **Variant E** — NetBird, ZeroTier, Cloudflare Tunnel (7488e7a)
+- A front door that fails to publish no longer aborts `start` before the status banner (65889da)
 
 ## [0.15.0] - 2026-07-26
 
-- **Breaking, only if `COLLIE_DEVICE_HEADER` is set:** a request arriving *without* the device header is now read-only. It previously got full write access, which let any tailnet client reach the bridge's own URL and skip the proxy that injects the header. Front doors that inject it on every request are unaffected; direct loopback/MagicDNS access now needs the header sent by hand (#28) — thanks @Optic00 (f88f1d6)
-- A 401/403 no longer renders as an endless "reconnecting" banner — an access refusal now says so and offers Reload (#30) — thanks @Optic00 (787b193)
-- Pane conversation history read from the agent's own transcript — scroll back past the live mirror (465c485)
-- `COLLIE_HERDR_DIAL=auto|net|bun` forces the dialer; `net` exercises the Windows path on Linux/macOS (4da4f03)
-- Windows support for the bridge: dials herdr's named pipe through `node:net`, one code path for both platforms (#25, #27) — thanks @mikebenner and @bwright2810 (120f829)
+### Added
+- Pane conversation history read from the agent's own transcript — scroll back past the live mirror (77dff7c)
+- Windows support for the bridge: dials herdr's named pipe through `node:net`, one code path for both platforms (#25, #27) — thanks @mikebenner and @bwright2810 (dd6610d)
+- `COLLIE_HERDR_DIAL=auto|net|bun` forces the dialer; `net` exercises the Windows path on Linux/macOS (f662834)
+
+### Changed
+- **Breaking, only if `COLLIE_DEVICE_HEADER` is set:** a request arriving *without* the device header is now read-only. It previously got full write access, which let any tailnet client reach the bridge's own URL and skip the proxy that injects the header. Front doors that inject it on every request are unaffected; direct loopback/MagicDNS access now needs the header sent by hand (#28) — thanks @Optic00 (8ed715d)
+
+### Fixed
+- A 401/403 no longer renders as an endless "reconnecting" banner — an access refusal now says so and offers Reload (#30) — thanks @Optic00 (7bdcbfb)
 
 ## [0.14.2] - 2026-07-23
 
-- Paste an image straight from the clipboard into the composer, same upload path as the picker (#24) (ffceb0f)
+### Added
+- Paste an image straight from the clipboard into the composer, same upload path as the picker (#24) (ad6957b)
 
 ## [0.14.1] - 2026-07-22
 
-- `collie-ctl.sh self_dnsname` shelled out to `node`, which Collie never requires — now uses `bun` (#22) — thanks @jz-wilson (6664ced)
+### Fixed
+- `collie-ctl.sh self_dnsname` shelled out to `node`, which Collie never requires — now uses `bun` (#22) — thanks @jz-wilson (a61f3d1)
 
 ## [0.14.0] - 2026-07-21
 
-- HERDR_API.md: multi-modifier chords live-verified in any order against Herdr 0.7.3, cross-confirmed on 0.7.4 by @bnivanov (0d1472b)
-- Alt modifier in the nav tray — `alt+<key>` chords now reachable from the phone (#19) — thanks @bnivanov (38e05cf)
-- Modifiers combine (checkbox, not radio): `ctrl+shift+p`, `alt+shift+p`, even triple chords (#20) (38e05cf)
-- Modifier lock — tap an armed modifier again to keep it armed across presses and Sends; Clear or a third tap releases (#20) (38e05cf)
+### Added
+- Alt modifier in the nav tray — `alt+<key>` chords now reachable from the phone (#19) — thanks @bnivanov (d1dc947)
+- Modifiers combine (checkbox, not radio): `ctrl+shift+p`, `alt+shift+p`, even triple chords (#20) (d1dc947)
+- Modifier lock — tap an armed modifier again to keep it armed across presses and Sends; Clear or a third tap releases (#20) (d1dc947)
+
+### Changed
+- HERDR_API.md: multi-modifier chords live-verified in any order against Herdr 0.7.3, cross-confirmed on 0.7.4 by @bnivanov (b505c4e)
 
 ## [0.13.2] - 2026-07-20
 
-- Tabs render in Herdr's reported order instead of stable-number order, so a reorder in Herdr survives to the screen — thanks @iFwu (6a8e0f7)
-- Tapping raw terminal output focuses the composer synchronously, keeping iOS's user-activation window so the software keyboard opens — thanks @iFwu (8ca41ca)
+### Fixed
+- Tabs render in Herdr's reported order instead of stable-number order, so a reorder in Herdr survives to the screen — thanks @iFwu (a16478f)
+- Tapping raw terminal output focuses the composer synchronously, keeping iOS's user-activation window so the software keyboard opens — thanks @iFwu (a78ccfd)
 
 ## [0.13.1] - 2026-07-20
 
-- Taking over or sending a draft no longer permanently mutes the preview for that same text — the handled key resets once the host line clears (730f6c6)
-- Send's pre-clear sweep overshoot widened 8 → 32 so host typing inside the poll gap can't leave a remnant (730f6c6)
-- A scrollback line starting with `❯` can no longer pin a bogus session name — only the live (bottommost) prompt decides (d8744f4)
+### Fixed
+- Taking over or sending a draft no longer permanently mutes the preview for that same text — the handled key resets once the host line clears (7153639)
+- Send's pre-clear sweep overshoot widened 8 → 32 so host typing inside the poll gap can't leave a remnant (7153639)
+- A scrollback line starting with `❯` can no longer pin a bogus session name — only the live (bottommost) prompt decides (808cce7)
 
 ## [0.13.0] - 2026-07-19
 
-- Pane rename end-to-end: `pane.rename` RPC, bridge route, label threading (317ec72)
+### Added
 - Long-press a pane pill for a pane actions sheet — rename + two-tap close (5b50941, c713551, 90210ce, ea20df0)
-- Busy strip on genuinely hung loads: navigations >500ms, background polls >6s (e886541, 3bfaa1c, 06516c4)
-- Own in-flight reply no longer flagged as a stranded terminal draft (15c1830)
-- Gallop sprite re-centered; the dog never freezes mid-stride (rest state is the static icon) (3c7174a, 394e6fe)
-- Offline banner no longer overlaps the sticky header (2e988f3)
-- Sustained outages escalate everywhere — boot splash, header, banner — with Retry/Reload (0cbbac1, 4d89588, 4494cf5)
-- `-dev` marker in the build stamp for non-release builds (32d76d6)
-- Wrapped multi-line drafts and the new background-agents footer no longer break input-box detection (829fc7e, d9521e3)
-- Claude's own `/rename` session name surfaced on cards, headers, and the switcher (7c6606c)
+- Pane rename end-to-end: `pane.rename` RPC, bridge route, label threading (99c8808)
 - Tab rename + tab close (blast-radius confirm) via the same long-press sheet on tab chips (a9664b5, 37a470e)
-- `navigator.onLine` never gates polling or liveness — lying flags can't wedge the app or fake outages (d31ffb8, 394e6fe)
-- Self-update without the service worker: `X-Collie-Build` on polled responses, auto-reload or tap-to-update banner (b83185a)
-- `assets/*` served immutable, everything else `no-cache` — proxy caches can no longer starve `/sw.js` updates (b83185a)
+- Claude's own `/rename` session name surfaced on cards, headers, and the switcher (d22fdd7)
 - Read-only "Draft in terminal" preview with explicit Take over — the composer input is exclusively phone-owned (4b6f0ac, 10fa28d)
+- Self-update without the service worker: `X-Collie-Build` on polled responses, auto-reload or tap-to-update banner (8d13622)
+- Instant offline navigation — during a known outage, routes serve the last good snapshot instead of hanging on a dead fetch (b756edd)
+- Busy strip on genuinely hung loads: navigations >500ms, background polls >6s (e886541, 3bfaa1c, 06516c4)
+- `-dev` marker in the build stamp for non-release builds (3e785f4)
+
+### Changed
+- One shared `AppHeader` for dashboard, space, and pane — same components underneath, stale status badges dim during outages (29432c2)
 - Connection status is a single animated top bar — amber "reconnecting…" after 4s of trouble, red with Retry at 15s, green flash on recovery; no header pill (394e6fe, b2dd50e)
+- Switcher sections carry status-colored bullets; per-row close removed (switching is the only action there) (3918c69)
+- `assets/*` served immutable, everything else `no-cache` — proxy caches can no longer starve `/sw.js` updates (8d13622)
+
+### Fixed
+- Own in-flight reply no longer flagged as a stranded terminal draft (e8462f9)
+- Wrapped multi-line drafts and the new background-agents footer no longer break input-box detection (829fc7e, d9521e3)
+- `navigator.onLine` never gates polling or liveness — lying flags can't wedge the app or fake outages (d31ffb8, 394e6fe)
 - One shared connection-lost clock; escalation survives route changes and app switches until a poll succeeds (1486e07, 5949885)
-- One shared `AppHeader` for dashboard, space, and pane — same components underneath, stale status badges dim during outages (bc60ea6)
-- Instant offline navigation — during a known outage, routes serve the last good snapshot instead of hanging on a dead fetch (6ba7dea)
-- Switcher sections carry status-colored bullets; per-row close removed (switching is the only action there) (724bce3)
+- Sustained outages escalate everywhere — boot splash, header, banner — with Retry/Reload (0cbbac1, 4d89588, 4494cf5)
+- Gallop sprite re-centered; the dog never freezes mid-stride (rest state is the static icon) (3c7174a, 394e6fe)
+- Offline banner no longer overlaps the sticky header (bf98a88)
 
 ## [0.12.0] - 2026-07-17
 
-- `COLLIE_SKIP_SERVE=1` env var to disable tailscale serve entirely — bridge stays on loopback only, ideal for deployments behind a reverse proxy (Caddy, Nginx, etc.) — thanks @diogenesc (791dfcc)
-- `COLLIE_PUBLIC_URL` — `collie-ctl.sh status` banner shows your real reverse-proxy URL instead of a placeholder (ec01d66)
-- Bridge startup warning when `COLLIE_TRUSTED_USER` is set under `COLLIE_SKIP_SERVE=1` — the identity gate is inert without tailscale serve injecting `Tailscale-User-Login`; use `COLLIE_DEVICE_HEADER` (ec01d66)
-- README Variant C — reverse proxy as the only front door (no Tailscale), with Caddy example and required env (c5c3533)
-- `collie-ctl.sh unserve`/`uninstall` always attempt serve teardown, even under `COLLIE_SKIP_SERVE=1` — a stale mapping from before the flag flip would keep publishing the app (ec01d66)
-- Security posture docs: "tailscale serve is the sole ingress" → "exactly one hardened front door" (tailscale serve or a conforming reverse proxy) across README, ARCHITECTURE, CLAUDE.md (c5c3533)
+### Added
+- `COLLIE_SKIP_SERVE=1` env var to disable tailscale serve entirely — bridge stays on loopback only, ideal for deployments behind a reverse proxy (Caddy, Nginx, etc.) — thanks @diogenesc (ad5833a)
+- `COLLIE_PUBLIC_URL` — `collie-ctl.sh status` banner shows your real reverse-proxy URL instead of a placeholder (4b043be)
+- Bridge startup warning when `COLLIE_TRUSTED_USER` is set under `COLLIE_SKIP_SERVE=1` — the identity gate is inert without tailscale serve injecting `Tailscale-User-Login`; use `COLLIE_DEVICE_HEADER` (4b043be)
+- README Variant C — reverse proxy as the only front door (no Tailscale), with Caddy example and required env (76019f7)
+
+### Changed
+- `collie-ctl.sh unserve`/`uninstall` always attempt serve teardown, even under `COLLIE_SKIP_SERVE=1` — a stale mapping from before the flag flip would keep publishing the app (4b043be)
+- Security posture docs: "tailscale serve is the sole ingress" → "exactly one hardened front door" (tailscale serve or a conforming reverse proxy) across README, ARCHITECTURE, CLAUDE.md (76019f7)
 
 ## [0.11.1] - 2026-07-16
 
-- Opening a tab/pane lands on the live tail — terminal `<pre>` no longer steals vertical scroll from the message list; stickiness also re-pins when content grows (8576152)
+### Fixed
+- Opening a tab/pane lands on the live tail — terminal `<pre>` no longer steals vertical scroll from the message list; stickiness also re-pins when content grows (04bf6fc)
 
 ## [0.11.0] - 2026-07-15
 
+### Added
 - Pluggable harness-adapter architecture: a `HarnessAdapter` registry replaces the single Claude-only gate, Claude's detectors move to `lib/harness/claude/`, and a core race-guard engine (`lib/harness/guard.ts`) is the only module that may touch the network — an import fence (enforced by `fence.test.ts` under `bun run test`) + a conformance suite let contributors add codex/pi/opencode (see `HARNESS_CONTRIBUTING.md`)
 - multiSelect AskUserQuestion support: checkbox options up-level to tappable checkbox rows (terminal is source of truth), with a closed-loop Submit that navigates the pointer to Submit and verifies before Enter (never blind-sends), plus the review/confirm screen
 - Prompt overlay: interactive prompts render in a bordered `bg-card` panel that lifts the whole dialog off the terminal mirror, with elevated option rows, leading key-digit badges, and a family-aware caption
 - Update notifications: a footer banner (linking to the GitHub release) and an opt-out web-push when a newer release is published upstream or the running bridge is behind the on-disk code — checks the repo's tags over anonymous HTTPS, stamps its own sources for the restart signal, a Settings "check for updates" button forces an immediate check, an `updates` notify pref is the off-switch, and update/restart are surfaced as location-independent Herdr plugin actions
-- Prompt-select + wizard grammars: a numbered list in a dialog body (e.g. a plan's steps) no longer breaks menu detection — the menu is taken as the trailing `1..m` run, so plan-approval prompts up-level correctly
+
+### Changed
 - Keys and Quick menus dock in-flow above the controls row instead of a fixed overlay, so the terminal mirror shrinks and re-pins to the bottom (ResizeObserver) — the prompt/cursor stays visible; both buttons are toggles
 - Prompt option rows compacted (tighter padding, snug line-height) so a multi-option dialog fits the phone viewport
 - "Sent" status toast moved from a bottom overlay (which covered the terminal tail) to a slim in-flow row below the header
 - Build stamp marks a dirty working tree (`<sha>-dirty`), so the footer no longer claims HEAD when the build carries uncommitted work
 - multiSelect Submit is ~2s instead of ~15s: the pointer walk re-reads the actual position each step and stops on "Submit", instead of polling for the bottom row after every key (which timed out ~2.8s per step)
 
+### Fixed
+- Prompt-select + wizard grammars: a numbered list in a dialog body (e.g. a plan's steps) no longer breaks menu detection — the menu is taken as the trailing `1..m` run, so plan-approval prompts up-level correctly
+
 ## [0.10.3] - 2026-07-12
 
+### Fixed
 - `collie-ctl.sh build` installs the root dependency tree (not just `web/`) before typechecking, so a fresh Herdr install no longer fails with TS2688 "Cannot find type definition file for 'bun'" (03f409f, #9)
 
 ## [0.10.2] - 2026-07-12
 
-- Composer Send clears a stranded draft off the terminal `❯` line (ctrl+k + Backspace) before typing so replies no longer accumulate on the prompt; a clean prompt skips the clear (412378f)
-- Bridge settles ~350ms between typing and Enter so the TUI reliably accepts the submit key (412378f)
+### Fixed
+- Composer Send clears a stranded draft off the terminal `❯` line (ctrl+k + Backspace) before typing so replies no longer accumulate on the prompt; a clean prompt skips the clear (cd1cc25)
+- Bridge settles ~350ms between typing and Enter so the TUI reliably accepts the submit key (cd1cc25)
 
 ## [0.10.1] - 2026-07-11
 
+### Fixed
 - Terminal mirror defaults to no-wrap for table alignment like desktop Herdr; clearer borders/typography (font 12, muted-foreground box-drawing); pane stays viewport-width — toggle Wrap on in View for prose (85f777b)
 
 ## [0.10.0] - 2026-07-10
 
+### Added
 - Herdr session switcher: one bridge fronts every named herdr session — `?session=` on the API, `?s=` in the app, a sessions summary in the snapshot, per-session notification slots, and a `COLLIE_MULTI_SESSION` kill-switch (8fa1f20)
+- Space detail is a deep-linkable route (`/space/:spaceId`) with a working browser Back button, replacing the in-home drill-in state (0e5f9c8)
+- Terminal-draft recovery: a queued-then-recalled message stranded on the "❯" input line surfaces as a composer chip, with "Edit here" to clear the line and adopt the text cleanly (46dcf35)
+
+### Changed
+- Dashboard leads with "Needs you" — agents awaiting your input sit at the top, above the spaces overview (1d92592)
+- Dashboard, space, and settings scroll inside a viewport-clipped region instead of the whole document (2aa9272)
 - Session switcher and the session chip are dashboard-only, keeping the in-space and pane headers clean (bb0048d, ba56ba9)
 - Header polish: consistent compact height across the dashboard and inside a space, zinc-800 nav chrome, a ringed Collie mark, a smaller pane-header agent logo, and the keyboard-only quick-keys strip removed (6250e0c, 9da7195, 35db0e5, ba56ba9)
-- Terminal-draft recovery: a queued-then-recalled message stranded on the "❯" input line surfaces as a composer chip, with "Edit here" to clear the line and adopt the text cleanly (46dcf35)
-- Dashboard, space, and settings scroll inside a viewport-clipped region instead of the whole document (2aa9272)
-- Space detail is a deep-linkable route (`/space/:spaceId`) with a working browser Back button, replacing the in-home drill-in state (0e5f9c8)
-- Deep-linking a space that never existed shows "Space not found" rather than "Space closed" (fcb0b7d)
 - Security posture documents that `COLLIE_MULTI_SESSION` (default on) fronts every named session under the config root (fcb0b7d)
-- Dashboard leads with "Needs you" — agents awaiting your input sit at the top, above the spaces overview (1d92592)
+
+### Fixed
+- Deep-linking a space that never existed shows "Space not found" rather than "Space closed" (fcb0b7d)
 
 ## [0.9.1] - 2026-07-09
 
+### Security
 - Removed one-tap yes/no reply buttons from push notifications — they POSTed to the terminal without opening the app, i.e. approving blind. Notifications now only deep-link to the pane (cb26ee0)
-- Unauthenticated `POST /pack/v1/enroll` no longer rewrites the trust store or appends an audit line on a no-op spend — write-amplification against the key/secret file (F4) (43b9a17)
 
 ## [0.9.0] - 2026-07-07
 
+### Changed
 - Quick keys mimic a physical keyboard on both surfaces: Esc top-left, Tab below it, inverted-T arrows, Enter top-right; Keys sheet gains a full-width spacebar (2f70662)
 - Attach image lives in the reply row (usable without the phone keyboard open); digits leave the inline strip — the 123 tab remains (2f70662)
 - Header collie logo is transparent like the gallop sprite — removed favicon.svg's baked-in gray backing rect (3f05da8)
 
 ## [0.8.0] - 2026-07-07
 
+### Added
 - Poll herdr 0.7.2's `session.snapshot` — one RPC per tick instead of three list calls; permanent fallback to the list trio on older servers (5687bbf)
 - Event-poked polling: `events.subscribe` stream triggers immediate debounced re-polls; interval relaxes to `COLLIE_POLL_IDLE_MS` (default 12s) while the stream is healthy (5687bbf)
+
+### Changed
 - HERDR_API.md re-verified against herdr 0.7.2 / protocol 16; terminal observe/control filed under ARCHITECTURE.md Future ideas (aad94b3)
 
 ## [0.7.0] - 2026-07-06
 
+### Added
 - Notification type prefs: Settings "Notify when" toggles per agent status, bridge-wide; default pushes only "Needs input" (blocked) — "Finished" (done) is off (98cf5d2)
+
+### Changed
 - Push sends carry a `collie-herd` topic + 6h TTL: an offline device now gets one current summary on reconnect instead of replaying every queued update (98cf5d2)
 - Disabling a notification kind retracts its pending/outstanding alerts immediately (98cf5d2)
 
 ## [0.6.0] - 2026-07-06
 
+### Added
 - First-paint PWA splash: the galloping collie shows before React mounts (299f632)
-- Option taps no longer pop the phone keyboard or steal the note editor's focus (11385ee)
-- Header Collie mark matches the agent logo (2rem, aligned across screens); Find lives in the composer View row; placeholder is just "Type a reply…" (11385ee)
 - Keys sheet: `Ctrl` modifier + visible key queue — compose chords/sequences, review, Send as one call; dialer-size digits on a `123` tab (515f795)
+
+### Changed
+- Header Collie mark matches the agent logo (2rem, aligned across screens); Find lives in the composer View row; placeholder is just "Type a reply…" (11385ee)
+
+### Fixed
+- Option taps no longer pop the phone keyboard or steal the note editor's focus (11385ee)
 - Stalled connections no longer zombify the app: fetch timeouts (10s/20s/60s), polls supersede a wedged revalidation at 12s, and the collie gallops within 2.5s of a stalled load or pane-tap navigation (e6ad939)
 
 ## [0.5.0] - 2026-07-05
 
+### Added
 - **Preview-variant question notes.** Claude Code's *preview* AskUserQuestion — a single-select
   question whose options carry a `preview` field (the mockup/snippet pane, footer hint
   `n to add notes`) — is lifted into a native block that surfaces the per-question note affordance.
@@ -959,6 +1142,8 @@ argued about again.
   a drifted dialog aborts before anything irreversible is sent). Claude-scoped (`hasBlockGrammar`)
   and web-only; the standard non-preview select and wizard steps are unaffected (pressing `n` there
   is a no-op, so no notes UI is shown).
+
+### Security
 - **Preview-note tap guard hardened to region-signature parity.** The preview dialog's race guard now
   carries a pointer- and note-independent **core signature** (the subject/question/stepper above the
   options joined with the option rows' left column, `❯` normalised) — matching the 0.4.0 `signature`
@@ -969,10 +1154,10 @@ argued about again.
   (ok / drifted / timeout) so the Escape-retry fires only on a genuine swallowed key — never after the
   dialog drifted or vanished (which a blind second Escape could cancel / interrupt). Pasted note text
   is stripped of C0/C1 control bytes (ESC, BEL, …) before it can reach the focused input.
-- Unauthenticated `POST /pack/v1/enroll` no longer rewrites the trust store or appends an audit line on a no-op spend — write-amplification against the key/secret file (F4) (43b9a17)
 
 ## [0.4.0] - 2026-07-05
 
+### Added
 - **Block-based terminal renderer.** Pane rendering now flows through a semantic Block AST (styled
   lines → typed blocks → React components) instead of a flat span mirror. The raw-block foundation is
   byte-for-byte identical to the old mirror, but it's the seam every feature below builds on —
@@ -1008,32 +1193,40 @@ argued about again.
   whenever the connection isn't live (connecting / reconnecting / offline), settling back to the
   static icon once live. Honours `prefers-reduced-motion`. New `DogGallop` component; rough
   first-pass art to be replaced with higher-quality frames.
-- **Multi-question AskUserQuestion no longer mis-parsed.** A multi-step AskUserQuestion (the
-  `☒ Focus area  ☐ Scope  ✔ Submit` stepper) was detected as a single-question select and answered
-  with one digit+Enter — submitting a half-filled form. It's now recognized as a wizard and left as
-  the raw mirror (drive it with the keys pad, or via the new escape hatch) rather than mis-sending.
+
+### Changed
 - **One consistent top-left mark on every screen.** The Collie is now the brand + home button +
   connection loader in a single shared `CollieHome` component, rendered identically on the dashboard
   and inside a pane — so the header's top-left always means the same thing (previously a "stacks"
   icon inside a pane vs. the Collie logo on the dashboard). Inside a pane the Collie gallops on
   reconnect from the same global connection state as the dashboard (shared `isConnecting` predicate).
+
+### Removed
 - **The pane's Nav-hub drawer** (the left "stacks" drawer). It was redundant now that the Collie
   handles Home, the swipe-up switcher already covers pane switching/closing, and the breadcrumb
   covers cross-space jumps — removed along with its `SpaceList` component. The swipe-up switcher now
   appears whenever a pane is open, so even the last pane stays closable.
+
+### Fixed
+- **Multi-question AskUserQuestion no longer mis-parsed.** A multi-step AskUserQuestion (the
+  `☒ Focus area  ☐ Scope  ✔ Submit` stepper) was detected as a single-question select and answered
+  with one digit+Enter — submitting a half-filled form. It's now recognized as a wizard and left as
+  the raw mirror (drive it with the keys pad, or via the new escape hatch) rather than mis-sending.
+
+### Security
 - **Prompt/wizard taps are guarded against same-shaped successor dialogs.** The tap race guard now
   compares a byte-signature of the whole dialog region — including the subject above the options (the
   diff/command being approved), not just the question and option labels. So a tap on a frozen mirror
   can no longer approve a *different* action that happens to render an identical-looking prompt (e.g.
   a second edit to the same file after the first was answered elsewhere). Herdr's `revision` is a
   stub, so this content signature is the load-bearing freshness check.
-- Unauthenticated `POST /pack/v1/enroll` no longer rewrites the trust store or appends an audit line on a no-op spend — write-amplification against the key/secret file (F4) (43b9a17)
 
 ## [0.3.0] - 2026-07-03
 
 A full-codebase review pass: four audit agents (backend, frontend, security, ops/product) swept the
 tree; everything they found was verified, fixed, and the top feature gaps were built.
 
+### Added
 - **Reply from the notification.** Needs-you pushes now carry up to two quick-reply action buttons
   (agent-aware: codex gets `yes`/`no`, others `yes`/`continue`; bridge sends `quickReplies` in the
   payload). Tapping one POSTs the reply straight from the service worker and confirms with a silent
@@ -1057,6 +1250,28 @@ tree; everything they found was verified, fixed, and the top feature gaps were b
   existing bind/allowlist warnings, since an empty trusted-user means any tailnet device has write
   access.
 - Uploaded images are now swept after 48h (was: kept forever).
+
+### Changed
+- **Builds are gated.** `bun run build` (root) and `collie-ctl.sh build` now typecheck bridge and
+  web before building, and build into `dist-staging` with an atomic swap — a failed build can no
+  longer leave an empty `web/dist` serving 503s. The pre-push hook typechecks both sides too
+  (`SKIP_TYPECHECK=1` to bypass once). Root tsconfig now enforces `noUnusedLocals/Parameters`.
+- **Write requests without an `Origin` header are rejected** unless they arrive on loopback
+  (browsers always send Origin on POST; curl-on-host keeps working).
+- Idle lock is now timestamp-based: backgrounding/foregrounding the app no longer resets the
+  countdown, and returning past the deadline locks immediately.
+- The composer moved into its own `<Composer>` component; `agent-chat.tsx` slimmed by ~230 lines.
+- A reply whose text lands but whose submit keystroke fails now reports "typed into the pane but
+  not submitted — check the pane before resending" (and `textDelivered: true`) instead of a generic
+  error that invited double-sends.
+- systemd unit hardened (`NoNewPrivileges`, `PrivateTmp`) and made persistent
+  (`StartLimitIntervalSec=0`, `RestartSec=5`) so a crash-loop can't leave the service permanently
+  down while you're phone-only.
+- Notification deep links URL-encode the pane id; sheets manage focus (focus in on open, restore on
+  close, `aria-labelledby`); space status dots gained screen-reader text; pinch-zoom re-enabled
+  (removed `maximum-scale=1`).
+
+### Fixed
 - **Socket leak on RPC timeout** — a stalled Herdr left the Unix-socket FD open on every timed-out
   request; under the 1.5s poll cadence this exhausted file descriptors and wedged the bridge. Every
   terminal path now closes the socket.
@@ -1084,35 +1299,10 @@ tree; everything they found was verified, fixed, and the top feature gaps were b
 - Pre-commit version guard now also covers `web/vite.config.ts`, `web/index.html`,
   `web/package.json`, `web/public/`, `systemd/`, and root `package.json`, and requires the new
   version to sort strictly above the old one.
-- **Builds are gated.** `bun run build` (root) and `collie-ctl.sh build` now typecheck bridge and
-  web before building, and build into `dist-staging` with an atomic swap — a failed build can no
-  longer leave an empty `web/dist` serving 503s. The pre-push hook typechecks both sides too
-  (`SKIP_TYPECHECK=1` to bypass once). Root tsconfig now enforces `noUnusedLocals/Parameters`.
-- **Write requests without an `Origin` header are rejected** unless they arrive on loopback
-  (browsers always send Origin on POST; curl-on-host keeps working).
-- Idle lock is now timestamp-based: backgrounding/foregrounding the app no longer resets the
-  countdown, and returning past the deadline locks immediately.
-- The composer moved into its own `<Composer>` component; `agent-chat.tsx` slimmed by ~230 lines.
-- A reply whose text lands but whose submit keystroke fails now reports "typed into the pane but
-  not submitted — check the pane before resending" (and `textDelivered: true`) instead of a generic
-  error that invited double-sends.
-- systemd unit hardened (`NoNewPrivileges`, `PrivateTmp`) and made persistent
-  (`StartLimitIntervalSec=0`, `RestartSec=5`) so a crash-loop can't leave the service permanently
-  down while you're phone-only.
-- Notification deep links URL-encode the pane id; sheets manage focus (focus in on open, restore on
-  close, `aria-labelledby`); space status dots gained screen-reader text; pinch-zoom re-enabled
-  (removed `maximum-scale=1`).
 
 ## [0.2.0] - 2026-06-30
 
-- **Do Not Disturb / snooze** (Settings → *Do not disturb*): pause all push for 30m / 1h / 4h, or
-  resume early. Server-enforced and self-expiring, so it quiets every device — and it clears whatever
-  is already on the lock screen the moment you snooze. The current deadline rides the snapshot, so it
-  stays in sync across devices.
-- `COLLIE_NOTIFY_DELAY_MS` env var — the push debounce window in ms (default `30000`; `0` notifies on
-  the next tick with no debounce).
-- `POST /api/notifications/snooze` — set/clear the global snooze (`{ snoozedUntil: number | null }`);
-  the active deadline is reported on the snapshot as `notifications.snoozedUntil`.
+### Changed
 - **Smarter push notifications.** A blocked/done alert is no longer fire-and-forget. Each one now
   waits a short **debounce window** (`COLLIE_NOTIFY_DELAY_MS`, default 30s) before it sends; an agent
   you clear at your desk within that window never reaches your phone. Alerts that *do* fire are
@@ -1123,11 +1313,22 @@ tree; everything they found was verified, fixed, and the top feature gaps were b
   shows the named, deep-linked alert; several collapse into a *"N agents need you"* digest (tap → the
   triage home) that updates in place as agents come and go, instead of stacking N separate alerts.
 
+### Added
+- **Do Not Disturb / snooze** (Settings → *Do not disturb*): pause all push for 30m / 1h / 4h, or
+  resume early. Server-enforced and self-expiring, so it quiets every device — and it clears whatever
+  is already on the lock screen the moment you snooze. The current deadline rides the snapshot, so it
+  stays in sync across devices.
+- `COLLIE_NOTIFY_DELAY_MS` env var — the push debounce window in ms (default `30000`; `0` notifies on
+  the next tick with no debounce).
+- `POST /api/notifications/snooze` — set/clear the global snooze (`{ snoozedUntil: number | null }`);
+  the active deadline is reported on the snapshot as `notifications.snoozedUntil`.
+
 ## [0.1.0] - 2026-06-30
 
 Initial public release of **Collie** — a phone web UI to monitor and reply to your Herdr agent
 herd over Tailscale.
 
+### Added
 - **Mobile-first PWA** (Vite + React + TypeScript + Tailwind v4 + shadcn): a triage dashboard
   (Spaces overview + Needs-you / Working / Idle agent groups), a per-agent colored terminal mirror,
   an agent-aware slash-command palette (Claude Code, Codex, pi, opencode), a special-keys pad with

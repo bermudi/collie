@@ -22,17 +22,17 @@ function disk(version: string): (p: string) => string | null {
 
 describe("the wire version stays the one it is running", () => {
   test("a manifest swapped under a running bridge does not change the captured string", () => {
-    // Boot. This is `bridge/index.ts`'s `crewVersion` and `bootVersion`, both resolved once.
-    const files = { read: disk("1.5.0") };
-    const crewVersion = collieVersionBare(ROOT, files.read);
+    // Boot. This is `bridge/index.ts`'s `version`, resolved once.
+    const files = { read: disk("0.48.0") };
+    const version = collieVersionBare(ROOT, files.read);
     const bootVersion = collieVersion(ROOT, files.read);
-    expect(crewVersion).toBe("1.5.0");
+    expect(version).toBe("0.48.0");
 
-    // `pacman -Syu` lands. The files say 1.6.0; this process is still 1.5.0.
-    files.read = disk("1.6.0");
+    // An update lands. The files say 0.49.0; this process is still 0.48.0.
+    files.read = disk("0.49.0");
 
-    // What `hello` and `/api/health` answer is the captured string, and it has not moved.
-    expect(crewVersion).toBe("1.5.0");
+    // What `/api/health` answers is the captured string, and it has not moved.
+    expect(version).toBe("0.48.0");
     // And a LIVE read disagrees with the boot capture — which is the restart-needed signal itself.
     expect(collieVersion(ROOT, files.read)).not.toBe(bootVersion);
   });
@@ -40,11 +40,8 @@ describe("the wire version stays the one it is running", () => {
   test("the bridge resolves its wire version once, at module scope, and never per request", async () => {
     const source = await Bun.file(new URL("./index.ts", import.meta.url)).text();
     // One resolution, and it is the bare spelling — a parenthetical would make a machine with no
-    // built bundle read as skewed against itself (CREW_PROTOCOL.md §7.1).
+    // built bundle read as skewed against itself.
     expect(source.split("collieVersionBare(").length - 1).toBe(1);
-    expect(source).toContain("const crewVersion = collieVersionBare(rootDir);");
-    // The live read exists too, and it is a THUNK the monitor throttles — never an inline call that
-    // some handler could end up making on the request path.
-    expect(source).toContain("liveVersion: () => collieVersion(rootDir)");
+    expect(source).toContain("const version = collieVersionBare(rootDir);");
   });
 });

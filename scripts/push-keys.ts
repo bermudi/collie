@@ -29,9 +29,18 @@ export type VapidKey = (typeof VAPID_KEYS)[number];
  * A VAPID keypair, base64url, in the shape `web-push` and the browser's `applicationServerKey` both
  * expect: public = the uncompressed P-256 point, private = the 32-byte scalar.
  */
-export function generateVapidKeys(): { publicKey: string; privateKey: string } {
+/** A VAPID P-256 key pair, both halves in the uncompressed base64url form Web Push expects. */
+export interface VapidKeyPair {
+  publicKey: string;
+  privateKey: string;
+}
+
+export function generateVapidKeys(): VapidKeyPair {
   const pair = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  // SAFETY: node:crypto's own export contract for a P-256 JWK; the length asserts below are the
+  // runtime half of this claim.
   const pub = pair.publicKey.export({ format: "jwk" }) as { x?: string; y?: string };
+  // SAFETY: same export contract, the private half.
   const priv = pair.privateKey.export({ format: "jwk" }) as { d?: string };
   if (!pub.x || !pub.y || !priv.d) throw new Error("node:crypto returned an incomplete P-256 JWK");
   const x = Buffer.from(pub.x, "base64url");
@@ -149,6 +158,7 @@ if (import.meta.main) {
   try {
     subject = subjectArg === undefined ? undefined : validateSubject(subjectArg);
   } catch (e) {
+    // SAFETY: the thrown value is this script's own `new Error(...)` sites.
     console.error(`✗ ${(e as Error).message}`);
     process.exit(2);
   }
@@ -209,6 +219,7 @@ if (import.meta.main) {
   try {
     await writeFile(tmp, merged, { mode: 0o600, flag: "wx" });
   } catch (e) {
+    // SAFETY: only node:fs throws here, and only the `wx` race is tolerated.
     if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
     // Left behind by a run that died between write and rename. Say so and stop: deleting it blind is
     // how `wx` stops meaning anything, and it may hold the only copy of a key someone just generated.

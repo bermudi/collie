@@ -74,14 +74,6 @@ export const API_ERROR_CODES = [
   "upload.bad_type",
   "upload.write_failed",
 
-  // Speech to text — POST /api/stt
-  "stt.unconfigured",
-  "stt.too_large",
-  "stt.bad_format",
-  "stt.busy",
-  "stt.unreadable",
-  "stt.empty",
-  "stt.provider_failed",
 
   // The prompt-cache watch list — /api/notifications/cache-watch (ADR 0042)
   "cache.pane_unknown",
@@ -98,22 +90,6 @@ export const API_ERROR_CODES = [
 
   // Addressing — the `(host, session)` a request named does not exist
   "session.unknown",
-  "host.unknown",
-
-  // The crew overview — this collie is not a lead with a crew (solo, or a peer)
-  "crew.not_lead",
-
-  // Starting an update from the phone — POST /api/update (M15/05)
-  "update.confirm_required",
-  "update.in_progress",
-  "update.preflight_unavailable",
-  "update.preflight_red",
-  "update.major_confirm_required",
-  "update.target_mismatch",
-  "update.none_available",
-  "update.peers_packaged",
-  "update.packaged",
-  "update.start_failed",
 ] as const;
 
 /** Every code the bridge can send. Derived from the list, so there is exactly one place to edit. */

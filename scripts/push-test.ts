@@ -31,6 +31,7 @@ if (!push.enabled) {
 const subsFile = join(cfg.stateDir, "push-subscriptions.json");
 let count = 0;
 try {
+  // SAFETY: the file is this bridge's own subscriptions JSON; the cast only names "some array".
   count = ((await Bun.file(subsFile).json()) as unknown[]).length;
 } catch {
   /* no saved subscriptions yet */

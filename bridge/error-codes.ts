@@ -33,7 +33,7 @@
 //   • Plain-text refusals (`text("bad body", 400)`, a 403 gate reason, a 405). They are not JSON, so
 //     there is no field to add one to — coding them would mean changing the response shape, which is
 //     exactly what this change promised not to do.
-//   • Crew-link errors (`bridge/crew/`). That surface is versioned separately (CREW_PROTOCOL.md) and
+//   • (Upstream also catalogues crew-link errors here; Pup carries no crew surface.)
 //     is guarded at commit time (ADR 0025); it keeps today's bodies in this release.
 //   • Push/OS notification text (`bridge/notifications.ts`). Different surface, different follow-up.
 
@@ -113,7 +113,7 @@ export const ERROR_CODES = {
   /**
    * Refused on the declared Content-Length (413) or on the decoded size (200 + ok:false). The
    * number is the HOST's own `COLLIE_MAX_UPLOAD_MB`, so it is interpolated rather than written:
-   * two members of one crew may answer this with two different sentences, both true.
+   * the number is the host's own, so it is interpolated rather than written.
    */
   "upload.too_large": "file too large (max {maxMb} MB)",
   /** The multipart body carried no `file` part. */
@@ -123,15 +123,6 @@ export const ERROR_CODES = {
   /** The bytes arrived but the host write failed (disk full, permissions). */
   "upload.write_failed": "{reason}",
 
-  // ── Speech to text: POST /api/stt (bridge/stt/http.ts) ─────────────────────────────
-  "stt.unconfigured": "speech-to-text is not configured on this collie — run `collie stt setup`",
-  "stt.too_large": "the recording is larger than 8 MiB",
-  "stt.bad_format": "that is not an audio format Collie sends on",
-  "stt.busy": "two recordings are already being transcribed — try again in a moment",
-  "stt.unreadable": "the recording could not be read",
-  "stt.empty": "the recording is empty",
-  /** The provider itself failed. `detail.kind` is the SttError kind; the sentence is its own words. */
-  "stt.provider_failed": "{reason}",
 
   // ── Device pairing: POST /api/pair, POST /api/devices/revoke ───────────────────────
   //
@@ -163,45 +154,22 @@ export const ERROR_CODES = {
 
   // ── Addressing: the `(host, session)` a request named does not exist ───────────────
   "session.unknown": "unknown session: {session}",
-  "host.unknown": "unknown host: {host}",
+
 
   // ── The crew overview: GET /api/crew ───────────────────────────────────────────────
-  /**
-   * This collie is not a lead with a crew, so it has no crew to report. Both refusals are this one
-   * code on purpose: a solo instance and a peer differ in what they ARE, not in what the phone can
-   * do about it — a peer is not a front door (ADR 0013), so neither has an overview to show.
-   */
-  "crew.not_lead": "this collie is not the lead of a crew",
+
 
   // ── Starting an update from the phone: POST /api/update (M15/05) ───────────────────
-  /** The body carried no confirm. One tap plus one confirm is the contract; nothing moved. */
-  "update.confirm_required": "an update needs an explicit confirm",
-  /** A run is already going. THE DOUBLE-TAP ANSWER — the second POST names the run, never starts one. */
-  "update.in_progress": "an update is already running ({state}); nothing was started",
-  /** The preflight could not be produced at all. "We could not check" is not "nothing is red". */
-  "update.preflight_unavailable": "the update preflight could not be run here",
-  /** The server re-ran the preflight and it is red. The check's own id and words, not a generic line. */
-  "update.preflight_red": "preflight is red on {check}: {reason}",
-  /** A major crossing needs its own consent (ADR 0020), exactly as `update --major` does on the CLI. */
-  "update.major_confirm_required": "{version} crosses a major — a major crossing needs its own confirm",
-  /** The card consented to a version this collie would no longer install. A stale card, refused. */
-  "update.target_mismatch": "this device asked for {asked}, but this collie would install {would}",
-  /** Nothing newer to take. */
-  "update.none_available": "there is no newer release to take",
-  /**
-   * A peers-only start where the only member behind runs a packaged install (ADR 0035). Its own
-   * package manager owns it, so no run from here can move it — which is a different answer from
-   * "the crew is level", and the operator is owed the difference.
-   */
-  "update.peers_packaged": "{name} is a packaged install, so its updates come from its own package manager",
-  /**
-   * A package manager owns this install's folder (ADR 0035). Its own preflight is GREEN, so nothing
-   * else on this gate would stop the start — which is exactly why this refusal exists here and not
-   * only in the client, whose disabled button this file's own contract calls a courtesy.
-   */
-  "update.packaged": "updates come from this machine's package manager — Collie does not replace its files",
-  /** The handoff itself failed — nothing was staged and nothing restarted. */
-  "update.start_failed": "the update could not be started: {reason}",
+
+
+
+
+
+
+
+
+
+
 } as const;
 
 /** Every code the bridge can send. The client mirror restates this union verbatim. */
