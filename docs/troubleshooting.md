@@ -139,10 +139,8 @@ stick to it.** (Over plain HTTP the SW can't register — always fresh, but no P
 
 
 **I saved a machine in Herdr and the phone does not show it.** Expected. Herdr's saved machines are
-its own client's list, and a crew is Collie's own; neither list feeds the other. To reach that
-machine from the phone, enrol it: `collie crew add <ssh-host>` on the lead, then `collie restart` on
-the lead and `collie crew status` to check the link. Adding or removing a machine in Herdr changes
-nothing in the crew ([Herdr machines and the crew](crew.md#herdr-machines-and-the-crew)).
+its own client's list, and Collie mirrors none of it. To reach that machine from the phone, run a
+Collie on it. Adding or removing a machine in Herdr changes nothing on the Collie side.
 
 **A pane shows no prompt-cache chip.** One of three things, and `collie doctor` tells them apart. The
 pane's harness has no journal adapter, which its `integration-<agent>` and `journal-roots` lines name.

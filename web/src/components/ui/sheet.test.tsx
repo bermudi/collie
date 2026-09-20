@@ -237,6 +237,33 @@ describe("BottomSheet: pull-driven peek", () => {
     expect(panel.className).toMatch(/slide-in-from-bottom/);
   });
 
+  it("settles the scrim early on its own layer, so the slide plays against a stable dim", () => {
+    const { container } = render(
+      <BottomSheet open onClose={vi.fn()} title="Switch pane">
+        body
+      </BottomSheet>,
+    );
+    const backdrop = container.querySelector('button[aria-hidden="true"]')!;
+    // Short fade that finishes before the panel's 200ms slide, decelerating.
+    expect(backdrop.className).toMatch(/duration-150/);
+    expect(backdrop.className).toMatch(/ease-out/);
+    // Compositor-owned opacity: the fade must not re-composite the filtered terminal per frame.
+    expect(backdrop.className).toContain("[will-change:opacity]");
+  });
+
+  it.each(["Switch pane", "Agent commands"])(
+    "keeps %s in an isolated paint layer without removing its entrance",
+    (title) => {
+      const { container } = render(
+        <BottomSheet open onClose={vi.fn()} title={title}>body</BottomSheet>,
+      );
+      const panel = container.querySelector<HTMLElement>('div[tabindex="-1"]')!;
+      expect(panel).toHaveClass("isolate", "[contain:paint]", "will-change-transform");
+      expect(panel).toHaveClass("bg-card", "animate-in", "slide-in-from-bottom");
+      expect(panel.querySelector(".sticky")).toHaveClass("backdrop-blur-md");
+    },
+  );
+
   it("caps the panel at the content column while the backdrop stays the whole screen", () => {
     // The sheet is the app's only floating layer and it holds ordinary rows, so it stops at the same
     // 640px every route body uses; ui/toast-viewport.tsx already caps its layer there. Uncapped, the

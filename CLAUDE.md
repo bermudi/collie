@@ -1,7 +1,8 @@
 # CLAUDE.md — working agreement for this repo
 
-**Collie** (repo `AltanS/collie`) — a phone web UI for the AI agents running in your terminal,
-served over Tailscale. A mobile-first PWA (Vite + React + TS + Tailwind v4 + shadcn) plus a Bun/TS
+**Collie Pup** (fork `bermudi/collie`, tracking [`AltanS/collie`](https://github.com/AltanS/collie)
+wholesale — [ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)) —
+a phone web UI for the AI agents running in your terminal, served over Tailscale. A mobile-first PWA (Vite + React + TS + Tailwind v4 + shadcn) plus a Bun/TS
 bridge that mirrors ONE multiplexer per install — Herdr, tmux or zellij — letting you monitor and
 reply to agents from a phone. Herdr is one adapter among the three, not the product: it is the
 default, it is the only one that talks over a Unix socket, and its plugin route stays supported —
@@ -35,7 +36,7 @@ not part of that agreement.
 **Two kinds of commit. A functional commit records; only the release commit bumps.** Never bump a
 version because you fixed something; the version moves once, when the release is cut.
 
-**Before committing any functional change** (anything under `bridge/`, `cli/`, `web/src/`,
+**Before committing any functional change** (anything under `bridge/`, `web/src/`,
 `web/public/`, `scripts/`, `systemd/`, or the manifest / package files, minus the tests and hooks
 carved out below), you MUST, **in the same
 commit**, add **one bullet** to `CHANGELOG.md` at the end of the `## [Unreleased]` list so the
@@ -77,7 +78,7 @@ write it as the sentence an operator reads there. Do not touch the three version
      - `**Urgent.** Updating from 1.9.0 leaves the service stopped.`
 
    - **MINOR** (`0.2.0 → 0.3.0`): something to learn, or worth hearing about today. A new verb,
-     a new page, a new crew capability, a changed default, anything that earns its own section
+     a new page, a new capability, a changed default, anything that earns its own section
      in `docs/`. The phone nudges within a day.
    - **MAJOR** (`0.2.0 → 1.0.0`): the operator must change something. A config key renamed or
      removed, a contract broken, a workflow that used to work and now does not.
@@ -205,18 +206,10 @@ today would claim a release nobody ever tested.
 
 **Update notice (user-facing).** The app's in-app update banner links to the newest release's GitHub
 page and shows the command to run. Pushing a `v*` tag auto-creates that GitHub Release (with the
-commands) via `.github/workflows/release.yml`. **On a Herdr-managed install, always express
-user-facing update/restart instructions as Herdr plugin actions** — `herdr plugin action invoke
-update --plugin herdr.collie` (or `restart`) — never `bin/collie …` / `systemctl … collie`, which
-depend on the caller's cwd and the unit name; the Herdr action runs from anywhere. A **binary
-install** (`scripts/install.sh`'s versioned layout) is not a Herdr plugin and has no such actions:
-there the spelling is `collie update` / `collie restart`. A **packaged install** (a folder a package
-manager owns — read-only, outside `$HOME`, or root-owned) takes neither: `collie update` REFUSES
-there, so printing it is printing the command that fails. The spelling is the package manager's own
-command where the resolved prefix names one, and the boundary sentence alone where it does not
-([ADR 0035](./.adr/0035-a-packaged-install-is-not-ours-to-update.md)). A string that may be read
-on more than one kind must come from the install kind (`cli/install-kind.ts`), never assume one —
-and "which kinds are there" is now three answers, not two.
+commands) via `.github/workflows/release.yml`. **Every Pup install is a Herdr-managed checkout, so always express user-facing update/restart
+instructions as Herdr plugin actions** — `herdr plugin action invoke update --plugin herdr.collie`
+(or `restart`) — never `systemctl … collie`, which depends on the caller's cwd and the unit name;
+the Herdr action runs from anywhere.
 
 ## Docs style (`docs/*.md`, published to colliepwa.dev)
 
@@ -248,16 +241,12 @@ page to be skimmed.
 
 ## Build / run (operational facts that are easy to forget)
 
-- **Every verb is spelled `bin/collie <verb>`** and implemented once, in `cli/`.
-  `scripts/collie-ctl.sh <verb>` is a bootstrap shim that compiles the binary when the checkout has
-  none and `exec`s it — it implements nothing, and its path is frozen because Herdr <0.8.0 invokes
-  the action set cached at install time
-  ([ADR 0006](./.adr/0006-update-advances-the-checkout-herdr-installed.md)). Teach the binary; don't
-  add logic to the shim.
-- **`collie link` publishes `~/.local/bin/collie` as a SYMLINK to the checkout's binary** — never a
-  copy, never a wrapper script, and never as a side effect of `build`/`update`
-  ([ADR 0021](./.adr/0021-the-path-name-is-a-pointer-never-a-copy.md)). `unlink` removes that name
-  only when it points at this checkout.
+- **Every verb is `scripts/collie-ctl.sh <verb>`** — Pup's operating surface (build / restart /
+  update / doctor / serve), carried whole from the fork. Upstream's `cli/` verbs are not carried
+  ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md));
+  the manifest's action set points at the ctl script, and its path is frozen because Herdr <0.8.0
+  invokes the action set cached at install time
+  ([ADR 0006](./.adr/0006-update-advances-the-checkout-herdr-installed.md)).
 - **There are two checkout shapes, and `update` handles both.** `herdr plugin install` does not clone
   — it leaves a **detached, shallow** checkout, so `git pull` cannot run there; a linked clone sits on
   a branch. One predicate (`git symbolic-ref -q HEAD`) picks the strategy, and the same predicate
@@ -307,7 +296,7 @@ page to be skimmed.
   The release recipe (*Versioning*, step 5) is where it moves; `scripts/check-flake-lock.sh` refuses
   it anywhere else, with `SKIP_FLAKE_LOCK_CHECK=1` as its own hatch. The guard judges a change to the
   lock, so the first commit that adds it passes without a release commit. The pinned Bun must also stay
-  at or above `MIN_BUN` in `cli/update-check.ts` — they are one fact, and
+  at or above `MIN_BUN` in `scripts/collie-ctl.sh` — they are one fact, and
   `scripts/check-flake-bun.test.ts` fails when they drift apart.
 - Service: `systemd --user` unit `collie` on the deployment host; logs `journalctl --user -u collie -f`.
 - **Dependencies must be 7 days old to install** (`bunfig.toml` + `web/bunfig.toml`, mirrored in
@@ -336,15 +325,13 @@ tests nothing Vitest already covers.
   never touches a live bridge. The `states` target runs the playground on port 5199, the way `make
   playground` runs it, and answers no API at all. Cases live under `web/e2e/`: today
   `smoke.spec.ts` and `handles.spec.ts`, plus the named cases proving a hand check,
-  `web/e2e/issue-180.spec.ts` and `web/e2e/m24-crew.spec.ts`, and `web/e2e/service-worker.spec.ts`,
+  `web/e2e/issue-180.spec.ts` and `web/e2e/service-worker.spec.ts`,
   which builds two bundles under `web/e2e/.builds/` to prove an old shell picks up a new one.
 - **Tier 2** runs by hand, from the workspace root: `make e2e`. It drives the dev lane's lead,
   instance `next` on port 8788, reads only, and never restarts or rebuilds anything. Its cases live
   under `web/e2e/live/`, sharing the harness in `web/e2e/live/live.ts`. It never runs in CI:
   `web/e2e/live/playwright.config.ts` throws when `CI` is set, so a copied command cannot point a
   runner at somebody's machine.
-- **Tier 3** is the VM lab: a real three-machine crew and a real update run. It is named here as the
-  end state and is not built.
 
 **Fixtures.** Tier 1 imports the same fixture modules the vitest suite already uses,
 `web/src/test/handlers.ts` and `web/src/playground/fixtures.ts`, and feeds them to `page.route`. A
@@ -418,14 +405,13 @@ a single command; never export one.
 | --- | --- | --- |
 | `SKIP_VERSION_CHECK=1` | `git commit` (pre-commit hook) | the version-consistency + bump-on-change guard |
 | `SKIP_LINT_CHECK=1` | `git commit` (pre-commit hook) | oxlint over the staged files |
-| `SKIP_CREW_WIRE_CHECK=1` | `git commit` (pre-commit hook) | the crew-wire decision guard |
 | `SKIP_FLAKE_LOCK_CHECK=1` | `git commit` (pre-commit hook) | the `flake.lock`-only-in-a-release guard |
 | `SKIP_TYPECHECK=1` | `bun run build` / `collie build` | both typecheck steps |
 | `SKIP_TESTS=1` | `git push` (pre-push hook) | both test suites |
 | `SKIP_TAG_CHECK=1` | `git push` (pre-push hook) | the untagged-release warning |
 
-The pre-commit hook's four guards are **independent** — `SKIP_VERSION_CHECK=1` does not disarm the
-lint guard, the crew-wire guard or the `flake.lock` guard.
+The pre-commit hook's guards are **independent** — `SKIP_VERSION_CHECK=1` does not disarm the
+lint guard or the `flake.lock` guard.
 
 ## Frontend data layer (React Router, not TanStack)
 
@@ -439,7 +425,7 @@ lint guard, the crew-wire guard or the `flake.lock` guard.
   a call site first is one that never gets promoted — the alert family cost six components that way.
 - **Check UI states in the playground** (`web/src/playground/`, `cd web && bun run playground`,
   README → "The states playground") before changing a banner, the mark, the boot splash, the idle
-  lock, or the crew page — it renders every state at once. Never import playground code from app
+  lock — it renders every state at once. Never import playground code from app
   code.
 - Data flows through **React Router** (`createBrowserRouter`, data mode): route **loaders**
   (`web/src/lib/loaders.ts`) fetch the snapshot + pane; **polling is `useRevalidator()` on an
@@ -501,7 +487,7 @@ lint guard, the crew-wire guard or the `flake.lock` guard.
   calls them subscribes via `useLocale()` so it re-renders on a locale (or lazy-dictionary) change.
   `messages/en.ts` is the source of truth; all six dictionary files change together, enforced by
   `tsc`. Not translated: terminal/agent output, quick replies, menu/dialog labels the screen printed,
-  key caps, crew role names, push notifications, service-worker strings, crew-link errors, and the
+  key caps, push notifications, service-worker strings, connection errors, and the
   slash-command descriptions in `web/src/lib/agent-commands.ts` (another tool's vocabulary — deferred)
   ([ADR 0030](./.adr/0030-the-ui-is-translated-by-a-typed-dictionary-not-a-library.md)).
 - **PWA** via `vite-plugin-pwa` (`web/vite.config.ts`): manifest + `sw.js`, registered manually
@@ -584,9 +570,8 @@ lint guard, the crew-wire guard or the `flake.lock` guard.
   ([ADR 0004](./.adr/0004-the-statusline-run-is-bounded.md), amended by
   [ADR 0048](./.adr/0048-the-input-box-is-found-by-its-own-frame.md)). `chrome.test.ts` and
   `input-box-frame.test.ts` pin both halves.
-- **The Herdr socket is never dialled across a machine boundary, and no Herdr vocabulary crosses a
-  crew link** — the lead consumes a peer's Collie API, never its Herdr socket
-  ([ADR 0011](./.adr/0011-the-pack-protocol-is-the-mux-driver-seam.md)).
+- **The Herdr socket is never dialled across a machine boundary** — one Collie mirrors one host's
+  multiplexer ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
 - **How soon Collie sees an out-of-band change is DECLARED (`topologyLatency`), never measured**, and
   `refresh()` is on the floor of the port so the phone can ask for a look now
   ([ADR 0031](./.adr/0031-freshness-is-a-declared-promise.md)). Every mutating route refreshes before
@@ -595,9 +580,8 @@ lint guard, the crew-wire guard or the `flake.lock` guard.
 ## The journal (scrollback the mirror can't give you)
 
 `bridge/journal/` reads the agent's own session log off disk, per harness (`claude` / `codex` / `pi`,
-registered in `registry.ts`). Two other things touch the filesystem, and neither is an exception to
-the rule below: `stt.json` in the state dir when the operator ran `collie stt setup`
-([ADR 0029](./.adr/0029-speech-to-text-is-a-provider-seam-collie-owns.md)), and the operator's own
+registered in `registry.ts`). One other thing touches the filesystem, and it is not an exception to
+the rule below: the operator's own
 font files under `<config-dir>/fonts`, served read-only through `bridge/operator-fonts.ts`
 ([ADR 0033](./.adr/0033-the-app-face-is-a-device-preference.md)).
 
@@ -619,58 +603,32 @@ conforming reverse proxy per docs/deployment.md Variant C (`COLLIE_SKIP_SERVE=1`
 optional identity/device gates · strict CSP. A socket call can type into a real terminal — treat a
 collie as remote shell access.
 
-**The loopback gates fail closed, and the crew link is exempt by construction, never by relaxation.**
-Host validation is on by default (`COLLIE_ALLOW_ANY_HOST=1` opts out), `COLLIE_TRUSTED_USER` rejects
-an ABSENT `Tailscale-User-Login` as well as a wrong one (`COLLIE_TRUSTED_USER_OPTIONAL=1`), a
-non-loopback bind refuses to start (`COLLIE_ALLOW_NON_LOOPBACK_BIND=1`), and a non-loopback TCP peer
-is refused. **A collie in a crew is exempt from the bind refusal and `/crew/v1/*` from the peer
-check** — a member is dialled across a machine boundary and that surface carries pinned mutual TLS
-plus the crew secret ([ADR 0013](./.adr/0013-a-peer-listens-without-becoming-a-front-door.md)). The
-exemption is granted by POSITION — the peer check sits after the federated dispatch in
-`bridge/server.ts` — so no crew path is ever spelled there. The standby door is its own listener on
-its own `COLLIE_STANDBY_HOST` and neither gate reaches it; don't route it through the front door's
-`fetch` to share them.
+**The loopback gates fail closed.** Host validation is on by default (`COLLIE_ALLOW_ANY_HOST=1`
+opts out), `COLLIE_TRUSTED_USER` rejects an ABSENT `Tailscale-User-Login` as well as a wrong one
+(`COLLIE_TRUSTED_USER_OPTIONAL=1`), a non-loopback bind refuses to start
+(`COLLIE_ALLOW_NON_LOOPBACK_BIND=1`), and a non-loopback TCP peer is refused. Pup has no second
+listener and no exempted surface — every route a client can reach sits behind these gates
+([ADR 0001](./.adr/0001-one-managed-front-door.md),
+[ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
 
-**The bridge makes no outbound call and spawns no long-running child for content — unless the
-operator ran `collie stt setup`.** Speech-to-text (`bridge/stt/`, CLI `cli/stt.ts`) is a registered
-provider seam, absent until that verb writes `stt.json`: it then holds a provider credential at 0600,
-opens an operator-configured outbound path carrying microphone audio, and on the `codex` provider
-spawns a `codex app-server` child. All three costs are declined by doing nothing, the local-engine
-configuration keeps the egress on loopback, and the wire identity is probed honest-first and recorded
-([ADR 0029](./.adr/0029-speech-to-text-is-a-provider-seam-collie-owns.md)). Setup is a CLI act, never
-a web form, for the reason pairing is.
+**The bridge makes no outbound call and spawns no long-running child for content.** Speech-to-text
+is not carried ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md));
+the phone keyboard's own microphone is the voice path on Pup.
 
 **Two device gates guard writes, independently, and compose by AND.** `COLLIE_DEVICE_HEADER` trusts
-a name a proxy injects; **pairing** (`bridge/pairing.ts`, `collie pair` / `collie devices`) requires a
+a name a proxy injects; **pairing** (`bridge/pairing.ts`) requires a
 bearer credential the device holds, and is on exactly when the registry is non-empty. Reads stay
-ungated by both. Neither applies to `/crew/v1/*`, which has its own two factors. The reasoning sits in
+ungated by both. The reasoning sits in
 `bridge/pairing.ts`'s header; don't collapse the two gates into one.
 
-**Collie manages exactly one front door: `tailscale serve`** — the CLI (`cli/serve.ts`) publishes it,
+**Collie manages exactly one front door: `tailscale serve`** — `collie-ctl.sh serve` publishes it,
 records the mapping in `tailscale-managed-handler`, and only ever tears down a mapping matching that
-record.
-Every other tunnel (NetBird, ZeroTier, Cloudflare Tunnel) is `COLLIE_SKIP_SERVE=1` + docs/deployment.md
-Variant E: the operator owns the ingress, Collie publishes nothing. **Don't add a second managed front
-door** — [ADR 0001](./.adr/0001-one-managed-front-door.md).
+record. Every other tunnel (NetBird, ZeroTier, Cloudflare Tunnel) is `COLLIE_SKIP_SERVE=1` +
+DEPLOYMENT.md Variant E: the operator owns the ingress, Collie publishes nothing. **Don't add a
+second managed front door** — [ADR 0001](./.adr/0001-one-managed-front-door.md).
 
-**The crew link (lead↔peer, `/crew/v1/*`) is specified in [`CREW_PROTOCOL.md`](./CREW_PROTOCOL.md)**
-— two factors gate it (pinned mutual TLS + crew secret), and a peer publishes no front door
-([ADR 0013](./.adr/0013-a-peer-listens-without-becoming-a-front-door.md)); the one exception is the
-**deputy's standby door** — bound, never published, armed by silence and spent by the operator's
-pairing credential ([ADR 0027](./.adr/0027-the-deputy-is-named-ahead-of-time.md) ·
-[ADR 0028](./.adr/0028-the-standby-door-is-a-second-listener.md)).
-
-**Touching the crew wire surface forces a protocol decision** — a commit staging one of the
-wire-shape files in `bridge/crew/` must also stage `CREW_PROTOCOL.md` (additive-optional, §7.1) or
-bump `CREW_PROTOCOL_VERSION` (not expressible that way). `scripts/check-crew-wire.sh` is guard C of
-the pre-commit hook; a pure refactor takes the `SKIP_CREW_WIRE_CHECK=1` hatch
-([ADR 0025](./.adr/0025-the-wire-guard-forces-a-decision-never-a-bump.md)).
-
-**Code reaches a peer over the operator's own SSH, never over the crew link** — `crew add` installs
-it and `crew update` levels it, both pushing the lead's own commit as a `git bundle`; the link
-carries runtime data and never becomes a distribution channel
-([ADR 0016](./.adr/0016-updates-ride-the-operators-ssh.md), addendum 2026-09-04: a peer may also
-level ITSELF to the release its lead is running, fetching that public tag from GitHub over anonymous
-HTTPS on its own decision, which adds no code, route or verb to the link). How the operator
-reached a member is remembered locally in `crew-ops.json`, which is never a wire field and never merged into the trust
-store.
+**There is no peer link on Pup** — no `/crew/v1/*`, no second listener, no standby door, no wire
+protocol to guard: the strip-fork removed them all
+([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)). If a
+merge reintroduces any of those files, resolve as deleted and re-run the strip-list grep from
+AGENTS.md.

@@ -6,7 +6,6 @@
 > purpose. For how to run it see [`README.md`](./README.md); for repo conventions
 > [`CLAUDE.md`](./CLAUDE.md); for the verified socket contract [`HERDR_API.md`](./HERDR_API.md); for
 > the multiplexer seam [`MUX_CONTRACT.md`](./MUX_CONTRACT.md); for the lead↔peer wire
-> [`CREW_PROTOCOL.md`](./CREW_PROTOCOL.md).
 
 ## 1. The problem (real workflow, real pain)
 
@@ -52,55 +51,11 @@ The browser never touches the multiplexer directly; the bridge is the only thing
    Herdr / tmux / zellij (owns panes, agents, state)
 ```
 
-Every operator verb is `bin/collie <verb>`, implemented once in `cli/` — pairing, serving, crews,
-speech-to-text, build and update. `scripts/collie-ctl.sh` is a frozen bootstrap shim that compiles
-the binary and `exec`s it; it implements nothing
+Every operator verb is `scripts/collie-ctl.sh <verb>` — build, restart, update, doctor, serve.
+Upstream's `cli/` verbs are not carried on Pup
+([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)); the
+manifest's action set points straight at the ctl script
 ([ADR 0006](./.adr/0006-update-advances-the-checkout-herdr-installed.md)).
-
-### 2.1 One collie is the floor; a **crew** is several of them
-
-Everything above describes one machine. A crew is several machines each running a **full collie**, one
-of which — the **lead** — holds the front door the phone talks to. A crew of one is today's install
-exactly, and pays no tax for the feature ([`CREW_PROTOCOL.md` §11](./CREW_PROTOCOL.md#11-the-solo-zero-tax-contract)).
-
-```
-   phone / laptop (PWA)
-        │  HTTPS  /api/*   (the phone talks to the lead and to NOTHING else)
-        ▼
-   lead collie  ── managed front door, serves the PWA
-        │  /crew/v1/*  ── pinned mutual TLS + crew secret, lead dials outbound
-        ├──────────────▶ peer collie      (no front door; its own mux, journal, uploads, audit)
-        └──────────────▶ deputy collie    (a peer, plus a warrant naming it)
-                              ╎  standby door: bound, never published, three routes
-   operator ─ ssh ─▶ every member          ← code rides HERE, never the crew link
-```
-
-- **The lead consumes a peer's *Collie* HTTP API.** It never dials a peer's multiplexer across a
-  machine boundary, and no Herdr (or tmux, or zellij) verb ever crosses the link — that is the
-  mux-driver seam ([ADR 0011](./.adr/0011-the-pack-protocol-is-the-mux-driver-seam.md)). What crosses
-  is Collie's own domain model: snapshots, pane grids, replies, history, uploads. What never crosses:
-  software. `collie crew add` / `crew update` push a git bundle over the **operator's own ssh**
-  ([ADR 0016](./.adr/0016-updates-ride-the-operators-ssh.md)), so the link is never a distribution
-  channel. A peer may also level itself to the release its lead is running, taking that public tag
-  from GitHub over anonymous HTTPS on its own decision (ADR 0016's addendum,
-  [`CREW_PROTOCOL.md` §20](./CREW_PROTOCOL.md)); still no code, route or verb on the link.
-- **Two independent factors gate `/crew/v1/*`,** before any handler runs: **pinned mutual TLS** and
-  the **crew secret** ([`CREW_PROTOCOL.md` §8](./CREW_PROTOCOL.md#8-trust-enrollment-factors-rotation)).
-  Neither browser gate of §6 applies there, and a peer publishes nothing — its listener is a path
-  prefix on its own bind, not a front door
-  ([ADR 0013](./.adr/0013-a-peer-listens-without-becoming-a-front-door.md)).
-- **The deputy is named ahead of time, never elected.** The operator names one peer while the crew is
-  healthy and the lead signs a **warrant** saying so; a higher generation supersedes it everywhere it
-  lands, and revocation is generation *N+1* naming nobody. Nothing infers a dead lead from silence —
-  the operator is the quorum ([ADR 0026](./.adr/0026-the-operator-is-the-quorum.md) ·
-  [ADR 0027](./.adr/0027-the-deputy-is-named-ahead-of-time.md) ·
-  [`CREW_PROTOCOL.md` §18](./CREW_PROTOCOL.md#18-the-deputy-and-the-warrant-added-2026-08-20)).
-- **The standby door is a second listener that arms on silence and is spent by the operator.** It
-  binds `COLLIE_STANDBY_PORT` (absent ⇒ no door), serves three routes and `404`s everything else, and
-  arms only while a verified warrant names this machine, the lead has been silent past a threshold,
-  and a synced pairing registry is non-empty. Arming grants nothing: the takeover is confirmed with
-  the phone's own pairing credential ([ADR 0028](./.adr/0028-the-standby-door-is-a-second-listener.md) ·
-  [`CREW_PROTOCOL.md` §18.15](./CREW_PROTOCOL.md#18-the-deputy-and-the-warrant-added-2026-08-20)).
 
 ## 3. Deployment model — **systemd user service, not a plugin pane**
 
@@ -112,8 +67,8 @@ watching the TUI. A long-lived network daemon must be supervised independently.
   restarts on failure, survives Herdr restarts.
 - **The Herdr plugin stays — as a thin registration/launcher,** so Collie shows up in
   `herdr plugin list` and Herdr conventions still apply. Its `[[actions]]` are frozen command strings
-  that hand a verb to `scripts/collie-ctl.sh`, which `exec`s the compiled `bin/collie` — start, stop,
-  update, **print the tailnet URL**; they do *not* host the server. A
+  that hand a verb to `scripts/collie-ctl.sh` — start, stop, restart, update, doctor, **print the
+  tailnet URL**; they do *not* host the server. A
   `[[build]]` step builds the web UI on `herdr plugin install` (GitHub); local `link` installs skip
   it and build lazily on first `start`. Concretely that's `[[actions]]` + `[[build]]` and nothing
   else: `[[panes]]` is what this section argues against, and `[[events]]` would duplicate the
@@ -143,8 +98,7 @@ agent goes blocked
    → tap → app opens to that agent
    → the pane, with recognised prompts parsed into tappable blocks
        (prompt-select · preview-select · wizard)   ← structured, not a raw screenful
-   → reply:  plain text box (the phone keyboard's own dictation works in it;
-                             an in-app mic appears only after `collie stt setup`)
+   → reply:  plain text box (the phone keyboard's own dictation works in it)
              + quick actions + a special-key strip
    → explicit Send button  → typeText + Enter, verified
    → "Sent ✓" + card flips blocked → working   ("did it land?" confirmation)
@@ -161,15 +115,11 @@ Product details that shaped the loop:
     `BlockingMessage`. That was never built: parsing is client-side and pattern-based, over whatever
     the current pane happens to show. It works because agent prompts are formulaic, and it degrades
     to "read the pane" when they aren't.
-- **Dictation needs zero special build; the in-app mic is opt-in.** The reply box is a plain text
-  field, so the phone keyboard's own mic works in it with nothing built, and Send stays an explicit
-  button — dictated text is reviewable before it goes. Beyond that, `collie stt setup` switches on
-  Collie's own record button through a provider seam (`bridge/stt/`, CLI `cli/stt.ts`,
-  [docs/voice-and-push.md → Voice input](./docs/voice-and-push.md#voice-input-optional)). The seam is **absent until that verb
-  runs**: no key, no outbound path, no child process, no button. Turning it on is what buys the
-  credential in the state dir and the outbound path carrying microphone audio — a local engine keeps
-  that egress on loopback, and hands-free sends go through the same guarded reply path a typed reply
-  takes ([ADR 0029](./.adr/0029-speech-to-text-is-a-provider-seam-collie-owns.md)).
+- **Dictation needs zero special build.** The reply box is a plain text field, so the phone
+  keyboard's own mic works in it with nothing built, and Send stays an explicit button — dictated
+  text is reviewable before it goes. The in-app mic and its provider seam are upstream's, not
+  carried on Pup
+  ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
 - **Quick replies are heuristics, not guarantees.** Different agents expect different input (a Y/n
   prompt vs a numbered menu vs an approval phrase), so there is always a **"send exactly what I
   type"** fallback.
@@ -222,7 +172,6 @@ graph TD
   end
 
   logs[("the agents' own session logs, on this machine's disk")]
-  beacons[("beacons — written by the agent's own hooks")]
 
   pwa -->|"HTTPS over the tailnet, polls /api/snapshot"| serve
   serve -->|"127.0.0.1:PORT — the browser never reaches further"| api
@@ -236,9 +185,6 @@ graph TD
   zellijd -->|"dump-screen --ansi"| panes
   panes -.->|"the harness writes its own turns"| logs
   journal -->|"reads the transcript off local disk, never the screen"| logs
-  panes -.->|"collie beacon emit, from the agent's hooks"| beacons
-  beacons -.->|"which pane holds an agent, and its session key"| tmuxd
-  beacons -.-> zellijd
 ```
 
 - **`bridge/mux/` is a port with three drivers, and nothing above it knows which one is loaded.** The
@@ -342,8 +288,7 @@ graph TD
   (`web/src/lib/operator-scope.ts`). Their **launcher rows**, from `launchers.toml`
   (`bridge/operator-launchers.ts`), share the reader but NOT `/api/config`: a launcher row creates
   its own pane rather than addressing an existing one, so it carries no scope, and its rows ride
-  their own session-scoped `GET /api/launchers` instead — rows must come from the host that runs
-  them, which a lead-only `/api/config` field cannot say in a crew (CREW_PROTOCOL.md §5).
+  their own session-scoped `GET /api/launchers` instead — rows come from the host that runs them.
 
 - **UI strings are translated by a typed dictionary, not a library** (`web/src/lib/i18n/`, six
   locales, English the compile-time source of truth) — `t()`/`tn()` plus the `useLocale()` hook
@@ -359,7 +304,7 @@ graph TD
 
 Driving a multiplexer equals **arbitrary code execution on the host** — `typeText` / `sendKeys` type
 into live terminals, whichever driver is loaded. The posture is single-user, behind one hardened front
-door (tailnet-only by default; one per **crew** — §2.1). These four are genuine RCE vectors and are
+door (tailnet-only by default). These four are genuine RCE vectors and are
 **load-bearing — do not regress them:**
 
 - **The bridge binds `127.0.0.1` only** and lets its single front door proxy it. Binding `0.0.0.0`
@@ -376,12 +321,9 @@ door (tailnet-only by default; one per **crew** — §2.1). These four are genui
   it needs the port not to be shared in the first place (its own network namespace, or a uid
   owner-match filter such as nftables `meta skuid`); a plain port firewall rule won't stop a
   same-host peer (raised in [#33](https://github.com/AltanS/collie/issues/33)).
-  **Named exception: the crew listener.** When crew federation is enabled, a peer's `/crew/v1/*`
-  prefix shares the bridge's one listener and one bind — `COLLIE_HOST`, the operator's to set, with
-  a loud warning on a wildcard bind — and admits a request only past two independent factors, pinned
-  mutual TLS plus the crew secret, before any handler runs. See [`CREW_PROTOCOL.md` §3](./CREW_PROTOCOL.md#3-roles-and-modes)
-  (amended 2026-08-08, F3) and
-  [ADR 0013](./.adr/0013-a-peer-listens-without-becoming-a-front-door.md).
+  On Pup there is no exempted listener: the strip-fork carries no federation surface, so every
+  route a client can reach sits behind the browser gates
+  ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
   Under `tailscale serve`, the `Tailscale-User-Login` header is the person gate — trusted **only**
   when the request source is loopback (i.e. it came from tailscaled). `COLLIE_TRUSTED_USER` rejects a
   *mismatching* login **and an absent one**: `serve` injects no header for a tagged node, so
@@ -399,23 +341,21 @@ door (tailnet-only by default; one per **crew** — §2.1). These four are genui
   needs no proxy at all: `collie pair` mints a one-time code out of band (the operator's own
   terminal), the phone trades it at `POST /api/pair` for a 256-bit bearer token, and the bridge keeps
   only its SHA-256. It is enforced exactly when the registry is non-empty, so an install that never
-  pairs anything is unchanged, and revocation (`collie devices revoke`) lands on the running service
+  pairs anything is unchanged, and revocation lands on the running service
   without a restart because the registry is re-read per request. The two gates compose by AND —
-  neither weakens or replaces the other — and neither touches `/crew/v1/*`, whose two factors are its
-  own. Where the header gate answers *is this device on the operator's list*, pairing answers *does
+  neither weakens or replaces the other. Where the header gate answers *is this device on the operator's list*, pairing answers *does
   this device hold a credential I issued*: a claim no proxy, DNS name or tailnet identity can forge.
 - **The `Host` header is validated, on by default, and fails closed.** A request whose `Host` is not
   the tailnet name, a loopback name, `COLLIE_PUBLIC_HOSTS` or a configured origin is refused, so a
   DNS-rebound `Host: evil.example` cannot reach the API. `collie start` discovers the node's MagicDNS
   name and Tailscale IPs into `COLLIE_TAILSCALE_HOSTS` and bakes them into the service unit, so a normal tailnet install configures
   nothing; behind your own front door `COLLIE_PUBLIC_HOSTS` is **required**.
-  `COLLIE_ALLOW_ANY_HOST=1` is the opt-out, and re-opens rebinding. `/crew/v1/*` is exempt: a lead
-  addresses a peer by its own hostname, and that surface carries its own two factors (ADR 0013).
+  `COLLIE_ALLOW_ANY_HOST=1` is the opt-out, and re-opens rebinding.
 - **The bridge refuses a non-loopback bind.** A `COLLIE_HOST` outside loopback does not start unless
   `COLLIE_ALLOW_NON_LOOPBACK_BIND=1`, and a non-loopback TCP peer is rejected — every gate above
-  trusts headers that are only untamperable while the sole client is the local front door. A **crew
-  member** is the one machine that must listen wide, so a crew-configured instance carries the same
-  permission implicitly (`bridge/crew/config.ts`) and `/crew/v1/*` is exempt from the peer check.
+  trusts headers that are only untamperable while the sole client is the local front door. Pup
+  grants no exemption to any machine: there is no federation surface to carry one
+  ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
 - **Pane-grid output renders safely** — it's attacker-influenceable (filenames, agent output,
   fetched web content). Never `innerHTML`; it renders as React text nodes under a **strict CSP**
   (`default-src 'self'`), so an escaping miss can't run injected script that calls back into the

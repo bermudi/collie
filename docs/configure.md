@@ -51,7 +51,7 @@ environment says. Every other key in the file still applies.
 
 Collie reads `config.toml` only during startup. Run `collie restart` after modifying it.
 
-> **Note.** A file holding `[push] vapid_private` or `[stt] stt_key` is held to mode 600, exactly as
+> **Note.** A file holding `[push] vapid_private`  is held to mode 600, exactly as
 > your `.env` is. If Collie cannot tighten it, those keys alone are dropped and `collie doctor` says
 > so.
 
@@ -97,8 +97,6 @@ The config file groups every setting under a `[section]`. The environment name o
 | `push` | the three Web Push (VAPID) values |
 | `uploads` | the attachment size cap and the extra text types accepted |
 | `journal` | where each harness keeps its own session log |
-| `crew` | the budgets a lead gives a member, and a peer's own browser |
-| `standby` | the deputy's second door: port, bind address, arming |
 | `update` | where releases come from, how many versions stay |
 | `serve` | whether Collie publishes the front door, and on what |
 | `stt` | speech-to-text, absent until `collie stt setup` runs |
@@ -309,8 +307,8 @@ and a **Launch** section in the switcher sheet (swipe up from a pane). A pinned 
 its folder, shortened under home; a cwd-less row says "here" in the switcher (the dashboard already
 implies home, so it says nothing there). Declare no rows and neither section appears.
 
-On a crew (several machines, one phone-facing lead), each machine reads its own copy of this file —
-a row launches on whichever machine's dashboard or pane you tapped it from, not on the lead.
+Every Collie reads its own copy of this file; a row launches on the machine whose dashboard or
+pane you tapped it from.
 
 To verify, reload the dashboard and look under the herd. If a row fails to load,
 `journalctl --user -u collie -n 20` prints the error.
@@ -426,8 +424,8 @@ change, a compaction, and `/reload-plugins --force`. The chip turns blue as soon
 the action to its transcript, and the sheet names the action. opencode reports a compaction and a
 model change the same way.
 
-The chip sits at the right end of the pane header's second line, after the pane's workspace. On a
-crew the machine's name sits beside it, on the same line. Tap the chip to view the underlying rule:
+The chip sits at the right end of the pane header's second line, after the pane's workspace. Tap
+the chip to view the underlying rule:
 the rule id, the vendor source page, and the retrieval date.
 
 > **Note.** Values are vendor claims with recorded dates, not live measurements, unless marked
@@ -491,7 +489,7 @@ body reach any handler, where that handler's own limit then refuses it. Nothing 
 48 hours are up, so the uploads directory holds at most what was sent in two days. Raise the number
 because you need it, not by default.
 
-In a [crew](crew.md), both settings are per machine, and the machine that stores the file is the one
+Both settings are per machine, and the machine that stores the file is the one
 that enforces them. The lead refuses an oversize body before forwarding it, to save your uplink, but
 it refuses it against its own number. Set the same values on every member, or a peer will refuse
 what its lead let through.
