@@ -118,7 +118,7 @@ describe("ViewportFrame", () => {
       configurable: true,
       value: viewport,
     });
-    const origInner = window.innerHeight;
+    const prevInner = window.innerHeight;
     Object.defineProperty(window, "innerHeight", { configurable: true, value: 780 });
 
     const { container } = render(<ViewportFrame>herd</ViewportFrame>);
@@ -136,7 +136,7 @@ describe("ViewportFrame", () => {
     await waitFor(() => expect(frame).toHaveStyle({ height: "400px" }));
 
     input.remove();
-    Object.defineProperty(window, "innerHeight", { configurable: true, value: origInner });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: prevInner });
     Object.defineProperty(window.navigator, "userAgent", { configurable: true, value: origUA });
   });
 

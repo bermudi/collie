@@ -22,6 +22,9 @@ export function ViewportFrame({ children }: { children: ReactNode }) {
 
     let animationFrame = 0;
     const isInputFocused = () => {
+      // SAFETY: `activeElement` is typed `Element | null`; every focusable element in this app is an
+      // HTMLElement, and the tagName/isContentEditable reads below are the check itself — a
+      // non-HTMLElement activeElement simply fails them.
       const el = document.activeElement as HTMLElement | null;
       if (!el) return false;
       const tag = el.tagName;

@@ -11,19 +11,19 @@ const PANES_DIR = join(import.meta.dirname, "..", "..", "fixtures", "panes");
 
 const allOpencodeFixtures = readdirSync(PANES_DIR)
   .filter((f) => f.startsWith("opencode--") && f.endsWith(".txt"))
-  .sort();
+  .toSorted();
 const allClaudeFixtures = readdirSync(PANES_DIR)
   .filter((f) => f.startsWith("claude--") && f.endsWith(".txt"))
-  .sort();
+  .toSorted();
 const allCodexFixtures = readdirSync(PANES_DIR)
   .filter((f) => f.startsWith("codex--") && f.endsWith(".txt"))
-  .sort();
+  .toSorted();
 const allGrokFixtures = readdirSync(PANES_DIR)
   .filter((f) => f.startsWith("grok--") && f.endsWith(".txt"))
-  .sort();
+  .toSorted();
 const allOmpFixtures = readdirSync(PANES_DIR)
   .filter((f) => f.startsWith("omp--") && f.endsWith(".txt"))
-  .sort();
+  .toSorted();
 
 // Tier-1: no interactive block kind, so ownFixtures is empty and every opencode capture is neutral.
 const ownFixtures: string[] = [];
@@ -61,7 +61,7 @@ describe("opencodeBuildBlocks emits nothing but raw", () => {
   });
 
   it("exposes only read-only surfaces", () => {
-    expect(Object.keys(opencodeAdapter).sort()).toEqual(
+    expect(Object.keys(opencodeAdapter).toSorted()).toEqual(
       [
         "agent",
         "buildBlocks",
@@ -69,7 +69,7 @@ describe("opencodeBuildBlocks emits nothing but raw", () => {
         "composerReady",
         "extractInputDraft",
         "extractStatusLines",
-      ].sort(),
+      ].toSorted(),
     );
   });
 });

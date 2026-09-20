@@ -238,6 +238,11 @@ interface TextRange {
   end: number;
 }
 
+/** The display length of one captured rule run — the only fact a run carries. */
+function rangeWidth(run: TextRange): number {
+  return run.end - run.start;
+}
+
 /**
  * The one strict classifier owns labelled-row clipping: the ranges of EVERY rule run on the row
  * (each is chrome, and each gets the muted ink), or null when the row is not that shape.
@@ -277,11 +282,10 @@ function labelledRuleRow(text: string): TextRange[] | null {
     if (/\s/.test(text[labelStart]!) || /\s/.test(text[labelEnd - 1]!)) return null;
   }
 
-  const width = (run: TextRange) => run.end - run.start;
-  if (width(runs[0]!) > MAX_LEADING_RULE_RUN) return null;
+  if (rangeWidth(runs[0]!) > MAX_LEADING_RULE_RUN) return null;
   let long = false;
   for (let i = 1; i < runs.length; i++) {
-    if (width(runs[i]!) >= MIN_LONG_RULE_RUN) long = true;
+    if (rangeWidth(runs[i]!) >= MIN_LONG_RULE_RUN) long = true;
     else if (i < runs.length - 1) return null; // a run between two labels must be a long one
   }
   if (!long) return null; // no run long enough to wrap — nothing for clipping to buy

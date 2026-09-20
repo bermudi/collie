@@ -2291,7 +2291,7 @@ async function createTab(
       cwd = await resolvePaneCwd(rawCwd);
     } catch (err) {
       return json(
-        { ok: false, ...apiError("tab.create_failed", { reason: (err as Error).message }) } satisfies CreateResponse,
+        { ok: false, ...apiError("tab.create_failed", { reason: err instanceof Error ? err.message : String(err) }) } satisfies CreateResponse,
         ae,
       );
     }
@@ -2358,7 +2358,7 @@ async function createWorkspace(
     cwd = await resolvePaneCwd(typeof fields.cwd === "string" ? fields.cwd : undefined);
   } catch (err) {
     return json(
-      { ok: false, ...apiError("workspace.create_failed", { reason: (err as Error).message }) } satisfies CreateResponse,
+      { ok: false, ...apiError("workspace.create_failed", { reason: err instanceof Error ? err.message : String(err) }) } satisfies CreateResponse,
       ae,
     );
   }
