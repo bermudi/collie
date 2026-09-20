@@ -15,6 +15,7 @@ describe("hasBlockGrammar", () => {
     expect(hasBlockGrammar("codex")).toBe(true);
     expect(hasBlockGrammar("grok")).toBe(true);
     expect(hasBlockGrammar("omp")).toBe(true);
+    expect(hasBlockGrammar("opencode")).toBe(true);
     expect(hasBlockGrammar("agy")).toBe(true);
     expect(hasBlockGrammar("antigravity")).toBe(true);
     expect(hasBlockGrammar("muse")).toBe(true);
@@ -22,7 +23,7 @@ describe("hasBlockGrammar", () => {
 
   it("is false for every unregistered agent (no adapter ⇒ raw mirror)", () => {
     // Exact strings only: the codex ADAPTER must not leak to variant spellings (#99).
-    for (const agent of ["opencode", "pi", "shell", "unknown", "Codex", "codex-cli"]) {
+    for (const agent of ["pi", "devin", "shell", "unknown", "Codex", "codex-cli"]) {
       expect(hasBlockGrammar(agent)).toBe(false);
     }
   });

@@ -19,6 +19,7 @@ import { claudeAdapter } from "./claude";
 import { codexAdapter } from "./codex";
 import { grokAdapter } from "./grok";
 import { ompAdapter } from "./omp";
+import { opencodeAdapter } from "./opencode";
 import { agyAdapter, antigravityAdapter } from "./agy";
 import { museAdapter } from "./muse";
 
@@ -29,6 +30,7 @@ const ADAPTERS: Record<string, HarnessAdapter> = Object.fromEntries(
     codexAdapter,
     grokAdapter,
     ompAdapter,
+    opencodeAdapter,
     agyAdapter,
     antigravityAdapter,
     museAdapter,
