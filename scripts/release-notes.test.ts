@@ -435,25 +435,9 @@ describe("the repository's CHANGELOG.md", () => {
 		for (const group of section.groups) expect(group.leads.length).toBeGreaterThan(0);
 	});
 
-	test("1.12.1 credits the contributor its changelog names", () => {
-		expect(creditedHandles(parseSection(changelog, "1.12.1"))).toEqual(["enieuwy"]);
-	});
-
-	test("1.12.0 credits every contributor its changelog names", () => {
-		expect(creditedHandles(parseSection(changelog, "1.12.0"))).toEqual([
-			"edwinhu",
-			"CorrectRoadH",
-			"fonnesbeck",
-			"waynehoover",
-			"jyothyswaroop",
-			"bendrucker",
-			"lighcen",
-			"dantebarba",
-			"jpcarranza94",
-			"ubuntudroid",
-			"Femoon",
-		]);
-	});
+	// Pup's changelog is its own narrative (ADR 9004): upstream's 1.12.x bullets were folded into
+	// the 0.49.0 section rather than carried as sections, so their version-specific credit tests
+	// have no sections to read here. The generic newest-section test above still runs on ours.
 
 	test("every bullet under Unreleased is grouped and has a bold lead", () => {
 		expect(() => checkUnreleased(changelog)).not.toThrow();
