@@ -53,7 +53,7 @@ The browser never touches the multiplexer directly; the bridge is the only thing
 
 Every operator verb is `scripts/collie-ctl.sh <verb>` — build, restart, update, doctor, serve.
 Upstream's `cli/` verbs are not carried on Pup
-([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)); the
+([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)); the
 manifest's action set points straight at the ctl script
 ([ADR 0006](./.adr/0006-update-advances-the-checkout-herdr-installed.md)).
 
@@ -119,13 +119,15 @@ Product details that shaped the loop:
   keyboard's own mic works in it with nothing built, and Send stays an explicit button — dictated
   text is reviewable before it goes. The in-app mic and its provider seam are upstream's, not
   carried on Pup
-  ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
+  ([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
 - **Quick replies are heuristics, not guarantees.** Different agents expect different input (a Y/n
   prompt vs a numbered menu vs an approval phrase), so there is always a **"send exactly what I
   type"** fallback.
-- **Opinionated triage.** The home screen leads with **"NEEDS YOU"** — blocked agents at top,
-  working/idle collapsed below. Simultaneous blocks batch into one summary notification, not three
-  races. The split rests on the `agentDetection` capability: a driver that cannot tell an agent from a
+- **Opinionated triage, without moving anything.** The home screen leads with one summary line that
+  counts what **needs you** and jumps to it; every pane stays where it sits, in the multiplexer's own
+  order, and urgency is a mark on the row, never a position
+  ([ADR 0063](./.adr/0063-a-pane-keeps-its-place-when-its-state-changes.md)). Simultaneous blocks
+  batch into one summary notification, not three races. The split rests on the `agentDetection` capability: a driver that cannot tell an agent from a
   shell says so, and the screen is panes rather than a triage it would have to invent.
 - **Close the trust loop.** A "Sent" state on the `POST`'s HTTP response, then the visible
   blocked→working transition. Without it, latency makes users double-tap.
@@ -323,7 +325,7 @@ door (tailnet-only by default). These four are genuine RCE vectors and are
   same-host peer (raised in [#33](https://github.com/AltanS/collie/issues/33)).
   On Pup there is no exempted listener: the strip-fork carries no federation surface, so every
   route a client can reach sits behind the browser gates
-  ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
+  ([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
   Under `tailscale serve`, the `Tailscale-User-Login` header is the person gate — trusted **only**
   when the request source is loopback (i.e. it came from tailscaled). `COLLIE_TRUSTED_USER` rejects a
   *mismatching* login **and an absent one**: `serve` injects no header for a tagged node, so
@@ -355,7 +357,7 @@ door (tailnet-only by default). These four are genuine RCE vectors and are
   `COLLIE_ALLOW_NON_LOOPBACK_BIND=1`, and a non-loopback TCP peer is rejected — every gate above
   trusts headers that are only untamperable while the sole client is the local front door. Pup
   grants no exemption to any machine: there is no federation surface to carry one
-  ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
+  ([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
 - **Pane-grid output renders safely** — it's attacker-influenceable (filenames, agent output,
   fetched web content). Never `innerHTML`; it renders as React text nodes under a **strict CSP**
   (`default-src 'self'`), so an escaping miss can't run injected script that calls back into the

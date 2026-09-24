@@ -13,6 +13,10 @@
 // Seeded with the language-selector copy only — the full string sweep lands separately.
 
 export const en = {
+  "settings.updateBanner.restart": "Bridge restart needed",
+  "settings.updateBanner.releaseAvailable": "Collie {version} available",
+  "settings.updateBanner.majorAvailable": "Collie {version} — a new major",
+  "settings.updateBanner.copyAria": "Copy command: {command}",
   "settings.language.title": "Language",
   "settings.language.description": "The terminal mirror is never translated.",
 
@@ -40,12 +44,23 @@ export const en = {
   "settings.install.iosHint": "On an iPhone or iPad, install from the browser's share sheet: tap Share, then \"Add to Home Screen\".",
   "settings.harnessBar.title": "Harness shortcuts",
   "settings.harnessBar.description": "A row of the running agent's own commands above the keys.",
+  "settings.beltSize.title": "Action belt size",
+  "settings.beltSize.description": "How tall the row of actions above the input is, and how large its icons and words are.",
+  "settings.beltSize.option.default": "Default",
+  "settings.beltSize.option.large": "Large",
+  "settings.beltSize.option.larger": "Larger",
   "settings.zen.title": "Zen mode",
   "settings.zen.description": "Adds a row to the pane menu that hides everything but the terminal.",
   "settings.zen.auto.label": "Enter on landscape",
   "settings.zen.auto.hint": "Rotate the phone sideways to open zen automatically; rotate back to close it.",
 
   // --- settings.handsFree ---
+  "settings.handsFree.title": "Hands-free voice",
+  "settings.handsFree.description":
+    "Send the transcript immediately instead of putting it in the message box. Off by default — you normally read what was heard before it reaches the terminal.",
+  "settings.handsFree.ariaLabel": "Hands-free voice: send transcript immediately",
+
+  // --- settings.push ---
   "settings.push.title": "Push notifications",
   "settings.push.description": "Get a notification when an agent needs you.",
   "settings.push.reason.insecure": "Push needs an HTTPS connection.",
@@ -156,10 +171,6 @@ export const en = {
   "settings.update.checking": "Checking…",
   "settings.update.error": "Couldn't check.",
   "settings.update.upToDate": "Up to date",
-  "settings.updateBanner.restart": "Bridge restart needed",
-  "settings.updateBanner.releaseAvailable": "Collie {version} available",
-  "settings.updateBanner.majorAvailable": "Collie {version} — a new major",
-  "settings.updateBanner.copyAria": "Copy command: {command}",
 
   // --- settings.typeface (the APP's own face — a per-device preference since ADR 0033) ---
   // FAMILY NAMES ARE NOT HERE, and must not be added: "Space Grotesk" and "Aldrich" are proper
@@ -201,6 +212,9 @@ export const en = {
   "settings.display.rawTerminal.label": "Raw terminal",
   "settings.display.rawTerminal.hint":
     "Shows the plain mirror — no tappable prompt buttons, no chrome or status strips. Use it when a dialog renders wrong and you want to drive it by hand from Keys.",
+  "settings.display.noInvert.label": "Render this pane natively",
+  "settings.display.noInvert.hint":
+    "Skips the light-theme inversion for this pane only. Turn it on when an agent is on a LIGHT theme and the mirror renders it dark; leave it off when the pane looks right.",
   "settings.display.textSize.label": "Text size",
   "settings.display.textSize.decrease": "Decrease font size",
   "settings.display.textSize.increase": "Increase font size",
@@ -226,10 +240,22 @@ export const en = {
   "composer.placeholder.direct": "Type into the terminal…",
   "composer.placeholder.shell": "Type a shell command…",
   "composer.placeholder.reply": "Type a reply…",
+  "composer.mic.unavailable": "Voice input is unavailable",
+  "composer.mic.stopAria": "Stop recording",
+  "composer.mic.recordAria": "Record a voice message",
+  "composer.mic.transcribing": "Transcribing…",
+  "composer.mic.recording": "Recording {elapsed}",
+  "composer.mic.handsFreeHint": "will send when you stop",
+  "composer.mic.manualHint": "lands in the message box",
+  "composer.mic.stop": "Stop",
+  "composer.mic.discardAria": "Discard recording",
   "composer.attach.aria": "Attach file",
   "composer.attach.title": "Attach",
   "composer.attach.photos": "Photos",
   "composer.attach.files": "Files",
+  "composer.attach.listAria": "Attachments",
+  "composer.attach.removeAria": "Remove {name}",
+  "composer.attach.inFront": "Its marker is gone from your text, so Send puts {name} in front.",
   "composer.send.typeAnyway": "Type anyway?",
   "composer.send.reallySend": "Really send?",
   "composer.send.stopTypingAria": "Stop typing into terminal",
@@ -237,6 +263,8 @@ export const en = {
   "composer.draft.tooLong":
     "Too long to keep as a saved draft — it survives switching panes, but not closing the app.",
   "composer.status.dialogWaiting": "A dialog is waiting — answer it first, then send.",
+  "composer.status.unreadDialog":
+    "Collie cannot read this dialog. {key} is on the card. Tap Send again to type anyway.",
   "composer.status.paneNotWritable": "Pane is no longer writable — nothing was sent",
   "composer.status.inputChanged":
     "The input box changed while clearing it — nothing was typed. Check the pane.",
@@ -246,12 +274,10 @@ export const en = {
   "composer.discard.confirmKeys.one": "Tap again to discard {count} queued key",
   "composer.discard.confirmKeys.other": "Tap again to discard {count} queued keys",
   "composer.destructive.confirm": "Destructive: {reason} — tap Send again to confirm",
-  "composer.upload.success": "File added, path in message",
+  "composer.destructive.confirmOnHost": "Destructive: {reason} on {host} — tap Send again to confirm",
+  "composer.upload.success": "File attached",
   "composer.upload.tooLarge": "That file is bigger than {max} MB, the limit on this collie.",
   "composer.upload.badType": "Collie can't attach {name}.",
-  "composer.upload.successBatch": "{n} files added, paths in message",
-  "composer.upload.mixed": "Added {attached} of {total} — {detail}",
-  "composer.upload.nothing": "Nothing added — {detail}",
   "composer.noEcho.title": "Password prompt — nothing echoes",
   "composer.noEcho.noLiveTyped":
     "What you typed is already in the pane, unsubmitted — but this view isn't live, so nothing can be sent from here. Answer it at the terminal.",
@@ -265,6 +291,7 @@ export const en = {
   "composer.noEcho.dismissAria": "Dismiss password-prompt notice",
   "composer.draftPreview.title": "Draft in terminal",
   "composer.draftPreview.takeOver": "Take over",
+  "composer.draftPreview.dismissAria": "Dismiss the terminal draft notice",
 
   // --- sendMode (the armed "typing straight through" indicator) ---
   "sendMode.armed.title": "Typing into terminal",
@@ -296,6 +323,8 @@ export const en = {
   "chat.scrollback.showHistory": "Show entire history",
   "chat.scrollback.loadOlder": "Load older",
   "chat.scrollback.loading": "Loading…",
+  "chat.scrollback.noSessionReported":
+    "{agent} has not reported a session to Herdr. Install or update the Herdr integration for it, then restart the agent in this pane.",
   "chat.fullReply.title": "Full reply",
   "chat.fullReply.fromTranscript": "from transcript",
   "chat.fullReply.showingTerminal": "showing the terminal",
@@ -399,6 +428,19 @@ export const en = {
   "home.sidebar.paneActionsTitle": "Tap for pane actions",
   "home.row.tabPosition": "tab {n}",
   "home.row.unseen": "unseen",
+  "home.tabs.aria": "Dashboard views",
+  "home.tabs.panes": "Panes",
+  "home.tabs.focus": "Focus",
+  "home.tabs.blocked.one": "{count} blocked",
+  "home.tabs.blocked.other": "{count} blocked",
+  "home.tabs.unseen": "finished panes unseen",
+  "home.changes.listAria": "Changes by workspace",
+  "home.changes.loading": "Reading…",
+  "home.changes.clean": "No changes",
+  "home.changes.noFolder": "No folder",
+  "home.changes.unavailable": "Can't read changes",
+  "home.changes.files.one": "{count} file",
+  "home.changes.files.other": "{count} files",
 
   // --- status (triage sections, status labels, counts) ---
   "status.section.needsYou": "Needs you",
@@ -456,6 +498,7 @@ export const en = {
   "space.tab.titleFallback": "Tab",
   "space.tab.titleWithLabel": "Tab {label}",
   "space.tab.readOnly": "Read-only — this device isn't authorised to rename or close tabs.",
+  "space.tab.hostBlockSuffix": "{hostBlock} — rename and close are unavailable until it answers.",
   "space.tab.rename": "Rename",
   "space.tab.close": "Close tab",
   "space.tab.closing": "Closing…",
@@ -525,6 +568,31 @@ export const en = {
   "connection.withLastSeen": "{cause} — last seen {time}",
   "connection.readOnly.notPaired": "Not paired — pair this device in Settings to type into agents.",
   "connection.readOnly.device": "Read-only — this device isn’t authorised to type into agents{deviceSuffix}.",
+  "connection.host.lastSeen": "last seen {time}",
+  "connection.host.neverSeen": "never seen",
+  "connection.host.unreachablePlain": "unreachable",
+  "connection.host.unreachableSuffix": "unreachable · {label}",
+  "connection.host.incompatible": "incompatible",
+  "connection.host.lead": "lead",
+  "connection.host.onPrefix": "on",
+  "connection.host.ariaSends": "Sends to host: {name}{unreachable}",
+  "connection.host.ariaHost": "Host: {name}{unreachable}",
+  "connection.host.ariaUnreachableSuffix": " (unreachable)",
+  // The parenthesis form is the LOCALE's, not this file's: a Chinese bundle writes full-width
+  // brackets and no leading space. So the punctuation is one key and the word inside it is the same
+  // word the eye reads, rather than a second translation of it that could drift.
+  "connection.host.ariaSuffix": " ({word})",
+  // ── §10.2's PRESENTATION SPLIT, IN WORDS (M22/05) ─────────────────────────
+  // Two situations used to share the word above. "reconnecting" is the lead still trying, inside its
+  // budget, and it asks nothing of the operator; "needs attention" is the lead unable to fix it by
+  // trying again. The pair only earns its keep if the two never read as the same thing, so the
+  // action sentences say the difference out loud rather than leaving it to a colour.
+  "connection.host.reconnecting": "reconnecting",
+  "connection.host.attention": "needs attention",
+  "connection.host.reconnectingSuffix": "reconnecting · {label}",
+  "connection.host.attentionSuffix": "needs attention · {label}",
+  "connection.host.reconnectingAction": "The lead is still trying. Nothing to do.",
+  "connection.host.attentionAction": "Trying again will not fix this. Check this machine.",
   "connection.stale.incompatible": "{name} is running an incompatible Collie",
   "connection.stale.unreachable": "{name} is unreachable · {label}",
   "connection.stale.nothingCached": "Nothing cached for this machine yet.",
@@ -536,13 +604,15 @@ export const en = {
   "connection.session.aria": "Session: {name}. Switch session",
   "connection.session.primary": "primary",
   "connection.session.unreachable": "unreachable",
+  "connection.session.ariaIn": "In session: {name}",
   "connection.session.all": "All sessions",
   "connection.session.allDescription": "Every session on this machine, in one list",
   "connection.session.allAria": "Showing every session. Switch session",
   "connection.server.title": "Machines",
   "connection.server.aria": "Host: {name}. Switch host",
 
-  // --- crew (the read-only /crew census; role names stay English, ADR 0030) ---
+
+  // --- error (boot splash, route-level error recovery) ---
   "error.boot.connecting": "Connecting to the herd…",
   "error.boot.title": "Not connected",
   "error.boot.body": "Can’t reach Collie — check your connection to the host, then try again.",
@@ -565,7 +635,6 @@ export const en = {
   // The band while a new bundle is downloading into the precache (2026-09-12). The other six
   // dictionaries carry this English sentence until it is translated.
   "pwa.updateInstalling": "Downloading the new version…",
-  "updateRibbon.hideNotice": "Hide this notice",
 
   // --- history (pane transcript route) ---
   "history.unavailable.disabled": "Transcript history is switched off on this bridge (COLLIE_TRANSCRIPT).",
@@ -595,15 +664,26 @@ export const en = {
 
   // --- mirror (terminal graphics in the pane mirror) ---
   "mirror.blankLines": "[{n} blank lines]",
+  "mirror.imageAlt": "Terminal graphics",
+  "mirror.imageBadge": "[Image]",
+  "mirror.imageMatchedByOrder": "matched by order, open History to check",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "just now",
   "time.compact.now": "now",
 
-  // --- sync (how fresh the herd on screen is, and asking for a fresher one) ---
 
   // --- dialog (menu / multi-select / wizard / preview-select block renderers) ---
   "dialog.sendingAria": "Sending",
+  // ADR 0056: every lifted card's own way back to the terminal rows it replaced.
+  "dialog.terminalControl": "Terminal",
+  "dialog.terminalControlAria": "Show the terminal instead of this card",
+  "dialog.backToCard": "Back to the card",
+  // ADR 0056 counsel fix: the generic-menu and unread-dialog cards already show the mirror by
+  // default, so their own Terminal control only hides their buttons — it needs its own words.
+  "dialog.putAwayControl": "Put away",
+  "dialog.putAwayControlAria": "Hide this card's buttons, keep the terminal",
+  "dialog.showButtons": "Show the buttons",
   "dialog.previousStepAria": "Previous step",
   "dialog.nextStepAria": "Next step",
   "dialog.answeredAria": "Answered",
@@ -623,6 +703,11 @@ export const en = {
   "dialog.menu.moveDown": "Move down",
   "dialog.menu.leftAria": "Left — {verb} ({label})",
   "dialog.menu.rightAria": "Right — {verb} ({label})",
+  // The printed scale's chips (.adr/0054): one per value the screen listed. The chip's own text is
+  // the level, so the aria name adds what a tap DOES to it.
+  "dialog.menu.levelAria": "{verb} to {label}",
+  "dialog.menu.levelCurrentAria": "{label}, current",
+  "unreadDialog.caption": "Collie cannot read this dialog",
   "dialog.preview.currentAnswerAria": "Current answer",
   "dialog.preview.previewedBelowAria": "Previewed below",
   "dialog.preview.previewLabel": "Preview · {label}",
@@ -661,7 +746,8 @@ export const en = {
   "promptAction.feedback.boxNotOpened": "The feedback box didn't open — check the pane",
   "promptAction.feedback.notArrived": "The feedback didn't arrive — nothing was submitted",
 
-  // --- stt (speech-to-text errors, lib/stt.ts + hooks/use-stt-recorder.ts) ---
+
+  // --- directTyping (the composer's "Type into terminal" mode, hooks/use-direct-typing.ts) ---
   "directTyping.status.draftPending": "Send or clear the draft before typing into the terminal.",
   "directTyping.status.armed": "Typing into the terminal — keys send as you type.",
   "directTyping.status.disarmed": "Back to sending replies",
@@ -744,8 +830,60 @@ export const en = {
   "space.new.tab.plain": "Space",
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "Repository",
+  "space.new.host.label": "Host",
   "worktree.orOpenExisting": "Or open one that already exists",
+  // --- apiError.update (POST /api/update refusals, M15/05) ---
   // --- settings.updateCard (the update card, M15/05) ---
+  // THE SENTENCE ABOUT THE CREW LINK (M27/06), whole. It lives in the CARD's namespace because the
+  // card is where it is read: above the confirm, with room for both halves of it — what changes,
+  // and what to do about it. The band prints `updateRibbon.linkChangeShort` instead, held to the
+  // row's forty characters like every other band string. The digest push carries this same English
+  // from `LINK_CHANGE_SENTENCE` in `bridge/update.ts`, which has no locale to read.
+  //
+  // Generic on purpose: it is printed off a wire-version DIFFERENCE, never off a release name, so
+  // the release after the next one carries it with no string edited.
+  // THE URGENT LABEL (ADR 0046). A label and nothing more: the sentence beside it is the release's
+  // own English, read from its `collie-release.json`, so it is printed as it was written and is
+  // never translated. An urgent release keeps the DAILY digest cadence even when the delta is
+  // patches only; the label is how the operator sees that on the card.
+  // THE SAME LABEL WHEN THE URGENT RELEASE IS NOT THE ONE ON OFFER (ADR 0046). An urgent 1.9.1 with
+  // a quiet 1.9.2 above it offers 1.9.2, and a bare "Urgent" would read as a claim about that
+  // release. Naming the version says what is true: the fix is in the pile, and taking the offer
+  // takes it.
+
+  // --- settings.updateCard, the crew half (M16/01) ---
+  // THE BUTTON OPENS UPDATE MODE (ADR 0064). It names the whole of what happens, all machines and the
+  // version, and it no longer grows a confirm inside the card: "Start update" on the first screen of
+  // update mode is the confirm.
+
+
+  // --- updateRibbon (the ONE top-of-app update band), M16/02 ---
+  // Every string in this block is held to a 40-CHARACTER BUDGET in all six locales, enforced by
+  // `update-ribbon-i18n.test.ts`. One truncating row on a phone is about forty characters wide, and
+  // a line that overflows it in German or Japanese is a line nobody can read. The budget is measured
+  // with the slots filled: a version, a peer name, a count. `{reason}` is a peer's own prose of
+  // unbounded length, so it is cut on a word boundary before it ever reaches a string here and the
+  // Updates page carries it whole.
+  // THE BAND'S OWN CUT OF IT. One truncating row is about forty characters wide, which the whole
+  // sentence is not, so the band states WHAT changes and the tap lands on the card, where the rest
+  // of it sits above the confirm. Held to the budget like every other band string.
+  // THE BAND'S HALF OF IT (ADR 0046). The label alone, because the release's sentence is prose of
+  // unbounded length and this row is forty characters. The tap lands on the card, which prints it.
+  // A packaged host cannot take the tap — its updates come from its package manager (ADR 0035) — so
+  // the band STATES the fact and names the manager. It does not instruct: the phone cannot run
+  // pacman, and a line that told the operator to would be telling them to go somewhere else.
+  // The same host under a prefix Collie does not recognise: there is no manager to name, so the band
+  // states the version and points at the page that carries the boundary sentence.
+  // The band's own control in the states that can also be PUT DOWN. `ui/notice.tsx` forbids a
+  // whole-row tap beside a dismiss X (a button may not hold a button), so those states name the
+  // tap instead of being one. It opens /settings/updates, where the confirm lives; it starts nothing.
+  // The close on the two QUIET crew states. Not "dismiss this version": what is put down there is a
+  // notice about another machine, and this host's own offer is untouched by it.
+  // ── The prompt-cache chip and its sheet (M28/02) ──────────────────────────
+  // A rule's `label`, its source title and its publisher are NOT here: those are another vendor's
+  // words about their own product, the same carve-out ADR 0030 makes for slash-command descriptions.
+  // The countdown itself is a number and a unit letter, which is the compact convention `timeAgoShort`
+  // already follows across every locale.
   "cache.warm": "Prompt cache warm",
   "cache.expiring": "Prompt cache expiring",
   "cache.cold": "cold",
@@ -774,6 +912,12 @@ export const en = {
   "cache.confidence.reported": "reported",
   "cache.confidence.inferred": "inferred",
   "cache.confidence.observed": "measured",
+  "updateRibbon.hideNotice": "Hide this notice",
+
+  // --- tour (the first-run screen, web/src/components/tour-sheet.tsx) ---
+  // ONE scrolling screen, shown once per device and then only when the operator asks in Settings.
+  // The English here is the source of truth; the six other catalogs carry it verbatim until it is
+  // translated. Raise TOUR_VERSION (lib/tour.ts) when a CLAIM below changes, never for polish.
   "tour.skip": "Skip",
   "tour.title": "Collie shows the agents in your terminal.",
   // The claim's second sentence, in the three forms the facts can support. {mux} is the
@@ -781,6 +925,8 @@ export const en = {
   // is dropped rather than filled with a placeholder.
   "tour.lead":
     "It mirrors the panes running under {mux} on {host}. It shows what is on those screens, and it never runs a terminal of its own.",
+  "tour.leadNoHost":
+    "It mirrors the panes running under {mux}. It shows what is on those screens, and it never runs a terminal of its own.",
   "tour.leadNoMux":
     "It mirrors the panes running in your terminal multiplexer. It shows what is on those screens, and it never runs a terminal of its own.",
 
@@ -791,6 +937,8 @@ export const en = {
   "tour.setup.needsYou.one": "{count} needs you",
   "tour.setup.needsYou.other": "{count} need you",
   "tour.setup.noPanes": "No panes yet",
+  "tour.setup.machines.one": "{count} machine in your crew",
+  "tour.setup.machines.other": "{count} machines in your crew",
   "tour.setup.canType": "This device can type",
   "tour.setup.readOnly": "This device can read only",
   "tour.setup.pushOff": "Notifications are off on this phone",
@@ -818,6 +966,9 @@ export const en = {
   "tour.can.type": "Type a reply, or send Esc, Tab and Ctrl keys.",
   "tour.can.harness": "Set model and effort from the actions row.",
   "tour.can.session": "Read the whole session, past the scrollback.",
+  "tour.can.crew": "Watch every machine in your crew from one URL.",
+
+  // The footer's one button. The first spelling opens the blocked pane; the second closes the sheet.
   "tour.done.pane": "Open the pane that needs you",
   "tour.done.dashboard": "Show the dashboard",
 
@@ -825,7 +976,108 @@ export const en = {
   "settings.tour.title": "Show the first screen again",
   "settings.tour.description": "What Collie does, and what this install looks like.",
   "settings.tour.button": "Show",
-};
+
+  // --- updateScreen (M28/01) ---
+  // The sheet a running update takes the screen with: one row per machine, one for this device's own
+  // download, and a way out of every state that can stall. `components/update-screen.tsx` renders it;
+  // `lib/update-screen.ts` decides every state it can be in. Short words — these rows are read on a
+  // phone while a machine is being rebuilt underneath them.
+  // The one sentence of truth, small and last: the run is on the machines, and this screen only shows
+  // it. An operator who thinks closing the phone stops the update will not close the phone.
+  // The badge, on a device that did not start the run. One line, so it truncates rather than wraps.
+  // A row's state, in the fewest words that are still true. The lead's four in-flight states say what
+  // the machine is DOING; a peer reports `updating` for all four, because the lead cannot see inside.
+  // The run ended and it did not arrive. The sentence names what happened and the reason the host gave.
+  // The lead has held one state longer than a whole build, restart and verify takes. Keep waiting, with
+  // the app back in your hands — never a cancel, and never a forced reload.
+  // THIS device, which is not a machine in the crew: it is the phone fetching the bundle the machines
+  // now serve. Counted in FILES, because per-file is the only thing the service worker reports.
+  // The end, through the status channel every other confirmation uses. A solo install names the MACHINE,
+  // because there is no crew to name.
+
+  // --- updateScreen, update mode (ADR 0064) ---
+  // The docked panel a running update puts the phone under: a band with the step and a clock, the app
+  // behind a veil, and seven steps. Plain words, short sentences: these are read on a phone while a
+  // machine is rebuilt underneath them. `{lead}` is the machine that leads the crew.
+  // Ready to start: the confirm, as the first screen of update mode.
+  // The seven steps.
+  // A member that needs you, on step 5.
+  // One row's words, after the machine's name.
+
+  // --- changes (ADR 0065) ---
+  "chat.changes.label": "Changes",
+  "changes.title": "Changes",
+  "changes.backAria.dashboard": "Back to the dashboard",
+  "changes.backAria.workspace": "Back to the workspace",
+  "changes.backAria.pane": "Back to the pane",
+  "changes.listBackAria": "Back to the list",
+  "changes.refreshAria": "Refresh changes",
+  "changes.loading": "Reading changes…",
+  "changes.empty": "No changes since the last commit.",
+  "changes.unavailable.noFolder": "Collie can't find a folder for this workspace, so there are no changes to show.",
+  "changes.unavailable.noGit": "Git is not installed on this machine.",
+  "changes.unavailable.noPane": "This pane is gone.",
+  "changes.unavailable.noWorkspace": "This workspace is gone.",
+  "changes.error": "Couldn't read the changes. Tap refresh to try again.",
+  "changes.stale": "Not updating",
+  "changes.truncated": "The list hit a limit, so some repos or files may be missing.",
+  "changes.bound.depth.one": "Stopped at {count} level, with repos further down.",
+  "changes.bound.depth.other": "Stopped at {count} levels, with repos further down.",
+  "changes.bound.settings": "Look deeper in Settings",
+  "changes.thisPane": "This pane",
+  "changes.repoFiles.one": "{name} · {count} file",
+  "changes.repoFiles.other": "{name} · {count} files",
+  "changes.status.M": "Modified",
+  "changes.status.A": "Added",
+  "changes.status.D": "Deleted",
+  "changes.status.R": "Renamed",
+  "changes.status.untracked": "Untracked",
+  "changes.binaryShort": "binary",
+  "changes.file.binary": "Binary file, not shown.",
+  "changes.file.directory": "New folder. Its files are not listed one by one.",
+  "changes.file.truncated": "The diff stops here. It is too long to show in full.",
+  "changes.file.unknown": "This file is no longer in the list of changes. Go back and refresh.",
+  "changes.file.gone": "No longer changed",
+  "changes.file.error": "Couldn't read this diff.",
+  "changes.file.noLines": "No line changes.",
+  "changes.file.renamedFrom": "Renamed from {path}",
+  "changes.file.prev": "Previous file",
+  "changes.file.next": "Next file",
+  "changes.layout.aria": "Layout",
+  "changes.layout.list": "List",
+  "changes.layout.tree": "Tree",
+  "changes.tree.folderAria.one": "{name}, {count} file",
+  "changes.tree.folderAria.other": "{name}, {count} files",
+  "changes.filter.button": "Filter files",
+  "changes.filter.buttonActive": "Filter files, {shown} of {total} shown",
+  "changes.filter.placeholder": "Filter by path",
+  "changes.filter.clearText": "Clear text",
+  "changes.filter.statusAria": "Filter by status",
+  "changes.filter.shown": "{shown} of {total} files",
+  "changes.filter.none": "No files match.",
+  "changes.filter.clear": "Clear filter",
+  "changes.commit.show": "Show last commit",
+  "changes.commit.showFor": "Show last commit of {name}",
+  "changes.commit.cleanHeading": "No uncommitted changes",
+  "changes.commit.title": "Last commit",
+  "changes.commit.backAria": "Back to the commit",
+  "changes.commit.loading": "Reading the commit…",
+  "changes.commit.error": "Couldn't read the commit. Tap refresh to try again.",
+  "changes.commit.noCommit": "This repo has no commits yet.",
+  "changes.commit.unknown": "Collie can't find this repo any more. Go back and refresh.",
+  "changes.commit.empty": "This commit changes no files.",
+  "changes.commit.newer": "A newer commit exists",
+  "changes.commit.uncommitted": "New uncommitted changes",
+  "changes.commit.fileNewer": "The repo has a newer commit. Go back and load it to read this file.",
+  "settings.changes.title": "Changes",
+  "settings.changes.description": "How a pane's Changes view finds git repos.",
+  "settings.changes.nested.label": "Look for repos inside this folder",
+  "settings.changes.nested.hint": "Also show repos in folders below the pane's folder, even ones the parent repo ignores.",
+  "settings.changes.depth.label": "How deep to look",
+  "settings.changes.depth.hint": "Folder levels below the pane's folder.",
+  "settings.changes.depth.levels.one": "{count} level",
+  "settings.changes.depth.levels.other": "{count} levels",
+} as const;
 
 /** Every key that exists, as a union of string literals. The completeness contract. */
 export type MessageKey = keyof typeof en;

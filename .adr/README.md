@@ -76,7 +76,7 @@ the pointer, it was a supersede.
 | # | Decision | Status |
 | --- | --- | --- |
 | [0001](./0001-one-managed-front-door.md) | Collie manages exactly one front door | Accepted |
-| [0002](./0002-invert-the-light-terminal-mirror.md) | The light terminal mirror is inverted, not re-themed | Accepted |
+| [0002](./0002-invert-the-light-terminal-mirror.md) | The light terminal mirror is inverted, not re-themed (addendum 2026-09-21: a per-pane override lands) | Accepted |
 | [0003](./0003-one-shared-seen.md) | "Seen" is one shared fact, and only Collie's own reads count | Accepted |
 | [0004](./0004-the-statusline-run-is-bounded.md) | The statusline run is bounded, but the bound guards less than it looks | Amended in scope by 0048 |
 | [0005](./0005-a-composed-key-queue-never-outlives-its-dock.md) | A composed key queue never outlives its dock | Accepted |
@@ -101,16 +101,34 @@ the pointer, it was a supersede.
 | [0042](./0042-notification-kinds-and-the-cache-watch.md) | Notification kinds, and the cache watch: global OR per-pane, keyed by session ref | Accepted |
 | [0043](./0043-operator-bar-rows-replace-the-bar-not-the-palette.md) | Operator bar rows replace the bar, not the palette (applies 0018 per surface) | Accepted |
 | [0046](./0046-an-urgent-patch-keeps-the-daily-cadence.md) | An urgent patch keeps the daily cadence | Accepted |
-| [0047](./0047-muse-panes-render-natively.md) | Muse panes render natively: no light-theme inversion | Accepted |
+| [0047](./0047-muse-panes-render-natively.md) | Muse panes render natively: no light-theme inversion (addendum 2026-09-21: the bit's own limit) | Accepted |
 | [0048](./0048-the-input-box-is-found-by-its-own-frame.md) | The input box is found by its own frame; the statusline bound only bounds what is stripped (amends 0004) | Accepted |
 | [0049](./0049-no-child-inherits-a-relocated-repository.md) | No child of Collie inherits a variable that relocates a git repository | Accepted |
-| [0050](./0050-opencode-sessions-are-pane-scoped.md) | Opencode sessions are pane-scoped, not server-scoped | Accepted (Pup) |
-| [0051](./0051-a-journal-image-reference-is-never-a-remote-url.md) | A journal image reference is this bridge's blob path or inline bytes, never a remote URL | Accepted (Pup) |
-| [0052](./0052-the-mirror-does-not-guess-images.md) | The mirror does not reconstruct terminal images; blank image rows collapse | Accepted (Pup) |
-| [0053](./0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md) | Pup tracks upstream wholesale and strips the pack, not the viewer | Accepted (Pup) |
-
+| [0051](./0051-the-phone-app-runs-react-router-in-library-mode.md) | The phone app runs React Router in library mode; four build seams framework mode would take | Accepted |
+| [0052](./0052-one-build-serves-any-mount.md) | One build serves any mount: `COLLIE_BASE_PATH` is a runtime setting the bridge applies when it serves the shell | Accepted |
+| [0053](./0053-an-unread-dialog-still-has-a-way-out.md) | An unread dialog still has a way out: a footer phrase never silences a grammar, and a raw-only modal gets its adapter's declared cancel key | Accepted |
+| [0054](./0054-a-printed-scale-is-tappable.md) | A printed scale is tappable: when the screen names every value the arrows move along, the card shows them all and a tap sends the delta as repeated arrow presses | Accepted |
+| [0055](./0055-a-pointed-list-is-walked-then-confirmed.md) | A pointed list is walked, then confirmed: an unnumbered list with a `❯` on one row is tapped as the arrow delta plus the commit key the footer named, and never a synthesised digit (applies 0054 to a list) | Accepted |
+| [0056](./0056-a-card-can-be-put-down.md) | A lifted card can be put down: every card carries a Terminal control that shows the rows it replaced, lasting only as long as that dialog | Accepted |
+| [0057](./0057-the-composer-is-one-box.md) | The composer is one box: the field, the attach control and Send share one bordered container with a toolbar row, the prompt-input pattern ported by hand | Accepted |
+| [0058](./0058-the-resume-picker-commits-with-enter.md) | The resume picker commits with Enter: the `/resume` session picker, recognised by its own title, search box and footer, lifts as a pointed list whose tap is the walk plus an unprinted Enter, a narrow exception to 0009 for this one dialog | Accepted |
+| [0059](./0059-a-card-docks-above-the-belt.md) | A card docks above the belt: every lifted card renders in one slot outside the mirror's scroller, directly above the actions belt, capped and scrolled inside (moves where 0056's card renders) | Accepted |
+| [0060](./0060-an-attachment-is-a-chip-not-a-path.md) | An attachment is a chip, not a path: an upload shows as a chip above the field and a `[Image #N]` marker in the draft, and Send swaps in the path where the marker stands | Accepted |
+| [0061](./0061-the-terminal-draft-notice-floats.md) | The terminal draft notice floats: it leaves the layout for an absolute slot at the mirror's bottom edge, above the card dock or the belt, and an x hides it until that draft is gone | Accepted |
+| [0063](./0063-a-pane-keeps-its-place-when-its-state-changes.md) | A pane keeps its place when its state changes: no list is ordered by status, the bridge and the crew merge send place order, every surface recomputes it, and urgency is a mark plus one summary line | Accepted |
+| [0065](./0065-the-changes-view-reads-git-read-only.md) | The Changes view reads git, read-only: HEAD as the base, nested repo discovery under two per-device settings, git hardened against repo-driven execution, and a diff served only for a repo and path the bridge itself listed | Accepted |
+| [0066](./0066-the-dashboard-has-a-footer-panes-needs-you-changes.md) | The dashboard has a footer: Panes, Attention, Changes. Attention filters to the attention panes and never sorts, Changes lists workspaces with counts that refresh every 5 s only while the tab is on screen, the tab is kept per device (amends nothing in 0063) | Amended in scope by 0068 |
+| [0067](./0067-back-goes-up-one-level.md) | Back goes up one level: down is a push that records `from`, sideways is a replace that carries it, up steps back onto a legitimate parent or replaces onto the structural one, a cold deep link is seeded with its parents, a POP draws no slide, and sheets own no history | Accepted |
+| [0068](./0068-the-second-tab-is-focus-not-attention.md) | The dashboard's second tab is Focus, not Attention: renamed for the same reason "Needs you" was, and `CircleDot` replaces `BellRing`, which read as a notification even in the quiet state (amends 0066 in scope) | Accepted |
+| [0069](./0069-a-row-glides-into-its-header.md) | A row glides into its header: one engine, hand-started same-document view transitions, forward on the tap and reverse only on the in-app back arrow, a crossfade when the landing isn't real, and no frozen screen because a network wait is paid before the transition starts, not during it | Accepted |
+| [9001](./9001-opencode-sessions-are-pane-scoped.md) | Opencode sessions are pane-scoped, not server-scoped | Accepted (Pup) |
+| [9002](./9002-a-journal-image-reference-is-never-a-remote-url.md) | A journal image reference is this bridge's blob path or inline bytes, never a remote URL | Accepted (Pup) |
+| [9003](./9003-the-mirror-does-not-guess-images.md) | The mirror does not reconstruct terminal images; blank image rows collapse | Accepted (Pup) |
+| [9004](./9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md) | Pup tracks upstream wholesale and strips the pack, not the viewer | Accepted (Pup) |
 Numbers are claimed across **both** lines: upstream's 0011–0016 were accepted on their `v1` while
-their `main` was still at 0010. On Pup, rows marked **(Pup)** are the fork's own decisions; the
-0011–0045 rows upstream uses for their pack/crew/STT/CLI machinery are gone with that machinery
-(ADR 0053), so their numbers stay reserved in the index but link nothing here. A new Pup ADR
-continues from the highest number in use; a merged upstream ADR keeps its own number.
+their `main` was still at 0010. On Pup, rows marked **(Pup)** are the fork's own decisions and live
+in the **9000 series** — upstream's own numbering grew into the 0050s (2026-09-23) and will keep
+growing, so the fork's numbers moved out of the way once, to numbers upstream can never reach. A
+merged upstream ADR keeps its own number; the rows upstream uses for their pack/crew/STT/CLI/update
+machinery are gone with that machinery (ADR 9004), so those numbers stay reserved in the index but
+link nothing here. A new Pup ADR continues from the highest 9000 in use.

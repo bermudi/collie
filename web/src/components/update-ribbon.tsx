@@ -114,6 +114,12 @@ export function UpdateRibbon() {
     );
   }
 
+  // THE WHOLE ROW IS THE TARGET (2026-09-23, upstream's shape). `ui/notice.tsx` used to forbid
+  // pairing a whole-surface tap with a separate dismiss — a <button> may not hold a second one — so
+  // a state that could be put down gave up the row-wide target. `Notice` now offers a shape for
+  // exactly this: an empty overlay button beside the body, so both stay independently tappable. The
+  // solo band's offer state has no dismiss at all (a newer release raises it again by design), so
+  // the whole row simply is the target, at the 44px floor the Notice union buys.
   return (
     <StripSlot priority={UPDATE}>
       <Notice {...shared} onActivate={() => void checkForUpdate()} />

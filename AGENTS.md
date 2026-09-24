@@ -4,7 +4,7 @@
 from upstream/main wholesale and stays there: upstream work arrives by ordinary merges, and Pup's
 own diff stays thin. What Pup strips — pack/crew/HA, speech-to-text, the TS `cli/`, agent beacons —
 and what it keeps — the whole viewer, i18n, the cache chip, e2e, lint — is decided once, in
-[`.adr/0053`](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md). Don't
+[`.adr/9004`](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md). Don't
 restate that ADR's reasoning here; link to it. Upstream repo: `AltanS/collie` · Fork: `bermudi/collie`
 · Plugin id stays `herdr.collie` (display name `Collie Pup`) so linked installs don't need a reinstall.
 
@@ -17,9 +17,12 @@ build/run, data layer, Herdr socket grammar, journal containment, security postu
 again**. If you're about to argue *why not* rather than *how*, check there first — if the answer
 isn't there and the decision is that shape, add one (see [`.adr/README.md`](./.adr/README.md)). Pup's
 gates live there: one managed front door (0001), no terminal emulator (0008), one major gate (0020),
-opencode pane-scoped (0050), generic menu digit ban (0009), the strip-fork strategy itself (0053).
-Rows marked **(Pup)** in the index are ours; upstream's ADRs arrive with their own numbers, and the
-0011–0045 numbers their pack/crew/STT machinery used are reserved-but-empty here.
+opencode pane-scoped (9001), generic menu digit ban (0009), the strip-fork strategy itself (9004).
+**Pup's own ADRs live in the 9000 series** — upstream's numbering grew into the 0050s on 2026-09-23
+and collided with Pup's post-rebranch numbers, so Pup's moved out of the way once, to numbers
+upstream can never reach. Rows marked **(Pup)** in the index are the 9000s; the 0011–0045 numbers
+(plus 0050/0062/0064, their crew/update-mode ADRs) their pack/crew/STT machinery used are
+reserved-but-empty here.
 
 ## Project
 
@@ -63,7 +66,7 @@ prompt-cache chip and watch (kept from upstream 1.10).
   Never `funnel`, never `0.0.0.0`. The dashboard is remote shell access — treat it like a root login.
 - Single scroll container on the dashboard. The page (`html`/`body`/`#root`) is `overflow-hidden`;
   only the list's inner `overflow-y-auto` scrolls.
-- Opencode sessions are pane-scoped ([ADR 0050](./.adr/0050-opencode-sessions-are-pane-scoped.md)) —
+- Opencode sessions are pane-scoped ([ADR 9001](./.adr/9001-opencode-sessions-are-pane-scoped.md)) —
   don't enumerate `opencode.db` / `GET /api/session` into phantom agents.
 - Major gate ([ADR 0020](./.adr/0020-a-major-upgrade-is-consented-by-flag.md)), menu digit ban
   ([ADR 0009](./.adr/0009-a-generic-menu-is-driven-by-the-keys-it-names.md)). Don't regress.

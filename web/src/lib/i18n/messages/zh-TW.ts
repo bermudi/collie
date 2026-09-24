@@ -4,6 +4,10 @@ import type { Dictionary } from "./en";
 // suffixes match.
 
 export const zhTW: Dictionary = {
+  "settings.updateBanner.restart": "需要重新啟動 Bridge",
+  "settings.updateBanner.releaseAvailable": "Collie {version} 已發布",
+  "settings.updateBanner.majorAvailable": "Collie {version} 發布（主要版本升級）",
+  "settings.updateBanner.copyAria": "複製指令：{command}",
   "settings.language.title": "語言",
   "settings.language.description": "終端機鏡像輸出不會被翻譯。",
 
@@ -28,14 +32,25 @@ export const zhTW: Dictionary = {
   "settings.install.description": "將 Collie 加入主畫面，支援全螢幕執行並顯示獨立圖示。",
   "settings.install.button": "安裝",
   "settings.install.iosHint": "在 iPhone 或 iPad 上，點選瀏覽器分享按鈕，選擇「加入主畫面」。",
-  "settings.harnessBar.title": "Harness shortcuts",
-  "settings.harnessBar.description": "A row of the running agent's own commands above the keys.",
+  "settings.harnessBar.title": "Harness 捷徑",
+  "settings.harnessBar.description": "按鍵上方一列執行中 agent 本身的指令。",
+  "settings.beltSize.title": "動作列大小",
+  "settings.beltSize.description": "輸入區上方動作列的高度，以及其圖示與文字的大小。",
+  "settings.beltSize.option.default": "預設",
+  "settings.beltSize.option.large": "大",
+  "settings.beltSize.option.larger": "較大",
   "settings.zen.title": "專注模式",
   "settings.zen.description": "在窗格選單中加入選項，隱藏終端機以外的所有介面元素。",
   "settings.zen.auto.label": "橫向時自動啟用",
   "settings.zen.auto.hint": "將手機橫向旋轉會自動開啟專注模式；轉回直向則自動關閉。",
 
   // --- settings.handsFree ---
+  "settings.handsFree.title": "語音直接傳送",
+  "settings.handsFree.description":
+    "語音轉錄完成後立即傳送，不經過輸入框緩衝。預設關閉，以便在內容寫入終端機前核對文字。",
+  "settings.handsFree.ariaLabel": "語音直接傳送：轉錄後立即傳送",
+
+  // --- settings.push ---
   "settings.push.title": "推播通知",
   "settings.push.description": "在 Agent 需要介入時接收通知。",
   "settings.push.reason.insecure": "推播功能需要 HTTPS 連線。",
@@ -59,13 +74,13 @@ export const zhTW: Dictionary = {
   "settings.notify.done.hint": "Agent 已完成目前工作",
   "settings.notify.updates.label": "版本更新",
   "settings.notify.updates.hint": "Collie 有新版本可用",
-  "settings.notify.cache.label": "Cache about to go cold",
+  "settings.notify.cache.label": "快取即將冷卻",
   "settings.notify.cache.hint":
-    "a pane's prompt cache expires in a few minutes; also covers panes you watched one by one",
-  "settings.notify.watched.title": "Watched panes",
-  "settings.notify.watched.empty": "None yet — open a pane's settings to watch it.",
-  "settings.notify.watched.remove": "Remove",
-  "settings.notify.watched.removeAria": "Stop watching {label}",
+    "窗格的 prompt cache 會在幾分鐘內過期，這也包含您逐一查看過的窗格",
+  "settings.notify.watched.title": "已監看窗格",
+  "settings.notify.watched.empty": "目前沒有，請開啟窗格的設定以監視它。",
+  "settings.notify.watched.remove": "移除",
+  "settings.notify.watched.removeAria": "停止監看 {label}",
 
   // --- settings.snooze ---
   "settings.snooze.title": "勿擾模式",
@@ -132,10 +147,6 @@ export const zhTW: Dictionary = {
   "settings.update.checking": "正在檢查…",
   "settings.update.error": "檢查更新失敗。",
   "settings.update.upToDate": "已是最新版本",
-  "settings.updateBanner.restart": "需要重新啟動 Bridge",
-  "settings.updateBanner.releaseAvailable": "Collie {version} 已發布",
-  "settings.updateBanner.majorAvailable": "Collie {version} 發布（主要版本升級）",
-  "settings.updateBanner.copyAria": "複製指令：{command}",
 
   // --- settings.typeface ---
   "settings.typeface.title": "介面字型",
@@ -172,6 +183,9 @@ export const zhTW: Dictionary = {
   "settings.display.rawTerminal.label": "原始終端機",
   "settings.display.rawTerminal.hint":
     "僅顯示純終端機鏡像，隱藏提示按鈕與狀態列。適用於對話框呈現異常時透過按鍵手動操作。",
+  "settings.display.noInvert.label": "以原始配色顯示此窗格",
+  "settings.display.noInvert.hint":
+    "僅對此窗格略過淺色主題的反色。當代理使用淺色主題而鏡像顯示為深色時開啟；顯示正常時保持關閉。",
   "settings.display.textSize.label": "字級大小",
   "settings.display.textSize.decrease": "縮小字級",
   "settings.display.textSize.increase": "放大字級",
@@ -197,16 +211,30 @@ export const zhTW: Dictionary = {
   "composer.placeholder.direct": "輸入終端機指令…",
   "composer.placeholder.shell": "輸入 Shell 指令…",
   "composer.placeholder.reply": "輸入回覆內容…",
+  "composer.mic.unavailable": "語音輸入不可用",
+  "composer.mic.stopAria": "停止錄音",
+  "composer.mic.recordAria": "錄製語音訊息",
+  "composer.mic.transcribing": "正在轉錄…",
+  "composer.mic.recording": "正在錄音 {elapsed}",
+  "composer.mic.handsFreeHint": "停止後自動傳送",
+  "composer.mic.manualHint": "內容將填入輸入框",
+  "composer.mic.stop": "停止",
+  "composer.mic.discardAria": "放棄錄音",
   "composer.attach.aria": "附加檔案",
   "composer.attach.title": "附加",
   "composer.attach.photos": "照片",
   "composer.attach.files": "檔案",
+  "composer.attach.listAria": "附件",
+  "composer.attach.removeAria": "移除 {name}",
+  "composer.attach.inFront": "您的文字中已缺少其標記，因此「傳送」會將 {name} 置於最前。",
   "composer.send.typeAnyway": "仍要輸入？",
   "composer.send.reallySend": "確認傳送？",
   "composer.send.stopTypingAria": "停止向終端機輸入",
   "composer.send.sendAria": "傳送",
   "composer.draft.tooLong": "內容過長，無法持久儲存為草稿。切換窗格時會保留，但離開應用程式後將遺失。",
   "composer.status.dialogWaiting": "有等待回應的對話框，請先處理後再傳送。",
+  "composer.status.unreadDialog":
+    "Collie 無法讀取此對話框。卡片上是 {key}。要繼續輸入，請再次點擊「傳送」。", // wordsmith
   "composer.status.paneNotWritable": "窗格已不可寫入，未傳送任何內容",
   "composer.status.inputChanged": "清空輸入框時內容發生變動，未寫入任何內容。請檢查窗格狀態。",
   "composer.status.clearFailed": "無法清空終端機目前輸入",
@@ -215,12 +243,10 @@ export const zhTW: Dictionary = {
   "composer.discard.confirmKeys.one": "再次點擊以放棄佇列中的 {count} 個按鍵",
   "composer.discard.confirmKeys.other": "再次點擊以放棄佇列中的 {count} 個按鍵",
   "composer.destructive.confirm": "破壞性操作：{reason}。再次點擊「傳送」以確認",
-  "composer.upload.success": "檔案已新增，路徑已填入訊息",
+  "composer.destructive.confirmOnHost": "破壞性操作：{host} 上的 {reason}。再次點擊「傳送」以確認",
+  "composer.upload.success": "檔案已附加",
   "composer.upload.tooLarge": "檔案超過此 collie 的 {max} MB 大小限制。",
   "composer.upload.badType": "Collie 無法附加 {name}。",
-  "composer.upload.successBatch": "已加入 {n} 個檔案，路徑在訊息中",
-  "composer.upload.mixed": "已加入 {total} 個中的 {attached} 個 — {detail}",
-  "composer.upload.nothing": "未加入任何檔案 — {detail}",
   "composer.noEcho.title": "密碼提示（無回顯）",
   "composer.noEcho.noLiveTyped":
     "已輸入內容目前位於窗格中但尚未提交。目前檢視不是即時狀態，無法在此傳送。請直接在終端機中處理。",
@@ -233,6 +259,7 @@ export const zhTW: Dictionary = {
   "composer.noEcho.dismissAria": "關閉密碼提示通知",
   "composer.draftPreview.title": "終端機中的草稿",
   "composer.draftPreview.takeOver": "接管",
+  "composer.draftPreview.dismissAria": "關閉終端機草稿提示",
 
   // --- sendMode (the armed "typing straight through" indicator) ---
   "sendMode.armed.title": "終端機直接輸入",
@@ -258,6 +285,8 @@ export const zhTW: Dictionary = {
   "chat.scrollback.showHistory": "查看完整記錄",
   "chat.scrollback.loadOlder": "載入較早記錄",
   "chat.scrollback.loading": "正在載入…",
+  "chat.scrollback.noSessionReported":
+    "{agent} 尚未向 Herdr 回報工作階段。請安裝或更新對應的 Herdr 整合，並在目前窗格重新啟動該 Agent。",
   "chat.fullReply.title": "完整回覆",
   "chat.fullReply.fromTranscript": "來自記錄",
   "chat.fullReply.showingTerminal": "正在顯示終端機",
@@ -302,16 +331,16 @@ export const zhTW: Dictionary = {
   "prompt.feedback.freeText.typedPrefix": "正在終端機中輸入自訂內容：",
 
   // --- paneSettings (one pane's own preferences; today the prompt-cache warning, ADR 0042) ---
-  "paneSettings.title": "Pane settings",
-  "paneSettings.cacheWatch.label": "Warn me before this pane's cache goes cold",
-  "paneSettings.cacheWatch.hint": "about {minutes} minutes before it expires",
-  "paneSettings.cacheWatch.pushOff": "Turn notifications on for this device in Settings first.",
-  "paneSettings.cacheWatch.globalOn": "Settings warns about every pane, so this one is covered.",
-  "paneSettings.cacheWatch.noSession": "This pane's agent names no session, so there is nothing to watch.",
+  "paneSettings.title": "窗格設定",
+  "paneSettings.cacheWatch.label": "在此窗格的快取變冷前發出警告",
+  "paneSettings.cacheWatch.hint": "約在過期前 {minutes} 分鐘",
+  "paneSettings.cacheWatch.pushOff": "請先在「設定」中開啟此裝置的通知。",
+  "paneSettings.cacheWatch.globalOn": "「設定」會針對每個窗格發出警告，因此這個窗格也包含在內。",
+  "paneSettings.cacheWatch.noSession": "此窗格的 agent 未指定工作階段名稱，因此沒有可監看的內容。",
 
   // --- paneActions (long-press sheet: rename / close a pane) ---
   "paneActions.title.fallback": "窗格",
-  "paneActions.settings.label": "Pane settings",
+  "paneActions.settings.label": "窗格設定",
   "paneActions.readOnly": "唯讀模式。目前裝置無權重新命名或關閉窗格。",
   "paneActions.rename.label": "重新命名",
   "paneActions.rename.placeholder": "窗格名稱",
@@ -360,6 +389,19 @@ export const zhTW: Dictionary = {
   "home.sidebar.paneActionsTitle": "查看窗格操作選項",
   "home.row.tabPosition": "分頁 {n}",
   "home.row.unseen": "未讀",
+  "home.tabs.aria": "資訊主頁檢視",
+  "home.tabs.panes": "窗格",
+  "home.tabs.focus": "焦點",
+  "home.tabs.blocked.one": "{count} 個已封鎖",
+  "home.tabs.blocked.other": "{count} 個已封鎖",
+  "home.tabs.unseen": "已結束的未檢視窗格",
+  "home.changes.listAria": "依工作區劃分的變更",
+  "home.changes.loading": "正在讀取…",
+  "home.changes.clean": "沒有變更",
+  "home.changes.noFolder": "沒有資料夾",
+  "home.changes.unavailable": "無法讀取變更",
+  "home.changes.files.one": "{count} 個檔案",
+  "home.changes.files.other": "{count} 個檔案",
 
   // --- status (triage sections, status labels, counts) ---
   "status.section.needsYou": "待處理",
@@ -417,6 +459,7 @@ export const zhTW: Dictionary = {
   "space.tab.titleFallback": "分頁",
   "space.tab.titleWithLabel": "分頁 {label}",
   "space.tab.readOnly": "唯讀模式，目前裝置無權修改名稱或關閉分頁。",
+  "space.tab.hostBlockSuffix": "{hostBlock}，回應前無法重新命名或關閉。",
   "space.tab.rename": "重新命名",
   "space.tab.close": "關閉分頁",
   "space.tab.closing": "正在關閉…",
@@ -450,13 +493,13 @@ export const zhTW: Dictionary = {
   // --- harnessBar (the row of the running agent's own commands, above the keys) ---
   // Slash commands are NEVER translated — they are wire text the harness parses — and neither is an
   // operator's own `bar_label`. Only these labels are.
-  "harnessBar.label": "Harness shortcuts",
-  "harnessBar.model": "Model",
+  "harnessBar.label": "Harness 捷徑",
+  "harnessBar.model": "模型",
   "harnessBar.effort": "Effort",
-  "harnessBar.compact": "Compact",
-  "harnessBar.resume": "Resume",
-  "harnessBar.tree": "Tree",
-  "harnessBar.confirmAria": "Tap again to confirm {command}",
+  "harnessBar.compact": "精簡",
+  "harnessBar.resume": "繼續",
+  "harnessBar.tree": "樹狀圖",
+  "harnessBar.confirmAria": "再次輕點以確認 {command}",
 
   // --- quickActions (one-tap reply dock) ---
   "quickActions.group.confirm": "確認",
@@ -486,6 +529,23 @@ export const zhTW: Dictionary = {
   "connection.withLastSeen": "{cause}，最後上線時間：{time}",
   "connection.readOnly.notPaired": "尚未配對。在設定中配對此裝置後才能向 Agent 輸入。",
   "connection.readOnly.device": "唯讀模式。此裝置無權向 Agent 輸入{deviceSuffix}。",
+  "connection.host.lastSeen": "最後上線：{time}",
+  "connection.host.neverSeen": "從未上線",
+  "connection.host.unreachablePlain": "無法連線",
+  "connection.host.unreachableSuffix": "無法連線 · {label}",
+  "connection.host.incompatible": "不相容",
+  "connection.host.lead": "主節點",
+  "connection.host.onPrefix": "執行於",
+  "connection.host.ariaSends": "傳送至主機：{name}{unreachable}",
+  "connection.host.ariaHost": "主機：{name}{unreachable}",
+  "connection.host.ariaUnreachableSuffix": "（無法連線）",
+  "connection.host.ariaSuffix": "（{word}）",
+  "connection.host.reconnecting": "正在重新連線",
+  "connection.host.attention": "需要處理",
+  "connection.host.reconnectingSuffix": "正在重新連線 · {label}",
+  "connection.host.attentionSuffix": "需要處理 · {label}",
+  "connection.host.reconnectingAction": "主節點仍在嘗試連線，無需操作。",
+  "connection.host.attentionAction": "重試無法解決此問題，請檢查此主機。",
   "connection.stale.incompatible": "{name} 執行的 Collie 版本不相容",
   "connection.stale.unreachable": "{name} 無法連線 · {label}",
   "connection.stale.nothingCached": "此主機目前沒有快取資料。",
@@ -496,13 +556,15 @@ export const zhTW: Dictionary = {
   "connection.session.aria": "工作階段：{name}。切換工作階段",
   "connection.session.primary": "主要工作階段",
   "connection.session.unreachable": "無法連線",
+  "connection.session.ariaIn": "目前工作階段：{name}",
   "connection.session.all": "所有工作階段",
   "connection.session.allDescription": "此機器上的所有工作階段清單",
   "connection.session.allAria": "正在顯示所有工作階段。切換工作階段",
   "connection.server.title": "主機",
   "connection.server.aria": "主機：{name}。切換主機",
 
-  // --- crew ---
+
+  // --- error (boot splash, route-level error recovery) ---
   "error.boot.connecting": "正在連線節點…",
   "error.boot.title": "未連線",
   "error.boot.body": "無法連線至 Collie。請檢查主機網路連線後再試一次。",
@@ -521,8 +583,7 @@ export const zhTW: Dictionary = {
 
   // --- pwa (self-update banner) ---
   "pwa.updateAvailable": "發現新版本，點擊以套用更新",
-  "pwa.updateInstalling": "Downloading the new version…",
-  "updateRibbon.hideNotice": "隱藏此通知",
+  "pwa.updateInstalling": "正在下載新版本…",
 
   // --- history (pane transcript route) ---
   "history.unavailable.disabled": "目前 Bridge 已停用工作階段記錄（COLLIE_TRANSCRIPT）。",
@@ -552,15 +613,29 @@ export const zhTW: Dictionary = {
 
   // --- mirror (terminal graphics in the pane mirror) ---
   "mirror.blankLines": "[{n} 行空白]",
+  "mirror.imageAlt": "終端機圖形",
+  "mirror.imageBadge": "[圖片]",
+  "mirror.imageMatchedByOrder": "依順序比對，開啟歷史記錄確認",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "剛剛",
   "time.compact.now": "現在",
 
-  // --- sync (how fresh the herd on screen is, and asking for a fresher one) ---
 
   // --- dialog (menu / multi-select / wizard / preview-select block renderers) ---
   "dialog.sendingAria": "正在傳送",
+  // TODO wordsmith
+  "dialog.terminalControl": "終端機",
+  // TODO wordsmith
+  "dialog.terminalControlAria": "顯示終端機而非此卡片",
+  // TODO wordsmith
+  "dialog.backToCard": "返回卡片",
+  // TODO wordsmith
+  "dialog.putAwayControl": "收合",
+  // TODO wordsmith
+  "dialog.putAwayControlAria": "隱藏此資訊卡的按鈕，保留終端機",
+  // TODO wordsmith
+  "dialog.showButtons": "顯示按鈕",
   "dialog.previousStepAria": "上一步",
   "dialog.nextStepAria": "下一步",
   "dialog.answeredAria": "已完成",
@@ -580,6 +655,11 @@ export const zhTW: Dictionary = {
   "dialog.menu.moveDown": "下移",
   "dialog.menu.leftAria": "向左：{verb}（{label}）",
   "dialog.menu.rightAria": "向右：{verb}（{label}）",
+  // TODO wordsmith
+  "dialog.menu.levelAria": "{verb}至 {label}",
+  // TODO wordsmith
+  "dialog.menu.levelCurrentAria": "{label}，目前",
+  "unreadDialog.caption": "Collie 無法讀取此對話框", // wordsmith
   "dialog.preview.currentAnswerAria": "目前回答",
   "dialog.preview.previewedBelowAria": "下方顯示預覽",
   "dialog.preview.previewLabel": "預覽 · {label}",
@@ -616,7 +696,8 @@ export const zhTW: Dictionary = {
   "promptAction.feedback.boxNotOpened": "回饋輸入框未能開啟，請檢查對應窗格",
   "promptAction.feedback.notArrived": "回饋未能送達，未提交任何變更",
 
-  // --- stt (speech-to-text errors, lib/stt.ts + hooks/use-stt-recorder.ts) ---
+
+  // --- directTyping (the composer's "Type into terminal" mode, hooks/use-direct-typing.ts) ---
   "directTyping.status.draftPending": "直接輸入終端機前，必須先傳送或清空草稿。",
   "directTyping.status.armed": "已直接連線終端機，按鍵即時傳送。",
   "directTyping.status.disarmed": "已切換為傳送一般訊息",
@@ -658,8 +739,8 @@ export const zhTW: Dictionary = {
   "apiError.pairing.bad_code": "配對代碼不符。",
   "apiError.pairing.duplicate_label": "此裝置名稱已被使用。",
   "apiError.device.unknown": "找不到符合此名稱的已配對裝置。",
-  "apiError.cache.pane_unknown": "That pane is gone, nothing was changed.",
-  "apiError.cache.no_session": "That pane's agent names no session, so it can't be watched.",
+  "apiError.cache.pane_unknown": "該 pane 已不存在，未進行任何變更。",
+  "apiError.cache.no_session": "該 pane 的 agent 未指定 session，因此無法監視。",
   "apiError.session.unknown": "目前 collie 上不存在名為 {session} 的工作階段。",
   // --- worktrees (ADR 0032) ---
   "apiError.worktree.list_failed": "取得 worktree 清單失敗：{reason}",
@@ -686,87 +767,176 @@ export const zhTW: Dictionary = {
   "space.new.tab.plain": "空間",
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "儲存庫",
+  "space.new.host.label": "主機",
   "worktree.orOpenExisting": "或開啟現有 Worktree",
-  // --- settings.updateCard (the update card, M15/05) ---
-  "cache.warm": "Prompt cache warm",
-  "cache.expiring": "Prompt cache expiring",
-  "cache.cold": "cold",
-  "cache.unknown": "Prompt cache not known",
+  // --- apiError.update (POST /api/update refusals, M15/05) ---
+
+  // --- M16/01: the updates page, its crew lines and the Settings row ---
+  // The prompt-cache chip and its sheet (M28/02). Mirrored from English verbatim: these are new
+  // keys, and a translation is a separate `wordsmith --translate` pass over this file.
+  "cache.warm": "Prompt 快取已溫熱",
+  "cache.expiring": "Prompt 快取即將過期",
+  "cache.cold": "冷",
+  "cache.unknown": "Prompt 快取狀態未知",
   "cache.under1m": "<1m",
-  "cache.overridden": "TTL set in cache-rules.toml",
-  "cache.sheet.title": "Prompt cache",
-  "cache.sheet.rule": "Rule",
-  "cache.sheet.ttl": "Stays warm for",
-  "cache.sheet.ttlMinutes": "{minutes} min",
-  "cache.sheet.confidence": "Confidence",
-  "cache.sheet.source": "Read on",
-  "cache.sheet.retrieved": "Checked",
-  "cache.sheet.measured": "Measured on this machine",
-  "cache.sheet.lastRead": "last read {age}",
-  "cache.sheet.overridden": "Moved by cache-rules.toml",
-  "cache.sheet.thisMachine": "This machine",
-  "cache.sheet.onPeer": "Read on {host}. Its rule catalog is not forwarded, so the source is not quoted here.",
+  "cache.overridden": "TTL 於 cache-rules.toml 設定",
+  "cache.sheet.title": "Prompt 快取",
+  "cache.sheet.rule": "規則",
+  "cache.sheet.ttl": "維持溫熱時間為",
+  "cache.sheet.ttlMinutes": "{minutes} 分鐘",
+  "cache.sheet.confidence": "信賴度",
+  "cache.sheet.source": "讀取於",
+  "cache.sheet.retrieved": "已檢查",
+  "cache.sheet.measured": "於此機器測量",
+  "cache.sheet.lastRead": "上次讀取於 {age}",
+  "cache.sheet.overridden": "由 cache-rules.toml 移動",
+  "cache.sheet.thisMachine": "此機器",
+  "cache.sheet.onPeer": "在 {host} 上讀取。其規則目錄未轉發，因此此處未引用來源。",
   "cache.sheet.reset.pending": "上一輪之後：{action}。下一輪將重建快取。",
   "cache.sheet.reset.cause": "上一輪之前：{action}。那一輪重建了快取。",
-  "cache.sheet.state": "State",
-  "cache.sheet.state.warm": "Warm",
-  "cache.sheet.state.expiring": "Expiring",
-  "cache.sheet.state.cold": "Cold",
-  "cache.confidence.documented": "documented",
-  "cache.confidence.reported": "reported",
-  "cache.confidence.inferred": "inferred",
-  "cache.confidence.observed": "measured",
-  "tour.skip": "Skip",
-  "tour.title": "Collie shows the agents in your terminal.",
+  "cache.sheet.state": "狀態",
+  "cache.sheet.state.warm": "溫熱",
+  "cache.sheet.state.expiring": "即將過期",
+  "cache.sheet.state.cold": "冷",
+  "cache.confidence.documented": "已記錄",
+  "cache.confidence.reported": "已回報",
+  "cache.confidence.inferred": "已推斷",
+  "cache.confidence.observed": "已測量",
+  "updateRibbon.hideNotice": "隱藏此通知",
+
+  // --- tour (the first-run screen) --- ENGLISH, not yet translated.
+  "tour.skip": "略過",
+  "tour.title": "Collie 會顯示您終端機中的 agent。",
   // The claim's second sentence, in the three forms the facts can support. {mux} is the
   // multiplexer's display name, {host} the lead machine's crew label; a clause whose fact is missing
   // is dropped rather than filled with a placeholder.
   "tour.lead":
-    "It mirrors the panes running under {mux} on {host}. It shows what is on those screens, and it never runs a terminal of its own.",
+    "它會鏡像在 {host} 上由 {mux} 執行的窗格。它會顯示這些螢幕上的內容，且本身絕不執行終端機。",
+  "tour.leadNoHost":
+    "它會鏡像在 {mux} 下執行的窗格。它會顯示這些螢幕上的內容，而且本身絕不執行終端機。",
   "tour.leadNoMux":
-    "It mirrors the panes running in your terminal multiplexer. It shows what is on those screens, and it never runs a terminal of its own.",
+    "它會鏡像終端機多工器中執行的窗格。它會顯示這些畫面上的內容，且本身絕不執行終端機。",
 
   // Your setup. Every row is a fact this snapshot carries, or the row is absent.
-  "tour.setup": "Your setup",
-  "tour.setup.panes.one": "{count} pane",
-  "tour.setup.panes.other": "{count} panes",
-  "tour.setup.needsYou.one": "{count} needs you",
-  "tour.setup.needsYou.other": "{count} need you",
-  "tour.setup.noPanes": "No panes yet",
-  "tour.setup.canType": "This device can type",
-  "tour.setup.readOnly": "This device can read only",
-  "tour.setup.pushOff": "Notifications are off on this phone",
+  "tour.setup": "您的設定",
+  "tour.setup.panes.one": "{count} 個窗格",
+  "tour.setup.panes.other": "{count} 個窗格",
+  "tour.setup.needsYou.one": "{count} 個需要您處理",
+  "tour.setup.needsYou.other": "{count} 個需要您處理",
+  "tour.setup.noPanes": "尚無窗格",
+  "tour.setup.machines.one": "您的 crew 中有 {count} 部機器",
+  "tour.setup.machines.other": "您的 crew 中有 {count} 部機器",
+  "tour.setup.canType": "此裝置可以輸入",
+  "tour.setup.readOnly": "此裝置僅能讀取",
+  "tour.setup.pushOff": "此手機已關閉通知",
 
   // Do this next. At most two cards, first match wins, in this order.
-  "tour.doNext": "Do this next",
-  "tour.pair.title": "Pair this phone",
-  "tour.pair.body": "Run collie pair on the host, then type the code in Settings.",
-  "tour.pair.button": "Pair",
-  "tour.space.title": "Nothing is running yet",
-  "tour.space.body": "Start an agent in your terminal, or make a space here.",
-  "tour.space.button": "New space",
-  "tour.pushCard.title": "Be told when a pane needs you",
-  "tour.pushCard.body": "Collie notifies you when an agent is blocked, or done.",
-  "tour.install.title": "Keep Collie on your home screen",
-  "tour.install.body": "It opens full screen and remembers where you were.",
-  "tour.install.button": "Add",
-  "tour.push.enable": "Turn on",
-  "tour.push.enabled": "Notifications are on for this device.",
+  "tour.doNext": "下一步操作",
+  "tour.pair.title": "配對此手機",
+  "tour.pair.body": "在主機上執行 collie pair，然後在「設定」中輸入代碼。",
+  "tour.pair.button": "配對",
+  "tour.space.title": "尚未執行任何內容",
+  "tour.space.body": "在您的終端機中啟動 agent，或在此處建立空間。",
+  "tour.space.button": "新增空間",
+  "tour.pushCard.title": "當窗格需要您處理時接收通知",
+  "tour.pushCard.body": "當 agent 受阻或完成時，Collie 會通知你。",
+  "tour.install.title": "將 Collie 保留在主畫面上",
+  "tour.install.body": "它會以全螢幕開啟，並記住您上次停留的位置。",
+  "tour.install.button": "新增",
+  "tour.push.enable": "開啟",
+  "tour.push.enabled": "此裝置已開啟通知。",
 
   // What you can do here. The six lines the site sells and the app never said.
-  "tour.can": "What you can do here",
-  "tour.can.mirror": "Read the live pane, colour and all.",
-  "tour.can.answer": "Answer a prompt by tapping its card.",
-  "tour.can.type": "Type a reply, or send Esc, Tab and Ctrl keys.",
-  "tour.can.harness": "Set model and effort from the actions row.",
-  "tour.can.session": "Read the whole session, past the scrollback.",
-  "tour.done.pane": "Open the pane that needs you",
-  "tour.done.dashboard": "Show the dashboard",
+  "tour.can": "你在這裡可以執行的操作",
+  "tour.can.mirror": "讀取即時 pane，包含完整色彩。",
+  "tour.can.answer": "輕點提示卡的區塊來回覆。",
+  "tour.can.type": "輸入回覆，或傳送 Esc、Tab 與 Ctrl 鍵。",
+  "tour.can.harness": "從動作列設定 model 與 effort。",
+  "tour.can.session": "讀取整個 session，超出 scrollback 的部分也能看。",
+  "tour.can.crew": "從單一 URL 查看你 crew 中的每部機器。",
+
+  // The footer's one button. The first spelling opens the blocked pane; the second closes the sheet.
+  "tour.done.pane": "開啟需要你處理的 pane",
+  "tour.done.dashboard": "顯示儀表板",
 
   // --- settings.tour ---
-  "settings.tour.title": "Show the first screen again",
-  "settings.tour.description": "What Collie does, and what this install looks like.",
-  "settings.tour.button": "Show",
+  "settings.tour.title": "再次顯示第一個畫面",
+  "settings.tour.description": "Collie 的功能，以及此安裝的架構外觀。",
+  "settings.tour.button": "顯示",
 
-  // --- updateScreen (M28/01): English until translated. ---
+
+
+  // --- changes (ADR 0065) ---
+  "chat.changes.label": "變更",
+  "changes.title": "變更",
+  "changes.backAria.dashboard": "返回資訊主頁",
+  "changes.backAria.workspace": "返回工作區",
+  "changes.backAria.pane": "返回窗格",
+  "changes.listBackAria": "返回清單",
+  "changes.refreshAria": "重新整理變更",
+  "changes.loading": "正在讀取變更…",
+  "changes.empty": "自上次提交以來沒有任何變更。",
+  "changes.unavailable.noFolder": "Collie 找不到此工作區的資料夾，因此沒有可顯示的變更。",
+  "changes.unavailable.noGit": "此電腦未安裝 Git。",
+  "changes.unavailable.noPane": "此窗格已不存在。",
+  "changes.unavailable.noWorkspace": "此工作區已不存在。",
+  "changes.error": "無法讀取變更。輕觸重新整理以再試一次。",
+  "changes.stale": "未更新",
+  "changes.truncated": "清單已達上限，因此可能遺漏部分存放庫或檔案。",
+  "changes.bound.depth.one": "已在第 {count} 層停止，更深層還有存放庫。",
+  "changes.bound.depth.other": "已在 {count} 層停止，更深層仍有存放庫。",
+  "changes.bound.settings": "在「設定」中查看更深層",
+  "changes.thisPane": "此窗格",
+  "changes.repoFiles.one": "{name} · {count} 個檔案",
+  "changes.repoFiles.other": "{name} · {count} 個檔案",
+  "changes.status.M": "已修改",
+  "changes.status.A": "已新增",
+  "changes.status.D": "已刪除",
+  "changes.status.R": "已重新命名",
+  "changes.status.untracked": "未追蹤",
+  "changes.binaryShort": "二進位",
+  "changes.file.binary": "二進位檔案，不顯示。",
+  "changes.file.directory": "新資料夾。未逐一列出其中的檔案。",
+  "changes.file.truncated": "diff 在此處停止。長度過長，無法完整顯示。",
+  "changes.file.unknown": "此檔案已不在變更清單中。請返回並重新整理。",
+  "changes.file.gone": "已無變更",
+  "changes.file.error": "無法讀取此 diff。",
+  "changes.file.noLines": "無行變更。",
+  "changes.file.renamedFrom": "已從 {path} 重新命名",
+  "changes.file.prev": "上一個檔案",
+  "changes.file.next": "下一個檔案",
+  "changes.layout.aria": "版面配置",
+  "changes.layout.list": "清單",
+  "changes.layout.tree": "樹狀圖",
+  "changes.tree.folderAria.one": "{name}，{count} 個檔案",
+  "changes.tree.folderAria.other": "{name}，{count} 個檔案",
+  "changes.filter.button": "篩選檔案",
+  "changes.filter.buttonActive": "篩選檔案，顯示 {total} 個中的 {shown} 個",
+  "changes.filter.placeholder": "依路徑篩選",
+  "changes.filter.clearText": "清除文字",
+  "changes.filter.statusAria": "依狀態篩選",
+  "changes.filter.shown": "{total} 個檔案中的 {shown} 個",
+  "changes.filter.none": "沒有相符的檔案。",
+  "changes.filter.clear": "清除篩選條件",
+  "changes.commit.show": "顯示最後一次提交",
+  "changes.commit.showFor": "顯示 {name} 的最後一次提交",
+  "changes.commit.cleanHeading": "沒有未提交的變更",
+  "changes.commit.title": "最新 commit",
+  "changes.commit.backAria": "返回該 commit",
+  "changes.commit.loading": "正在讀取 commit…",
+  "changes.commit.error": "無法讀取該 commit。輕觸重新整理以再試一次。",
+  "changes.commit.noCommit": "此 repo 尚無任何 commit。",
+  "changes.commit.unknown": "Collie 找不到此存放庫。請返回並重新整理。",
+  "changes.commit.empty": "此 commit 未變更任何檔案。",
+  "changes.commit.newer": "存在較新的 commit",
+  "changes.commit.uncommitted": "新的未 commit 變更",
+  "changes.commit.fileNewer": "此存放庫有較新的 commit。請返回並載入該 commit 以讀取此檔案。",
+  "settings.changes.title": "變更",
+  "settings.changes.description": "窗格的「變更」檢視尋找 git repo 的方式。",
+  "settings.changes.nested.label": "在此資料夾內尋找 repo",
+  "settings.changes.nested.hint": "同時顯示位於窗格資料夾之下的存放庫，即使上層存放庫忽略該存放庫也會顯示。",
+  "settings.changes.depth.label": "搜尋深度",
+  "settings.changes.depth.hint": "窗格資料夾下方的資料夾層級數。",
+  "settings.changes.depth.levels.one": "{count} 層",
+  "settings.changes.depth.levels.other": "{count} 層",
 };

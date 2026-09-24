@@ -3,6 +3,10 @@ import type { Dictionary } from "./en";
 // Japanese. See de.ts for the typing contract. One plural category, so both suffixes match.
 
 export const ja: Dictionary = {
+  "settings.updateBanner.restart": "Bridgeの再起動が必要です",
+  "settings.updateBanner.releaseAvailable": "Collie {version} が利用可能です",
+  "settings.updateBanner.majorAvailable": "Collie {version} (メジャーアップデート)",
+  "settings.updateBanner.copyAria": "コマンドをコピー: {command}",
   "settings.language.title": "言語",
   "settings.language.description": "ターミナル出力は翻訳されません。",
 
@@ -28,14 +32,25 @@ export const ja: Dictionary = {
   "settings.install.description": "ホーム画面に Collie を追加して、全画面と専用アイコンで起動します。",
   "settings.install.button": "インストール",
   "settings.install.iosHint": "iOS または iPadOS では、ブラウザの共有メニューから「ホーム画面に追加」を選択します。",
-  "settings.harnessBar.title": "Harness shortcuts",
-  "settings.harnessBar.description": "A row of the running agent's own commands above the keys.",
+  "settings.harnessBar.title": "Harnessショートカット",
+  "settings.harnessBar.description": "キーの上に、実行中のエージェント固有のコマンドが並びます。",
+  "settings.beltSize.title": "アクションベルトのサイズ",
+  "settings.beltSize.description": "入力欄の上にあるアクション行の高さ、およびそのアイコンと文字の大きさ。",
+  "settings.beltSize.option.default": "デフォルト",
+  "settings.beltSize.option.large": "大",
+  "settings.beltSize.option.larger": "特大",
   "settings.zen.title": "Zen モード",
   "settings.zen.description": "ペインメニューに、ターミナル以外のUI要素を非表示にする項目を追加します。",
   "settings.zen.auto.label": "横向きで自動的に有効化",
   "settings.zen.auto.hint": "本体を横向きにすると Zen モードが自動的に開き、縦に戻すと閉じます。",
 
   // --- settings.handsFree ---
+  "settings.handsFree.title": "ハンズフリー音声入力",
+  "settings.handsFree.description":
+    "音声認識テキストを入力欄に挿入せず、そのまま送信します。デフォルトはオフです。送信前の確認を省略します。",
+  "settings.handsFree.ariaLabel": "ハンズフリー音声入力: 音声認識結果を即時送信",
+
+  // --- settings.push ---
   "settings.push.title": "プッシュ通知",
   "settings.push.description": "エージェントがユーザー入力を要求した際に通知します。",
   "settings.push.reason.insecure": "プッシュ通知には HTTPS 接続が必要です。",
@@ -62,13 +77,13 @@ export const ja: Dictionary = {
   "settings.notify.done.hint": "エージェントがタスクを完了したとき",
   "settings.notify.updates.label": "アップデート",
   "settings.notify.updates.hint": "新しい Collie のリリースが存在するとき",
-  "settings.notify.cache.label": "Cache about to go cold",
+  "settings.notify.cache.label": "キャッシュがまもなく失効します",
   "settings.notify.cache.hint":
-    "a pane's prompt cache expires in a few minutes; also covers panes you watched one by one",
-  "settings.notify.watched.title": "Watched panes",
-  "settings.notify.watched.empty": "None yet — open a pane's settings to watch it.",
-  "settings.notify.watched.remove": "Remove",
-  "settings.notify.watched.removeAria": "Stop watching {label}",
+    "ペインのプロンプトキャッシュが数分で期限切れになります。個別に監視しているペインも対象です。",
+  "settings.notify.watched.title": "監視中のペイン",
+  "settings.notify.watched.empty": "まだありません。ペインの設定を開いて監視を開始してください。",
+  "settings.notify.watched.remove": "削除",
+  "settings.notify.watched.removeAria": "{label} の監視を停止",
 
   // --- settings.snooze ---
   "settings.snooze.title": "通知の一時停止",
@@ -143,10 +158,6 @@ export const ja: Dictionary = {
   "settings.update.checking": "確認中…",
   "settings.update.error": "確認に失敗しました。",
   "settings.update.upToDate": "最新バージョンです",
-  "settings.updateBanner.restart": "Bridgeの再起動が必要です",
-  "settings.updateBanner.releaseAvailable": "Collie {version} が利用可能です",
-  "settings.updateBanner.majorAvailable": "Collie {version} (メジャーアップデート)",
-  "settings.updateBanner.copyAria": "コマンドをコピー: {command}",
 
   // --- settings.typeface ---
   "settings.typeface.title": "UIフォント",
@@ -183,6 +194,9 @@ export const ja: Dictionary = {
   "settings.display.rawTerminal.label": "未加工ターミナル",
   "settings.display.rawTerminal.hint":
     "プロンプトボタンやステータス表示を除いた素の出力を表示します。ダイアログの表示崩れを手動で制御する際に使用します。",
+  "settings.display.noInvert.label": "このペインをそのまま表示",
+  "settings.display.noInvert.hint":
+    "このペインだけライトテーマの反転を行いません。エージェントがライトテーマで、ミラーが暗く表示される場合にオンにしてください。表示が正しい場合はオフのままにします。",
   "settings.display.textSize.label": "文字サイズ",
   "settings.display.textSize.decrease": "文字サイズを縮小",
   "settings.display.textSize.increase": "文字サイズを拡大",
@@ -208,10 +222,22 @@ export const ja: Dictionary = {
   "composer.placeholder.direct": "ターミナルへ入力…",
   "composer.placeholder.shell": "シェルコマンドを入力…",
   "composer.placeholder.reply": "返信を入力…",
+  "composer.mic.unavailable": "音声入力は利用できません",
+  "composer.mic.stopAria": "録音停止",
+  "composer.mic.recordAria": "音声メッセージを録音",
+  "composer.mic.transcribing": "文字起こし中…",
+  "composer.mic.recording": "録音中 {elapsed}",
+  "composer.mic.handsFreeHint": "録音停止時に送信されます",
+  "composer.mic.manualHint": "メッセージ入力欄に挿入されます",
+  "composer.mic.stop": "停止",
+  "composer.mic.discardAria": "録音を破棄",
   "composer.attach.aria": "ファイルを添付",
   "composer.attach.title": "添付",
   "composer.attach.photos": "写真",
   "composer.attach.files": "ファイル",
+  "composer.attach.listAria": "添付ファイル",
+  "composer.attach.removeAria": "{name}を削除",
+  "composer.attach.inFront": "テキストからマーカーが消えたため、送信時に先頭へ {name} が付きます。",
   "composer.send.typeAnyway": "強制的に入力しますか？",
   "composer.send.reallySend": "送信しますか？",
   "composer.send.stopTypingAria": "ターミナルへの入力を停止",
@@ -219,6 +245,8 @@ export const ja: Dictionary = {
   "composer.draft.tooLong":
     "下書き保存の上限を超えています。ペイン切り替え時は保持されますが、アプリ終了時に破棄されます。",
   "composer.status.dialogWaiting": "対話プロンプトの応答待ちです。先に応答してから送信してください。",
+  "composer.status.unreadDialog":
+    "Collie はこの対話を読み取れません。カードに {key} があります。それでも入力するには、もう一度送信をタップしてください。", // wordsmith
   "composer.status.paneNotWritable": "ペインが書き込み不可になったため、送信を中止しました",
   "composer.status.inputChanged":
     "消去中に入力内容が変更されたため、入力を中断しました。ペインを確認してください。",
@@ -228,12 +256,10 @@ export const ja: Dictionary = {
   "composer.discard.confirmKeys.one": "もう一度タップすると待機中の{count}キーを破棄します",
   "composer.discard.confirmKeys.other": "もう一度タップすると待機中の{count}キーを破棄します",
   "composer.destructive.confirm": "破壊的操作: {reason}。確認のため送信を再タップしてください",
-  "composer.upload.success": "ファイルを追加しました（パスを挿入）",
+  "composer.destructive.confirmOnHost": "破壊的操作: {host}上の{reason}。確認のため送信を再タップしてください",
+  "composer.upload.success": "ファイルを添付しました",
   "composer.upload.tooLarge": "上限の {max} MB を超えています。",
   "composer.upload.badType": "{name} は添付できません。",
-  "composer.upload.successBatch": "{n}件のファイルを追加、パスはメッセージ内",
-  "composer.upload.mixed": "{total}件中{attached}件を追加 — {detail}",
-  "composer.upload.nothing": "何も追加されていません — {detail}",
   "composer.noEcho.title": "パスワード入力プロンプト: エコーバック無効",
   "composer.noEcho.noLiveTyped":
     "入力内容はペインに存在しますが未送信です。このビューはライブではないため送信できません。ターミナルで直接操作してください。",
@@ -247,6 +273,7 @@ export const ja: Dictionary = {
   "composer.noEcho.dismissAria": "パスワードプロンプト通知を閉じる",
   "composer.draftPreview.title": "ターミナル内の下書き",
   "composer.draftPreview.takeOver": "引き継ぐ",
+  "composer.draftPreview.dismissAria": "ターミナルの下書きの通知を閉じる",
 
   // --- sendMode (the armed "typing straight through" indicator) ---
   "sendMode.armed.title": "ターミナル直接入力中",
@@ -272,6 +299,8 @@ export const ja: Dictionary = {
   "chat.scrollback.showHistory": "全履歴を表示",
   "chat.scrollback.loadOlder": "過去のログを読み込む",
   "chat.scrollback.loading": "読み込み中…",
+  "chat.scrollback.noSessionReported":
+    "{agent} のセッションが Herdr に報告されていません。Herdr 連携をインストールまたは更新し、このペインでエージェントを再起動してください。",
   "chat.fullReply.title": "返答の全文",
   "chat.fullReply.fromTranscript": "ログより",
   "chat.fullReply.showingTerminal": "ターミナルを表示中",
@@ -316,16 +345,16 @@ export const ja: Dictionary = {
   "prompt.feedback.freeText.typedPrefix": "ターミナルに直接入力中: ",
 
   // --- paneSettings (one pane's own preferences; today the prompt-cache warning, ADR 0042) ---
-  "paneSettings.title": "Pane settings",
-  "paneSettings.cacheWatch.label": "Warn me before this pane's cache goes cold",
-  "paneSettings.cacheWatch.hint": "about {minutes} minutes before it expires",
-  "paneSettings.cacheWatch.pushOff": "Turn notifications on for this device in Settings first.",
-  "paneSettings.cacheWatch.globalOn": "Settings warns about every pane, so this one is covered.",
-  "paneSettings.cacheWatch.noSession": "This pane's agent names no session, so there is nothing to watch.",
+  "paneSettings.title": "ペイン設定",
+  "paneSettings.cacheWatch.label": "このペインのキャッシュが失効する前に警告する",
+  "paneSettings.cacheWatch.hint": "有効期限が切れる約 {minutes} 分前",
+  "paneSettings.cacheWatch.pushOff": "先に設定でこのデバイスの通知を有効にしてください。",
+  "paneSettings.cacheWatch.globalOn": "設定によりすべてのペインについて警告されるため、このペインも対象に含まれます。",
+  "paneSettings.cacheWatch.noSession": "このペインのエージェントはセッションを指定していないため、監視対象がありません。",
 
   // --- paneActions (long-press sheet: rename / close a pane) ---
   "paneActions.title.fallback": "ペイン",
-  "paneActions.settings.label": "Pane settings",
+  "paneActions.settings.label": "ペイン設定",
   "paneActions.readOnly": "読み取り専用: この端末にはペインの名前変更や終了の権限がありません。",
   "paneActions.rename.label": "名前変更",
   "paneActions.rename.placeholder": "ペイン名",
@@ -360,7 +389,7 @@ export const ja: Dictionary = {
   "nav.home.aria.default": "Collie ホーム",
   "nav.home.aria.lost": "Collie ホーム (未接続)",
   "nav.home.aria.reconnecting": "Collie ホーム (再接続中)",
-  "nav.mux.onPrefix": "on",
+  "nav.mux.onPrefix": "オン",
   "nav.prereleaseTitle": "プレリリースビルド: {version}",
 
   // --- home (dashboard herd list) ---
@@ -377,6 +406,19 @@ export const ja: Dictionary = {
   "home.sidebar.paneActionsTitle": "タップしてペイン操作を表示",
   "home.row.tabPosition": "タブ {n}",
   "home.row.unseen": "未読",
+  "home.tabs.aria": "ダッシュボードビュー",
+  "home.tabs.panes": "ペイン",
+  "home.tabs.focus": "フォーカス",
+  "home.tabs.blocked.one": "{count} 件ブロック中",
+  "home.tabs.blocked.other": "{count} 件ブロック中",
+  "home.tabs.unseen": "未確認の終了ペイン",
+  "home.changes.listAria": "ワークスペース別の変更",
+  "home.changes.loading": "読み込み中…",
+  "home.changes.clean": "変更なし",
+  "home.changes.noFolder": "フォルダーがありません",
+  "home.changes.unavailable": "変更を読み込めません",
+  "home.changes.files.one": "{count} ファイル",
+  "home.changes.files.other": "{count} ファイル",
 
   // --- status (triage sections, status labels, counts) ---
   "status.section.needsYou": "要対応",
@@ -434,6 +476,7 @@ export const ja: Dictionary = {
   "space.tab.titleFallback": "タブ",
   "space.tab.titleWithLabel": "タブ {label}",
   "space.tab.readOnly": "読み取り専用です。この端末からはタブ名の変更や終了ができません。",
+  "space.tab.hostBlockSuffix": "{hostBlock}。応答があるまで名前変更と終了は実行できません。",
   "space.tab.rename": "名前を変更",
   "space.tab.close": "タブを終了",
   "space.tab.closing": "終了中...",
@@ -467,13 +510,13 @@ export const ja: Dictionary = {
   // --- harnessBar (the row of the running agent's own commands, above the keys) ---
   // Slash commands are NEVER translated — they are wire text the harness parses — and neither is an
   // operator's own `bar_label`. Only these labels are.
-  "harnessBar.label": "Harness shortcuts",
-  "harnessBar.model": "Model",
+  "harnessBar.label": "Harnessショートカット",
+  "harnessBar.model": "モデル",
   "harnessBar.effort": "Effort",
   "harnessBar.compact": "Compact",
-  "harnessBar.resume": "Resume",
-  "harnessBar.tree": "Tree",
-  "harnessBar.confirmAria": "Tap again to confirm {command}",
+  "harnessBar.resume": "再開",
+  "harnessBar.tree": "ツリー",
+  "harnessBar.confirmAria": "もう一度タップして {command} を確定",
 
   // --- quickActions (one-tap reply dock) ---
   "quickActions.group.confirm": "確認",
@@ -503,6 +546,23 @@ export const ja: Dictionary = {
   "connection.withLastSeen": "{cause} (最終確認 {time})",
   "connection.readOnly.notPaired": "未ペアリング。設定でこの端末をペアリングするとエージェントに入力できます。",
   "connection.readOnly.device": "読み取り専用。この端末はエージェントへの入力権限がありません{deviceSuffix}。",
+  "connection.host.lastSeen": "最終確認 {time}",
+  "connection.host.neverSeen": "未確認",
+  "connection.host.unreachablePlain": "到達不能",
+  "connection.host.unreachableSuffix": "到達不能 · {label}",
+  "connection.host.incompatible": "非互換",
+  "connection.host.lead": "リード",
+  "connection.host.onPrefix": "稼働中",
+  "connection.host.ariaSends": "送信先ホスト: {name}{unreachable}",
+  "connection.host.ariaHost": "ホスト: {name}{unreachable}",
+  "connection.host.ariaUnreachableSuffix": " (到達不能)",
+  "connection.host.ariaSuffix": " ({word})",
+  "connection.host.reconnecting": "再接続中",
+  "connection.host.attention": "要確認",
+  "connection.host.reconnectingSuffix": "再接続中 · {label}",
+  "connection.host.attentionSuffix": "要確認 · {label}",
+  "connection.host.reconnectingAction": "leadが再試行しています。対応は不要です。",
+  "connection.host.attentionAction": "再試行しても解決しません。このマシンを確認してください。",
   "connection.stale.incompatible": "{name} で動作中の Collie は非互換です",
   "connection.stale.unreachable": "{name} に到達できません · {label}",
   "connection.stale.nothingCached": "このマシンのキャッシュデータはありません。",
@@ -513,13 +573,15 @@ export const ja: Dictionary = {
   "connection.session.aria": "セッション: {name}。セッションを切り替え",
   "connection.session.primary": "プライマリ",
   "connection.session.unreachable": "到達不能",
+  "connection.session.ariaIn": "セッション: {name}",
   "connection.session.all": "すべてのセッション",
   "connection.session.allDescription": "このマシンの全セッション一覧",
   "connection.session.allAria": "全セッションを表示中。セッションを切り替え",
   "connection.server.title": "マシン",
   "connection.server.aria": "ホスト: {name}。ホストを切り替え",
 
-  // --- crew ---
+
+  // --- error (boot splash, route-level error recovery) ---
   "error.boot.connecting": "ホスト群に接続中...",
   "error.boot.title": "未接続",
   "error.boot.body": "Collieに接続できません。ホストへのネットワーク接続を確認して再試行してください。",
@@ -538,8 +600,7 @@ export const ja: Dictionary = {
 
   // --- pwa (self-update banner) ---
   "pwa.updateAvailable": "新しいバージョンがあります。タップして更新してください。",
-  "pwa.updateInstalling": "Downloading the new version…",
-  "updateRibbon.hideNotice": "この通知を非表示",
+  "pwa.updateInstalling": "新しいバージョンをダウンロード中…",
 
   // --- history (pane transcript route) ---
   "history.unavailable.disabled": "このブリッジでは会話履歴が無効化されています (COLLIE_TRANSCRIPT)。",
@@ -569,15 +630,29 @@ export const ja: Dictionary = {
 
   // --- mirror (terminal graphics in the pane mirror) ---
   "mirror.blankLines": "[{n}行の空行]",
+  "mirror.imageAlt": "ターミナルグラフィックス",
+  "mirror.imageBadge": "[画像]",
+  "mirror.imageMatchedByOrder": "順序で対応付け。確認は履歴から",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "たった今",
   "time.compact.now": "今",
 
-  // --- sync (how fresh the herd on screen is, and asking for a fresher one) ---
 
   // --- dialog (menu / multi-select / wizard / preview-select block renderers) ---
   "dialog.sendingAria": "送信中",
+  // TODO wordsmith
+  "dialog.terminalControl": "ターミナル",
+  // TODO wordsmith
+  "dialog.terminalControlAria": "このカードの代わりにターミナルを表示",
+  // TODO wordsmith
+  "dialog.backToCard": "カードに戻る",
+  // TODO wordsmith
+  "dialog.putAwayControl": "しまう",
+  // TODO wordsmith
+  "dialog.putAwayControlAria": "ターミナルを残して、このカードのボタンを非表示",
+  // TODO wordsmith
+  "dialog.showButtons": "ボタンを表示",
   "dialog.previousStepAria": "前のステップ",
   "dialog.nextStepAria": "次のステップ",
   "dialog.answeredAria": "回答済み",
@@ -597,6 +672,11 @@ export const ja: Dictionary = {
   "dialog.menu.moveDown": "下へ移動",
   "dialog.menu.leftAria": "左: {verb}（{label}）",
   "dialog.menu.rightAria": "右: {verb}（{label}）",
+  // TODO wordsmith
+  "dialog.menu.levelAria": "{label}に{verb}",
+  // TODO wordsmith
+  "dialog.menu.levelCurrentAria": "{label}、現在",
+  "unreadDialog.caption": "Collie はこの対話を読み取れません", // wordsmith
   "dialog.preview.currentAnswerAria": "現在の回答",
   "dialog.preview.previewedBelowAria": "プレビューを下に表示中",
   "dialog.preview.previewLabel": "プレビュー · {label}",
@@ -635,7 +715,8 @@ export const ja: Dictionary = {
   "promptAction.feedback.boxNotOpened": "フィードバック欄が開きませんでした。ペインの状態を確認してください。",
   "promptAction.feedback.notArrived": "フィードバックが届きませんでした。送信は実行されていません。",
 
-  // --- stt (speech-to-text errors, lib/stt.ts + hooks/use-stt-recorder.ts) ---
+
+  // --- directTyping (the composer's "Type into terminal" mode, hooks/use-direct-typing.ts) ---
   "directTyping.status.draftPending":
     "ターミナルへ入力する前に、下書きを送信または破棄してください。",
   "directTyping.status.armed": "ターミナル直接入力中: キー入力が即座に送信されます。",
@@ -684,8 +765,8 @@ export const ja: Dictionary = {
   "apiError.pairing.bad_code": "コードが一致しません。",
   "apiError.pairing.duplicate_label": "指定された名前は既に使用されています。",
   "apiError.device.unknown": "該当する名前のペアリング済みデバイスが見つかりません。",
-  "apiError.cache.pane_unknown": "That pane is gone, nothing was changed.",
-  "apiError.cache.no_session": "That pane's agent names no session, so it can't be watched.",
+  "apiError.cache.pane_unknown": "対象のペインは存在しません。変更はありませんでした。",
+  "apiError.cache.no_session": "対象のペインのエージェントはセッションを指定していないため、監視できません。",
   "apiError.session.unknown": "この collie にセッション {session} は存在しません。",
   // --- worktrees (ADR 0032) ---
   "apiError.worktree.list_failed": "worktree の一覧取得に失敗しました: {reason}",
@@ -707,92 +788,182 @@ export const ja: Dictionary = {
   "worktree.opening": "展開中…",
   "worktree.mainCheckout": "メインリポジトリ",
   "worktree.empty": "Worktree はありません。",
-  "worktree.detached": "detached",
+  "worktree.detached": "デタッチ済み",
   "worktree.recoverOpen": "作成済みブランチを開く",
   "space.new.tab.plain": "スペース",
   "space.new.tab.worktree": "ワークツリー",
   "space.new.repo.label": "リポジトリ",
+  "space.new.host.label": "ホスト",
   "worktree.orOpenExisting": "または既存のものを開く",
-  // --- settings.updateCard (the update card, M15/05) ---
-  "cache.warm": "Prompt cache warm",
-  "cache.expiring": "Prompt cache expiring",
-  "cache.cold": "cold",
-  "cache.unknown": "Prompt cache not known",
+  // --- apiError.update (POST /api/update refusals, M15/05) ---
+
+
+  // --- M16/01: the updates page, its crew lines and the Settings row ---
+  // The prompt-cache chip and its sheet (M28/02). Mirrored from English verbatim: these are new
+  // keys, and a translation is a separate `wordsmith --translate` pass over this file.
+  "cache.warm": "プロンプトキャッシュ有効",
+  "cache.expiring": "プロンプトキャッシュ期限切れ間近",
+  "cache.cold": "コールド",
+  "cache.unknown": "プロンプトキャッシュ不明",
   "cache.under1m": "<1m",
-  "cache.overridden": "TTL set in cache-rules.toml",
-  "cache.sheet.title": "Prompt cache",
-  "cache.sheet.rule": "Rule",
-  "cache.sheet.ttl": "Stays warm for",
-  "cache.sheet.ttlMinutes": "{minutes} min",
-  "cache.sheet.confidence": "Confidence",
-  "cache.sheet.source": "Read on",
-  "cache.sheet.retrieved": "Checked",
-  "cache.sheet.measured": "Measured on this machine",
-  "cache.sheet.lastRead": "last read {age}",
-  "cache.sheet.overridden": "Moved by cache-rules.toml",
-  "cache.sheet.thisMachine": "This machine",
-  "cache.sheet.onPeer": "Read on {host}. Its rule catalog is not forwarded, so the source is not quoted here.",
+  "cache.overridden": "cache-rules.toml で設定されたTTL",
+  "cache.sheet.title": "プロンプトキャッシュ",
+  "cache.sheet.rule": "ルール",
+  "cache.sheet.ttl": "有効期間",
+  "cache.sheet.ttlMinutes": "{minutes}分",
+  "cache.sheet.confidence": "信頼度",
+  "cache.sheet.source": "読み込み元",
+  "cache.sheet.retrieved": "確認済み",
+  "cache.sheet.measured": "このマシンで計測",
+  "cache.sheet.lastRead": "最終読み込み {age}",
+  "cache.sheet.overridden": "cache-rules.toml により移動",
+  "cache.sheet.thisMachine": "このマシン",
+  "cache.sheet.onPeer": "{host} で読み込まれました。ルールカタログが転送されていないため、ここではソースを引用していません。",
   "cache.sheet.reset.pending": "前回のターンの後: {action}。次のターンでキャッシュが再構築されます。",
   "cache.sheet.reset.cause": "前回のターンの前: {action}。そのターンでキャッシュが再構築されました。",
-  "cache.sheet.state": "State",
-  "cache.sheet.state.warm": "Warm",
-  "cache.sheet.state.expiring": "Expiring",
-  "cache.sheet.state.cold": "Cold",
-  "cache.confidence.documented": "documented",
-  "cache.confidence.reported": "reported",
-  "cache.confidence.inferred": "inferred",
-  "cache.confidence.observed": "measured",
-  "tour.skip": "Skip",
-  "tour.title": "Collie shows the agents in your terminal.",
+  "cache.sheet.state": "状態",
+  "cache.sheet.state.warm": "ウォーム",
+  "cache.sheet.state.expiring": "期限切れ間近",
+  "cache.sheet.state.cold": "コールド",
+  "cache.confidence.documented": "ドキュメント記載",
+  "cache.confidence.reported": "報告済み",
+  "cache.confidence.inferred": "推定",
+  "cache.confidence.observed": "測定済み",
+  "updateRibbon.hideNotice": "この通知を非表示",
+
+  // --- tour (the first-run screen) --- ENGLISH, not yet translated.
+  "tour.skip": "スキップ",
+  "tour.title": "Collieはターミナル内のエージェントを表示します。",
   // The claim's second sentence, in the three forms the facts can support. {mux} is the
   // multiplexer's display name, {host} the lead machine's crew label; a clause whose fact is missing
   // is dropped rather than filled with a placeholder.
   "tour.lead":
-    "It mirrors the panes running under {mux} on {host}. It shows what is on those screens, and it never runs a terminal of its own.",
+    "{host}上の{mux}で動作しているペインをミラーリングします。それらの画面内容を表示するのみで、独自のターミナルを実行することはありません。",
+  "tour.leadNoHost":
+    "{mux}で動作しているペインをミラーリングします。それらの画面内容を表示するのみで、独自のターミナルを実行することはありません。",
   "tour.leadNoMux":
-    "It mirrors the panes running in your terminal multiplexer. It shows what is on those screens, and it never runs a terminal of its own.",
+    "ターミナルマルチプレクサで動作しているペインをミラーリングします。それらの画面内容を表示するのみで、独自のターミナルを実行することはありません。",
 
   // Your setup. Every row is a fact this snapshot carries, or the row is absent.
-  "tour.setup": "Your setup",
-  "tour.setup.panes.one": "{count} pane",
-  "tour.setup.panes.other": "{count} panes",
-  "tour.setup.needsYou.one": "{count} needs you",
-  "tour.setup.needsYou.other": "{count} need you",
-  "tour.setup.noPanes": "No panes yet",
-  "tour.setup.canType": "This device can type",
-  "tour.setup.readOnly": "This device can read only",
-  "tour.setup.pushOff": "Notifications are off on this phone",
+  "tour.setup": "設定状況",
+  "tour.setup.panes.one": "{count}件のペイン",
+  "tour.setup.panes.other": "{count}件のペイン",
+  "tour.setup.needsYou.one": "{count}件が対応待ち",
+  "tour.setup.needsYou.other": "{count}件が対応待ち",
+  "tour.setup.noPanes": "ペインはまだありません",
+  "tour.setup.machines.one": "クルー内のマシン: {count}台",
+  "tour.setup.machines.other": "クルー内のマシン: {count}台",
+  "tour.setup.canType": "このデバイスから入力可能",
+  "tour.setup.readOnly": "このデバイスは読み取り専用",
+  "tour.setup.pushOff": "このスマートフォンでは通知がオフになっています",
 
   // Do this next. At most two cards, first match wins, in this order.
-  "tour.doNext": "Do this next",
-  "tour.pair.title": "Pair this phone",
-  "tour.pair.body": "Run collie pair on the host, then type the code in Settings.",
-  "tour.pair.button": "Pair",
-  "tour.space.title": "Nothing is running yet",
-  "tour.space.body": "Start an agent in your terminal, or make a space here.",
-  "tour.space.button": "New space",
-  "tour.pushCard.title": "Be told when a pane needs you",
-  "tour.pushCard.body": "Collie notifies you when an agent is blocked, or done.",
-  "tour.install.title": "Keep Collie on your home screen",
-  "tour.install.body": "It opens full screen and remembers where you were.",
-  "tour.install.button": "Add",
-  "tour.push.enable": "Turn on",
-  "tour.push.enabled": "Notifications are on for this device.",
+  "tour.doNext": "次の操作を行ってください",
+  "tour.pair.title": "このスマートフォンをペアリング",
+  "tour.pair.body": "ホストでcollie pairを実行し、設定画面でコードを入力してください。",
+  "tour.pair.button": "ペアリング",
+  "tour.space.title": "実行中の項目はまだありません",
+  "tour.space.body": "ターミナルでエージェントを起動するか、ここでスペースを作成してください。",
+  "tour.space.button": "新規スペース",
+  "tour.pushCard.title": "ペインがユーザーを必要としたときに通知を受け取る",
+  "tour.pushCard.body": "エージェントがブロックされたときや完了したときに、Collieが通知します。",
+  "tour.install.title": "Collieをホーム画面に追加",
+  "tour.install.body": "全画面で開き、前回の位置を記憶します。",
+  "tour.install.button": "追加",
+  "tour.push.enable": "有効にする",
+  "tour.push.enabled": "このデバイスの通知は有効です。",
 
   // What you can do here. The six lines the site sells and the app never said.
-  "tour.can": "What you can do here",
-  "tour.can.mirror": "Read the live pane, colour and all.",
-  "tour.can.answer": "Answer a prompt by tapping its card.",
-  "tour.can.type": "Type a reply, or send Esc, Tab and Ctrl keys.",
-  "tour.can.harness": "Set model and effort from the actions row.",
-  "tour.can.session": "Read the whole session, past the scrollback.",
-  "tour.done.pane": "Open the pane that needs you",
-  "tour.done.dashboard": "Show the dashboard",
+  "tour.can": "ここでできること",
+  "tour.can.mirror": "色も含めてライブペインを表示する。",
+  "tour.can.answer": "カードをタップしてプロンプトに応答する。",
+  "tour.can.type": "返信を入力するか、Esc、Tab、Ctrlキーを送信する。",
+  "tour.can.harness": "アクション行からモデルとエフォートを設定する。",
+  "tour.can.session": "スクロールバックを超えてセッション全体を表示する。",
+  "tour.can.crew": "1つのURLからcrew内のすべてのマシンを監視する。",
+
+  // The footer's one button. The first spelling opens the blocked pane; the second closes the sheet.
+  "tour.done.pane": "対応が必要なペインを開く",
+  "tour.done.dashboard": "ダッシュボードを表示",
 
   // --- settings.tour ---
-  "settings.tour.title": "Show the first screen again",
-  "settings.tour.description": "What Collie does, and what this install looks like.",
-  "settings.tour.button": "Show",
+  "settings.tour.title": "最初の画面を再表示",
+  "settings.tour.description": "Collie の機能と、このインストールの概要。",
+  "settings.tour.button": "表示",
 
-  // --- updateScreen (M28/01): English until translated. ---
+
+
+  // --- changes (ADR 0065) ---
+  "chat.changes.label": "変更",
+  "changes.title": "変更",
+  "changes.backAria.dashboard": "ダッシュボードに戻る",
+  "changes.backAria.workspace": "ワークスペースに戻る",
+  "changes.backAria.pane": "ペインに戻る",
+  "changes.listBackAria": "一覧に戻る",
+  "changes.refreshAria": "変更を更新",
+  "changes.loading": "変更を読み取り中…",
+  "changes.empty": "前回のコミット以降の変更はありません。",
+  "changes.unavailable.noFolder": "Collie はこのワークスペースのフォルダーを見つけられないため、表示する変更はありません。",
+  "changes.unavailable.noGit": "このマシンにはgitがインストールされていません。",
+  "changes.unavailable.noPane": "このペインは削除されました。",
+  "changes.unavailable.noWorkspace": "このワークスペースは削除されました。",
+  "changes.error": "変更を読み取れませんでした。再試行するには「更新」をタップしてください。",
+  "changes.stale": "更新していません",
+  "changes.truncated": "一覧の上限に達したため、一部のリポジトリまたはファイルが表示されていない可能性があります。",
+  "changes.bound.depth.one": "{count} 階層で停止しました。さらに下位にリポジトリがあります。",
+  "changes.bound.depth.other": "{count} 階層で停止しました。さらに下位にリポジトリがあります。",
+  "changes.bound.settings": "設定でより深く検索",
+  "changes.thisPane": "このペイン",
+  "changes.repoFiles.one": "{name} · {count} ファイル",
+  "changes.repoFiles.other": "{name} · {count} ファイル",
+  "changes.status.M": "変更済み",
+  "changes.status.A": "追加済み",
+  "changes.status.D": "削除済み",
+  "changes.status.R": "名前変更済み",
+  "changes.status.untracked": "追跡対象外",
+  "changes.binaryShort": "バイナリ",
+  "changes.file.binary": "バイナリファイルです。表示されません。",
+  "changes.file.directory": "新しいフォルダーです。ファイルは個別に一覧表示されません。",
+  "changes.file.truncated": "diff はここで終了します。長すぎるため全体を表示できません。",
+  "changes.file.unknown": "このファイルは変更一覧に存在しません。戻って更新してください。",
+  "changes.file.gone": "変更は破棄されました",
+  "changes.file.error": "この diff を読み取れませんでした。",
+  "changes.file.noLines": "行の変更はありません。",
+  "changes.file.renamedFrom": "{path} から名前変更",
+  "changes.file.prev": "前のファイル",
+  "changes.file.next": "次のファイル",
+  "changes.layout.aria": "レイアウト",
+  "changes.layout.list": "リスト",
+  "changes.layout.tree": "ツリー",
+  "changes.tree.folderAria.one": "{name}、{count} 件のファイル",
+  "changes.tree.folderAria.other": "{name}、{count} 件のファイル",
+  "changes.filter.button": "ファイルをフィルター",
+  "changes.filter.buttonActive": "ファイルをフィルター、{total} 件中 {shown} 件を表示",
+  "changes.filter.placeholder": "パスでフィルター",
+  "changes.filter.clearText": "テキストを消去",
+  "changes.filter.statusAria": "ステータスでフィルター",
+  "changes.filter.shown": "{total} 件中 {shown} 件のファイル",
+  "changes.filter.none": "一致するファイルはありません。",
+  "changes.filter.clear": "フィルターを解除",
+  "changes.commit.show": "最新のコミットを表示",
+  "changes.commit.showFor": "{name} の最新のコミットを表示",
+  "changes.commit.cleanHeading": "未コミットの変更はありません",
+  "changes.commit.title": "最新のコミット",
+  "changes.commit.backAria": "コミットに戻る",
+  "changes.commit.loading": "コミットを読み込み中…",
+  "changes.commit.error": "コミットを読み込めませんでした。更新をタップして再試行してください。",
+  "changes.commit.noCommit": "このリポジトリにはまだコミットがありません。",
+  "changes.commit.unknown": "Collieがこのリポジトリを見つけられなくなりました。戻って更新してください。",
+  "changes.commit.empty": "このコミットで変更されたファイルはありません。",
+  "changes.commit.newer": "より新しいコミットが存在します",
+  "changes.commit.uncommitted": "コミットされていない新しい変更",
+  "changes.commit.fileNewer": "リポジトリにより新しいコミットがあります。戻って読み込み直すと、このファイルを表示できます。",
+  "settings.changes.title": "変更",
+  "settings.changes.description": "ペインの「変更」ビューがgitリポジトリを検出する方法。",
+  "settings.changes.nested.label": "このフォルダー内のリポジトリを検索",
+  "settings.changes.nested.hint": "親リポジトリが無視しているものも含め、ペインのフォルダーより下層にあるフォルダー内のリポジトリも表示します。",
+  "settings.changes.depth.label": "検索する深さ",
+  "settings.changes.depth.hint": "ペインのフォルダーより下のフォルダー階層数。",
+  "settings.changes.depth.levels.one": "{count} 階層",
+  "settings.changes.depth.levels.other": "{count} 階層",
 };

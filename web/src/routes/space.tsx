@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams, useRevalidator } from "react-router";
+import { useParams, useRevalidator } from "react-router";
 
 import { RouteHeader, SettingsGear } from "@/components/app-header";
 import { ReadOnlyBanner } from "@/components/read-only-banner";
@@ -12,9 +12,12 @@ import { ToastViewport } from "@/components/ui/toast-viewport";
 import { BuildStamp } from "@/components/build-stamp";
 import { UpdateBanner } from "@/components/update-banner";
 import { useSpaceActions } from "@/hooks/use-spaces";
-import { homePath, panePath, spacePath } from "@/lib/nav";
-import { ambientHost, paneScope } from "@/lib/hosts";
-import type { AgentView } from "@/lib/types";
+import { useNav } from "@/hooks/use-nav";
+import { usePaneOpen } from "@/hooks/use-pane-open";
+import { useScrollMemory } from "@/hooks/use-scroll-memory";
+import { homePath, spacePath } from "@/lib/nav";
+import { ambientHost } from "@/lib/hosts";
+import { scopeKey } from "@/lib/scope";
 import { setStatus } from "@/lib/status";
 import { isReadOnly } from "@/lib/types";
 import { usePairing } from "@/lib/pairing";
@@ -26,7 +29,7 @@ import { useRootData } from "@/lib/route-data";
 export function SpaceRoute() {
   const data = useRootData();
   const { spaceId = "" } = useParams();
-  const navigate = useNavigate();
+  const nav = useNav();
   const revalidator = useRevalidator();
   const { newTab, newSpace, creatingTab, creatingSpace } = useSpaceActions();
   const [newSpaceOpen, setNewSpaceOpen] = useState(false);
@@ -46,8 +49,9 @@ export function SpaceRoute() {
 
   const selectedWs = data.workspaces.find((w) => w.workspaceId === spaceId);
 
-  const toDashboard = () => navigate(homePath(data.scope));
-  const switchSpace = (id: string) => navigate(spacePath(id, data.scope));
+  // ADR 0067: the dashboard is up, another space is sideways, a pane is down.
+  const toDashboard = () => nav.up(homePath(data.scope));
+  const switchSpace = (id: string) => nav.side(spacePath(id, data.scope));
   const switchTab = (id: string | null) => setTab(id);
   // The machine THIS space is addressed on, not necessarily the one leading the crew. The loader's
   // `ambientSpaces` narrows `data.workspaces`/`data.tabs` to the host `?h=` names before this route
@@ -57,8 +61,15 @@ export function SpaceRoute() {
   // re-derive one from the workspace row. Keying on the lead instead matched nothing and drew every
   // tab as "(empty tab)" (#209). Undefined when solo, which is `undefined` both ways.
   const navHost = ambientHost(data.servers, data.scope.host);
-  const open = (pane: AgentView) =>
-    navigate(panePath(pane.paneId, paneScope(data.scope, pane, data.servers, data.sessions)));
+  // A pane is down, and its tap glides the row into the pane header when the pane's read is in time
+  // (use-pane-open.ts); the header's back arrow glides it back into this list.
+  const paneOpen = usePaneOpen(data.scope, data.servers, data.sessions);
+
+  // Same fix as home.tsx's dashboard scroller, same cause: ScreenTransition remounts this route on
+  // every space<->pane move, so the scroller below is a fresh DOM node each time. Keyed on scope +
+  // spaceId — a workspace id is host-scoped, so two crew members (or two herdr sessions) can each
+  // have their own "space a" with independent positions. See lib/scroll-memory.ts.
+  const scrollRef = useScrollMemory<HTMLDivElement>(`space:${scopeKey(data.scope)}:${spaceId}`);
 
   // Recover from a deleted space: once a healthy snapshot no longer has it, bounce to the dashboard
   // instead of leaving you on an empty shell. Guarded on a connected, non-stale snapshot so a
@@ -70,12 +81,15 @@ export function SpaceRoute() {
   const gone = !selectedWs;
   const everExisted = useRef(false);
   if (selectedWs) everExisted.current = true;
+  // Up, once per space: an up can be a step back, and a second one would climb past the dashboard.
+  const exited = useRef<string | null>(null);
   useEffect(() => {
-    if (gone && data.bridge === "connected" && !data.error) {
+    if (gone && data.bridge === "connected" && !data.error && exited.current !== spaceId) {
+      exited.current = spaceId;
       setStatus(everExisted.current ? "Space closed" : "Space not found", "info");
-      navigate(homePath(data.scope), { replace: true });
+      nav.up(homePath(data.scope));
     }
-  }, [gone, data.bridge, data.error, data.scope, navigate]);
+  }, [gone, data.bridge, data.error, data.scope, nav, spaceId]);
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-screen-sm flex-1 flex-col">
@@ -92,7 +106,7 @@ export function SpaceRoute() {
       {/* Content region below the header: the viewport-clipped scroller, the same shell the
           dashboard uses — the two are one list screen at two depths. `relative` for the reason
           home.tsx gives: an `sr-only` descendant must resolve against this scroller. */}
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div ref={scrollRef} className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
         {/* Below the header, so it is content, not viewport chrome: an inset box on this route's
             gutter, like the dashboard's. See read-only-banner.tsx. */}
         <ReadOnlyBanner device={data.device} />
@@ -135,7 +149,9 @@ export function SpaceRoute() {
                 agents={data.agents}
                 shellPanes={data.shellPanes}
                 selectedTab={tab}
-                onOpen={open}
+                onOpen={paneOpen.open}
+                glideKeyOf={paneOpen.glideKeyOf}
+                onPress={paneOpen.press}
                 host={navHost}
               />
             </main>

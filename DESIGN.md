@@ -42,6 +42,7 @@ afterwards. A copy-paste gives you six places to remember instead.
 | `ui/sheet.tsx` | `BottomSheet`. The app's only floating layer; there is no popover, no dialog, no tooltip. |
 | `ui/strip-host.tsx` | The top band above the header. Renders ONE `StripSlot` at a time, the highest priority, and keeps the two permanent `sr-only` live regions. Domain-blind: a bigger number wins, and it does not know what a connection is. |
 | `ui/switch.tsx` | A boolean toggle, `role="switch"`. No Radix. |
+| `ui/tab-bar.tsx` | A bottom tab bar: equal icon-over-word tabs on the page colour, a rule above, the safe area below. The active mark is a reserved 2px top edge, and a count badge floats on the icon, so a switch or a count never moves a word. The dashboard footer (ADR 0066). |
 | `ui/toast-viewport.tsx` | Where a transient event floats: `dock="bottom"` fixed to the viewport, `dock="top"` absolute inside a route's content region. Owns position and nothing else. |
 | `ui/chat/chat-input.tsx` | The composer's text box shell. |
 | `ui/chat/chat-message-list.tsx` | The transcript's scrolling list. |
@@ -144,6 +145,60 @@ This principle is also why the alert work in §1 is happening: six notices with 
 appearing and disappearing at the top of the viewport is the same fault, one order of
 magnitude larger. §11 states the one exception the app allows, and names the single component
 that is allowed to be it.
+
+### Every layout shift is a defect until this file says otherwise
+
+§2 above states the rule per element: a state repaints, it never re-lays-out. This is the
+route-wide form of the same rule, stated once for the whole app: **content the operator is
+reading or aiming at does not move unless the operator moved it.** A box that grows, a sibling
+that slides, a row that appears, a scroller whose contents jump, a control that changes width
+for a moment. All of it is the same fault, whether the trigger is a state, a timer, a poll, a
+navigation or a network reply.
+
+This rule governs the chrome the app draws around the terminal: the header, the strips, the
+belt, the composer, the sheets. It does not govern the mirrored terminal stream itself, which
+moves because the agent wrote a line, and the mirror's own contract is that it follows the tail.
+Two more things are not this fault, and neither is precedent for it: the OS resizing the
+viewport when the keyboard opens, because the operator opened it and the app moved nothing; and
+a toast, which is an Event in §11's table and floats in the overlay layer, so it holds no space
+and can never push a sibling.
+
+Why it is graded this harshly: on a phone the thumb is already moving when the layout changes.
+A 51px slide under a moving thumb is a wrong tap, and a wrong tap on this belt sends a command
+to an agent. Reading breaks the same way, the eye loses its line. So the cost is never "looks a
+bit off". It is a mis-sent keystroke or a lost place.
+
+**What is allowed is a closed list.** (a) A shift the operator caused directly and is watching:
+opening a dock, scrolling, typing lines into the composer, opening a sheet. (b) A fact that
+outlives the next interaction, arriving through `Collapse` (§11, hard rule 1), because the
+change is then continuous and eased and the neighbours animate rather than teleport. (c) A
+shift written down here, with its trigger, its pixels, and why reserving the space was worse.
+A shift is ADR-grade, not a paragraph, when a tap already in flight could land on different
+content after it: a control that appears or leaves, a row that changes height while its
+neighbours are tappable, a chip that changes width. The finger is down before the eye has caught
+up, so there is no judgment call to make. "It is only 700ms" is not a reason: duration makes a shift harder to
+aim around, not easier.
+
+The shapes this repo has already paid for, so nobody pays twice. The harness chip that dropped
+its word for a ✓ (`harness-bar.tsx`, fixed 2026-09-21: on a Claude pane "Compact" went from
+95px to the 44px `min-w-11` floor for 700ms, and every chip after it slid 51px left and back;
+the ✓ now takes the icon's cell and the word stays). The in-flow "Sent" row that moved the
+mirror 30px twice to say one word (§11). The header that jumped 4px between dashboard and pane
+because its height was its children's (§6). The status word that moved a host name 33px
+sideways (§2, the slot). The border gained in a state (§2, the technique). And a pill withdrawn
+instead of greyed, which moves every pill after it.
+
+How to catch one before it ships. In a unit test: render the two states and compare
+`textContent` and the child count of the box, the way `harness-bar.test.tsx` "keeps the word
+under the ✓ so the belt does not move" does. A state that changes either has changed the box. In
+a browser: a `requestAnimationFrame` sampler that records the neighbour's
+`getBoundingClientRect()` per frame. A glide is a run of eased values over ~240ms; a jump is two
+values one frame apart. Ask it of every diff that touches a state: which box changed size or
+position, and who caused it. If the answer is "the app did", it needs a reason from the list
+above or it does not land.
+
+§6 grants one exception, the fixed-height reservations (the status band, and update mode's
+panel), and §11 grants the other, `Collapse`. Add a third only by adding it to this list.
 
 ---
 
@@ -365,6 +420,18 @@ warns about is paid honestly — nothing here can grow, because nothing here is 
 and it is written down at the line. Add a second one only with the same two properties:
 every occupant states its own box, and the strip's height is a number the layout was designed
 around rather than a consequence of what it holds.
+
+**The second one is update mode's docked panel** (`components/update-screen.tsx`,
+[ADR 0064](./.adr/0064-an-update-puts-the-phone-in-update-mode.md)). Its heading is `h-7` and
+truncates, its subtitle is `h-10` and clamps to two lines, each row is `h-13` with a reserved
+second line, the note is `h-[5.25rem]` and the footer two 44px rows, all in rem so a larger text
+size grows each box with its text, and the row list alone gives way, by scrolling, when the panel
+would reach up under the band. Both properties hold: every
+occupant states its box (truncate, `line-clamp-2`, fixed buttons), and the heights were designed
+around the seven steps rather than measured from them. It earns `h` over `min-h` for the reason
+the status band does: the panel's whole job is that a state change repaints it and never moves
+it, and `e2e/update-screen.spec.ts` measures that to half a pixel in Chromium and WebKit, and
+once more at 150% text, where it also fails a box that spills or a clamp that cuts a line in half.
 
 ---
 
@@ -619,3 +686,27 @@ the reason §6 gives at `app-header.tsx:212`. They are **floors** — a two-line
 legitimately grows its box — and what they buy is that two one-line notices are the same height
 whether or not one carries a button, so swapping one strip for another inside the open band
 repaints it and never moves it.
+
+## 12. Navigation — back goes up one level
+
+On a phone the edge swipe is history back, so the history stack must be the level tree
+([ADR 0067](./.adr/0067-back-goes-up-one-level.md)). Navigate through `useNav()`
+(`web/src/hooks/use-nav.ts`), never a bare `navigate(path)`:
+
+- **Down** (`nav.down`) pushes and records `from`. Opening a space, a pane, History, Changes,
+  Settings, Crew, Updates.
+- **Sideways** (`nav.side`) replaces and carries `from`. Pane to pane, tab to tab, space chip to
+  space chip, the machine and session switchers. `nav.open` picks down or sideways for a new pane.
+- **Up** (`nav.up(parent)`, `nav.upTo(parent)`) steps back when the entry behind is a legitimate
+  parent, else replaces onto `parent`. Every back arrow, the Collie mark inside a level, every close
+  and every automatic exit. Never push a parent.
+- **A new route** gets its place in `ancestorsOf` and `parentChain` (`web/src/lib/nav.ts`) in the
+  same change.
+- **A sheet owns no history entry.** It opens and closes without navigating.
+
+**A glide is reserved for the one case where a row IS the next screen's header** — one element
+carries its identity forward, not merely its position ([ADR 0069](./.adr/0069-a-row-glides-into-its-header.md),
+`web/src/lib/glide.ts`). Forward is the tap on that row; reverse is the in-app back arrow alone,
+never the swipe. Every other move stays what it was: a sideways move crossfades or slides, and the
+phone's own edge swipe plays the phone's own animation, never one of ours.
+

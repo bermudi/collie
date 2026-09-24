@@ -1,9 +1,9 @@
 {
   "name": "collie",
-  "version": "0.48.0",
+  "version": "0.49.0",
   "private": true,
   "license": "MIT",
-  "description": "Collie \u2014 a mobile web UI to monitor and reply to the AI agents in your terminal, over Tailscale",
+  "description": "Collie — a mobile web UI to monitor and reply to the AI agents in your terminal, over Tailscale",
   "type": "module",
   "scripts": {
     "start": "bun run bridge/index.ts",

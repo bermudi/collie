@@ -3,6 +3,8 @@ import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Config } from "./config.ts";
 import type { UpdateStatus } from "./types.ts";
+import type { Environment } from "./config-source.ts";
+import type { JsonValue } from "./json.ts";
 
 // Update-availability signal, surfaced on the (access-gated) /api/snapshot as `update`. Two
 // independent questions the running plugin can answer about itself:
@@ -174,15 +176,112 @@ export function githubReleaseUrl(repo: string, version: string): string {
   return `https://github.com/${repo}/releases/tag/v${version}`;
 }
 
-/** Anonymous HTTPS fetch of a GitHub repo's tags → their names (`["v0.11.0", …]`). Throws on a
- *  non-OK response or timeout so the caller keeps its previous result and retries next tick. */
-export function githubTagsFetcher(repo: string): () => Promise<string[]> {
-  const url = `https://api.github.com/repos/${repo}/tags?per_page=100`;
+/** One tag as GitHub's `/tags` endpoint reports it: the ref name and the commit it points at. */
+export interface ApiTag {
+  name: string;
+  /** `commit.sha` — carried so the CLI can fill a `ReleaseTag` without a second request. */
+  sha: string;
+}
+
+/** The endpoint the banner reads — never `releases/latest`, which hides prereleases and stalls a
+ *  whole beta train. */
+export function githubTagsUrl(repo: string): string {
+  return `https://api.github.com/repos/${repo}/tags?per_page=100`;
+}
+
+// ── The GitHub credential (#254) ─────────────────────────────────────────────
+// GitHub allows an anonymous caller 60 API calls an hour, counted per network address, so every
+// machine behind one router shares a budget the release check can exhaust. A token makes the limit
+// the caller's own. Collie READS one and never asks for one: the tag list is public, so a token
+// with no scopes at all is enough. It is sent to `api.github.com` alone — a release asset lives on
+// github.com, which counts nothing, and redirects to a storage host that must never see it.
+
+/** The names read for a GitHub token, in the order they win. `GH_TOKEN` and `GITHUB_TOKEN` are the
+ *  two the `gh` CLI and Actions already set; the first is Collie's own, for a service's `.env`. */
+export const GITHUB_TOKEN_ENVS = ["COLLIE_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"] as const;
+
+/** A token and the NAME it was read from. A message names the variable and never the value. */
+export interface GithubCredential {
+  token: string;
+  source: (typeof GITHUB_TOKEN_ENVS)[number];
+}
+
+/** The first of {@link GITHUB_TOKEN_ENVS} with a non-blank value, or null: anonymous, as before. */
+export function githubCredential(env: Environment): GithubCredential | null {
+  for (const source of GITHUB_TOKEN_ENVS) {
+    const token = env[source]?.trim();
+    if (token !== undefined && token !== "") return { token, source };
+  }
+  return null;
+}
+
+/** Whether `url` is one the credential may go to: GitHub's API host, by exact host match. */
+export function isGithubApiUrl(url: string): boolean {
+  try {
+    return new URL(url).host === "api.github.com";
+  } catch {
+    return false;
+  }
+}
+
+/** `base`, plus the bearer header when there is a credential AND `url` is the API. */
+export function githubHeaders(
+  url: string,
+  credential: GithubCredential | null,
+  base: Record<string, string>,
+) {
+  if (credential === null || !isGithubApiUrl(url)) return base;
+  return { ...base, authorization: `Bearer ${credential.token}` };
+}
+
+/**
+ * GitHub's `/tags` payload → {@link ApiTag}[]. The ONE parser of that document: the bridge's banner
+ * fetches it over `fetch`, and `collie update`'s binary path fetches it through the CLI's `net`
+ * seam, and both land here (M14/01 §2.3).
+ *
+ * A tag with no readable name is dropped, and so is one with no `commit.sha`: an EMPTY sha is worse
+ * than a missing tag, because `planUpdate`'s "already there" arm compares the candidate's commit
+ * against the installed head — and on a binary install that head is `""`, so an empty sha would
+ * match it and report a real update as "already current".
+ */
+export function parseTagsResponse(data: JsonValue): ApiTag[] {
+  if (!Array.isArray(data)) return [];
+  return data.flatMap((t) => {
+    if (t === null || typeof t !== "object" || Array.isArray(t)) return [];
+    if (typeof t.name !== "string" || t.name === "") return [];
+    const commit = t.commit;
+    if (commit === null || typeof commit !== "object" || Array.isArray(commit)) return [];
+    if (typeof commit.sha !== "string" || commit.sha === "") return [];
+    return [{ name: t.name, sha: commit.sha }];
+  });
+}
+
+/** HTTPS fetch of a GitHub repo's tags, with the credential when there is one. Throws on a non-OK
+ *  response or timeout so the caller keeps its previous result and retries next tick. A refused
+ *  token is said ONCE in the log, because the banner would otherwise stall in silence on it. */
+export function githubTagsFetcher(
+  repo: string,
+  credential: GithubCredential | null = null,
+): () => Promise<string[]> {
+  const url = githubTagsUrl(repo);
+  let refusedSaid = false;
   return async () => {
     const res = await fetch(url, {
-      headers: { accept: "application/vnd.github+json", "user-agent": "collie-update-check" },
+      headers: githubHeaders(url, credential, {
+        accept: "application/vnd.github+json",
+        "user-agent": "collie-update-check",
+      }),
       signal: AbortSignal.timeout(TAGS_TIMEOUT_MS),
     });
+    // Once, not every tick: the check runs for the life of the process, and a line an hour is the
+    // sort of log nobody reads. The price is that a token revoked later is said once and then only
+    // shows as a banner that stops moving; `collie update --check` names it any time it is asked.
+    if (res.status === 401 && credential !== null && !refusedSaid) {
+      refusedSaid = true;
+      console.warn(
+        `[update] GitHub refused the token in ${credential.source} (HTTP 401); the release check fails until it is fixed or unset`,
+      );
+    }
     if (!res.ok) throw new Error(`github tags: HTTP ${res.status}`);
     const data: unknown = await res.json();
     if (!Array.isArray(data)) return [];

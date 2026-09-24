@@ -4,6 +4,10 @@ import type { Dictionary } from "./en";
 // `.other` carry the same sentence — the pair still exists because `tn()` asks for it by suffix.
 
 export const ko: Dictionary = {
+  "settings.updateBanner.restart": "브리지 재시작 필요",
+  "settings.updateBanner.releaseAvailable": "Collie {version} 업데이트 가능",
+  "settings.updateBanner.majorAvailable": "Collie {version} 메이저 업데이트 출시",
+  "settings.updateBanner.copyAria": "명령어 복사: {command}",
   "settings.language.title": "언어",
   "settings.language.description": "터미널 출력 내용은 번역되지 않습니다.",
 
@@ -29,14 +33,25 @@ export const ko: Dictionary = {
   "settings.install.description": "Collie를 홈 화면에 추가하여 전용 아이콘과 전체 화면으로 실행합니다.",
   "settings.install.button": "설치",
   "settings.install.iosHint": "iPhone 및 iPad에서는 브라우저 공유 메뉴에서 \"홈 화면에 추가\"를 선택하여 설치합니다.",
-  "settings.harnessBar.title": "Harness shortcuts",
-  "settings.harnessBar.description": "A row of the running agent's own commands above the keys.",
+  "settings.harnessBar.title": "Harness 바로가기",
+  "settings.harnessBar.description": "키 위에 표시되는 실행 중인 에이전트의 자체 명령 행입니다.",
+  "settings.beltSize.title": "작업 벨트 크기",
+  "settings.beltSize.description": "입력창 위 액션 행의 높이와 해당 아이콘 및 텍스트의 크기를 설정합니다.",
+  "settings.beltSize.option.default": "기본값",
+  "settings.beltSize.option.large": "크게",
+  "settings.beltSize.option.larger": "더 크게",
   "settings.zen.title": "젠 모드",
   "settings.zen.description": "터미널만 남기고 나머지 UI를 숨기는 메뉴 항목을 추가합니다.",
   "settings.zen.auto.label": "가로 모드에서 자동 실행",
   "settings.zen.auto.hint": "휴대폰을 옆으로 돌리면 젠 모드가 자동으로 열리고, 다시 돌리면 닫힙니다.",
 
   // --- settings.handsFree ---
+  "settings.handsFree.title": "음성 직접 전송",
+  "settings.handsFree.description":
+    "음성 인식 텍스트를 입력창에 넣지 않고 터미널로 즉시 전송합니다. 오인식을 방지하기 위해 기본값은 꺼짐입니다.",
+  "settings.handsFree.ariaLabel": "음성 직접 전송: 인식된 텍스트 즉시 전송",
+
+  // --- settings.push ---
   "settings.push.title": "푸시 알림",
   "settings.push.description": "에이전트가 입력을 대기할 때 알림을 수신합니다.",
   "settings.push.reason.insecure": "푸시 알림에는 HTTPS 연결이 필요합니다.",
@@ -63,13 +78,13 @@ export const ko: Dictionary = {
   "settings.notify.done.hint": "에이전트 작업이 끝났을 때",
   "settings.notify.updates.label": "앱 업데이트",
   "settings.notify.updates.hint": "새로운 Collie 버전이 릴리스되었을 때",
-  "settings.notify.cache.label": "Cache about to go cold",
+  "settings.notify.cache.label": "캐시 만료 임박",
   "settings.notify.cache.hint":
-    "a pane's prompt cache expires in a few minutes; also covers panes you watched one by one",
-  "settings.notify.watched.title": "Watched panes",
-  "settings.notify.watched.empty": "None yet — open a pane's settings to watch it.",
-  "settings.notify.watched.remove": "Remove",
-  "settings.notify.watched.removeAria": "Stop watching {label}",
+    "창의 프롬프트 캐시가 몇 분 내에 만료됩니다. 개별적으로 주시한 창도 포함됩니다.",
+  "settings.notify.watched.title": "주시 중인 창",
+  "settings.notify.watched.empty": "아직 없습니다. 창 설정을 열어 주시하십시오.",
+  "settings.notify.watched.remove": "제거",
+  "settings.notify.watched.removeAria": "{label} 주시 중지",
 
   // --- settings.snooze ---
   "settings.snooze.title": "방해 금지 모드",
@@ -142,10 +157,6 @@ export const ko: Dictionary = {
   "settings.update.checking": "확인 중...",
   "settings.update.error": "업데이트를 확인하지 못했습니다.",
   "settings.update.upToDate": "최신 버전",
-  "settings.updateBanner.restart": "브리지 재시작 필요",
-  "settings.updateBanner.releaseAvailable": "Collie {version} 업데이트 가능",
-  "settings.updateBanner.majorAvailable": "Collie {version} 메이저 업데이트 출시",
-  "settings.updateBanner.copyAria": "명령어 복사: {command}",
 
   // --- settings.typeface ---
   "settings.typeface.title": "UI 글꼴",
@@ -182,6 +193,9 @@ export const ko: Dictionary = {
   "settings.display.rawTerminal.label": "원시 터미널",
   "settings.display.rawTerminal.hint":
     "프롬프트 버튼, UI 장식, 상태 바 없이 순수 화면만 표시합니다. 대화상자가 깨져서 직접 키를 입력해야 할 때 유용합니다.",
+  "settings.display.noInvert.label": "이 창을 원본 그대로 표시",
+  "settings.display.noInvert.hint":
+    "이 창에만 라이트 테마 반전을 적용하지 않습니다. 에이전트가 라이트 테마인데 미러가 어둡게 표시될 때 켜세요. 표시가 정상이면 꺼두세요.",
   "settings.display.textSize.label": "글꼴 크기",
   "settings.display.textSize.decrease": "글꼴 축소",
   "settings.display.textSize.increase": "글꼴 확대",
@@ -207,16 +221,30 @@ export const ko: Dictionary = {
   "composer.placeholder.direct": "터미널에 입력…",
   "composer.placeholder.shell": "셸 명령 입력…",
   "composer.placeholder.reply": "응답 입력…",
+  "composer.mic.unavailable": "음성 입력을 사용할 수 없습니다",
+  "composer.mic.stopAria": "녹음 중지",
+  "composer.mic.recordAria": "음성 녹음",
+  "composer.mic.transcribing": "텍스트 변환 중…",
+  "composer.mic.recording": "녹음 중 {elapsed}",
+  "composer.mic.handsFreeHint": "중지 시 자동 전송",
+  "composer.mic.manualHint": "입력창에 텍스트로 삽입",
+  "composer.mic.stop": "중지",
+  "composer.mic.discardAria": "녹음 취소",
   "composer.attach.aria": "파일 첨부",
   "composer.attach.title": "첨부",
   "composer.attach.photos": "사진",
   "composer.attach.files": "파일",
+  "composer.attach.listAria": "첨부 파일",
+  "composer.attach.removeAria": "{name} 제거",
+  "composer.attach.inFront": "텍스트에서 해당 표시가 사라졌으므로 전송 시 {name}을(를) 앞에 둡니다.",
   "composer.send.typeAnyway": "그대로 입력할까요?",
   "composer.send.reallySend": "전송할까요?",
   "composer.send.stopTypingAria": "터미널 입력 중단",
   "composer.send.sendAria": "전송",
   "composer.draft.tooLong": "임시 저장 용량을 초과했습니다. 창 전환 시에는 유지되지만 앱 종료 시 삭제됩니다.",
   "composer.status.dialogWaiting": "대기 중인 대화상자가 있습니다. 먼저 응답해야 전송할 수 있습니다.",
+  "composer.status.unreadDialog":
+    "Collie가 이 대화상자를 읽을 수 없습니다. 카드에 {key}이(가) 있습니다. 그래도 입력하려면 전송을 다시 누르세요.", // wordsmith
   "composer.status.paneNotWritable": "창에 쓸 수 없는 상태입니다. 아무것도 전송되지 않았습니다.",
   "composer.status.inputChanged":
     "입력 초기화 중 내용이 변경되어 전송이 취소되었습니다. 창을 확인하십시오.",
@@ -226,12 +254,10 @@ export const ko: Dictionary = {
   "composer.discard.confirmKeys.one": "대기 중인 키 {count}개를 삭제하려면 다시 누르세요.",
   "composer.discard.confirmKeys.other": "대기 중인 키 {count}개를 삭제하려면 다시 누르세요.",
   "composer.destructive.confirm": "주의가 필요한 명령: {reason}. 확인하려면 전송을 다시 누르세요.",
-  "composer.upload.success": "파일 추가됨, 메시지에 경로 표시",
+  "composer.destructive.confirmOnHost": "주의가 필요한 명령: {host}의 {reason}. 확인하려면 전송을 다시 누르세요.",
+  "composer.upload.success": "파일 첨부됨",
   "composer.upload.tooLarge": "파일이 이 Collie의 제한인 {max}MB를 초과합니다.",
   "composer.upload.badType": "Collie에서 {name} 파일을 첨부할 수 없습니다.",
-  "composer.upload.successBatch": "파일 {n}개 추가됨, 경로는 메시지에",
-  "composer.upload.mixed": "{total}개 중 {attached}개 추가됨 — {detail}",
-  "composer.upload.nothing": "추가된 파일 없음 — {detail}",
   "composer.noEcho.title": "비밀번호 입력 프롬프트. 입력 내용이 표시되지 않습니다.",
   "composer.noEcho.noLiveTyped":
     "입력한 내용이 창에 남아 있지만 제출되지 않았습니다. 현재 뷰는 실시간 세션이 아니므로 여기서 전송할 수 없습니다. 터미널에서 직접 처리하세요.",
@@ -245,6 +271,7 @@ export const ko: Dictionary = {
   "composer.noEcho.dismissAria": "비밀번호 프롬프트 알림 닫기",
   "composer.draftPreview.title": "터미널 임시 저장본",
   "composer.draftPreview.takeOver": "가져오기",
+  "composer.draftPreview.dismissAria": "터미널 임시 저장본 알림 닫기",
 
   // --- sendMode (the armed "typing straight through" indicator) ---
   "sendMode.armed.title": "터미널 직접 입력 모드",
@@ -270,6 +297,8 @@ export const ko: Dictionary = {
   "chat.scrollback.showHistory": "전체 기록 보기",
   "chat.scrollback.loadOlder": "이전 로그 불러오기",
   "chat.scrollback.loading": "불러오는 중…",
+  "chat.scrollback.noSessionReported":
+    "{agent}가 Herdr에 세션을 보고하지 않았습니다. 에이전트용 Herdr 연동 패키지를 설치하거나 업데이트한 후 이 창에서 에이전트를 재시작하십시오.",
   "chat.fullReply.title": "답변 전체",
   "chat.fullReply.fromTranscript": "로그에서",
   "chat.fullReply.showingTerminal": "터미널 표시 중",
@@ -314,16 +343,16 @@ export const ko: Dictionary = {
   "prompt.feedback.freeText.typedPrefix": "터미널에서 직접 답변 작성 중: ",
 
   // --- paneSettings (one pane's own preferences; today the prompt-cache warning, ADR 0042) ---
-  "paneSettings.title": "Pane settings",
-  "paneSettings.cacheWatch.label": "Warn me before this pane's cache goes cold",
-  "paneSettings.cacheWatch.hint": "about {minutes} minutes before it expires",
-  "paneSettings.cacheWatch.pushOff": "Turn notifications on for this device in Settings first.",
-  "paneSettings.cacheWatch.globalOn": "Settings warns about every pane, so this one is covered.",
-  "paneSettings.cacheWatch.noSession": "This pane's agent names no session, so there is nothing to watch.",
+  "paneSettings.title": "창 설정",
+  "paneSettings.cacheWatch.label": "이 창의 캐시가 만료되기 전에 알림을 받습니다",
+  "paneSettings.cacheWatch.hint": "만료되기 약 {minutes}분 전",
+  "paneSettings.cacheWatch.pushOff": "먼저 설정에서 이 기기의 알림을 켜십시오.",
+  "paneSettings.cacheWatch.globalOn": "설정에서 모든 창에 대해 경고하므로 이 창도 포함됩니다.",
+  "paneSettings.cacheWatch.noSession": "이 창의 에이전트가 세션을 지정하지 않으므로 주시할 대상이 없습니다.",
 
   // --- paneActions (long-press sheet: rename / close a pane) ---
   "paneActions.title.fallback": "창",
-  "paneActions.settings.label": "Pane settings",
+  "paneActions.settings.label": "창 설정",
   "paneActions.readOnly": "읽기 전용. 이 기기에는 창 이름을 바꾸거나 닫을 권한이 없습니다.",
   "paneActions.rename.label": "이름 변경",
   "paneActions.rename.placeholder": "창 이름 입력",
@@ -358,7 +387,7 @@ export const ko: Dictionary = {
   "nav.home.aria.default": "Collie 홈",
   "nav.home.aria.lost": "Collie 홈, 연결 끊김",
   "nav.home.aria.reconnecting": "Collie 홈, 재연결 중",
-  "nav.mux.onPrefix": "on",
+  "nav.mux.onPrefix": "켜짐",
   "nav.prereleaseTitle": "프리릴리스 빌드 {version}",
 
   // --- home (dashboard herd list) ---
@@ -375,6 +404,19 @@ export const ko: Dictionary = {
   "home.sidebar.paneActionsTitle": "창 작업 보기",
   "home.row.tabPosition": "탭 {n}",
   "home.row.unseen": "읽지 않음",
+  "home.tabs.aria": "대시보드 보기",
+  "home.tabs.panes": "창",
+  "home.tabs.focus": "포커스",
+  "home.tabs.blocked.one": "{count}개 차단됨",
+  "home.tabs.blocked.other": "{count}개 차단됨",
+  "home.tabs.unseen": "확인하지 않은 완료된 창",
+  "home.changes.listAria": "워크스페이스별 변경 사항",
+  "home.changes.loading": "읽는 중…",
+  "home.changes.clean": "변경 사항 없음",
+  "home.changes.noFolder": "폴더 없음",
+  "home.changes.unavailable": "변경 사항을 읽을 수 없습니다",
+  "home.changes.files.one": "파일 {count}개",
+  "home.changes.files.other": "파일 {count}개",
 
   // --- status (triage sections, status labels, counts) ---
   "status.section.needsYou": "입력 대기",
@@ -432,6 +474,7 @@ export const ko: Dictionary = {
   "space.tab.titleFallback": "탭",
   "space.tab.titleWithLabel": "탭 {label}",
   "space.tab.readOnly": "읽기 전용. 이 기기에는 탭 이름 변경이나 닫기 권한이 없습니다.",
+  "space.tab.hostBlockSuffix": "{hostBlock}. 응답할 때까지 이름 변경 및 닫기를 사용할 수 없습니다.",
   "space.tab.rename": "이름 변경",
   "space.tab.close": "탭 닫기",
   "space.tab.closing": "닫는 중…",
@@ -465,13 +508,13 @@ export const ko: Dictionary = {
   // --- harnessBar (the row of the running agent's own commands, above the keys) ---
   // Slash commands are NEVER translated — they are wire text the harness parses — and neither is an
   // operator's own `bar_label`. Only these labels are.
-  "harnessBar.label": "Harness shortcuts",
-  "harnessBar.model": "Model",
+  "harnessBar.label": "Harness 바로가기",
+  "harnessBar.model": "모델",
   "harnessBar.effort": "Effort",
-  "harnessBar.compact": "Compact",
-  "harnessBar.resume": "Resume",
-  "harnessBar.tree": "Tree",
-  "harnessBar.confirmAria": "Tap again to confirm {command}",
+  "harnessBar.compact": "축약",
+  "harnessBar.resume": "재개",
+  "harnessBar.tree": "트리",
+  "harnessBar.confirmAria": "{command}을(를) 확인하려면 다시 탭하십시오",
 
   // --- quickActions (one-tap reply dock) ---
   "quickActions.group.confirm": "확인",
@@ -501,6 +544,23 @@ export const ko: Dictionary = {
   "connection.withLastSeen": "{cause}. 마지막 확인 시각: {time}",
   "connection.readOnly.notPaired": "미등록 기기. 에이전트에 입력하려면 설정에서 기기를 페어링하세요.",
   "connection.readOnly.device": "읽기 전용. 이 기기에는 에이전트 입력 권한이 없습니다{deviceSuffix}.",
+  "connection.host.lastSeen": "마지막 확인 {time}",
+  "connection.host.neverSeen": "연결 이력 없음",
+  "connection.host.unreachablePlain": "접근 불가",
+  "connection.host.unreachableSuffix": "접근 불가 · {label}",
+  "connection.host.incompatible": "호환 불가",
+  "connection.host.lead": "lead",
+  "connection.host.onPrefix": "켜짐",
+  "connection.host.ariaSends": "전송 대상 호스트: {name}{unreachable}",
+  "connection.host.ariaHost": "호스트: {name}{unreachable}",
+  "connection.host.ariaUnreachableSuffix": " (접근 불가)",
+  "connection.host.ariaSuffix": " ({word})",
+  "connection.host.reconnecting": "재연결 중",
+  "connection.host.attention": "확인 필요",
+  "connection.host.reconnectingSuffix": "재연결 중 · {label}",
+  "connection.host.attentionSuffix": "확인 필요 · {label}",
+  "connection.host.reconnectingAction": "lead가 재시도 중입니다. 조치할 필요가 없습니다.",
+  "connection.host.attentionAction": "재시도로 해결되지 않습니다. 이 머신을 확인하세요.",
   "connection.stale.incompatible": "{name}에서 호환되지 않는 Collie 버전이 실행 중입니다.",
   "connection.stale.unreachable": "{name}에 접근할 수 없습니다 · {label}",
   "connection.stale.nothingCached": "이 머신에 캐시된 데이터가 없습니다.",
@@ -511,13 +571,15 @@ export const ko: Dictionary = {
   "connection.session.aria": "세션: {name}. 세션 전환",
   "connection.session.primary": "기본",
   "connection.session.unreachable": "접근 불가",
+  "connection.session.ariaIn": "세션 위치: {name}",
   "connection.session.all": "모든 세션",
   "connection.session.allDescription": "이 머신의 전체 세션 목록",
   "connection.session.allAria": "전체 세션 표시 중. 세션 전환",
   "connection.server.title": "머신",
   "connection.server.aria": "호스트: {name}. 호스트 전환",
 
-  // --- crew ---
+
+  // --- error (boot splash, route-level error recovery) ---
   "error.boot.connecting": "클러스터 연결 중...",
   "error.boot.title": "연결 끊김",
   "error.boot.body": "Collie에 연결할 수 없습니다. 호스트 연결 상태를 확인한 후 다시 시도하세요.",
@@ -536,8 +598,7 @@ export const ko: Dictionary = {
 
   // --- pwa (self-update banner) ---
   "pwa.updateAvailable": "새 버전 업데이트 가능. 탭하여 적용하십시오.",
-  "pwa.updateInstalling": "Downloading the new version…",
-  "updateRibbon.hideNotice": "이 알림 숨기기",
+  "pwa.updateInstalling": "새 버전을 다운로드하는 중…",
 
   // --- history (pane transcript route) ---
   "history.unavailable.disabled": "현재 브리지에서 트랜스크립트 기록이 비활성화되어 있습니다 (COLLIE_TRANSCRIPT).",
@@ -567,15 +628,29 @@ export const ko: Dictionary = {
 
   // --- mirror (terminal graphics in the pane mirror) ---
   "mirror.blankLines": "[{n}개의 빈 줄]",
+  "mirror.imageAlt": "터미널 그래픽",
+  "mirror.imageBadge": "[이미지]",
+  "mirror.imageMatchedByOrder": "순서로 맞춤, 확인은 기록에서",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "방금 전",
   "time.compact.now": "방금",
 
-  // --- sync (how fresh the herd on screen is, and asking for a fresher one) ---
 
   // --- dialog (menu / multi-select / wizard / preview-select block renderers) ---
   "dialog.sendingAria": "전송 중",
+  // TODO wordsmith
+  "dialog.terminalControl": "터미널",
+  // TODO wordsmith
+  "dialog.terminalControlAria": "이 카드 대신 터미널 표시",
+  // TODO wordsmith
+  "dialog.backToCard": "카드로 돌아가기",
+  // TODO wordsmith
+  "dialog.putAwayControl": "치우기",
+  // TODO wordsmith
+  "dialog.putAwayControlAria": "이 카드의 버튼을 숨기고 터미널을 유지합니다",
+  // TODO wordsmith
+  "dialog.showButtons": "버튼 표시",
   "dialog.previousStepAria": "이전 단계",
   "dialog.nextStepAria": "다음 단계",
   "dialog.answeredAria": "응답 완료",
@@ -595,6 +670,11 @@ export const ko: Dictionary = {
   "dialog.menu.moveDown": "아래로 이동",
   "dialog.menu.leftAria": "왼쪽: {verb} ({label})",
   "dialog.menu.rightAria": "오른쪽: {verb} ({label})",
+  // TODO wordsmith
+  "dialog.menu.levelAria": "{label}에 {verb}",
+  // TODO wordsmith
+  "dialog.menu.levelCurrentAria": "{label}, 현재",
+  "unreadDialog.caption": "Collie가 이 대화상자를 읽을 수 없습니다", // wordsmith
   "dialog.preview.currentAnswerAria": "현재 답변",
   "dialog.preview.previewedBelowAria": "하단 미리보기",
   "dialog.preview.previewLabel": "미리보기 · {label}",
@@ -633,7 +713,8 @@ export const ko: Dictionary = {
   "promptAction.feedback.boxNotOpened": "피드백 입력창이 열리지 않았습니다. 창 상태를 확인하십시오.",
   "promptAction.feedback.notArrived": "피드백이 전달되지 않았습니다. 아무것도 제출되지 않았습니다.",
 
-  // --- stt (speech-to-text errors, lib/stt.ts + hooks/use-stt-recorder.ts) ---
+
+  // --- directTyping (the composer's "Type into terminal" mode, hooks/use-direct-typing.ts) ---
   "directTyping.status.draftPending": "터미널에 입력하려면 먼저 작성 중인 초안을 전송하거나 삭제하세요.",
   "directTyping.status.armed": "터미널 직접 입력 활성화됨. 키 입력이 즉시 전달됩니다.",
   "directTyping.status.disarmed": "일반 메시지 전송 모드로 복귀",
@@ -676,8 +757,8 @@ export const ko: Dictionary = {
   "apiError.pairing.bad_code": "페어링 코드가 일치하지 않습니다.",
   "apiError.pairing.duplicate_label": "동일한 이름을 사용하는 기기가 이미 존재합니다.",
   "apiError.device.unknown": "해당 이름을 가진 페어링된 기기가 없습니다.",
-  "apiError.cache.pane_unknown": "That pane is gone, nothing was changed.",
-  "apiError.cache.no_session": "That pane's agent names no session, so it can't be watched.",
+  "apiError.cache.pane_unknown": "해당 창이 사라졌으며 아무것도 변경되지 않았습니다.",
+  "apiError.cache.no_session": "해당 창의 agent가 세션을 지정하지 않아 감시할 수 없습니다.",
   "apiError.session.unknown": "해당 collie에 {session} 세션이 없습니다.",
   // --- worktrees (ADR 0032) ---
   "apiError.worktree.list_failed": "worktree 목록을 가져오지 못했습니다: {reason}",
@@ -704,87 +785,177 @@ export const ko: Dictionary = {
   "space.new.tab.plain": "스페이스",
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "저장소",
+  "space.new.host.label": "호스트",
   "worktree.orOpenExisting": "기존 worktree 열기",
-  // --- settings.updateCard (the update card, M15/05) ---
-  "cache.warm": "Prompt cache warm",
-  "cache.expiring": "Prompt cache expiring",
-  "cache.cold": "cold",
-  "cache.unknown": "Prompt cache not known",
+  // --- apiError.update (POST /api/update refusals, M15/05) ---
+
+
+  // --- M16/01: the updates page, its crew lines and the Settings row ---
+  // The prompt-cache chip and its sheet (M28/02). Mirrored from English verbatim: these are new
+  // keys, and a translation is a separate `wordsmith --translate` pass over this file.
+  "cache.warm": "프롬프트 캐시 웜",
+  "cache.expiring": "프롬프트 캐시 만료 예정",
+  "cache.cold": "콜드",
+  "cache.unknown": "프롬프트 캐시 알 수 없음",
   "cache.under1m": "<1m",
-  "cache.overridden": "TTL set in cache-rules.toml",
-  "cache.sheet.title": "Prompt cache",
-  "cache.sheet.rule": "Rule",
-  "cache.sheet.ttl": "Stays warm for",
-  "cache.sheet.ttlMinutes": "{minutes} min",
-  "cache.sheet.confidence": "Confidence",
-  "cache.sheet.source": "Read on",
-  "cache.sheet.retrieved": "Checked",
-  "cache.sheet.measured": "Measured on this machine",
-  "cache.sheet.lastRead": "last read {age}",
-  "cache.sheet.overridden": "Moved by cache-rules.toml",
-  "cache.sheet.thisMachine": "This machine",
-  "cache.sheet.onPeer": "Read on {host}. Its rule catalog is not forwarded, so the source is not quoted here.",
+  "cache.overridden": "cache-rules.toml에 설정된 TTL",
+  "cache.sheet.title": "프롬프트 캐시",
+  "cache.sheet.rule": "규칙",
+  "cache.sheet.ttl": "웜 상태 유지 시간",
+  "cache.sheet.ttlMinutes": "{minutes}분",
+  "cache.sheet.confidence": "신뢰도",
+  "cache.sheet.source": "읽은 위치",
+  "cache.sheet.retrieved": "확인됨",
+  "cache.sheet.measured": "이 머신에서 측정됨",
+  "cache.sheet.lastRead": "마지막으로 읽은 시간: {age}",
+  "cache.sheet.overridden": "cache-rules.toml에 의해 이동됨",
+  "cache.sheet.thisMachine": "이 머신",
+  "cache.sheet.onPeer": "{host}에서 읽었습니다. 해당 호스트의 규칙 카탈로그가 전달되지 않았으므로 소스는 여기에 인용되지 않습니다.",
   "cache.sheet.reset.pending": "마지막 턴 이후: {action}. 다음 턴에서 캐시를 다시 만듭니다.",
   "cache.sheet.reset.cause": "마지막 턴 이전: {action}. 그 턴에서 캐시를 다시 만들었습니다.",
-  "cache.sheet.state": "State",
+  "cache.sheet.state": "상태",
   "cache.sheet.state.warm": "Warm",
-  "cache.sheet.state.expiring": "Expiring",
+  "cache.sheet.state.expiring": "만료 중",
   "cache.sheet.state.cold": "Cold",
-  "cache.confidence.documented": "documented",
-  "cache.confidence.reported": "reported",
-  "cache.confidence.inferred": "inferred",
-  "cache.confidence.observed": "measured",
-  "tour.skip": "Skip",
-  "tour.title": "Collie shows the agents in your terminal.",
+  "cache.confidence.documented": "문서화됨",
+  "cache.confidence.reported": "보고됨",
+  "cache.confidence.inferred": "추론됨",
+  "cache.confidence.observed": "측정됨",
+  "updateRibbon.hideNotice": "이 알림 숨기기",
+
+  // --- tour (the first-run screen) --- ENGLISH, not yet translated.
+  "tour.skip": "건너뛰기",
+  "tour.title": "Collie는 터미널의 에이전트를 표시합니다.",
   // The claim's second sentence, in the three forms the facts can support. {mux} is the
   // multiplexer's display name, {host} the lead machine's crew label; a clause whose fact is missing
   // is dropped rather than filled with a placeholder.
   "tour.lead":
-    "It mirrors the panes running under {mux} on {host}. It shows what is on those screens, and it never runs a terminal of its own.",
+    "{host}의 {mux}에서 실행 중인 창을 미러링합니다. 해당 화면의 내용을 표시하며, 자체 터미널을 직접 실행하지 않습니다.",
+  "tour.leadNoHost":
+    "{mux}에서 실행 중인 창을 미러링합니다. 해당 화면의 내용을 표시하며, 자체 터미널을 직접 실행하지 않습니다.",
   "tour.leadNoMux":
-    "It mirrors the panes running in your terminal multiplexer. It shows what is on those screens, and it never runs a terminal of its own.",
+    "터미널 멀티플렉서에서 실행 중인 창을 미러링합니다. 해당 화면의 내용을 표시하며, 자체 터미널을 직접 실행하지 않습니다.",
 
   // Your setup. Every row is a fact this snapshot carries, or the row is absent.
-  "tour.setup": "Your setup",
-  "tour.setup.panes.one": "{count} pane",
-  "tour.setup.panes.other": "{count} panes",
-  "tour.setup.needsYou.one": "{count} needs you",
-  "tour.setup.needsYou.other": "{count} need you",
-  "tour.setup.noPanes": "No panes yet",
-  "tour.setup.canType": "This device can type",
-  "tour.setup.readOnly": "This device can read only",
-  "tour.setup.pushOff": "Notifications are off on this phone",
+  "tour.setup": "사용자 설정",
+  "tour.setup.panes.one": "창 {count}개",
+  "tour.setup.panes.other": "창 {count}개",
+  "tour.setup.needsYou.one": "{count}개 항목에 작업이 필요합니다",
+  "tour.setup.needsYou.other": "{count}개 항목에 작업이 필요합니다",
+  "tour.setup.noPanes": "아직 창이 없습니다",
+  "tour.setup.machines.one": "크루에 머신 {count}대 있음",
+  "tour.setup.machines.other": "크루에 머신 {count}대 있음",
+  "tour.setup.canType": "이 기기에서 입력할 수 있습니다",
+  "tour.setup.readOnly": "이 기기는 읽기 전용입니다",
+  "tour.setup.pushOff": "이 전화에서 알림이 꺼져 있습니다",
 
   // Do this next. At most two cards, first match wins, in this order.
-  "tour.doNext": "Do this next",
-  "tour.pair.title": "Pair this phone",
-  "tour.pair.body": "Run collie pair on the host, then type the code in Settings.",
-  "tour.pair.button": "Pair",
-  "tour.space.title": "Nothing is running yet",
-  "tour.space.body": "Start an agent in your terminal, or make a space here.",
-  "tour.space.button": "New space",
-  "tour.pushCard.title": "Be told when a pane needs you",
-  "tour.pushCard.body": "Collie notifies you when an agent is blocked, or done.",
-  "tour.install.title": "Keep Collie on your home screen",
-  "tour.install.body": "It opens full screen and remembers where you were.",
-  "tour.install.button": "Add",
-  "tour.push.enable": "Turn on",
-  "tour.push.enabled": "Notifications are on for this device.",
+  "tour.doNext": "다음에 할 작업",
+  "tour.pair.title": "이 전화 페어링",
+  "tour.pair.body": "호스트에서 collie pair를 실행한 다음 설정에 코드를 입력하십시오.",
+  "tour.pair.button": "페어링",
+  "tour.space.title": "아직 실행 중인 항목이 없습니다",
+  "tour.space.body": "터미널에서 에이전트를 시작하거나 여기에서 공간을 만드십시오.",
+  "tour.space.button": "새 공간",
+  "tour.pushCard.title": "창에 사용자의 작업이 필요할 때 알림 받기",
+  "tour.pushCard.body": "Collie는 에이전트가 차단되거나 완료되면 알림을 보냅니다.",
+  "tour.install.title": "홈 화면에 Collie 유지하기",
+  "tour.install.body": "전체 화면으로 열리며 이전 위치를 기억합니다.",
+  "tour.install.button": "추가",
+  "tour.push.enable": "켜기",
+  "tour.push.enabled": "이 기기에서 알림이 켜져 있습니다.",
 
   // What you can do here. The six lines the site sells and the app never said.
-  "tour.can": "What you can do here",
-  "tour.can.mirror": "Read the live pane, colour and all.",
-  "tour.can.answer": "Answer a prompt by tapping its card.",
-  "tour.can.type": "Type a reply, or send Esc, Tab and Ctrl keys.",
-  "tour.can.harness": "Set model and effort from the actions row.",
-  "tour.can.session": "Read the whole session, past the scrollback.",
-  "tour.done.pane": "Open the pane that needs you",
-  "tour.done.dashboard": "Show the dashboard",
+  "tour.can": "여기서 할 수 있는 작업",
+  "tour.can.mirror": "색상을 포함한 실시간 창을 읽습니다.",
+  "tour.can.answer": "카드를 탭하여 프롬프트에 응답합니다.",
+  "tour.can.type": "답장을 입력하거나 Esc, Tab, Ctrl 키를 전송합니다.",
+  "tour.can.harness": "작업 행에서 모델과 노력을 설정합니다.",
+  "tour.can.session": "스크롤백을 지나 전체 세션을 읽습니다.",
+  "tour.can.crew": "단일 URL에서 크루의 모든 머신을 확인합니다.",
+
+  // The footer's one button. The first spelling opens the blocked pane; the second closes the sheet.
+  "tour.done.pane": "작업이 필요한 창 열기",
+  "tour.done.dashboard": "대시보드 표시",
 
   // --- settings.tour ---
-  "settings.tour.title": "Show the first screen again",
-  "settings.tour.description": "What Collie does, and what this install looks like.",
-  "settings.tour.button": "Show",
+  "settings.tour.title": "첫 화면 다시 표시",
+  "settings.tour.description": "Collie가 하는 일, 그리고 이 설치가 어떻게 구성되는지 안내합니다.",
+  "settings.tour.button": "표시",
 
-  // --- updateScreen (M28/01): English until translated. ---
+
+
+  // --- changes (ADR 0065) ---
+  "chat.changes.label": "변경 사항",
+  "changes.title": "변경 사항",
+  "changes.backAria.dashboard": "대시보드로 돌아가기",
+  "changes.backAria.workspace": "워크스페이스로 돌아가기",
+  "changes.backAria.pane": "창으로 돌아가기",
+  "changes.listBackAria": "목록으로 돌아가기",
+  "changes.refreshAria": "변경 사항 새로고침",
+  "changes.loading": "변경 사항을 읽는 중…",
+  "changes.empty": "마지막 커밋 이후 변경 사항이 없습니다.",
+  "changes.unavailable.noFolder": "Collie가 이 워크스페이스의 폴더를 찾을 수 없으므로 표시할 변경 사항이 없습니다.",
+  "changes.unavailable.noGit": "이 컴퓨터에 Git이 설치되어 있지 않습니다.",
+  "changes.unavailable.noPane": "이 창이 사라졌습니다.",
+  "changes.unavailable.noWorkspace": "이 워크스페이스가 사라졌습니다.",
+  "changes.error": "변경 사항을 읽을 수 없습니다. 다시 시도하려면 새로고침을 누르십시오.",
+  "changes.stale": "업데이트하지 않는 중",
+  "changes.truncated": "목록 제한에 도달하여 일부 저장소나 파일이 누락되었을 수 있습니다.",
+  "changes.bound.depth.one": "{count}단계에서 중단되었으며, 더 아래에 저장소가 있습니다.",
+  "changes.bound.depth.other": "{count}단계에서 중단되었으며, 더 아래에 저장소가 있습니다.",
+  "changes.bound.settings": "설정에서 더 깊은 수준 확인",
+  "changes.thisPane": "이 창",
+  "changes.repoFiles.one": "{name} · 파일 {count}개",
+  "changes.repoFiles.other": "{name} · 파일 {count}개",
+  "changes.status.M": "수정됨",
+  "changes.status.A": "추가됨",
+  "changes.status.D": "삭제됨",
+  "changes.status.R": "이름 변경됨",
+  "changes.status.untracked": "추적되지 않음",
+  "changes.binaryShort": "바이너리",
+  "changes.file.binary": "바이너리 파일입니다. 표시하지 않습니다.",
+  "changes.file.directory": "새 폴더입니다. 내부 파일이 하나씩 나열되지 않습니다.",
+  "changes.file.truncated": "diff가 여기서 중단됩니다. 전체를 표시하기에 너무 깁니다.",
+  "changes.file.unknown": "이 파일은 더 이상 변경 사항 목록에 없습니다. 돌아가서 새로 고치십시오.",
+  "changes.file.gone": "더 이상 변경되지 않음",
+  "changes.file.error": "이 diff를 읽을 수 없습니다.",
+  "changes.file.noLines": "줄 변경 사항이 없습니다.",
+  "changes.file.renamedFrom": "{path}에서 이름 변경됨",
+  "changes.file.prev": "이전 파일",
+  "changes.file.next": "다음 파일",
+  "changes.layout.aria": "레이아웃",
+  "changes.layout.list": "목록",
+  "changes.layout.tree": "트리",
+  "changes.tree.folderAria.one": "{name}, 파일 {count}개",
+  "changes.tree.folderAria.other": "{name}, 파일 {count}개",
+  "changes.filter.button": "파일 필터링",
+  "changes.filter.buttonActive": "파일 필터링, {total}개 중 {shown}개 표시됨",
+  "changes.filter.placeholder": "경로로 필터링",
+  "changes.filter.clearText": "텍스트 지우기",
+  "changes.filter.statusAria": "상태로 필터링",
+  "changes.filter.shown": "파일 {total}개 중 {shown}개",
+  "changes.filter.none": "일치하는 파일이 없습니다.",
+  "changes.filter.clear": "필터 지우기",
+  "changes.commit.show": "마지막 커밋 표시",
+  "changes.commit.showFor": "{name}의 마지막 커밋 표시",
+  "changes.commit.cleanHeading": "커밋되지 않은 변경 사항 없음",
+  "changes.commit.title": "마지막 커밋",
+  "changes.commit.backAria": "커밋으로 돌아가기",
+  "changes.commit.loading": "커밋을 읽는 중…",
+  "changes.commit.error": "커밋을 읽을 수 없습니다. 다시 시도하려면 새로고침을 탭하십시오.",
+  "changes.commit.noCommit": "이 저장소에는 아직 커밋이 없습니다.",
+  "changes.commit.unknown": "Collie가 이 저장소를 더 이상 찾을 수 없습니다. 뒤로 돌아가서 새로고침하십시오.",
+  "changes.commit.empty": "이 커밋은 변경된 파일이 없습니다.",
+  "changes.commit.newer": "더 최신 커밋이 존재합니다",
+  "changes.commit.uncommitted": "커밋되지 않은 새로운 변경 사항",
+  "changes.commit.fileNewer": "저장소에 더 최신 커밋이 있습니다. 이 파일을 읽으려면 뒤로 돌아가서 해당 커밋을 로드하십시오.",
+  "settings.changes.title": "변경 사항",
+  "settings.changes.description": "창의 변경 사항 뷰가 git 저장소를 찾는 방법입니다.",
+  "settings.changes.nested.label": "이 폴더 내의 저장소 찾기",
+  "settings.changes.nested.hint": "상위 저장소가 무시하는 항목을 포함하여, 창 폴더 아래의 하위 폴더에 있는 저장소도 표시합니다.",
+  "settings.changes.depth.label": "탐색 깊이",
+  "settings.changes.depth.hint": "창 폴더 아래의 폴더 단계입니다.",
+  "settings.changes.depth.levels.one": "{count}단계",
+  "settings.changes.depth.levels.other": "{count}단계",
 };

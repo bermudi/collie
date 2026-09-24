@@ -4,6 +4,10 @@ import type { Dictionary } from "./en";
 // key this file invents that English does not have is one too. Keep the `{slot}` names byte-exact.
 
 export const de: Dictionary = {
+  "settings.updateBanner.restart": "Bridge-Neustart erforderlich",
+  "settings.updateBanner.releaseAvailable": "Collie {version} verfügbar",
+  "settings.updateBanner.majorAvailable": "Collie {version} (Major-Release)",
+  "settings.updateBanner.copyAria": "Befehl kopieren: {command}",
   "settings.language.title": "Sprache",
   "settings.language.description": "Der Terminal-Spiegel wird nie übersetzt.",
 
@@ -29,14 +33,25 @@ export const de: Dictionary = {
   "settings.install.description": "Collie zum Startbildschirm hinzufügen: Vollbild und eigenes App-Icon.",
   "settings.install.button": "Installieren",
   "settings.install.iosHint": "Unter iOS und iPadOS über das Teilen-Menü des Browsers installieren: Teilen antippen, dann „Zum Home-Bildschirm“.",
-  "settings.harnessBar.title": "Harness shortcuts",
-  "settings.harnessBar.description": "A row of the running agent's own commands above the keys.",
+  "settings.harnessBar.title": "Harness-Tastenkürzel",
+  "settings.harnessBar.description": "Eine Leiste mit den eigenen Befehlen des laufenden Agenten über den Tasten.",
+  "settings.beltSize.title": "Größe der Aktionsleiste",
+  "settings.beltSize.description": "Wie hoch die Zeile mit Aktionen über der Eingabe ist und wie groß deren Symbole und Wörter sind.",
+  "settings.beltSize.option.default": "Standard",
+  "settings.beltSize.option.large": "Groß",
+  "settings.beltSize.option.larger": "Größer",
   "settings.zen.title": "Zen-Modus",
   "settings.zen.description": "Fügt dem Menü einen Eintrag hinzu, der alle Elemente außer dem Terminal ausblendet.",
   "settings.zen.auto.label": "Bei Querformat aktivieren",
   "settings.zen.auto.hint": "Beim seitlichen Drehen öffnet sich der Zen-Modus automatisch; beim Zurückdrehen schließt er sich wieder.",
 
   // --- settings.handsFree ---
+  "settings.handsFree.title": "Freisprechen",
+  "settings.handsFree.description":
+    "Transkript sofort senden, statt es im Eingabefeld abzulegen. Standardmäßig deaktiviert, um Eingaben vor dem Senden an das Terminal prüfen zu können.",
+  "settings.handsFree.ariaLabel": "Freisprechen: Transkript sofort senden",
+
+  // --- settings.push ---
   "settings.push.title": "Push-Benachrichtigungen",
   "settings.push.description": "Benachrichtigung empfangen, wenn ein Agent Eingaben erfordert.",
   "settings.push.reason.insecure": "Push erfordert eine HTTPS-Verbindung.",
@@ -65,13 +80,13 @@ export const de: Dictionary = {
   "settings.notify.done.hint": "ein Agent schließt seine Aufgabe ab",
   "settings.notify.updates.label": "App-Updates",
   "settings.notify.updates.hint": "eine neue Collie-Version ist verfügbar",
-  "settings.notify.cache.label": "Cache about to go cold",
+  "settings.notify.cache.label": "Cache wird bald inaktiv",
   "settings.notify.cache.hint":
-    "a pane's prompt cache expires in a few minutes; also covers panes you watched one by one",
-  "settings.notify.watched.title": "Watched panes",
-  "settings.notify.watched.empty": "None yet — open a pane's settings to watch it.",
-  "settings.notify.watched.remove": "Remove",
-  "settings.notify.watched.removeAria": "Stop watching {label}",
+    "Der Prompt-Cache eines Panes läuft in wenigen Minuten ab; deckt auch Panes ab, die Sie einzeln beobachten",
+  "settings.notify.watched.title": "Beobachtete Panes",
+  "settings.notify.watched.empty": "Noch keine: Öffnen Sie die Einstellungen eines Panes, um es zu beobachten.",
+  "settings.notify.watched.remove": "Entfernen",
+  "settings.notify.watched.removeAria": "{label} nicht mehr beobachten",
 
   // --- settings.snooze ---
   "settings.snooze.title": "Nicht stören",
@@ -139,7 +154,7 @@ export const de: Dictionary = {
   "settings.connection.device.readOnly": "Schreibgeschützt",
 
   // --- settings.update (update-check-control + footer update banner) ---
-  "settings.update.title": "Updates",
+  "settings.update.title": "Aktualisierungen",
   "settings.update.check.prompt": "Auf neue Collie-Versionen prüfen.",
   "settings.update.check.running": "Version v{current}",
   "settings.update.check.runningChecked": "Version v{current} · Geprüft {checked}",
@@ -147,10 +162,6 @@ export const de: Dictionary = {
   "settings.update.checking": "Wird geprüft…",
   "settings.update.error": "Prüfung fehlgeschlagen.",
   "settings.update.upToDate": "Aktuell",
-  "settings.updateBanner.restart": "Bridge-Neustart erforderlich",
-  "settings.updateBanner.releaseAvailable": "Collie {version} verfügbar",
-  "settings.updateBanner.majorAvailable": "Collie {version} (Major-Release)",
-  "settings.updateBanner.copyAria": "Befehl kopieren: {command}",
 
   // --- settings.typeface ---
   "settings.typeface.title": "Schriftart",
@@ -187,6 +198,9 @@ export const de: Dictionary = {
   "settings.display.rawTerminal.label": "Rohes Terminal",
   "settings.display.rawTerminal.hint":
     "Zeigt den reinen Terminal-Puffer ohne Buttons, Rahmen oder Statusleisten. Gedacht für falsch dargestellte TUI-Dialoge zur manuellen Tastensteuerung.",
+  "settings.display.noInvert.label": "Dieses Pane nativ darstellen",
+  "settings.display.noInvert.hint":
+    "Überspringt die Invertierung im hellen Theme nur für dieses Pane. Aktiviere es, wenn ein Agent ein HELLES Theme nutzt und der Spiegel ihn dunkel darstellt; lass es aus, wenn das Pane richtig aussieht.",
   "settings.display.textSize.label": "Textgröße",
   "settings.display.textSize.decrease": "Schriftgröße verringern",
   "settings.display.textSize.increase": "Schriftgröße erhöhen",
@@ -212,10 +226,22 @@ export const de: Dictionary = {
   "composer.placeholder.direct": "Ins Terminal eingeben…",
   "composer.placeholder.shell": "Shell-Befehl eingeben…",
   "composer.placeholder.reply": "Antwort eingeben…",
+  "composer.mic.unavailable": "Spracheingabe nicht verfügbar",
+  "composer.mic.stopAria": "Aufnahme beenden",
+  "composer.mic.recordAria": "Sprachnachricht aufnehmen",
+  "composer.mic.transcribing": "Transkription läuft…",
+  "composer.mic.recording": "Aufnahme: {elapsed}",
+  "composer.mic.handsFreeHint": "Wird beim Beenden gesendet",
+  "composer.mic.manualHint": "Wird in das Eingabefeld eingefügt",
+  "composer.mic.stop": "Stopp",
+  "composer.mic.discardAria": "Aufnahme verwerfen",
   "composer.attach.aria": "Datei anhängen",
   "composer.attach.title": "Anhängen",
   "composer.attach.photos": "Fotos",
   "composer.attach.files": "Dateien",
+  "composer.attach.listAria": "Anhänge",
+  "composer.attach.removeAria": "{name} entfernen",
+  "composer.attach.inFront": "Seine Markierung fehlt in Ihrem Text, daher setzt Senden {name} voran.",
   "composer.send.typeAnyway": "Trotzdem tippen",
   "composer.send.reallySend": "Senden bestätigen",
   "composer.send.stopTypingAria": "Eingabe ins Terminal abbrechen",
@@ -223,6 +249,8 @@ export const de: Dictionary = {
   "composer.draft.tooLong":
     "Zu lang für einen dauerhaften Entwurf. Bleibt beim Pane-Wechsel erhalten, geht aber beim Beenden der App verloren.",
   "composer.status.dialogWaiting": "Ein Dialog ist geöffnet. Erst antworten, dann senden.",
+  "composer.status.unreadDialog":
+    "Collie kann diesen Dialog nicht lesen. {key} steht auf der Karte. Zum Tippen erneut auf Senden tippen.", // wordsmith
   "composer.status.paneNotWritable": "Pane ist nicht mehr beschreibbar. Nichts gesendet.",
   "composer.status.inputChanged":
     "Eingabefeld hat sich beim Leeren geändert. Es wurde nichts getippt. Pane prüfen.",
@@ -232,12 +260,11 @@ export const de: Dictionary = {
   "composer.discard.confirmKeys.one": "Erneut tippen, um {count} wartende Taste zu verwerfen",
   "composer.discard.confirmKeys.other": "Erneut tippen, um {count} wartende Tasten zu verwerfen",
   "composer.destructive.confirm": "Destruktiv: {reason}. Erneut tippen zum Bestätigen.",
-  "composer.upload.success": "Datei hinzugefügt, Pfad in Nachricht",
+  "composer.destructive.confirmOnHost":
+    "Destruktiv: {reason} auf {host}. Erneut tippen zum Bestätigen.",
+  "composer.upload.success": "Datei angehängt",
   "composer.upload.tooLarge": "Die Datei ist größer als {max} MB, das Limit für diesen Collie.",
   "composer.upload.badType": "Collie kann {name} nicht anhängen.",
-  "composer.upload.successBatch": "{n} Dateien hinzugefügt, Pfade in Nachricht",
-  "composer.upload.mixed": "{attached} von {total} hinzugefügt — {detail}",
-  "composer.upload.nothing": "Nichts hinzugefügt — {detail}",
   "composer.noEcho.title": "Passwortabfrage ohne Echo",
   "composer.noEcho.noLiveTyped":
     "Der Text steht unbestätigt im Pane. Da diese Ansicht nicht live ist, kann von hier aus nichts gesendet werden. Die Eingabe direkt im Terminal beantworten.",
@@ -251,6 +278,7 @@ export const de: Dictionary = {
   "composer.noEcho.dismissAria": "Passworthinweis verwerfen",
   "composer.draftPreview.title": "Entwurf im Terminal",
   "composer.draftPreview.takeOver": "Übernehmen",
+  "composer.draftPreview.dismissAria": "Hinweis zum Terminal-Entwurf schließen",
 
   // --- sendMode (the armed "typing straight through" indicator) ---
   "sendMode.armed.title": "Eingabe ins Terminal",
@@ -276,6 +304,8 @@ export const de: Dictionary = {
   "chat.scrollback.showHistory": "Gesamten Verlauf anzeigen",
   "chat.scrollback.loadOlder": "Ältere Einträge laden",
   "chat.scrollback.loading": "Wird geladen…",
+  "chat.scrollback.noSessionReported":
+    "{agent} hat keine Sitzung an Herdr gemeldet. Herdr-Integration installieren oder aktualisieren und den Agenten in diesem Pane neu starten.",
   "chat.fullReply.title": "Vollständige Antwort",
   "chat.fullReply.fromTranscript": "aus dem Protokoll",
   "chat.fullReply.showingTerminal": "Terminal wird gezeigt",
@@ -320,16 +350,16 @@ export const de: Dictionary = {
   "prompt.feedback.freeText.typedPrefix": "Eigene Eingabe im Terminal: ",
 
   // --- paneSettings (one pane's own preferences; today the prompt-cache warning, ADR 0042) ---
-  "paneSettings.title": "Pane settings",
-  "paneSettings.cacheWatch.label": "Warn me before this pane's cache goes cold",
-  "paneSettings.cacheWatch.hint": "about {minutes} minutes before it expires",
-  "paneSettings.cacheWatch.pushOff": "Turn notifications on for this device in Settings first.",
-  "paneSettings.cacheWatch.globalOn": "Settings warns about every pane, so this one is covered.",
-  "paneSettings.cacheWatch.noSession": "This pane's agent names no session, so there is nothing to watch.",
+  "paneSettings.title": "Pane-Einstellungen",
+  "paneSettings.cacheWatch.label": "Warnen, bevor der Cache dieses Panes inaktiv wird",
+  "paneSettings.cacheWatch.hint": "etwa {minutes} Minuten vor dem Ablauf",
+  "paneSettings.cacheWatch.pushOff": "Aktivieren Sie zuerst Benachrichtigungen für dieses Gerät in den Einstellungen.",
+  "paneSettings.cacheWatch.globalOn": "Die Einstellungen warnen vor jedem Pane, dieses ist also abgedeckt.",
+  "paneSettings.cacheWatch.noSession": "Der Agent dieses Panes benennt keine Sitzung, es gibt also nichts zu beobachten.",
 
   // --- paneActions (long-press sheet: rename / close a pane) ---
   "paneActions.title.fallback": "Pane",
-  "paneActions.settings.label": "Pane settings",
+  "paneActions.settings.label": "Pane-Einstellungen",
   "paneActions.readOnly": "Nur Lesezugriff: Dieses Gerät darf Panes weder umbenennen noch schließen.",
   "paneActions.rename.label": "Umbenennen",
   "paneActions.rename.placeholder": "Pane-Name",
@@ -381,6 +411,19 @@ export const de: Dictionary = {
   "home.sidebar.paneActionsTitle": "Pane-Aktionen anzeigen",
   "home.row.tabPosition": "Tab {n}",
   "home.row.unseen": "ungesehen",
+  "home.tabs.aria": "Dashboard-Ansichten",
+  "home.tabs.panes": "Bereiche",
+  "home.tabs.focus": "Fokus",
+  "home.tabs.blocked.one": "{count} blockiert",
+  "home.tabs.blocked.other": "{count} blockiert",
+  "home.tabs.unseen": "Beendete Bereiche ungesehen",
+  "home.changes.listAria": "Änderungen nach Arbeitsbereich",
+  "home.changes.loading": "Wird gelesen…",
+  "home.changes.clean": "Keine Änderungen",
+  "home.changes.noFolder": "Kein Ordner",
+  "home.changes.unavailable": "Änderungen können nicht gelesen werden",
+  "home.changes.files.one": "{count} Datei",
+  "home.changes.files.other": "{count} Dateien",
 
   // --- status (triage sections, status labels, counts) ---
   "status.section.needsYou": "Eingabe erforderlich",
@@ -396,7 +439,7 @@ export const de: Dictionary = {
   "status.count.needsYou.other": "{count} warten auf Eingabe",
   "status.count.working.one": "{count} läuft",
   "status.count.working.other": "{count} laufen",
-  "status.shellBadge": "shell",
+  "status.shellBadge": "Shell",
   "status.dismissAria": "Verwerfen",
   "status.detailAria": "Vollständige Nachricht anzeigen",
   "status.detail.title": "Was schiefgelaufen ist",
@@ -432,12 +475,13 @@ export const de: Dictionary = {
   "space.new.title": "Neuer Space",
   "space.new.dir.label": "Verzeichnis (optional)",
   "space.new.dir.placeholder": "~ (Home-Verzeichnis)",
-  "space.new.label.label": "Label (optional)",
+  "space.new.label.label": "Beschriftung (optional)",
   "space.new.label.placeholder": "Space benennen",
   "space.new.create": "Space erstellen und Shell öffnen",
   "space.tab.titleFallback": "Tab",
   "space.tab.titleWithLabel": "Tab {label}",
   "space.tab.readOnly": "Schreibgeschützt. Dieses Gerät darf Tabs nicht umbenennen oder schließen.",
+  "space.tab.hostBlockSuffix": "{hostBlock}: Umbenennen und Schließen erst nach Antwort möglich.",
   "space.tab.rename": "Umbenennen",
   "space.tab.close": "Tab schließen",
   "space.tab.closing": "Wird geschlossen…",
@@ -471,13 +515,13 @@ export const de: Dictionary = {
   // --- harnessBar (the row of the running agent's own commands, above the keys) ---
   // Slash commands are NEVER translated — they are wire text the harness parses — and neither is an
   // operator's own `bar_label`. Only these labels are.
-  "harnessBar.label": "Harness shortcuts",
-  "harnessBar.model": "Model",
-  "harnessBar.effort": "Effort",
-  "harnessBar.compact": "Compact",
-  "harnessBar.resume": "Resume",
-  "harnessBar.tree": "Tree",
-  "harnessBar.confirmAria": "Tap again to confirm {command}",
+  "harnessBar.label": "Harness-Tastenkürzel",
+  "harnessBar.model": "Modell",
+  "harnessBar.effort": "Aufwand",
+  "harnessBar.compact": "Kompakt",
+  "harnessBar.resume": "Fortsetzen",
+  "harnessBar.tree": "Baum",
+  "harnessBar.confirmAria": "Erneut tippen, um {command} zu bestätigen",
 
   // --- quickActions (one-tap reply dock) ---
   "quickActions.group.confirm": "Bestätigen",
@@ -507,6 +551,23 @@ export const de: Dictionary = {
   "connection.withLastSeen": "{cause}, zuletzt gesehen {time}",
   "connection.readOnly.notPaired": "Nicht gekoppelt. Gerät in den Einstellungen koppeln, um Eingaben an Agenten zu senden.",
   "connection.readOnly.device": "Schreibgeschützt: Dieses Gerät darf keine Eingaben an Agenten senden{deviceSuffix}.",
+  "connection.host.lastSeen": "zuletzt gesehen {time}",
+  "connection.host.neverSeen": "nie gesehen",
+  "connection.host.unreachablePlain": "nicht erreichbar",
+  "connection.host.unreachableSuffix": "nicht erreichbar · {label}",
+  "connection.host.incompatible": "inkompatibel",
+  "connection.host.lead": "Lead",
+  "connection.host.onPrefix": "auf",
+  "connection.host.ariaSends": "Sendet an Host: {name}{unreachable}",
+  "connection.host.ariaHost": "Host: {name}{unreachable}",
+  "connection.host.ariaUnreachableSuffix": " (nicht erreichbar)",
+  "connection.host.ariaSuffix": " ({word})",
+  "connection.host.reconnecting": "verbindet neu",
+  "connection.host.attention": "erfordert Aufmerksamkeit",
+  "connection.host.reconnectingSuffix": "verbindet neu · {label}",
+  "connection.host.attentionSuffix": "erfordert Aufmerksamkeit · {label}",
+  "connection.host.reconnectingAction": "Der Lead versucht es noch. Nichts zu tun.",
+  "connection.host.attentionAction": "Erneutes Versuchen hilft hier nicht. Diese Maschine prüfen.",
   "connection.stale.incompatible": "{name} verwendet eine inkompatible Collie-Version",
   "connection.stale.unreachable": "{name} ist nicht erreichbar · {label}",
   "connection.stale.nothingCached": "Für diesen Rechner sind noch keine Daten zwischengespeichert.",
@@ -518,13 +579,15 @@ export const de: Dictionary = {
   "connection.session.aria": "Sitzung: {name}. Sitzung wechseln",
   "connection.session.primary": "primär",
   "connection.session.unreachable": "nicht erreichbar",
+  "connection.session.ariaIn": "In Sitzung: {name}",
   "connection.session.all": "Alle Sitzungen",
   "connection.session.allDescription": "Alle Sitzungen dieses Rechners in einer Liste",
   "connection.session.allAria": "Alle Sitzungen werden angezeigt. Sitzung wechseln",
   "connection.server.title": "Rechner",
   "connection.server.aria": "Host: {name}. Host wechseln",
 
-  // --- crew ---
+
+  // --- error (boot splash, route-level error recovery) ---
   "error.boot.connecting": "Verbindung zur Herde wird aufgebaut…",
   "error.boot.title": "Keine Verbindung",
   "error.boot.body": "Collie ist nicht erreichbar. Verbindung zum Host prüfen und erneut versuchen.",
@@ -544,8 +607,7 @@ export const de: Dictionary = {
 
   // --- pwa (self-update banner) ---
   "pwa.updateAvailable": "Neue Version verfügbar. Zum Aktualisieren tippen.",
-  "pwa.updateInstalling": "Downloading the new version…",
-  "updateRibbon.hideNotice": "Hinweis ausblenden",
+  "pwa.updateInstalling": "Neue Version wird heruntergeladen…",
 
   // --- history (pane transcript route) ---
   "history.unavailable.disabled": "Transkriptverlauf ist auf dieser Bridge deaktiviert (COLLIE_TRANSCRIPT).",
@@ -575,15 +637,29 @@ export const de: Dictionary = {
 
   // --- mirror (terminal graphics in the pane mirror) ---
   "mirror.blankLines": "[{n} Leerzeilen]",
+  "mirror.imageAlt": "Terminal-Grafik",
+  "mirror.imageBadge": "[Bild]",
+  "mirror.imageMatchedByOrder": "nach Reihenfolge zugeordnet, zum Prüfen den Verlauf öffnen",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "gerade eben",
   "time.compact.now": "jetzt",
 
-  // --- sync (how fresh the herd on screen is, and asking for a fresher one) ---
 
   // --- dialog (menu / multi-select / wizard / preview-select block renderers) ---
   "dialog.sendingAria": "Wird gesendet",
+  // TODO wordsmith
+  "dialog.terminalControl": "Terminal",
+  // TODO wordsmith
+  "dialog.terminalControlAria": "Terminal anstelle dieser Karte anzeigen",
+  // TODO wordsmith
+  "dialog.backToCard": "Zurück zur Karte",
+  // TODO wordsmith
+  "dialog.putAwayControl": "Ablegen",
+  // TODO wordsmith
+  "dialog.putAwayControlAria": "Schaltflächen dieser Karte ausblenden, Terminal behalten",
+  // TODO wordsmith
+  "dialog.showButtons": "Schaltflächen anzeigen",
   "dialog.previousStepAria": "Vorheriger Schritt",
   "dialog.nextStepAria": "Nächster Schritt",
   "dialog.answeredAria": "Beantwortet",
@@ -603,6 +679,11 @@ export const de: Dictionary = {
   "dialog.menu.moveDown": "Nach unten",
   "dialog.menu.leftAria": "Links: {verb} ({label})",
   "dialog.menu.rightAria": "Rechts: {verb} ({label})",
+  // TODO wordsmith
+  "dialog.menu.levelAria": "{verb} zu {label}",
+  // TODO wordsmith
+  "dialog.menu.levelCurrentAria": "{label}, aktuell",
+  "unreadDialog.caption": "Collie kann diesen Dialog nicht lesen", // wordsmith
   "dialog.preview.currentAnswerAria": "Aktuelle Antwort",
   "dialog.preview.previewedBelowAria": "Vorschau unten",
   "dialog.preview.previewLabel": "Vorschau: {label}",
@@ -641,7 +722,8 @@ export const de: Dictionary = {
   "promptAction.feedback.boxNotOpened": "Das Feedback-Feld hat sich nicht geöffnet. Pane prüfen.",
   "promptAction.feedback.notArrived": "Das Feedback ist nicht angekommen. Es wurde nichts gesendet.",
 
-  // --- stt (speech-to-text errors, lib/stt.ts + hooks/use-stt-recorder.ts) ---
+
+  // --- directTyping (the composer's "Type into terminal" mode, hooks/use-direct-typing.ts) ---
   "directTyping.status.draftPending":
     "Entwurf vor der Eingabe ins Terminal senden oder verwerfen.",
   "directTyping.status.armed": "Direkteingabe im Terminal aktiv. Tastenanschläge werden direkt gesendet.",
@@ -693,8 +775,8 @@ export const de: Dictionary = {
   "apiError.pairing.bad_code": "Ungültiger Kopplungscode.",
   "apiError.pairing.duplicate_label": "Ein Gerät mit diesem Namen existiert bereits.",
   "apiError.device.unknown": "Kein gekoppeltes Gerät mit diesem Namen vorhanden.",
-  "apiError.cache.pane_unknown": "That pane is gone, nothing was changed.",
-  "apiError.cache.no_session": "That pane's agent names no session, so it can't be watched.",
+  "apiError.cache.pane_unknown": "Dieser Pane ist nicht mehr vorhanden, es wurde nichts geändert.",
+  "apiError.cache.no_session": "Der Agent dieses Panes benennt keine Sitzung, daher kann er nicht beobachtet werden.",
   "apiError.session.unknown": "Keine Sitzung namens {session} auf diesem collie vorhanden.",
   // --- worktrees (ADR 0032) ---
   "apiError.worktree.list_failed": "Worktrees konnten nicht aufgelistet werden: {reason}",
@@ -718,90 +800,180 @@ export const de: Dictionary = {
   "worktree.empty": "Keine Worktrees vorhanden.",
   "worktree.detached": "losgelöst",
   "worktree.recoverOpen": "Erstellten Branch öffnen",
-  "space.new.tab.plain": "Space",
+  "space.new.tab.plain": "Leertaste",
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "Repository",
+  "space.new.host.label": "Host",
   "worktree.orOpenExisting": "Oder bestehenden öffnen",
-  // --- settings.updateCard (the update card, M15/05) ---
-  "cache.warm": "Prompt cache warm",
-  "cache.expiring": "Prompt cache expiring",
-  "cache.cold": "cold",
-  "cache.unknown": "Prompt cache not known",
+  // --- apiError.update (POST /api/update refusals, M15/05) ---
+
+
+  // --- M16/01: the updates page, its crew lines and the Settings row ---
+  // The prompt-cache chip and its sheet (M28/02). Mirrored from English verbatim: these are new
+  // keys, and a translation is a separate `wordsmith --translate` pass over this file.
+  "cache.warm": "Prompt-Cache warm",
+  "cache.expiring": "Prompt-Cache läuft ab",
+  "cache.cold": "kalt",
+  "cache.unknown": "Prompt-Cache nicht bekannt",
   "cache.under1m": "<1m",
-  "cache.overridden": "TTL set in cache-rules.toml",
-  "cache.sheet.title": "Prompt cache",
-  "cache.sheet.rule": "Rule",
-  "cache.sheet.ttl": "Stays warm for",
-  "cache.sheet.ttlMinutes": "{minutes} min",
-  "cache.sheet.confidence": "Confidence",
-  "cache.sheet.source": "Read on",
-  "cache.sheet.retrieved": "Checked",
-  "cache.sheet.measured": "Measured on this machine",
-  "cache.sheet.lastRead": "last read {age}",
-  "cache.sheet.overridden": "Moved by cache-rules.toml",
-  "cache.sheet.thisMachine": "This machine",
-  "cache.sheet.onPeer": "Read on {host}. Its rule catalog is not forwarded, so the source is not quoted here.",
+  "cache.overridden": "TTL festgelegt in cache-rules.toml",
+  "cache.sheet.title": "Prompt-Cache",
+  "cache.sheet.rule": "Regel",
+  "cache.sheet.ttl": "Bleibt warm für",
+  "cache.sheet.ttlMinutes": "{minutes} Min.",
+  "cache.sheet.confidence": "Konfidenz",
+  "cache.sheet.source": "Gelesen am",
+  "cache.sheet.retrieved": "Geprüft",
+  "cache.sheet.measured": "Auf dieser Maschine gemessen",
+  "cache.sheet.lastRead": "zuletzt gelesen vor {age}",
+  "cache.sheet.overridden": "Verschoben durch cache-rules.toml",
+  "cache.sheet.thisMachine": "Diese Maschine",
+  "cache.sheet.onPeer": "Gelesen auf {host}. Dessen Regelkatalog wird nicht weitergeleitet, daher wird die Quelle hier nicht zitiert.",
   "cache.sheet.reset.pending": "Nach dem letzten Durchgang: {action}. Der nächste Durchgang baut den Cache neu auf.",
   "cache.sheet.reset.cause": "Vor dem letzten Durchgang: {action}. Dieser Durchgang hat den Cache neu aufgebaut.",
-  "cache.sheet.state": "State",
+  "cache.sheet.state": "Status",
   "cache.sheet.state.warm": "Warm",
-  "cache.sheet.state.expiring": "Expiring",
-  "cache.sheet.state.cold": "Cold",
-  "cache.confidence.documented": "documented",
-  "cache.confidence.reported": "reported",
-  "cache.confidence.inferred": "inferred",
-  "cache.confidence.observed": "measured",
-  "tour.skip": "Skip",
-  "tour.title": "Collie shows the agents in your terminal.",
+  "cache.sheet.state.expiring": "Läuft ab",
+  "cache.sheet.state.cold": "Kalt",
+  "cache.confidence.documented": "dokumentiert",
+  "cache.confidence.reported": "gemeldet",
+  "cache.confidence.inferred": "abgeleitet",
+  "cache.confidence.observed": "gemessen",
+  "updateRibbon.hideNotice": "Hinweis ausblenden",
+
+  // --- tour (the first-run screen) --- ENGLISH, not yet translated.
+  "tour.skip": "Überspringen",
+  "tour.title": "Collie zeigt die Agents in Ihrem Terminal.",
   // The claim's second sentence, in the three forms the facts can support. {mux} is the
   // multiplexer's display name, {host} the lead machine's crew label; a clause whose fact is missing
   // is dropped rather than filled with a placeholder.
   "tour.lead":
-    "It mirrors the panes running under {mux} on {host}. It shows what is on those screens, and it never runs a terminal of its own.",
+    "Es spiegelt die Panes, die unter {mux} auf {host} laufen. Es zeigt, was auf diesen Bildschirmen zu sehen ist, und führt niemals ein eigenes Terminal aus.",
+  "tour.leadNoHost":
+    "Es spiegelt die Panes, die unter {mux} laufen. Es zeigt, was auf diesen Bildschirmen zu sehen ist, und führt niemals ein eigenes Terminal aus.",
   "tour.leadNoMux":
-    "It mirrors the panes running in your terminal multiplexer. It shows what is on those screens, and it never runs a terminal of its own.",
+    "Es spiegelt die Panes, die in Ihrem Terminal-Multiplexer laufen. Es zeigt, was auf diesen Bildschirmen zu sehen ist, und führt niemals ein eigenes Terminal aus.",
 
   // Your setup. Every row is a fact this snapshot carries, or the row is absent.
-  "tour.setup": "Your setup",
-  "tour.setup.panes.one": "{count} pane",
-  "tour.setup.panes.other": "{count} panes",
-  "tour.setup.needsYou.one": "{count} needs you",
-  "tour.setup.needsYou.other": "{count} need you",
-  "tour.setup.noPanes": "No panes yet",
-  "tour.setup.canType": "This device can type",
-  "tour.setup.readOnly": "This device can read only",
-  "tour.setup.pushOff": "Notifications are off on this phone",
+  "tour.setup": "Ihr Setup",
+  "tour.setup.panes.one": "{count} Pane",
+  "tour.setup.panes.other": "{count} Panes",
+  "tour.setup.needsYou.one": "{count} braucht Sie",
+  "tour.setup.needsYou.other": "{count} brauchen Sie",
+  "tour.setup.noPanes": "Noch keine Panes",
+  "tour.setup.machines.one": "{count} Maschine in Ihrer Crew",
+  "tour.setup.machines.other": "{count} Maschinen in Ihrer Crew",
+  "tour.setup.canType": "Dieses Gerät kann tippen",
+  "tour.setup.readOnly": "Dieses Gerät kann nur lesen",
+  "tour.setup.pushOff": "Benachrichtigungen sind auf diesem Telefon deaktiviert",
 
   // Do this next. At most two cards, first match wins, in this order.
-  "tour.doNext": "Do this next",
-  "tour.pair.title": "Pair this phone",
-  "tour.pair.body": "Run collie pair on the host, then type the code in Settings.",
-  "tour.pair.button": "Pair",
-  "tour.space.title": "Nothing is running yet",
-  "tour.space.body": "Start an agent in your terminal, or make a space here.",
-  "tour.space.button": "New space",
-  "tour.pushCard.title": "Be told when a pane needs you",
-  "tour.pushCard.body": "Collie notifies you when an agent is blocked, or done.",
-  "tour.install.title": "Keep Collie on your home screen",
-  "tour.install.body": "It opens full screen and remembers where you were.",
-  "tour.install.button": "Add",
-  "tour.push.enable": "Turn on",
-  "tour.push.enabled": "Notifications are on for this device.",
+  "tour.doNext": "Als Nächstes tun",
+  "tour.pair.title": "Dieses Telefon koppeln",
+  "tour.pair.body": "Führen Sie collie pair auf dem Host aus und geben Sie den Code dann in den Einstellungen ein.",
+  "tour.pair.button": "Koppeln",
+  "tour.space.title": "Es läuft noch nichts",
+  "tour.space.body": "Starten Sie einen Agent in Ihrem Terminal oder erstellen Sie hier einen Bereich.",
+  "tour.space.button": "Neuer Bereich",
+  "tour.pushCard.title": "Benachrichtigt werden, wenn ein Pane Sie braucht",
+  "tour.pushCard.body": "Collie benachrichtigt Sie, wenn ein Agent blockiert oder fertig ist.",
+  "tour.install.title": "Collie auf Ihrem Startbildschirm behalten",
+  "tour.install.body": "Es öffnet sich im Vollbildmodus und merkt sich, wo Sie waren.",
+  "tour.install.button": "Hinzufügen",
+  "tour.push.enable": "Einschalten",
+  "tour.push.enabled": "Benachrichtigungen sind für dieses Gerät aktiviert.",
 
   // What you can do here. The six lines the site sells and the app never said.
-  "tour.can": "What you can do here",
-  "tour.can.mirror": "Read the live pane, colour and all.",
-  "tour.can.answer": "Answer a prompt by tapping its card.",
-  "tour.can.type": "Type a reply, or send Esc, Tab and Ctrl keys.",
-  "tour.can.harness": "Set model and effort from the actions row.",
-  "tour.can.session": "Read the whole session, past the scrollback.",
-  "tour.done.pane": "Open the pane that needs you",
-  "tour.done.dashboard": "Show the dashboard",
+  "tour.can": "Was Sie hier tun können",
+  "tour.can.mirror": "Lesen Sie den Live-Pane, inklusive Farben.",
+  "tour.can.answer": "Beantworten Sie eine Eingabeaufforderung, indem Sie auf deren Karte tippen.",
+  "tour.can.type": "Tippen Sie eine Antwort ein oder senden Sie die Tasten Esc, Tab und Ctrl.",
+  "tour.can.harness": "Legen Sie Modell und Aufwand über die Aktionsleiste fest.",
+  "tour.can.session": "Lesen Sie die gesamte Sitzung, auch über den Scrollback hinaus.",
+  "tour.can.crew": "Beobachten Sie jede Maschine in Ihrer Crew über eine einzige URL.",
+
+  // The footer's one button. The first spelling opens the blocked pane; the second closes the sheet.
+  "tour.done.pane": "Öffnen Sie den Pane, der Ihre Aufmerksamkeit erfordert",
+  "tour.done.dashboard": "Dashboard anzeigen",
 
   // --- settings.tour ---
-  "settings.tour.title": "Show the first screen again",
-  "settings.tour.description": "What Collie does, and what this install looks like.",
-  "settings.tour.button": "Show",
+  "settings.tour.title": "Den ersten Bildschirm wieder anzeigen",
+  "settings.tour.description": "Was Collie tut und wie diese Installation aussieht.",
+  "settings.tour.button": "Anzeigen",
 
-  // --- updateScreen (M28/01): English until translated. ---
+
+
+  // --- changes (ADR 0065) ---
+  "chat.changes.label": "Änderungen",
+  "changes.title": "Änderungen",
+  "changes.backAria.dashboard": "Zurück zum Dashboard",
+  "changes.backAria.workspace": "Zurück zum Arbeitsbereich",
+  "changes.backAria.pane": "Zurück zum Bereich",
+  "changes.listBackAria": "Zurück zur Liste",
+  "changes.refreshAria": "Änderungen aktualisieren",
+  "changes.loading": "Änderungen werden gelesen…",
+  "changes.empty": "Keine Änderungen seit dem letzten Commit.",
+  "changes.unavailable.noFolder": "Collie kann keinen Ordner für diesen Arbeitsbereich finden, daher gibt es keine Änderungen anzuzeigen.",
+  "changes.unavailable.noGit": "Git ist auf diesem Rechner nicht installiert.",
+  "changes.unavailable.noPane": "Dieser Bereich existiert nicht mehr.",
+  "changes.unavailable.noWorkspace": "Dieser Arbeitsbereich existiert nicht mehr.",
+  "changes.error": "Die Änderungen konnten nicht gelesen werden. Tippen Sie auf Aktualisieren, um es erneut zu versuchen.",
+  "changes.stale": "Wird nicht aktualisiert",
+  "changes.truncated": "Die Liste hat ein Limit erreicht, daher fehlen möglicherweise einige Repositories oder Dateien.",
+  "changes.bound.depth.one": "Bei {count} Ebene gestoppt, mit Repositories weiter unten.",
+  "changes.bound.depth.other": "Bei {count} Ebenen gestoppt, mit Repositories weiter unten.",
+  "changes.bound.settings": "Tiefer in den Einstellungen suchen",
+  "changes.thisPane": "Dieser Bereich",
+  "changes.repoFiles.one": "{name} · {count} Datei",
+  "changes.repoFiles.other": "{name} · {count} Dateien",
+  "changes.status.M": "Geändert",
+  "changes.status.A": "Hinzugefügt",
+  "changes.status.D": "Gelöscht",
+  "changes.status.R": "Umbenannt",
+  "changes.status.untracked": "Unversioniert",
+  "changes.binaryShort": "binär",
+  "changes.file.binary": "Binärdatei, nicht angezeigt.",
+  "changes.file.directory": "Neuer Ordner. Seine Dateien werden nicht einzeln aufgeführt.",
+  "changes.file.truncated": "Das Diff endet hier. Es ist zu lang, um vollständig angezeigt zu werden.",
+  "changes.file.unknown": "Diese Datei befindet sich nicht mehr in der Liste der Änderungen. Gehen Sie zurück und aktualisieren Sie.",
+  "changes.file.gone": "Nicht mehr geändert",
+  "changes.file.error": "Dieses Diff konnte nicht gelesen werden.",
+  "changes.file.noLines": "Keine Zeilenänderungen.",
+  "changes.file.renamedFrom": "Umbenannt von {path}",
+  "changes.file.prev": "Vorherige Datei",
+  "changes.file.next": "Nächste Datei",
+  "changes.layout.aria": "Layout",
+  "changes.layout.list": "Liste",
+  "changes.layout.tree": "Baum",
+  "changes.tree.folderAria.one": "{name}, {count} Datei",
+  "changes.tree.folderAria.other": "{name}, {count} Dateien",
+  "changes.filter.button": "Dateien filtern",
+  "changes.filter.buttonActive": "Dateien filtern, {shown} von {total} angezeigt",
+  "changes.filter.placeholder": "Nach Pfad filtern",
+  "changes.filter.clearText": "Text löschen",
+  "changes.filter.statusAria": "Nach Status filtern",
+  "changes.filter.shown": "{shown} von {total} Dateien",
+  "changes.filter.none": "Keine passenden Dateien.",
+  "changes.filter.clear": "Filter zurücksetzen",
+  "changes.commit.show": "Letzten Commit anzeigen",
+  "changes.commit.showFor": "Letzten Commit von {name} anzeigen",
+  "changes.commit.cleanHeading": "Keine uncommitteten Änderungen",
+  "changes.commit.title": "Letzter Commit",
+  "changes.commit.backAria": "Zurück zum Commit",
+  "changes.commit.loading": "Commit wird gelesen…",
+  "changes.commit.error": "Der Commit konnte nicht gelesen werden. Tippen Sie auf Aktualisieren, um es erneut zu versuchen.",
+  "changes.commit.noCommit": "Dieses Repository enthält noch keine Commits.",
+  "changes.commit.unknown": "Collie kann dieses Repository nicht mehr finden. Gehen Sie zurück und aktualisieren Sie.",
+  "changes.commit.empty": "Dieser Commit ändert keine Dateien.",
+  "changes.commit.newer": "Ein neuerer Commit ist vorhanden",
+  "changes.commit.uncommitted": "Neue nicht committete Änderungen",
+  "changes.commit.fileNewer": "Das Repository hat einen neueren Commit. Gehen Sie zurück und laden Sie ihn, um diese Datei zu lesen.",
+  "settings.changes.title": "Änderungen",
+  "settings.changes.description": "Wie die Änderungsansicht eines Bereichs git-Repositorys findet.",
+  "settings.changes.nested.label": "In diesem Ordner nach Repositorys suchen",
+  "settings.changes.nested.hint": "Auch Repositorys in Unterordnern des Bereichsordners anzeigen, selbst wenn das übergeordnete Repository sie ignoriert.",
+  "settings.changes.depth.label": "Suchtiefe",
+  "settings.changes.depth.hint": "Ordnerebenen unterhalb des Bereichsordners.",
+  "settings.changes.depth.levels.one": "{count} Ebene",
+  "settings.changes.depth.levels.other": "{count} Ebenen",
 };

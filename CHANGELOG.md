@@ -6,9 +6,36 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.49.0] - 2026-09-23
+
+Merged from upstream past their 1.12.1 (2026-09-23). The update-mode screens and the crew update
+machinery that arrived in the same window stay stripped ([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md));
+everything below ships here.
+
+### Added
+- **A pane can show what changed in its workspace since the last commit.** The Changes mark at the right end of the actions belt opens the files changed in the pane's repos, grouped by repo with added and removed line counts; tap a file to read its diff. It only reads — nothing is staged, no hook runs, no network is touched. The list can show as a tree, a filter narrows it, and diffs over 2000 lines stay plain. Every pane in a workspace shares one list, and phones that read the same workspace share one git run ([ADR 0065](./.adr/0065-the-changes-view-reads-git-read-only.md)).
+- **A clean repo can show its last commit.** Agents commit their own work, so the list often empties right after the change you wanted to read; a clean repo now offers the last commit with the same list, tree, filter and diffs, read from HEAD only (ADR 0065).
+- **The dashboard has a footer with three tabs: Panes, Focus and Changes.** Panes is the dashboard as it was; the tab you pick is kept on this device, and the footer, workspace strip and summary line stay put when you switch. Focus shows only the panes that need you, in their own order, and the Changes tab lists every workspace with its counts ([ADR 0066](./.adr/0066-the-dashboard-has-a-footer-panes-needs-you-changes.md)).
+- **The six translated catalogs catch up.** The Changes view, the belt-size setting, the dashboard footer and the older strings that still read English are translated in German, Spanish, Japanese, Korean and both Chinese scripts.
+
+### Changed
+- **The actions belt is 15% larger, and Settings can make it larger still.** The band grows to 45px and Settings → Action belt size offers Default, Large and Larger.
+- **Tapping a row glides it into the screen it opens, and the back arrow glides it back.** Where the browser supports view transitions, a Changes row or a pane row flies into the arriving header; the swipe back, reduced motion and a slow read skip the glide for the plain slide ([ADR 0069](./.adr/0069-a-row-glides-into-its-header.md)).
+- **Panes keep the multiplexer's order everywhere.** A pane that blocks no longer jumps to the top of the pane strip, the space view or the Switch pane sheet; the sheet now groups panes by workspace like the dashboard ([ADR 0063](./.adr/0063-a-pane-keeps-its-place-when-its-state-changes.md)).
+- **An attachment chip whose marker you deleted says where its path will go.** Its border turns dashed, its number gains an arrow, and its title and screen-reader text say the path goes in front of your text (ADR 0060).
+- **The Changes and Switch pane pills tint on press**, so a tap is visibly acknowledged on both.
+
+### Fixed
+- **Block and Powerline characters paint to the full row in the terminal mirror.** Prompt pills' round caps and stacked `█` bars no longer stop a quarter short, so rows meet and half blocks split at half the row.
+- **A swipe back goes up one level.** Switching panes, tabs or spaces replaces the screen instead of stacking it, so the edge swipe and the in-app back arrow agree; a pane opened from a notification has the dashboard behind it ([ADR 0067](./.adr/0067-back-goes-up-one-level.md)).
+- **The last action on the belt stops clear of the pane switcher**, with 16px of room to spare instead of sliding under the fade.
+- **The keyboard stays open on a foldable's cover screen** — auto-zen starts only when the phone itself is turned.
+- **An open Changes screen refreshes every 5 seconds** while the app is visible, waits while you scroll, and never flickers a redraw when nothing changed.
+- **A drag-opened pane switcher no longer drops out and slides back in**, and a deep link seeds only in the installed app or a notification's window.
+
 ## [0.48.0] - 2026-09-20
 
-The re-branch ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)): Pup now tracks [`AltanS/collie`](https://github.com/AltanS/collie) wholesale (base: their 1.11.0-rc.1) and stays there as a strip-fork — upstream work arrives by ordinary merges from here on, and the per-commit port rounds of 0.32→0.47 are retired.
+The re-branch ([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)): Pup now tracks [`AltanS/collie`](https://github.com/AltanS/collie) wholesale (base: their 1.11.0-rc.1) and stays there as a strip-fork — upstream work arrives by ordinary merges from here on, and the per-commit port rounds of 0.32→0.47 are retired.
 
 ### Added
 - **The prompt-cache chip and the cache watch.** Each agent pane shows how long its prompt cache stays warm, sourced-claim rules (`cache-rules.toml`) can override it, and you can ask to be warned before a pane's cache goes cold. The countdown is measured, not guessed.
@@ -27,10 +54,10 @@ The re-branch ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-t
 ### Fixed
 - **Android/Firefox viewport repairs** — stale height after keyboard dismiss, the CSS dvh rule, the single scroll container — and the sheet's isolated paint and early-settling dim.
 - **Devin: the command catalog** (20 synced commands), the pinwheel brand mark, clipped two-label composer rules.
-- **The opencode pane-scoped web adapter** ([ADR 0050](./.adr/0050-opencode-sessions-are-pane-scoped.md)).
+- **The opencode pane-scoped web adapter** ([ADR 9001](./.adr/9001-opencode-sessions-are-pane-scoped.md)).
 - **Shift+Tab arrives as one raw BackTab** (`ESC [ Z`).
 - **Hermes reads the schema that is actually on disk**; pi's composer prompt is bounded before the wire; `~` expands and new-space directories are validated (`~/build` no longer opens `$HOME`); multi-select attach.
-- **Box-drawing tables render as tables in transcripts**; the Kitty placeholder cards are gone again and blank runs collapse ([ADR 0052](./.adr/0052-the-mirror-does-not-guess-images.md)).
+- **Box-drawing tables render as tables in transcripts**; the Kitty placeholder cards are gone again and blank runs collapse ([ADR 9003](./.adr/9003-the-mirror-does-not-guess-images.md)).
 
 ## [0.47.0] - 2026-09-17
 

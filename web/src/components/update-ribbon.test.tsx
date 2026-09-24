@@ -248,7 +248,9 @@ describe("auto-reload unless held", () => {
     holdReload("an-open-composer-draft");
     confirmStaleBundle();
     await renderBand();
-    await user.click(screen.getByText("New version — tap to update"));
+    // The row's tap target is the whole-row overlay button (Notice's new shape), addressed by its
+    // accessible name — jsdom does no hit-testing, so clicking the text node itself finds nothing.
+    await user.click(screen.getByRole("button", { name: "New version — tap to update" }));
     expect(checkForUpdate).toHaveBeenCalledTimes(1);
   });
 });

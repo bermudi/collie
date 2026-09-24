@@ -2,7 +2,7 @@
 
 > **This ledger describes the OLD strategy** (0.32→0.47): upstream commits cherry-picked onto Pup's
 > own 0.x line and adapted one by one. Pup re-branch(ed) from upstream/main wholesale in 0.48.0 —
-> see [`.adr/0053`](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)
+> see [`.adr/9004`](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)
 > and [AGENTS.md](./AGENTS.md)'s merge workflow. What stays useful below is the per-subsystem map of
 > upstream's tree and what Pup declines; the "how to port a commit" procedure is obsolete.
 
@@ -146,7 +146,7 @@ was the exact pre-fix code; two new MSW cases pin one-fetch-when-unseeded, zero-
 
 ### Images in the mirror — upstream `fd28d018`, `fbae4cf6`, `8e8cf78a`, `ba8e19a0`, `797318d6` (v1.8.0)
 
-**Status:** Ported, then **the mirror half was reverted** ([.adr/0041](./.adr/0052-the-mirror-does-not-guess-images.md)).
+**Status:** Ported, then **the mirror half was reverted** ([.adr/9003](./.adr/9003-the-mirror-does-not-guess-images.md)).
 The cluster/card/badge machinery below only ever fired for harnesses that *print* Kitty unicode
 placeholders (omp does, pi does not — pi's direct `a=T` placement leaves only blank rows in the
 read). What survives: the journal half — History/transcript render exact image references — the

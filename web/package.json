@@ -1,17 +1,17 @@
 {
   "name": "collie-web",
-  "version": "0.48.0",
+  "version": "0.49.0",
   "private": true,
   "license": "MIT",
   "type": "module",
-  "description": "Collie \u2014 mobile PWA frontend (Vite + React + shadcn)",
+  "description": "Collie — mobile PWA frontend (Vite + React + shadcn)",
   "scripts": {
     "dev": "vite",
     "playground": "COLLIE_PLAYGROUND=1 vite --host --port 5199 --strictPort",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json",
-    "test": "nice -n 19 vitest run",
+    "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "vite build && playwright test",
     "e2e:ui": "playwright test --ui"
@@ -23,6 +23,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router": "^7.18.0",
+    "sugar-high": "2.4.1",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

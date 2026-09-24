@@ -1,7 +1,7 @@
 # CLAUDE.md — working agreement for this repo
 
 **Collie Pup** (fork `bermudi/collie`, tracking [`AltanS/collie`](https://github.com/AltanS/collie)
-wholesale — [ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)) —
+wholesale — [ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)) —
 a phone web UI for the AI agents running in your terminal, served over Tailscale. A mobile-first PWA (Vite + React + TS + Tailwind v4 + shadcn) plus a Bun/TS
 bridge that mirrors ONE multiplexer per install — Herdr, tmux or zellij — letting you monitor and
 reply to agents from a phone. Herdr is one adapter among the three, not the product: it is the
@@ -243,7 +243,7 @@ page to be skimmed.
 
 - **Every verb is `scripts/collie-ctl.sh <verb>`** — Pup's operating surface (build / restart /
   update / doctor / serve), carried whole from the fork. Upstream's `cli/` verbs are not carried
-  ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md));
+  ([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md));
   the manifest's action set points at the ctl script, and its path is frozen because Herdr <0.8.0
   invokes the action set cached at install time
   ([ADR 0006](./.adr/0006-update-advances-the-checkout-herdr-installed.md)).
@@ -430,8 +430,15 @@ lint guard or the `flake.lock` guard.
   (`web/src/lib/loaders.ts`) fetch the snapshot + pane; **polling is `useRevalidator()` on an
   adaptive interval** (`web/src/hooks/use-polling.ts`); mutations are direct `lib/api.ts` calls
   followed by `revalidator.revalidate()`. There is **no TanStack Query** — don't reintroduce it.
-- Routes (`web/src/router.tsx`): `/`, `/space/:spaceId`, `/settings`, `/pane/:paneId` and
-  `/pane/:paneId/history`. The router instance is module-scoped so it keeps its location.
+- Routes (`web/src/router.tsx`): `/`, `/space/:spaceId`, `/settings`, `/pane/:paneId`,
+  `/pane/:paneId/history`, `/pane/:paneId/changes` and `/space/:spaceId/changes` (both matched as
+  `changes/*`, so the commit view `…/changes/commit` shares the list's component). The router
+  instance is module-scoped so it keeps its location.
+- **Back goes up one level.** Navigate through `useNav()` (`web/src/hooks/use-nav.ts`): down is a
+  push that records `from`, sideways is a replace, up steps back onto a legitimate parent or
+  replaces onto the structural one, never a push. A new route gets its place in `ancestorsOf` and
+  `parentChain` (`web/src/lib/nav.ts`). Sheets own no history
+  ([ADR 0067](./.adr/0067-back-goes-up-one-level.md), DESIGN.md §12).
 - **The idle lock pauses; it does not gate.** It only appears when Collie is left *open, visible and
   untouched* — a hidden page never locks, and returning to the foreground auto-resumes. It covers a
   still-mounted router (unmounting it ate in-progress composer drafts) and pauses polling through
@@ -574,7 +581,7 @@ lint guard or the `flake.lock` guard.
   [ADR 0048](./.adr/0048-the-input-box-is-found-by-its-own-frame.md)). `chrome.test.ts` and
   `input-box-frame.test.ts` pin both halves.
 - **The Herdr socket is never dialled across a machine boundary** — one Collie mirrors one host's
-  multiplexer ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
+  multiplexer ([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
 - **How soon Collie sees an out-of-band change is DECLARED (`topologyLatency`), never measured**, and
   `refresh()` is on the floor of the port so the phone can ask for a look now
   ([ADR 0031](./.adr/0031-freshness-is-a-declared-promise.md)). Every mutating route refreshes before
@@ -588,10 +595,15 @@ the rule below: the operator's own
 font files under `<config-dir>/fonts`, served read-only through `bridge/operator-fonts.ts`
 ([ADR 0033](./.adr/0033-the-app-face-is-a-device-preference.md)).
 
-**The law is that the journal is the only place a CLIENT-SUPPLIED value becomes a path** — and even
-there it is a pane id, never a path. `GET /api/fonts/<basename>` does not become a second such place:
-the request's name is **looked up** in the rows the operator's own `theme.toml` declared and that
-row's path is taken, so a name nobody declared is refused before any path exists. The containment
+**The law is that a CLIENT-SUPPLIED value becomes a path in two places only: the journal, and the
+Changes view** — in the journal it is a pane id, never a path. The Changes view
+(`bridge/changes.ts`, [ADR 0065](./.adr/0065-the-changes-view-reads-git-read-only.md)) is bounded by
+a listed-paths rule: a diff is served only for a repo the bridge's own discovery returned and a path
+git listed there, and an untracked read goes through `containedRealpath` too. Its git runs are
+hardened against repo-driven code execution (fsmonitor, external diff, textconv, filter drivers);
+don't drop a `-c` there without reading the module header. `GET /api/fonts/<basename>` does not
+become a third such place: the request's name is **looked up** in the rows the operator's own
+`theme.toml` declared and that row's path is taken, so a name nobody declared is refused before any path exists. The containment
 rule in [`files.ts`](./bridge/journal/files.ts) then runs anyway, on both surfaces and as an
 independent second check: **every** path about to be read goes through `containedRealpath` — after
 symlink resolution, on the real paths, including paths derived from one already checked. Reuse that
@@ -612,10 +624,10 @@ opts out), `COLLIE_TRUSTED_USER` rejects an ABSENT `Tailscale-User-Login` as wel
 (`COLLIE_ALLOW_NON_LOOPBACK_BIND=1`), and a non-loopback TCP peer is refused. Pup has no second
 listener and no exempted surface — every route a client can reach sits behind these gates
 ([ADR 0001](./.adr/0001-one-managed-front-door.md),
-[ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
+[ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)).
 
 **The bridge makes no outbound call and spawns no long-running child for content.** Speech-to-text
-is not carried ([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md));
+is not carried ([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md));
 the phone keyboard's own microphone is the voice path on Pup.
 
 **Two device gates guard writes, independently, and compose by AND.** `COLLIE_DEVICE_HEADER` trusts
@@ -632,6 +644,6 @@ second managed front door** — [ADR 0001](./.adr/0001-one-managed-front-door.md
 
 **There is no peer link on Pup** — no `/crew/v1/*`, no second listener, no standby door, no wire
 protocol to guard: the strip-fork removed them all
-([ADR 0053](./.adr/0053-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)). If a
+([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md)). If a
 merge reintroduces any of those files, resolve as deleted and re-run the strip-list grep from
 AGENTS.md.

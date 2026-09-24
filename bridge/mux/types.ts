@@ -217,7 +217,7 @@ export interface MuxPane extends MuxIdentity {
    *
    * It is the RAW FACT the adapter already holds, reported as a raw fact. Exactly TWO modules in the
    * tree read it, and both spend it on presentation only — it never reaches {@link agent}, {@link
-   * status}, the session ref or the triage sort:
+   * status}, the session ref or triage:
    *
    *  • `bridge/beacon/hint.ts`, where it may become a sentence for the operator.
    *  • `bridge/state-engine.ts`, where "a shell in the foreground under a non-empty {@link
@@ -276,6 +276,13 @@ export interface MuxSpace {
    * always a bug. `false` means "this is the repo itself", which is what a worktree row nests under.
    */
   readonly isWorktree?: boolean;
+  /**
+   * The space's own folder, when the multiplexer keeps one: herdr reports the checkout of the
+   * worktree a workspace sits in, tmux reports `session_path` (the folder a session was started
+   * in). zellij keeps none, and omits it. A FACT the adapter reads, never a guess from the panes:
+   * the Changes view derives its fallback from the panes itself (bridge/changes-root.ts).
+   */
+  readonly folder?: string;
 }
 
 /** One tab within a space — a layout holding one or more panes. */

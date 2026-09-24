@@ -5,6 +5,15 @@ import type { JsonObject, JsonValue } from "./json.ts";
 import type { ActivityLedger } from "./activity.ts";
 import { type AuditDetail, AuditLog } from "./audit.ts";
 import { isLoopbackBindHost, type Config } from "./config.ts";
+import {
+  changesParams,
+  repoOfFolder,
+  sharedCommitFileDiff,
+  sharedFileDiff,
+  sharedListChanges,
+  sharedReadCommit,
+} from "./changes.ts";
+import { rootOfWorkspace, type RootSnapshot } from "./changes-root.ts";
 import { apiError, type ApiErrorBody, type ApiErrorDetail, type ErrorCode } from "./error-codes.ts";
 import { MUX_CAPABILITIES, type MuxCapability, type MuxCapabilityDeclaration } from "./mux/capabilities.ts";
 import type { MuxAdapter, MuxAck, MuxGrid } from "./mux/types.ts";
@@ -67,6 +76,14 @@ import type {
   CacheWatchListResponse,
   CacheWatchResponse,
   PaneCache,
+  PaneChangeCommitDiffResponse,
+  PaneChangeCommitResponse,
+  PaneChangeDiffResponse,
+  PaneChangesResponse,
+  WorkspaceChangeCommitDiffResponse,
+  WorkspaceChangeCommitResponse,
+  WorkspaceChangeDiffResponse,
+  WorkspaceChangesResponse,
   PaneHistoryResponse,
   PaneReadResponse,
   PaneWire,
@@ -118,9 +135,11 @@ const CONTENT_TYPES = new Map<string, string>([
 
 // Strict CSP. Scripts are external, hashed bundles (script-src 'self'); pane text is rendered by
 // React as text nodes, never markup, so terminal output can't inject. 'unsafe-inline' is allowed
-// for styles only (the toast library injects a <style> tag) — it can't execute code.
+// for styles only (the toast library injects a <style> tag) — it can't execute code. `blob:` in
+// img-src is the composer's attachment thumbnail (ADR 0060): a blob URL is minted only by this
+// page's own script, from a file the operator picked, so it admits no new origin.
 const CSP =
-  "default-src 'self'; connect-src 'self'; img-src 'self' data:; " +
+  "default-src 'self'; connect-src 'self'; img-src 'self' data: blob:; " +
   "style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self'; " +
   "manifest-src 'self'; base-uri 'none'; frame-ancestors 'none'";
 
@@ -151,7 +170,7 @@ export function isLoopbackPeer(address: string | null | undefined): boolean {
   return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(v4);
 }
 
-const PANE_ROUTE = /^\/api\/pane\/([^/]+)(?:\/(reply|keys|upload|close|rename|history|focus))?$/;
+const PANE_ROUTE = /^\/api\/pane\/([^/]+)(?:\/(reply|keys|upload|close|rename|history|changes|focus))?$/;
 
 /**
  * A pairing claim's refusal, as an error code.
@@ -198,6 +217,13 @@ const WORKTREE_LIST_ROUTE = /^\/api\/workspace\/([^/]+)\/worktrees$/;
 const WORKTREE_ACTION_ROUTE = /^\/api\/workspace\/([^/]+)\/worktree(?:\/(open))?$/;
 
 /**
+ * `GET /api/workspace/<id>/changes` — the Changes view asked by workspace rather than by pane
+ * (ADR 0065). The same list every pane of that workspace shows. A READ, forwarded with `?host=` like
+ * the pane route: `bridge/crew/forward.ts` mirrors this shape and `forward.test.ts` pins it.
+ */
+const WORKSPACE_CHANGES_ROUTE = /^\/api\/workspace\/([^/]+)\/changes$/;
+
+/**
  * Header the web app sets on its own pane reads, and the ONLY thing that lets a read mark a pane
  * seen. See {@link marksPaneSeen} for why a header, of all things, is the check.
  */
@@ -220,12 +246,23 @@ export const SEEN_HEADER = "x-collie-seen";
  * same-origin `fetch` sets it freely.
  *
  * Write actions (reply/keys/upload/close/rename) need no header: they already cleared
- * `guard(…, "write")`, which requires an `Origin`. `history` is a read despite being an action
- * segment, so it needs the header like any other read.
+ * `guard(…, "write")`, which requires an `Origin`. `history` and `changes` are reads despite being
+ * action segments, so they need the header like any other read. The web app sends it on history
+ * (reading the transcript is looking at the pane) and not on changes (a git view of the folder is
+ * not the pane's conversation).
  */
 export function marksPaneSeen(req: Request, action: string | undefined): boolean {
   if (req.headers.get(SEEN_HEADER) !== null) return true;
-  return action !== undefined && action !== "history";
+  return action !== undefined && !isPaneReadAction(action);
+}
+
+/**
+ * The action segments that only READ: `history` reads the agent's log, `changes` runs read-only git
+ * over the pane's folder (ADR 0065). Every other segment types into or restructures a terminal.
+ * `bridge/crew/forward.ts` decides a forwarded route's kind the same way.
+ */
+export function isPaneReadAction(action: string | undefined): boolean {
+  return action === "history" || action === "changes";
 }
 
 /**
@@ -804,6 +841,22 @@ export function startServer(opts: {
       return blobRoute(hash, cfg.journalRoots.pi, req.headers.get("if-none-match"));
     }
 
+    // ── Changes, asked by workspace (ADR 0065): the list every pane of the space shows ──
+    const workspaceChangesMatch = pathname.match(WORKSPACE_CHANGES_ROUTE);
+    if (workspaceChangesMatch && req.method === "GET") {
+      const denied = caller.gate("read");
+      if (denied) return denied;
+      const rt = await caller.resolve();
+      if (rt instanceof Response) return rt;
+      let workspaceId: string;
+      try {
+        workspaceId = decodeURIComponent(workspaceChangesMatch[1]!);
+      } catch {
+        return text("malformed URL", 400);
+      }
+      return workspaceChanges(rt.engine, workspaceId, url, req);
+    }
+
     // ── Worktrees: list / create / open / remove, all scoped to a space (ADR 0032) ──
     const worktreeListMatch = pathname.match(WORKTREE_LIST_ROUTE);
     if (worktreeListMatch && req.method === "GET") {
@@ -847,8 +900,9 @@ export function startServer(opts: {
       const action = paneMatch[2];
       // Reading a pane is allowed for any access-gated client; every action (reply/keys/upload/
       // close) types into or restructures a terminal, so it additionally needs an authorised device.
-      // `history` is a READ despite being an action segment — it only ever reads a log off disk.
-      const isRead = !action || action === "history";
+      // `history` and `changes` are READS despite being action segments — one reads a log off disk,
+      // the other runs read-only git over the pane's folder.
+      const isRead = !action || isPaneReadAction(action);
       const denied = caller.gate(isRead ? "read" : "write");
       if (denied) return denied;
       const rt = await caller.resolve();
@@ -876,6 +930,7 @@ export function startServer(opts: {
       if (!action && req.method === "GET") return readPane(herdr, cfg, paneId, url, req);
       if (action === "history" && req.method === "GET")
         return paneHistory(cfg, journals, transcripts, rt.engine, paneId, url, req);
+      if (action === "changes" && req.method === "GET") return paneChanges(rt.engine, paneId, url, req);
       if (action === "reply" && req.method === "POST") return replyPane(herdr, cfg, paneId, req, audit_, device, session);
       if (action === "keys" && req.method === "POST") return keysPane(herdr, cfg, paneId, req, audit_, device, session);
       if (action === "upload" && req.method === "POST") return uploadPane(cfg, paneId, req, audit_, device, session);
@@ -901,6 +956,12 @@ export function startServer(opts: {
 
     async fetch(req) {
       const url = new URL(req.url);
+      // A mounted collie (`COLLIE_BASE_PATH`, ADR 0052) is normally reached through a proxy that
+      // strips the mount before it forwards — `tailscale serve` does, `http.StripPrefix` on the
+      // mount point. One that does not would otherwise be answered with the app shell for
+      // `/collie/api/health`, so an inbound path that still carries the mount is read as if it had
+      // been stripped. Before the crew surface and every gate, because all of them read the path.
+      if (cfg.basePath !== "/") url.pathname = stripMount(url.pathname, cfg.basePath);
       const { pathname } = url;
 
       // The peer-address check, ahead of the front door: everything below trusts headers a client
@@ -1354,11 +1415,17 @@ export function startServer(opts: {
       if (isReservedAuthPath(pathname)) return reservedAuthPlaceholder();
 
       // ── Static PWA (with SPA fallback) ───────────────────────────────────
-      return serveStatic(pathname, req.headers.get("accept-encoding"));
+      return serveStatic(pathname, req.headers.get("accept-encoding"), WEB_DIR, cfg.basePath);
     },
   });
 
   console.log(`[bridge] listening on http://${cfg.host}:${cfg.port}  (poll ${cfg.pollMs}ms)`);
+  if (cfg.basePath !== "/") {
+    console.log(
+      `[bridge] mounted at ${cfg.basePath} (COLLIE_BASE_PATH) — the app, its assets and /api/* answer under that path` +
+        " and at the root; the front door must proxy that path here",
+    );
+  }
   if (cfg.deviceHeader) {
     console.log(
       `[bridge] per-device auth ON: trusting '${cfg.deviceHeader}', ${cfg.deviceAllowlist.length} device(s) allowlisted`,
@@ -1622,6 +1689,105 @@ async function paneHistory(
     return json({ paneId, available: true, ...page } satisfies PaneHistoryResponse, accept);
   } catch (err) {
     return text(`transcript read failed: ${errorText(err)}`, 502);
+  }
+}
+
+/** The snapshot a Changes route reads its root off. The state engine is one. */
+export interface ChangesSnapshotSource {
+  current(): RootSnapshot;
+}
+
+/**
+ * GET /api/pane/:id/changes — what changed under the pane's WORKSPACE folder since the last commit
+ * (ADR 0065). The root is bridge/changes-root.ts's rule over the live snapshot; when the workspace
+ * has no narrow enough folder, the pane's own cwd is the root, as it was before.
+ *
+ * The folder comes off the live snapshot, keyed by pane id; the client never sends one. With
+ * `?repo=&path=` the answer is one file's diff, and bridge/changes.ts serves it only for a repo its
+ * own discovery returns and a path git listed there. With `?view=commit&repo=` it is that repo's
+ * last commit (HEAD), and with `&path=` one file of it, under the same rule.
+ */
+export async function paneChanges(
+  engine: ChangesSnapshotSource,
+  paneId: string,
+  url: URL,
+  req: Request,
+  home: string = homedir(),
+): Promise<Response> {
+  const accept = req.headers.get("accept-encoding");
+  const params = changesParams(url);
+  const snap = engine.current();
+  const pane = [...snap.agents, ...snap.shellPanes].find((a) => a.paneId === paneId);
+  const wantsDiff = params.repo !== null || params.path !== null;
+  if (!pane) {
+    return wantsDiff
+      ? json({ paneId, available: false, reason: "no-pane" } satisfies PaneChangeDiffResponse, accept)
+      : json({ paneId, available: false, reason: "no-pane" } satisfies PaneChangesResponse, accept);
+  }
+  const found = rootOfWorkspace(snap, pane.workspaceId, home);
+  const root = found?.root ?? pane.cwd;
+  const subject = found
+    ? { paneId, workspaceId: found.workspace.workspaceId, workspaceLabel: found.workspace.label }
+    : { paneId };
+  try {
+    if (params.view === "commit") {
+      if (params.path !== null) {
+        return json({ ...subject, ...(await sharedCommitFileDiff(root, params)) } satisfies PaneChangeCommitDiffResponse, accept);
+      }
+      return json({ ...subject, ...(await sharedReadCommit(root, params)) } satisfies PaneChangeCommitResponse, accept);
+    }
+    if (wantsDiff) return json({ ...subject, ...(await sharedFileDiff(root, params)) } satisfies PaneChangeDiffResponse, accept);
+    const list = await sharedListChanges(root, params);
+    const paneRepo = list.available ? await repoOfFolder(list.root, list.repos, pane.cwd) : undefined;
+    const answer: PaneChangesResponse = { ...subject, ...list };
+    if (paneRepo !== undefined) answer.paneRepo = paneRepo;
+    return json(answer, accept);
+  } catch (err) {
+    return text(`changes read failed: ${errorText(err)}`, 502);
+  }
+}
+
+/**
+ * GET /api/workspace/:id/changes — the same list, asked by workspace (ADR 0065). The root rule is
+ * the pane route's, without the fallback: a workspace with no narrow enough folder answers
+ * `no-folder`, because there is no asking pane whose folder could stand in.
+ */
+export async function workspaceChanges(
+  engine: ChangesSnapshotSource,
+  workspaceId: string,
+  url: URL,
+  req: Request,
+  home: string = homedir(),
+): Promise<Response> {
+  const accept = req.headers.get("accept-encoding");
+  const params = changesParams(url);
+  const wantsDiff = params.repo !== null || params.path !== null;
+  const found = rootOfWorkspace(engine.current(), workspaceId, home);
+  if (found === null) {
+    return wantsDiff
+      ? json({ workspaceId, available: false, reason: "no-workspace" } satisfies WorkspaceChangeDiffResponse, accept)
+      : json({ workspaceId, available: false, reason: "no-workspace" } satisfies WorkspaceChangesResponse, accept);
+  }
+  const subject = { workspaceId, workspaceLabel: found.workspace.label };
+  if (found.root === null) {
+    return json({ ...subject, available: false, reason: "no-folder" } satisfies WorkspaceChangesResponse, accept);
+  }
+  try {
+    if (params.view === "commit") {
+      if (params.path !== null) {
+        return json(
+          { ...subject, ...(await sharedCommitFileDiff(found.root, params)) } satisfies WorkspaceChangeCommitDiffResponse,
+          accept,
+        );
+      }
+      return json({ ...subject, ...(await sharedReadCommit(found.root, params)) } satisfies WorkspaceChangeCommitResponse, accept);
+    }
+    if (wantsDiff) {
+      return json({ ...subject, ...(await sharedFileDiff(found.root, params)) } satisfies WorkspaceChangeDiffResponse, accept);
+    }
+    return json({ ...subject, ...(await sharedListChanges(found.root, params)) } satisfies WorkspaceChangesResponse, accept);
+  } catch (err) {
+    return text(`changes read failed: ${errorText(err)}`, 502);
   }
 }
 
@@ -3340,6 +3506,42 @@ export function resolveStaticPath(
 }
 
 /**
+ * An inbound path with the mount taken off it, for a proxy that forwards the mount instead of
+ * stripping it: `/collie/api/health` under `/collie/` reads `/api/health`, `/collie` and `/collie/`
+ * read `/`. A path outside the mount is returned as it came — the bridge still answers at its own
+ * root for the proxy that strips, which is the common case and the one `tailscale serve` is.
+ * `/collieX` is not under `/collie/`. Pure + exported for tests.
+ */
+export function stripMount(pathname: string, basePath: string): string {
+  if (basePath === "/") return pathname;
+  const bare = basePath.slice(0, -1);
+  if (pathname === bare) return "/";
+  return pathname.startsWith(basePath) ? pathname.slice(bare.length) : pathname;
+}
+
+/**
+ * The app shell resolved to its mount (ADR 0052). `web/dist/index.html` is built with every
+ * reference ROOT-ABSOLUTE (`/assets/…`, `/theme-init.js`, `/fonts/…`) and the mount declared as
+ * `<meta name="collie-base" content="/">`; inside the bundle nothing names the root (Vite's
+ * `renderBuiltUrl` makes every chunk and stylesheet reference relative). So the shell is the one
+ * file that has to be told where it is: each root-absolute reference gets the mount in front of it,
+ * and the meta tag carries the mount for the app, the router and the service-worker registration
+ * to read. At the root this is the identity, and `serveStatic` does not even call it there.
+ *
+ * Four spellings and no more, because the file is ours: an attribute value (`href="/`, `src="/`,
+ * `content="/`), and a double-quoted, single-quoted or bare CSS `url(/` in the inline splash style.
+ * A protocol-relative `//host` is not a root-absolute path and is left alone. The CSP forbids a
+ * `<base>` element (`base-uri 'none'`), which is why this is a rewrite and not a tag.
+ * Pure + exported for tests.
+ */
+export function mountIndexHtml(html: string, basePath: string): string {
+  if (basePath === "/") return html;
+  return html
+    .replace(/(="|url\("|url\('|url\()\/(?!\/)/g, `$1${basePath}`)
+    .replace(/(<meta\s+name="collie-base"\s+content=")[^"]*(")/, `$1${basePath}$2`);
+}
+
+/**
  * The namespace reserved for the operator's front door. Matches `/auth` with or without a trailing
  * slash and anything beneath it — a proxy may serve one page or a whole flow. Kept in lockstep with
  * the service worker's navigation denylist (`web/src/lib/sw-routes.ts`); if these two disagree, an
@@ -3392,6 +3594,7 @@ export async function serveStatic(
   pathname: string,
   acceptEncoding: string | null,
   webDir: string = WEB_DIR,
+  basePath: string = "/",
 ): Promise<Response> {
   const resolved = resolveStaticPath(pathname, webDir);
   if (!resolved) return text("forbidden", 403);
@@ -3420,6 +3623,21 @@ export async function serveStatic(
   };
   if (ext === ".html") headers["content-security-policy"] = CSP;
   if (rel === "sw.js") headers["service-worker-allowed"] = "/";
+
+  // Under a mount the app shell is the one file not served as it lies on disk: its root-absolute
+  // references and its `<meta name="collie-base">` are resolved to the mount here (ADR 0052). At the
+  // root the file goes out as built, through the same path as every other file. Same cache, keyed
+  // by the mount as well, so two mounts served from one tree never read each other's body.
+  if (rel === "index.html" && basePath !== "/") {
+    const body = new TextEncoder().encode(mountIndexHtml(await file.text(), basePath));
+    const key = `${full}\0${file.lastModified}\0${file.size}\0mount=${basePath}`;
+    const gzHtml = gzippedBytes(key, body, ext, acceptEncoding);
+    if (gzHtml === null) return secure(new Response(body, { headers }));
+    headers["content-encoding"] = "gzip";
+    headers["vary"] = "accept-encoding";
+    headers["content-length"] = String(gzHtml.byteLength);
+    return secure(new Response(gzHtml, { headers }));
+  }
 
   const gz = await gzippedStatic(file, full, ext, acceptEncoding);
   if (gz === null) return secure(new Response(file, { headers }));
@@ -3503,7 +3721,22 @@ async function gzippedStatic(
   const size = file.size;
   if (!wantsGzip(acceptEncoding, size, STATIC_GZIP_MIN_BYTES)) return null;
 
-  const key = `${full} ${file.lastModified} ${size}`;
+  return gzippedBytes(`${full} ${file.lastModified} ${size}`, new Uint8Array(await file.arrayBuffer()), ext, acceptEncoding);
+}
+
+/**
+ * The same cache for a body that is already in memory — the app shell, once the mount has been
+ * applied to it. `null` under the same three questions as {@link gzippedStatic}, so a small body
+ * still goes out raw.
+ */
+function gzippedBytes(
+  key: string,
+  bytes: Uint8Array<ArrayBuffer>,
+  ext: string,
+  acceptEncoding: string | null,
+): Uint8Array<ArrayBuffer> | null {
+  if (!COMPRESSIBLE_EXT.has(ext)) return null;
+  if (!wantsGzip(acceptEncoding, bytes.byteLength, STATIC_GZIP_MIN_BYTES)) return null;
   const cached = gzipCache.get(key);
   if (cached !== undefined) {
     gzipCacheHits += 1;
@@ -3511,7 +3744,7 @@ async function gzippedStatic(
   }
 
   gzipCacheMisses += 1;
-  const compressed = Bun.gzipSync(new Uint8Array(await file.arrayBuffer()));
+  const compressed = Bun.gzipSync(bytes);
   gzipCache.set(key, compressed);
   gzipCacheBytes += compressed.byteLength;
   while (gzipCache.size > GZIP_CACHE_MAX_ENTRIES || gzipCacheBytes > GZIP_CACHE_MAX_BYTES) {

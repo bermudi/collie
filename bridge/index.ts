@@ -40,6 +40,7 @@ import { Snooze } from "./snooze.ts";
 import { StateEngine } from "./state-engine.ts";
 import {
   bridgeStampSync,
+  githubCredential,
   githubTagsFetcher,
   resolveUpdateRepo,
   UpdateMonitor,
@@ -180,7 +181,9 @@ const updateMonitor = new UpdateMonitor({
   repo: updateRepo,
   current: currentVersion,
   startupStamp: bridgeStampSync(bridgeDir, rootDir),
-  fetchTags: githubTagsFetcher(updateRepo),
+  // With the operator's GitHub token when the env holds one (#254): the same three names, in the
+  // same order, that `collie update` reads, so the banner and the verb share one budget.
+  fetchTags: githubTagsFetcher(updateRepo, githubCredential(process.env)),
   bridgeStamp: () => bridgeStampSync(bridgeDir, rootDir),
   store: updateStore,
   now: Date.now,
