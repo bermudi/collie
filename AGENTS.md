@@ -100,5 +100,5 @@ worker per core. Rules:
 
 If it runs, it emits signals. No swallowed exceptions, no black-box external boundaries. Every fix
 gets a test that would have caught it. Prefer deleting a subsystem to adding one, and keep the
-fork's own diff thin enough to re-apply after any wholesale move (ADR 0053's consequence): a change
+fork's own diff thin enough to re-apply after any wholesale move (ADR 9004's consequence): a change
 that could live upstream belongs upstream, as a PR.
