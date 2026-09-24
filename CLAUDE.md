@@ -36,6 +36,11 @@ not part of that agreement.
 **Two kinds of commit. A functional commit records; only the release commit bumps.** Never bump a
 version because you fixed something; the version moves once, when the release is cut.
 
+**An upstream merge is functional, and the release it adds up to is still its own commit.** Land the
+merge with `SKIP_VERSION_CHECK=1 git commit` (the hook's hatch exists for exactly this), then cut
+`chore(release): x.y.z` separately — a merge that bumps inside itself hides which commit published
+what, and leaves no `## [Unreleased]` behind for the next round.
+
 **Before committing any functional change** (anything under `bridge/`, `web/src/`,
 `web/public/`, `scripts/`, `systemd/`, or the manifest / package files, minus the tests and hooks
 carved out below), you MUST, **in the same

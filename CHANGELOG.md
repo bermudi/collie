@@ -6,6 +6,8 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [Unreleased]
+
 ## [0.49.0] - 2026-09-23
 
 Merged from upstream past their 1.12.1 (2026-09-23). The update-mode screens and the crew update
