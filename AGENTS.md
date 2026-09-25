@@ -50,7 +50,12 @@ prompt-cache chip and watch (kept from upstream 1.10).
   conflicts exactly where upstream touches the strip list (`cli/`, `bridge/crew/`, `bridge/stt/`,
   beacons, the staged update runner, the crew ADRs) — resolve every one as **stays deleted**, then
   re-check the strip-list grep: `git ls-tree -r --name-only HEAD | grep -iE '^(cli/|bridge/crew/|bridge/stt/)|beacon'`
-  must come back empty.
+  must come back empty. Watch for silent rename/delete drops: when upstream *renames* a file the
+strip deleted (1.13.x renamed `components/update-screen.tsx` → `routes/updates.tsx`), git resolves
+it to the delete with no conflict — the renamed target vanishes without appearing in the conflict
+list. After each merge, diff the full file lists
+(`comm -23 <(git ls-tree -r --name-only upstream/main | sort) <(git ls-files | sort)`) and confirm
+every absence is a strip decision, not a casualty.
 - The bridge's update path is Pup's own: `bridge/update.ts` is the fork's check-only monitor
   watching `bermudi/collie` tags (ADR 0020's gate rides it), and `POST /api/update/check` is the only
   update route. Upstream's update-run/runner machinery never merges in.
