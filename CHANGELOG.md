@@ -8,6 +8,18 @@ All notable changes to Collie are recorded here. The format follows
 
 ## [Unreleased]
 
+Merged from upstream past their 1.13.1 (2026-09-24). The round brings OpenCode 2 journal support
+and the Muse fixes below; the update-mode screens and the update runner they drive stay stripped
+([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md),
+[ADR 0020](./.adr/0020-a-major-upgrade-is-consented-by-flag.md)).
+
+### Fixed
+- **OpenCode 2 panes show their history and their prompt-cache chip.** OpenCode 2 keeps its sessions in new tables in the same database, which the journal reader did not read, so History said there was no log and the cache chip never appeared. The reader now reads both the OpenCode 1 and the OpenCode 2 tables, and when a session sits in both, it reads the one written last; its tool error record reads too, and a failed compaction is skipped. Thanks @kekefigure.
+- **A Muse message with a blank line in it sends.** A paragraph break in the draft made the pane lose Muse's input box: the send typed but never submitted, the unread-dialog card covered the box, and each retry typed the message once more. The box is now read across blank lines. Thanks @jpcarranza94 (#274).
+- **A slash command sent to a Muse pane runs.** Typing `/usage` opens Muse's command list under the input box, and the send read that list as part of the message, so it never matched and stalled. When the list shows exactly the command you typed, the command alone is submitted. Thanks @jpcarranza94 (#276).
+- **A photo or file sent to a Muse pane submits.** Muse turns a typed image path into `[Image #1]` and puts quotes around any other path, so the input box never showed the text sent and the send stalled. Each image mark now maps back to its path, in order, and the quotes drop before the compare. Thanks @jpcarranza94 (#278).
+- **A Muse request for network access shows its answers as buttons.** Muse asks before it reaches a host, and the pane used to show only the card with Esc, which answers No. The four answers now show as buttons, with the host and the full address on screen above them. Thanks @jpcarranza94 (#280).
+
 ## [0.49.0] - 2026-09-23
 
 Merged from upstream past their 1.12.1 (2026-09-23). The update-mode screens and the crew update
