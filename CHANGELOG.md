@@ -8,6 +8,8 @@ All notable changes to Collie are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-09-25
+
 Merged from upstream past their 1.13.1 (2026-09-24). The round brings OpenCode 2 journal support
 and the Muse fixes below; the update-mode screens and the update runner they drive stay stripped
 ([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md),
