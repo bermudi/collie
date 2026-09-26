@@ -28,8 +28,19 @@ export interface ScopedRow {
 
 const MISSES = 0;
 const UNSCOPED = 1;
-const FAMILY = 2;
-const EXACT = 3;
+const AGENTS = 2;
+const FAMILY = 3;
+const EXACT = 4;
+
+/**
+ * The scope token for "every agent harness, never a shell". Unscoped already
+ * means every pane — shells included — which is rarely what a row is meant to
+ * say ("commit and push" at a bash prompt); naming all nine families means the
+ * file rots the day the catalog grows a tenth. One word says it instead.
+ * Deliberately not in AGENT_FAMILIES: it is not a family, and canonicalAgent
+ * must never fold a pane onto it.
+ */
+export const AGENT_SCOPE = "agent";
 
 /**
  * Fold a PANE's agent name onto the name its catalog is filed under ("claude-code" -> "claude"),
@@ -64,6 +75,11 @@ function specificity(row: ScopedRow, paneKey: string, paneFamily: string): numbe
   if (paneKey === "") return MISSES;
   const scope = row.agent.toLowerCase().trim();
   if (scope === paneKey) return EXACT;
+  // The wildcard sits between unscoped and family: on an agent pane an `agent` row beats an
+  // unscoped one with the same name, a family row beats it in turn, and on a shell it misses —
+  // a shell's rows say `scope = "shell"` or nothing at all. (A pane literally keyed "agent"
+  // would have matched EXACT above; no harness ships that name today.)
+  if (scope === AGENT_SCOPE) return paneKey === "shell" ? MISSES : AGENTS;
   // A family scope is only ever the catalog's own name for the family: `claude:` reaches a
   // "claude-code" pane because CLAUDE's shipped rows do; `claude-local:` does NOT, even though the
   // catalog lookup would fold it onto CLAUDE. Folding an arbitrary operator string through that
@@ -82,9 +98,10 @@ function specificity(row: ScopedRow, paneKey: string, paneFamily: string): numbe
  * 2. A PANE YOU DID NOT ADDRESS KEEPS WHAT SHIPS. Scoping rows to `omp` says nothing about your
  *    claude panes. Declaring nothing at all leaves every pane as shipped.
  * 3. THE MORE SPECIFIC SCOPE WINS, and one name is one row. Exact (`claude-code` on a claude-code
- *    pane) beats family (`claude` on the same pane) beats unscoped, so "this everywhere, except
- *    here" is spellable and must not render as two identically named buttons. Declaration order
- *    decides only between rows of equal specificity, where the later one wins.
+ *    pane) beats family (`claude` on the same pane) beats `agent` (every harness, never a shell)
+ *    beats unscoped (every pane, shells included), so "this everywhere, except here" is spellable
+ *    and must not render as two identically named buttons. Declaration order decides only between
+ *    rows of equal specificity, where the later one wins.
  */
 export function rowsFor<T extends ScopedRow>(
   rows: readonly T[],

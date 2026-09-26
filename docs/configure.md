@@ -263,7 +263,8 @@ When a pane matches your rules, your groups replace the default ones
 English (`yes`, `commit and push`).
 
 Use this file to run in other languages, or to send words like `approve` to specific harnesses.
-Setting `scope = "shell"` targets standard shell panes, which otherwise only receive `y`/`n`.
+Setting `scope = "agent"` targets every harness and never a shell; `scope = "shell"` targets
+standard shell panes, which otherwise only receive `y`/`n`.
 
 To verify, open a pane and tap **Quick** to see your groups. If a row fails to load,
 `journalctl --user -u collie -n 20` prints the error.

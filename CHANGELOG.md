@@ -13,6 +13,9 @@ and the Muse fixes below; the update-mode screens and the update runner they dri
 ([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md),
 [ADR 0020](./.adr/0020-a-major-upgrade-is-consented-by-flag.md)).
 
+### Added
+- **A scope can say "every harness" in one word.** The operator files' `scope` now takes `agent` — every agent harness, never a shell — sitting between unscoped and a named family in the specificity ladder, so "these quick replies on every harness, but keep y/n on shells" is two rows instead of one per family. The same token works in `keys.toml` and `commands.toml`.
+
 ### Fixed
 - **OpenCode 2 panes show their history and their prompt-cache chip.** OpenCode 2 keeps its sessions in new tables in the same database, which the journal reader did not read, so History said there was no log and the cache chip never appeared. The reader now reads both the OpenCode 1 and the OpenCode 2 tables, and when a session sits in both, it reads the one written last; its tool error record reads too, and a failed compaction is skipped. Thanks @kekefigure.
 - **A Muse message with a blank line in it sends.** A paragraph break in the draft made the pane lose Muse's input box: the send typed but never submitted, the unread-dialog card covered the box, and each retry typed the message once more. The box is now read across blank lines. Thanks @jpcarranza94 (#274).

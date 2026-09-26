@@ -1,4 +1,5 @@
 import { quickRepliesFor } from "./quick-replies";
+import { AGENT_FAMILIES } from "./operator-scope";
 
 // The catalog is data, but the LOOKUP carries the policy — that a shell is not an agent, and that an
 // unknown/hostile agent string can't crash the dock.
@@ -83,5 +84,36 @@ describe("quickRepliesFor with operator rows", () => {
     expect(quickRepliesFor("claude", false, mixed)).toEqual([
       { title: "confirm", items: ["scoped"] },
     ]);
+  });
+
+  // `scope = "agent"` is the grammar's "every harness": unscoped means every PANE (shells
+  // included), and naming all nine families rots the day the catalog grows a tenth.
+  it("an agent-scoped row reaches every harness and never a shell", () => {
+    const agentOnly = [{ agent: "agent", title: "common", items: ["continue"] }];
+    for (const agent of AGENT_FAMILIES) {
+      expect(quickRepliesFor(agent, false, agentOnly)).toEqual([
+        { title: "common", items: ["continue"] },
+      ]);
+    }
+    // The shell keeps what ships — the row missed it, and a shell is not an agent.
+    expect(quickRepliesFor("shell", true, agentOnly)).toEqual(quickRepliesFor("shell", true));
+    // ...including an unknown future harness, which is an agent pane all the same.
+    expect(quickRepliesFor("some-future-harness", false, agentOnly)).toEqual([
+      { title: "common", items: ["continue"] },
+    ]);
+  });
+
+  it("\"agent\" sits between unscoped and family in the specificity ladder", () => {
+    const ladder = [
+      { title: "g", items: ["unscoped"] },
+      { agent: "agent", title: "g", items: ["agent"] },
+      { agent: "pi", title: "g", items: ["family"] },
+    ];
+    // Narrowest wins on a pi pane...
+    expect(quickRepliesFor("pi", false, ladder)).toEqual([{ title: "g", items: ["family"] }]);
+    // ...the wildcard beats unscoped on a harness with no family row...
+    expect(quickRepliesFor("codex", false, ladder)).toEqual([{ title: "g", items: ["agent"] }]);
+    // ...and on a shell only the unscoped row reached, the wildcard missed.
+    expect(quickRepliesFor("shell", true, ladder)).toEqual([{ title: "g", items: ["unscoped"] }]);
   });
 });

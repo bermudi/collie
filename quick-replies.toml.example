@@ -13,8 +13,9 @@
 # Fields: `title` (required, the group's heading and its identity), `items` (required, one or more
 # strings sent verbatim), `scope` (a herdr agent name — omit it and the row addresses every pane).
 #
-# `scope` takes an agent family: claude, codex, pi, opencode, omp, grok — or `shell` for a plain
-# shell pane, which by default gets only y/n.
+# `scope` takes an agent family: claude, codex, devin, pi, opencode, omp, grok, agy, antigravity —
+# or `shell` for a plain shell pane (which by default gets only y/n), or `agent` for every harness
+# and never a shell, or nothing to reach every pane including shells.
 
 # The shipped dock, restated — start here and edit the phrases.
 # [[replies]]
