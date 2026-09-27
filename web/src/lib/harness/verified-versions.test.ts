@@ -10,16 +10,11 @@ import ledgerJson from "./verified-versions.json";
 // opencode's new adapter while claiming to be the registry's own list.
 const REGISTERED_AGENTS = registeredAgents();
 
-// M41 spec 05 — the SECOND reader. Chat draws from the agent's own session log, which is a different
-// registry with a different list (`bridge/journal/registry.ts`, mirrored by `lib/journal-agents.ts`
-// and pinned against the bridge's own list by `bridge/journal/registry.test.ts`). An entry's
-// `journal` block is the journal reader's line, and it is present exactly where that registry can
-// serve the agent: an agent with one reader and not the other is ordinary, and the two versions
-// drift apart because a vendor can change what it paints without changing what it writes.
 const JOURNAL_AGENTS = [...JOURNAL_AGENT_NAMES];
 
-// Hermes and OpenClaw have no block grammar, but their journal readers still need a ledger entry.
-const UNADAPTED_AGENTS = ["hermes", "openclaw"];
+// Hermes, OpenClaw and devin have no block grammar, but their journal readers still need a
+// ledger entry. devin is Pup's addition (raw mirror, one-shot send).
+const UNADAPTED_AGENTS = ["hermes", "openclaw", "devin"];
 
 const ALLOWED_HOW = new Set(["canary", "live sweep", "capture", "unverified"]);
 
