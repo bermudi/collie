@@ -1245,6 +1245,46 @@ describe("AgentChat — top-of-mirror history affordance", () => {
 // log and reported none is the operator's to fix (the `herdr integration install` hook), while an
 // agent with no journal adapter has nothing to say. The line is prose, never a control — there is
 // still no transcript to open.
+describe("AgentChat — no session reported", () => {
+  const noSessionNote = () => screen.queryByText(/has not reported a session to Herdr/i);
+
+  it("explains the silence on an agent that could have a transcript but reported none", () => {
+    const agent = { ...fixtureAgents[0]!, agent: "claude" }; // journal adapter, no hasSession
+    renderChat({ agent, agents: [agent] });
+    const note = noSessionNote();
+    expect(note).toBeInTheDocument();
+    expect(note).toHaveTextContent(/^claude /);
+    // Prose, not an affordance: nothing here is tappable, and the history button stays absent.
+    expect(note?.closest("button")).toBeNull();
+    expect(screen.queryByRole("button", { name: /show entire history/i })).not.toBeInTheDocument();
+  });
+
+  it("says nothing once the pane has reported a session", () => {
+    const agent = { ...fixtureAgents[0]!, agent: "claude", hasSession: true };
+    renderChat({ agent, agents: [agent] });
+    expect(noSessionNote()).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /show entire history/i })).toBeInTheDocument();
+  });
+
+  // #294: Codex reports its session only once its first prompt is submitted, so a fresh Codex pane
+  // has none and nothing is broken. Its note must not tell the operator to reinstall a working hook.
+  it("tells a Codex pane with no session yet that it reports on its first message", () => {
+    const agent = { ...fixtureAgents[0]!, agent: "codex" };
+    renderChat({ agent, agents: [agent] });
+    expect(noSessionNote()).not.toBeInTheDocument();
+    const note = screen.getByText(/reports its session to Herdr only after its first message/i);
+    expect(note).toHaveTextContent(/^codex /);
+    expect(note).toHaveTextContent("/hooks in codex");
+    expect(note.closest("button")).toBeNull();
+  });
+
+  it("says nothing for an agent with no journal adapter — there is no transcript to promise", () => {
+    const agent = { ...fixtureAgents[0]!, agent: "unknown-agent" }; // block grammars, no journal
+    renderChat({ agent, agents: [agent] });
+    expect(noSessionNote()).not.toBeInTheDocument();
+  });
+});
+
 // The strip has its own scroll bound (`max-h-[18dvh]`) for a statusline tall enough to spill it. On a
 // phone, dragging past that bound with no `overscroll-contain` chains the gesture into the document
 // (there is no other scrollable ancestor to absorb it) and drags the whole app — composer included —
