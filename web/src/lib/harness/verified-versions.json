@@ -1,5 +1,5 @@
 {
-  "$comment": "M37 spec 01 — one entry per Herdr agent name: the version Collie's reader was last verified against, when, how, whether it has a block-grammar adapter (registry.ts), and the evidence that version is real. `scripts/harness-drift.ts` reads this file; `verified-versions.test.ts` pins every key the adapter registry maps, plus opencode and pi (no adapter — raw mirror, one-shot send). `how` is one of canary | live sweep | capture | unverified.",
+  "$comment": "M37 spec 01 — one entry per Herdr agent name: the version Collie's reader was last verified against, when, how, whether it has a block-grammar adapter (registry.ts), and the evidence that version is real. `scripts/harness-drift.ts` reads this file; `verified-versions.test.ts` pins every key the adapter registry maps, plus opencode, pi and devin (no adapter — raw mirror, one-shot send; devin is Pup's row, the herd this fork serves). `how` is one of canary | live sweep | capture | unverified.",
   "agents": {
     "claude": {
       "version": "2.1.283",
@@ -63,6 +63,13 @@
       "how": "unverified",
       "adapter": false,
       "evidence": "installed 2026-09-26, first canary run pending (M37 spec 02)"
+    },
+    "devin": {
+      "version": "3000.11.3",
+      "verified": "2026-09-27",
+      "how": "unverified",
+      "adapter": false,
+      "evidence": "installed 2026-09-27, no adapter — raw mirror, one-shot send (registry.test.ts pins devin as unregistered). Pup's mirror layer is capture-pinned for it: blocks.test.ts clips Devin's two-label composer rules against fixture devin--composer-labelled-rules.txt (commit c2a12546). First canary run pending (no devin driver in scripts/harness-canary)"
     }
   }
 }

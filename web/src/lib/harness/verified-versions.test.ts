@@ -25,8 +25,10 @@ const REGISTERED_AGENTS = [
 ].map((a) => a.agent);
 
 // opencode and pi have no adapter at all — raw mirror, one-shot send — but the ledger still owes
-// them an entry (Ground Truth: both are installed and their version drifts too).
-const UNADAPTED_AGENTS = ["opencode", "pi"];
+// them an entry (Ground Truth: both are installed and their version drifts too). devin is the same
+// shape and is Pup's addition: it is the herd this fork serves daily, upstream carries no row for
+// it (2026-09-27), and its mirror layer is capture-pinned in blocks.test.ts.
+const UNADAPTED_AGENTS = ["opencode", "pi", "devin"];
 
 const ALLOWED_HOW = new Set(["canary", "live sweep", "capture", "unverified"]);
 
@@ -58,7 +60,7 @@ describe("verified-versions ledger", () => {
     }
   });
 
-  it("has an entry for opencode and pi, with adapter: false", () => {
+  it("has an entry for the unadapted agents (opencode, pi, devin), with adapter: false", () => {
     for (const agent of UNADAPTED_AGENTS) {
       const entry = entryFor(agent);
       expect(entry, `missing ledger entry for "${agent}"`).toBeDefined();
