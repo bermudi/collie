@@ -59,6 +59,14 @@ every absence is a strip decision, not a casualty.
 - The bridge's update path is Pup's own: `bridge/update.ts` is the fork's check-only monitor
   watching `bermudi/collie` tags (ADR 0020's gate rides it), and `POST /api/update/check` is the only
   update route. Upstream's update-run/runner machinery never merges in.
+- Merge-commit ritual details (learned 2026-09-30, merge 62925ca7): merge commits use
+  `SKIP_VERSION_CHECK=1 git commit` (the pre-commit hook's own escape — merges never bump, ADR 0020),
+  and the CHANGELOG carries upstream's release entries **demoted under `## [Unreleased]`** (headings
+  become bold text like `**Upstream 1.14.2 — 2026-09-28**`) — a `## [x.y.z]` heading from upstream
+  becomes the newest numbered heading and trips `check-version.sh`. Pup's own `## [0.x]` headings
+  stay the only numbered ones. When upstream's tests assume their raw-cwd passthrough, adapt them to
+  `resolvePaneCwd` semantics (create a real `~/dir` under homedir; assert the mux gets the expanded
+  path and Recent gets what the mux reported).
 - `scripts/collie-ctl.sh` + `herdr-plugin.toml` are Pup's operating surface (build / restart / update /
   doctor / serve). Upstream equivalents live in their stripped cli — don't port them back.
 - Version line stays **0.x** (ADR 0020). A merge never bumps the version by itself; releases are cut
