@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,8 @@ import type { Scope } from "@/lib/scope";
 import type { WorktreeView } from "@/lib/types";
 import { Collapse } from "@/components/ui/collapse";
 import { BottomSheet } from "@/components/ui/sheet";
+import { FolderSections } from "@/components/new-space-folders";
+import { useFolders } from "@/lib/folders";
 import { useHoldReload } from "@/lib/reload-guard";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/hooks/use-locale";
@@ -69,6 +71,18 @@ export function NewSpaceSheet({
   const [branch, setBranch] = useState("");
   const [repo, setRepo] = useState("");
   const worktreesOffered = repos.length > 0 && onCreateWorktree !== undefined;
+  // This machine's own folder list (#289): read when the sheet opens, never polled. A bridge on an
+  // older version has none, and the sheet then renders as it always did. The fork is single-machine
+  // (one multiplexer per install, ADR 0036), so the list rides the ambient scope and there is no
+  // host picker to move it.
+  const { folders, star } = useFolders(scope, open);
+  // What the list holds NOW, for a tap that lands on a row the Collapse is still fading out: a
+  // stale folder must never reach the field.
+  const shownFolders = useRef(folders);
+  shownFolders.current = folders;
+  const isShown = (folder: string): boolean =>
+    shownFolders.current.recent.includes(folder) || shownFolders.current.favourites.includes(folder);
+  const createButton = useRef<HTMLButtonElement>(null);
   /**
    * Worktrees of the chosen repo that NOTHING is showing.
    *
@@ -117,6 +131,18 @@ export function NewSpaceSheet({
   function create() {
     onCreate({ label: label.trim() || undefined, cwd: cwd.trim() || undefined }, undefined);
     onClose();
+  }
+
+  /** A folder row's tap: fill the field and move to Create. Never a create by itself. */
+  function fillFolder(folder: string) {
+    if (!isShown(folder)) return;
+    setCwd(folder);
+    createButton.current?.focus();
+  }
+
+  function toggleStar(folder: string, starred: boolean) {
+    if (!isShown(folder)) return;
+    void star(folder, starred);
   }
 
   function createWorktree() {
@@ -230,6 +256,7 @@ export function NewSpaceSheet({
             className="h-11 rounded-lg border border-border bg-background px-3 font-mono text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
         </label>
+        <FolderSections folders={folders} onUse={fillFolder} onStar={toggleStar} />
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground">{t("space.new.label.label")}</span>
           <input
@@ -239,7 +266,7 @@ export function NewSpaceSheet({
             className="h-11 rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
         </label>
-        <Button onClick={create} className="mt-1 h-11">
+        <Button ref={createButton} onClick={create} className="mt-1 h-11">
           {t("space.new.create")}
         </Button>
         </>

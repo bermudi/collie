@@ -74,6 +74,11 @@ const settled = () => screen.findByRole("navigation", { name: /spaces/i });
  *  now carry the same workspace name a heading does (agent-list.tsx). */
 const groupSection = (label: string) => screen.getByRole("heading", { name: label }).closest("section")!;
 
+/** A workspace group's pane rows: the buttons in its list, never the "+" at the end of its heading
+ *  (M40/03), which is a button of the same section. */
+const rowsOf = (section: HTMLElement) =>
+  within(section.querySelector<HTMLElement>('[data-slot="list-group"]')!).getAllByRole("button");
+
 const url = (router: ReturnType<typeof renderHome>) =>
   router.state.location.pathname + router.state.location.search;
 
@@ -97,7 +102,7 @@ describe("the dashboard on ONE machine is untouched", () => {
     await settled();
     // The row's own text is just its name and its tab now — "webapp" only names the workspace
     // heading (and its Spaces chip), so the row is found through its group instead.
-    const [row] = within(groupSection("webapp")).getAllByRole("button");
+    const [row] = rowsOf(groupSection("webapp"));
     await userEvent.click(row!);
     await waitFor(() => expect(url(router)).toBe("/pane/w1%3Ap1"));
   });
@@ -163,7 +168,7 @@ describe("the dashboard across sessions", () => {
    *  `webapp`, because this test is about how many TERMINALS are listed, not how many spaces. */
   const rows = () => {
     const sections = screen.getAllByRole("heading", { name: "webapp" }).map((h) => h.closest("section")!);
-    return sections.flatMap((s) => within(s).getAllByRole("button"));
+    return sections.flatMap((s) => rowsOf(s));
   };
 
   it("renders BOTH colliding rows, not one recycled row", async () => {

@@ -22,10 +22,30 @@ export const en = {
 
   // --- settings (page chrome) ---
   "settings.title": "Settings",
+  // The handoff when a bare shell pane becomes an agent pane (components/agent-start.tsx).
+  // `{agent}` is the harness's own name and is never translated.
+  "pane.agentStart.handed": "Handed to {agent}",
+  // The stand-in for the steps a turn took, when tool calls are off (Settings → Appearance). Per
+  // TURN, not per call: one line where forty cards were.
+  "transcript.tools.hidden.one": "{count} step hidden — tap to show",
+  "transcript.tools.hidden.other": "{count} steps hidden — tap to show",
+  "settings.tools.title": "Tool calls",
+  "settings.tools.description": "Draw the reads, searches, commands and edits an agent ran. Off keeps the thread to what it said.",
+  // --- settings sections (the index's four rows) ---
+  // The blurb names the three or four cards a person is most likely to be hunting for, so the row
+  // answers "is it in here?" without being opened. Keep it short: it truncates on a narrow phone.
+  "settings.section.appearance.title": "Appearance",
+  "settings.section.appearance.blurb": "Theme, language, fonts",
+  "settings.section.device.title": "Device",
+  "settings.section.device.blurb": "Haptics, voice, zen mode",
+  "settings.section.alerts.title": "Alerts",
+  "settings.section.alerts.blurb": "Notifications, quiet hours",
+  "settings.section.system.title": "System",
+  "settings.section.system.blurb": "Updates, devices, crew",
   "settings.nav.back": "Back",
 
   // --- settings.theme ---
-  "settings.theme.title": "Appearance",
+  "settings.theme.title": "Theme",
   "settings.theme.description": "Follow your phone, or pin one.",
   "settings.theme.option.system": "System",
   "settings.theme.option.light": "Light",
@@ -233,6 +253,8 @@ export const en = {
   "composer.controls.agent": "Agent",
   "composer.controls.displayAria": "Display settings",
   "composer.controls.display": "Display",
+  "composer.controls.clear": "Clear message",
+  "composer.controls.undoClear": "Undo clear",
   "composer.sentPreview.label": "You sent:",
   "composer.placeholder.gone": "Pane is gone",
   "composer.placeholder.readOnly": "Read-only — not authorised",
@@ -315,6 +337,9 @@ export const en = {
   "chat.strips.show.panes": "Show panes. {panes} hidden.",
   "chat.find.label": "Find in output",
   "chat.history.label": "Conversation history",
+  "chat.copyOutput.label": "Copy output",
+  "chat.copyOutput.done": "Copied output to clipboard",
+  "chat.copyOutput.failed": "Couldn't copy output",
   // The header's ⋮ — the glyph names nothing, so the accessible name has to say what it OPENS.
   "chat.paneMenu.aria": "Pane actions",
   "chat.header.openOverviewAria": "Open {workspace} overview{status}",
@@ -335,6 +360,12 @@ export const en = {
   "chat.switcher.ariaNeedsYou": "Switch pane, another pane needs you",
   "chat.switcher.title": "Switch pane",
   "chat.switcher.launch.here": "here",
+  // --- pane order (the switcher's toggle and the Settings row write one value, ADR 0071) ---
+  "paneOrder.aria": "Pane order",
+  "paneOrder.place": "Place",
+  "paneOrder.activity": "Activity",
+  "paneOrder.recent": "Newest first",
+  "settings.paneOrder.description": "Activity puts the pane where something last happened at the top of the switcher. Place keeps the order your terminal has.",
   "chat.status.feedbackSent": "Feedback sent",
   "chat.status.sent": "Sent",
   "chat.status.menuChanged": "Menu changed — refreshing",
@@ -392,6 +423,10 @@ export const en = {
   "paneActions.focus.labelFallback": "Focus in the terminal",
   "paneActions.focus.done": "Focused in the terminal",
   "paneActions.focus.failed": "Couldn't focus in the terminal",
+  "paneActions.pin.label": "Pin to top",
+  "paneActions.unpin.label": "Unpin",
+  "paneActions.pin.done": "Pinned to the top",
+  "paneActions.unpin.done": "Unpinned",
   "paneActions.empty.fallback": "This multiplexer offers no actions for a pane.",
   "paneActions.status.renamed": "Renamed",
   "paneActions.status.labelCleared": "Label cleared",
@@ -426,7 +461,13 @@ export const en = {
   "home.workspace.paneCount.one": "{count} pane",
   "home.workspace.paneCount.other": "{count} panes",
   "home.workspace.hidden": "hidden",
+  "home.machineHidden.show": "Show {name}'s panes",
   "home.sidebar.shells": "Shells",
+  "home.pinned.title": "Pinned",
+  "home.pinHint.hold": "Hold a pane to pin it here.",
+  "home.pinHint.rightClick": "Right-click a pane to pin it here.",
+  "home.pinHint.dismiss": "Dismiss hint",
+  "home.group.newTab": "New tab in {name}",
   "home.sidebar.paneActionsTitle": "Tap for pane actions",
   "home.row.tabPosition": "tab {n}",
   "home.row.unseen": "unseen",
@@ -612,6 +653,8 @@ export const en = {
   "connection.session.allAria": "Showing every session. Switch session",
   "connection.server.title": "Machines",
   "connection.server.aria": "Host: {name}. Switch host",
+  "connection.server.show": "Show on the dashboard",
+  "connection.server.showLocked": "The machine you are on is always shown",
 
 
   // --- error (boot splash, route-level error recovery) ---
@@ -669,6 +712,7 @@ export const en = {
   "mirror.imageAlt": "Terminal graphics",
   "mirror.imageBadge": "[Image]",
   "mirror.imageMatchedByOrder": "matched by order, open History to check",
+  "mirror.turnImageCaption": "the agent's newest picture, from its log",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "just now",
@@ -784,6 +828,8 @@ export const en = {
   "apiError.tab.workspace_required": "No space was named for the new tab.",
   "apiError.launch.not_allowlisted": "That command isn't one of your launchers",
   "apiError.launch.pane_unknown": "That pane is gone, nothing was launched",
+  "apiError.folders.unknown": "That folder is no longer in Recent, so it can't be starred.",
+  "apiError.folders.favourites_full": "Favourites are full ({max}). Remove one first.",
   "apiError.workspace.create_failed": "The space couldn't be created: {reason}",
   "apiError.upload.too_large": "That file is too large, {maxMb} MB is the limit.",
   "apiError.upload.no_file": "No file was sent.",
@@ -833,6 +879,11 @@ export const en = {
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "Repository",
   "space.new.host.label": "Host",
+  "space.new.folders.favourites": "Favourites",
+  "space.new.folders.recent": "Recent",
+  "space.new.folders.use": "Use {path}",
+  "space.new.folders.star": "Add {folder} to favourites",
+  "space.new.folders.unstar": "Remove {folder} from favourites",
   "worktree.orOpenExisting": "Or open one that already exists",
   // --- apiError.update (POST /api/update refusals, M15/05) ---
   // --- settings.updateCard (the update card, M15/05) ---
@@ -1079,6 +1130,20 @@ export const en = {
   "settings.changes.depth.hint": "Folder levels below the pane's folder.",
   "settings.changes.depth.levels.one": "{count} level",
   "settings.changes.depth.levels.other": "{count} levels",
+
+  // --- pushTitle (a notification's headline, keyed by the code on the push) ---
+  //
+  // ONE KEY PER CODE in `lib/push-title-codes.ts`, spelled `pushTitle.<code>`. The bridge sends the
+  // English beside the code (bridge/push-titles.ts); the service worker shows THIS translation
+  // instead when the device has one (ADR 0074). `{agent}` is the agent's kind ("claude"), never
+  // translated. `{count}` in a `herd.*` title is always 2 or more, so these are not plural pairs.
+  "pushTitle.agent.blocked": "{agent} needs you",
+  "pushTitle.agent.done": "{agent} is done",
+  "pushTitle.herd.blocked": "{count} agents need you",
+  "pushTitle.herd.done": "{count} agents done",
+  "pushTitle.herd.mixed": "{count} agents need attention",
+  "pushTitle.update.available": "Collie update available",
+  "pushTitle.cache.cold_soon": "Cache goes cold in about {minutes} min",
 } as const;
 
 /** Every key that exists, as a union of string literals. The completeness contract. */

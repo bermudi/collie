@@ -12,10 +12,24 @@ export const ja: Dictionary = {
 
   // --- settings (page chrome) ---
   "settings.title": "設定",
+  "pane.agentStart.handed": "{agent} に引き継ぎました",
+  "transcript.tools.hidden.one": "{count} 件の操作を非表示。タップで表示",
+  "transcript.tools.hidden.other": "{count} 件の操作を非表示。タップで表示",
+  "settings.tools.title": "ツール呼び出し",
+  "settings.tools.description": "エージェントが実行した読み取り、検索、コマンド、編集を表示します。オフにすると発言だけが残ります。",
+  // --- settings sections ---
+  "settings.section.appearance.title": "外観",
+  "settings.section.appearance.blurb": "テーマ、言語、フォント",
+  "settings.section.device.title": "デバイス",
+  "settings.section.device.blurb": "触覚、音声、ゼンモード",
+  "settings.section.alerts.title": "通知",
+  "settings.section.alerts.blurb": "通知、サイレント時間",
+  "settings.section.system.title": "システム",
+  "settings.section.system.blurb": "更新、デバイス、クルー",
   "settings.nav.back": "戻る",
 
   // --- settings.theme ---
-  "settings.theme.title": "外観",
+  "settings.theme.title": "テーマ",
   "settings.theme.description": "システム設定に同期するか、明示的に指定します。",
   "settings.theme.option.system": "システム",
   "settings.theme.option.light": "ライト",
@@ -77,7 +91,7 @@ export const ja: Dictionary = {
   "settings.notify.done.hint": "エージェントがタスクを完了したとき",
   "settings.notify.updates.label": "アップデート",
   "settings.notify.updates.hint": "新しい Collie のリリースが存在するとき",
-  "settings.notify.cache.label": "キャッシュがまもなく失効します",
+  "settings.notify.cache.label": "キャッシュがまもなくコールドになります",
   "settings.notify.cache.hint":
     "ペインのプロンプトキャッシュが数分で期限切れになります。個別に監視しているペインも対象です。",
   "settings.notify.watched.title": "監視中のペイン",
@@ -215,6 +229,8 @@ export const ja: Dictionary = {
   "composer.controls.agent": "エージェント",
   "composer.controls.displayAria": "表示設定",
   "composer.controls.display": "表示",
+  "composer.controls.clear": "メッセージを消去",
+  "composer.controls.undoClear": "消去を元に戻す",
   "composer.sentPreview.label": "送信済み:",
   "composer.placeholder.gone": "ペインが存在しません",
   "composer.placeholder.readOnly": "読み取り専用です。権限がありません",
@@ -292,6 +308,9 @@ export const ja: Dictionary = {
   "chat.strips.show.panes": "ペインを表示（非表示: {panes}）",
   "chat.find.label": "出力内を検索",
   "chat.history.label": "会話履歴",
+  "chat.copyOutput.label": "出力をコピー",
+  "chat.copyOutput.done": "出力をクリップボードにコピーしました",
+  "chat.copyOutput.failed": "出力をコピーできませんでした",
   "chat.paneMenu.aria": "ペイン操作",
   "chat.header.openOverviewAria": "{workspace} の概要を開く{status}",
   "chat.header.statusAria": "（{label}）",
@@ -302,7 +321,7 @@ export const ja: Dictionary = {
   "chat.scrollback.noSessionReported":
     "{agent} のセッションが Herdr に報告されていません。Herdr 連携をインストールまたは更新し、このペインでエージェントを再起動してください。",
   "chat.scrollback.noSessionYet":
-    "{agent} reports its session to Herdr only after its first message, so there is no history yet. If this note stays after {agent} has replied, review its hooks with /hooks in {agent}, or update the Herdr integration and restart the agent.",
+    "{agent}は最初のメッセージの送信後にのみセッションをHerdrに報告するため、履歴はまだありません。{agent}が返信した後もこのメッセージが表示され続ける場合は、{agent}で/hooksを実行してフックを確認するか、Herdr連携を更新してエージェントを再起動してください。",
   "chat.fullReply.title": "返答の全文",
   "chat.fullReply.fromTranscript": "ログより",
   "chat.fullReply.showingTerminal": "ターミナルを表示中",
@@ -311,6 +330,11 @@ export const ja: Dictionary = {
   "chat.switcher.ariaNeedsYou": "ペインを切り替え、別のペインが対応を待っています",
   "chat.switcher.title": "ペインを切り替え",
   "chat.switcher.launch.here": "ここ",
+  "paneOrder.aria": "ペインの並び順",
+  "paneOrder.place": "場所",
+  "paneOrder.activity": "アクティビティ",
+  "paneOrder.recent": "新しい順",
+  "settings.paneOrder.description": "アクティビティは、最後に動きがあったペインを切り替えリストの先頭に置きます。場所は、ターミナルの並び順をそのまま保ちます。",
   "chat.status.feedbackSent": "フィードバックを送信しました",
   "chat.status.sent": "送信完了",
   "chat.status.menuChanged": "メニューが変更されました。更新中",
@@ -348,7 +372,7 @@ export const ja: Dictionary = {
 
   // --- paneSettings (one pane's own preferences; today the prompt-cache warning, ADR 0042) ---
   "paneSettings.title": "ペイン設定",
-  "paneSettings.cacheWatch.label": "このペインのキャッシュが失効する前に警告する",
+  "paneSettings.cacheWatch.label": "このペインのキャッシュがコールドになる前に警告する",
   "paneSettings.cacheWatch.hint": "有効期限が切れる約 {minutes} 分前",
   "paneSettings.cacheWatch.pushOff": "先に設定でこのデバイスの通知を有効にしてください。",
   "paneSettings.cacheWatch.globalOn": "設定によりすべてのペインについて警告されるため、このペインも対象に含まれます。",
@@ -370,6 +394,10 @@ export const ja: Dictionary = {
   "paneActions.focus.labelFallback": "ターミナルでフォーカス",
   "paneActions.focus.done": "ターミナルでフォーカスしました",
   "paneActions.focus.failed": "ターミナルでフォーカスできませんでした",
+  "paneActions.pin.label": "トップに固定",
+  "paneActions.unpin.label": "固定を解除",
+  "paneActions.pin.done": "トップに固定しました",
+  "paneActions.unpin.done": "固定を解除しました",
   "paneActions.empty.fallback": "このマルチプレクサにはペイン用のアクションがありません。",
   "paneActions.status.renamed": "名前を変更しました",
   "paneActions.status.labelCleared": "ラベルを消去しました",
@@ -404,7 +432,13 @@ export const ja: Dictionary = {
   "home.workspace.paneCount.one": "{count}ペイン",
   "home.workspace.paneCount.other": "{count}ペイン",
   "home.workspace.hidden": "非表示",
+  "home.machineHidden.show": "{name}のペインを表示",
   "home.sidebar.shells": "シェル",
+  "home.pinned.title": "固定済み",
+  "home.pinHint.hold": "ペインを長押しするとここに固定できます。",
+  "home.pinHint.rightClick": "ペインを右クリックするとここに固定できます。",
+  "home.pinHint.dismiss": "ヒントを閉じる",
+  "home.group.newTab": "{name}で新しいタブを開く",
   "home.sidebar.paneActionsTitle": "タップしてペイン操作を表示",
   "home.row.tabPosition": "タブ {n}",
   "home.row.unseen": "未読",
@@ -581,6 +615,8 @@ export const ja: Dictionary = {
   "connection.session.allAria": "全セッションを表示中。セッションを切り替え",
   "connection.server.title": "マシン",
   "connection.server.aria": "ホスト: {name}。ホストを切り替え",
+  "connection.server.show": "ダッシュボードに表示",
+  "connection.server.showLocked": "現在使用しているマシンは常に表示されます",
 
 
   // --- error (boot splash, route-level error recovery) ---
@@ -635,6 +671,7 @@ export const ja: Dictionary = {
   "mirror.imageAlt": "ターミナルグラフィックス",
   "mirror.imageBadge": "[画像]",
   "mirror.imageMatchedByOrder": "順序で対応付け。確認は履歴から",
+  "mirror.turnImageCaption": "エージェントのログから取得した最新の画像",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "たった今",
@@ -746,6 +783,8 @@ export const ja: Dictionary = {
   "apiError.tab.workspace_required": "新規タブのスペースが指定されていません。",
   "apiError.launch.not_allowlisted": "そのコマンドはランチャーに登録されていません",
   "apiError.launch.pane_unknown": "そのペインは見つかりません。何も起動されませんでした",
+  "apiError.folders.unknown": "そのフォルダーは「最近使った項目」にないため、お気に入りに追加できません。",
+  "apiError.folders.favourites_full": "お気に入りが上限（{max}）に達しています。先にお気に入りを1つ削除してください。",
   "apiError.workspace.create_failed": "スペースの作成に失敗しました: {reason}",
   "apiError.upload.too_large": "ファイルが大きすぎます。上限は {maxMb} MB です。",
   "apiError.upload.no_file": "ファイルが指定されていません。",
@@ -796,6 +835,11 @@ export const ja: Dictionary = {
   "space.new.tab.worktree": "ワークツリー",
   "space.new.repo.label": "リポジトリ",
   "space.new.host.label": "ホスト",
+  "space.new.folders.favourites": "お気に入り",
+  "space.new.folders.recent": "最近使った項目",
+  "space.new.folders.use": "{path}を使用",
+  "space.new.folders.star": "{folder}をお気に入りに追加",
+  "space.new.folders.unstar": "{folder}をお気に入りから削除",
   "worktree.orOpenExisting": "または既存のものを開く",
   // --- apiError.update (POST /api/update refusals, M15/05) ---
 
@@ -968,4 +1012,13 @@ export const ja: Dictionary = {
   "settings.changes.depth.hint": "ペインのフォルダーより下のフォルダー階層数。",
   "settings.changes.depth.levels.one": "{count} 階層",
   "settings.changes.depth.levels.other": "{count} 階層",
+
+  // --- pushTitle ---
+  "pushTitle.agent.blocked": "{agent} が対応待ちです",
+  "pushTitle.agent.done": "{agent} が完了しました",
+  "pushTitle.herd.blocked": "{count}件のエージェントが対応待ちです",
+  "pushTitle.herd.done": "{count}件のエージェントが完了しました",
+  "pushTitle.herd.mixed": "{count}件のエージェントに確認が必要です",
+  "pushTitle.update.available": "Collie のアップデートがあります",
+  "pushTitle.cache.cold_soon": "約{minutes}分後にキャッシュがコールドになります",
 };

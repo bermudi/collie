@@ -12,9 +12,10 @@ import {
 } from "lucide-react";
 import { useKeyboardOpen } from "@/hooks/use-keyboard";
 import { useSheetPull } from "@/hooks/use-sheet-pull";
-import { useSpaceActions } from "@/hooks/use-spaces";
+import { tabCreateKey, useSpaceActions } from "@/hooks/use-spaces";
 import { useNav } from "@/hooks/use-nav";
 import { useDashPrefs, openForCount } from "@/hooks/use-dash-prefs";
+import { useAgentStart } from "@/hooks/use-agent-start";
 import { useLaunchers } from "@/lib/launchers";
 import { buzz } from "@/lib/haptics";
 import { mirrorFont, useDisplayPrefs } from "@/hooks/use-display-prefs";
@@ -33,6 +34,7 @@ import { BottomSheet } from "@/components/ui/sheet";
 import { Collapse, CollapseSwap } from "@/components/ui/collapse";
 import { RouteHeader } from "@/components/app-header";
 import { HeaderStatus } from "@/components/header-status";
+import { AgentStart } from "@/components/agent-start";
 import { AnsiOutput } from "@/components/ansi-output";
 import { CardDock } from "@/components/card-dock";
 import { MIRROR_SPACE, MIRROR_INVERT, MUSE_MIRROR, segmentStyle } from "@/components/mirror-space";
@@ -75,6 +77,7 @@ import { panesOfTab } from "@/lib/pane-ordinal";
 import { useMuxCapability } from "@/lib/mux-capability";
 import { hasJournalAdapter, reportsSessionOnFirstPrompt } from "@/lib/journal-agents";
 import { paneRowKey, paneScope } from "@/lib/hosts";
+import { usePins } from "@/lib/pins";
 import { changesPath, historyPath, panePath, spacePath } from "@/lib/nav";
 import { isReadOnly, statusLabel } from "@/lib/types";
 import { usePairing } from "@/lib/pairing";
@@ -254,6 +257,10 @@ export function AgentChat({
   // so a mis-detected/mis-rendered dialog can always be driven by hand with the keys pad.
   const grammarsOn = !prefs.rawTerminal;
   const isShell = agent?.kind === "shell";
+  // A bare shell that just became an agent pane. The hook is the EDGE and nothing else: opening a
+  // pane that has been running Claude for an hour announces nothing, because this mount never
+  // watched it turn over (hooks/use-agent-start.ts).
+  const agentStart = useAgentStart(paneId, agent?.agent, isShell);
   // LINE 1 IS THE NAME, LINE 2 IS THE PLACE — the one rule every other surface follows
   // (lib/pane-name.ts). The header used to lead with the ADDRESS and never consult the terminal
   // title at all, so a pane the dashboard called "Collie playground sync check" was called
@@ -268,6 +275,10 @@ export function AgentChat({
     () => (agent === undefined ? [] : panesOfTab(agent, agents, shellPanes)),
     [agent, agents, shellPanes],
   );
+  // Every pane of the herd, for the pane menu's Pin to top row on both doors (lib/pins.ts reads it to
+  // tell a live pin from a dormant one), and this device's pins, for the switcher's Pinned section.
+  const herd = useMemo(() => [...agents, ...shellPanes], [agents, shellPanes]);
+  const pins = usePins();
   // This device may not type into agents: the backend rejects every write, so the composer drops to
   // read-only (and shows a banner). The mirror still polls (reading is fine). Either write gate puts
   // us here — the proxy-asserted allowlist, or a missing/rejected pairing credential — and the
@@ -738,6 +749,23 @@ export function AgentChat({
   function closeFind() {
     setFindOpen(false);
     setFindQuery("");
+  }
+
+  // Copy the pane's buffered terminal output to the clipboard, from the FROZEN snapshot the operator
+  // is looking at (`shown`, not the live props) so a poll landing mid-tap can't swap what gets
+  // copied. Prefer the unwrapped logical text — the buffer without the phone-width hard wraps, so a
+  // paste reads as real lines — and fall back to the display text when the agent reports no unwrapped
+  // form. `navigator.clipboard` is absent over plain HTTP (an insecure context, a supported deploy —
+  // see status-detail-sheet's copy), so this can reject; `canCopyOutput` keeps the row off that
+  // deploy, and the catch keeps a failure honest rather than claiming a copy that never happened.
+  const canCopyOutput = !!navigator.clipboard;
+  async function copyOutput() {
+    try {
+      await navigator.clipboard.writeText(shown.logicalText || shown.text);
+      setStatus(t("chat.copyOutput.done"), "success");
+    } catch {
+      setStatus(t("chat.copyOutput.failed"), "error");
+    }
   }
 
   // What the top of the buffer can offer — see the JSX for why these are mutually exclusive.
@@ -1616,6 +1644,13 @@ export function AgentChat({
             zen && "[padding-bottom:env(safe-area-inset-bottom)]",
           )}
         >
+          {/* THE HANDOFF. A shell pane became an agent pane, so the Collie mark flies out of the
+              header's own mark, blooms over the mirror and hands the pane to the agent's mark. It is
+              absolutely positioned against this region, holds no space and moves nothing (§2), and a
+              tap ends it at once. It marks a fact the poll has already found; it never predicts one. */}
+          {agentStart.started !== null && (
+            <AgentStart harness={agentStart.started} onDone={agentStart.clear} />
+          )}
           {/* THE ONE WAY OUT OF ZEN. A single floating affordance over the mirror rather than a
               strip, so "everything hides" stays literally true, and TOP-right so entering (the ⋮ that
               opened the sheet) and leaving happen in the same corner — opposite corners would make
@@ -1733,7 +1768,7 @@ export function AgentChat({
                     selected={agent.tabId}
                     onSelect={(id) => id && goToTab(id)}
                     onNewTab={newTab}
-                    creatingTab={creatingTab.has(agent.workspaceId)}
+                    creatingTab={creatingTab.has(tabCreateKey(agent.workspaceId, scope))}
                     allowAll={false}
                     scope={scope}
                     readOnly={readOnly}
@@ -1780,6 +1815,7 @@ export function AgentChat({
                     onRenamed={() => revalidator.revalidate()}
                     // Mirror closePane's success branch: closing the open pane returns Home, else revalidate.
                     onClosed={(id) => (id === paneId ? onBack() : revalidator.revalidate())}
+                    herd={herd}
                   />
                 )}
                 </div>
@@ -1970,6 +2006,16 @@ export function AgentChat({
                     blocks={blocks}
                     hideLeadingLines={hiddenMirrorLines}
                   />
+                  {/* THE NEWEST TURN'S PICTURE, RIGHT AFTER THE MIRROR (M39, #292). pi draws a
+                      picture by direct placement, which leaves only blank rows on the grid, so
+                      there is no row to put it at; it comes from the journal instead. Placement
+                      was decided between three (2026-09-26, after a live pi run): A, the full-reply
+                      card's slot above the mirror, is the top of pi's scrollback (pi renders
+                      inline), so the card sat out of sight; C, at the reply's own rows, needs a
+                      text probe too fragile for a two-letter reply; B, here, is what the
+                      bottom-pinned view shows a few rows under the reply. A direct child of the
+                      scroller, so ChatMessageList re-pins when it appears or its picture loads,
+                      and only while the operator is following the tail. */}
                 </>
               ) : (
                 <div className="py-16 text-center text-sm text-muted-foreground">
@@ -2243,6 +2289,9 @@ export function AgentChat({
             onSelect={switchToPane}
             tabs={tabs}
             servers={servers}
+            // This device's pins lead the sheet in a Pinned section (ADR 0070). The sheet itself
+            // stays switch-only: pinning is the pane menu's row, never a hold here.
+            pins={pins}
             // Shells fold on the same count rule Spaces uses: on a herd with dozens of bare shells
             // they'd otherwise bury the agents you opened this sheet to reach.
             shellsOpen={openForCount(dash.prefs.shellsOpen, shellPanes.length)}
@@ -2270,6 +2319,11 @@ export function AgentChat({
             launching={launching}
             launchOpen={openForCount(dash.prefs.launchOpen, launchers.length)}
             onLaunchOpenChange={dash.setLaunchOpen}
+            // Place or activity (ADR 0071), the operator's own standing choice, stored per device
+            // beside the two folds above. The sheet's toggle and the Settings row write this same
+            // value, so a person who taps it here finds it there.
+            order={dash.prefs.paneOrder}
+            onOrderChange={dash.setPaneOrder}
             className="px-0 py-1"
           />
         </BottomSheet>
@@ -2304,6 +2358,10 @@ export function AgentChat({
           onClosed={(id) => (id === paneId ? onBack() : revalidator.revalidate())}
           onFind={display ? openFind : undefined}
           onHistory={historyAvailable ? () => nav.down(historyPath(paneId, scope)) : undefined}
+          // Copy the buffered output — gated on there being output AND a clipboard to write to (absent
+          // over plain HTTP), so the row hides where it could only fail, the way find hides with no
+          // output. Same read-row family as find and history.
+          onCopyOutput={display && canCopyOutput ? copyOutput : undefined}
           // ZEN'S ONE ENTRY POINT, and the absence of this callback IS the gate — the sheet hides a
           // row it was given nothing for, exactly as it does for find and history. Gated twice: the
           // Settings toggle decides whether this phone offers zen at all, and `display` keeps it off
@@ -2320,6 +2378,9 @@ export function AgentChat({
           // already spent. It hands over to the sheet below in one React event, so the actions sheet
           // unmounts in the same commit the settings sheet mounts.
           onSettings={() => setDrawer("paneSettings")}
+          // Pin to top / Unpin, the last read row (ADR 0070). No `onPinChange`: the Pinned group is
+          // on the dashboard and in the switcher, not on this screen, so the sheet says it in a toast.
+          herd={herd}
         />
         {/* This pane's own settings — one switch today, the prompt-cache warning (ADR 0042). Scoped to
             the PANE's machine, because `?host=` there names where the pane lives; the preference itself

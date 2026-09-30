@@ -1,6 +1,7 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, replace } from "react-router";
 
 import { basePath } from "@/lib/base-path";
+import { pairLandingPath } from "@/lib/nav";
 import { listenForInAppOpen, markBooted, openPendingTarget, probeStandalone, seedColdEntry, type OpenGate } from "@/lib/nav-entry";
 import { isReloadInFlight } from "@/lib/pwa";
 import { UPDATE_MODE_HOLD, isReloadHeldBy, subscribeReloadHeld } from "@/lib/reload-guard";
@@ -12,6 +13,12 @@ import { DetailRoute } from "@/routes/detail";
 import { HistoryRoute } from "@/routes/history";
 import { ChangesRoute } from "@/routes/changes";
 import { SettingsRoute } from "@/routes/settings";
+import {
+  SettingsAlertsRoute,
+  SettingsAppearanceRoute,
+  SettingsDeviceRoute,
+  SettingsSystemRoute,
+} from "@/routes/settings-sections";
 import {
   devicesLoader,
   historyLoader,
@@ -67,9 +74,25 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomeRoute /> },
       { path: "space/:spaceId", element: <SpaceRoute /> },
-      // Settings carries the paired-device registry, so it gets its own loader — a revoke or a pair
-      // is then the app's standard mutation shape (api call → revalidate), with no second data path.
-      { path: "settings", loader: devicesLoader, element: <SettingsRoute /> },
+      // Settings is an INDEX of four sections (routes/settings.tsx). Its only loader is the pairing
+      // forward: the QR `collie pair` prints still names `/settings?pair=<code>`, and the form now
+      // lives on System. `replace`, as for `/pack` below, so Back does not land on the index and
+      // bounce forward again. No `pair`, no redirect, and the registry stays on System's loader.
+      {
+        path: "settings",
+        loader: ({ request }) => {
+          const target = pairLandingPath(new URL(request.url).search);
+          return target === null ? null : replace(target);
+        },
+        element: <SettingsRoute />,
+      },
+      { path: "settings/appearance", element: <SettingsAppearanceRoute /> },
+      { path: "settings/device", element: <SettingsDeviceRoute /> },
+      { path: "settings/alerts", element: <SettingsAlertsRoute /> },
+      // The System section carries the paired-device registry, so it gets the loader Settings used
+      // to hold — a revoke or a pair is then the app's standard mutation shape (api call →
+      // revalidate), with no second data path.
+      { path: "settings/system", loader: devicesLoader, element: <SettingsSystemRoute /> },
       // Named, so RootLayout can ask for THIS route's data by id (react-router hands back undefined
       // whenever it isn't the active route) — see the "last seen" note there.
       { id: PANE_ROUTE_ID, path: "pane/:paneId", loader: paneLoader, element: <DetailRoute /> },

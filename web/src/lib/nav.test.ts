@@ -3,6 +3,7 @@ import {
   changesCommitPath,
   homePath,
   isAncestor,
+  pairLandingPath,
   panePath,
   parentChain,
   readFrom,
@@ -69,6 +70,21 @@ describe("homePath", () => {
   it("carries a host as ?h=, before ?s=", () => {
     expect(homePath({ host: "badger" })).toBe("/?h=badger");
     expect(homePath({ host: "badger", session: "collie-demo" })).toBe("/?h=badger&s=collie-demo");
+  });
+});
+
+
+describe("pairLandingPath", () => {
+  // The QR `collie pair` prints names `/settings?pair=<code>`. The form is on System now, so the
+  // index forwards a code there with the whole query, scope included.
+  it("sends a pairing code to Settings → System with the query intact", () => {
+    expect(pairLandingPath("?pair=ABCD2345")).toBe("/settings/system?pair=ABCD2345");
+    expect(pairLandingPath("?h=badger&pair=ABCD2345")).toBe("/settings/system?h=badger&pair=ABCD2345");
+  });
+
+  it("leaves the index alone when there is no code", () => {
+    expect(pairLandingPath("")).toBeNull();
+    expect(pairLandingPath("?h=badger")).toBeNull();
   });
 });
 
@@ -198,8 +214,11 @@ describe("parentChain: what a cold deep link gets behind it", () => {
     ],
     ["/space/w1/changes/commit", "?repo=.&path=a.ts", ["/", "/space/w1", "/space/w1/changes", "/space/w1/changes/commit?repo=."]],
     ["/settings", "", ["/"]],
-    ["/settings/updates", "", ["/", "/settings"]],
-    ["/crew", "", ["/"]],
+    // Both are opened from the System section now, so a cold deep link gets the index AND that
+    // section behind it — two taps back to home, matching the two pushes that would have got here.
+    ["/settings/updates", "", ["/", "/settings", "/settings/system"]],
+    ["/settings/device", "", ["/", "/settings"]],
+    ["/crew", "", ["/", "/settings", "/settings/system"]],
     ["/nowhere", "", []],
   ])("%s%s → %j", (pathname, search, expected) => {
     expect(parentChain(pathname, search)).toEqual(expected);

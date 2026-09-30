@@ -30,7 +30,9 @@ import { TMUX_BINARY_OPTION } from "./mux/tmux/adapter.ts";
 import type { MuxAdapter } from "./mux/types.ts";
 import { ZELLIJ_BINARY_OPTION } from "./mux/zellij/adapter.ts";
 import { NotificationCoordinator, makeNotifySink, type NotifyClock } from "./notifications.ts";
+import { pushTitle } from "./push-titles.ts";
 import { NotifyPrefsStore } from "./notify-prefs.ts";
+import { FolderStore } from "./folders.ts";
 import { filePairingIo, PairingStore } from "./pairing.ts";
 import { Push } from "./push.ts";
 import { pluginRoot } from "./root.ts";
@@ -140,6 +142,12 @@ const paneCache =
 const cacheWatch = new CacheWatchStore(cfg);
 await cacheWatch.load();
 
+// The folders a new space was created in on THIS machine, and the ones the operator starred — the
+// new-space sheet's list (#289, bridge/folders.ts). One per machine, whatever the session. Loading
+// writes nothing: the file appears on the first create with a folder or the first star.
+const folders = new FolderStore(cfg);
+await folders.load();
+
 // The warden that judges them. A DEPS LITERAL WITH NO LOGIC IN IT, for the reason
 // `bridge/update.ts`'s monitor is built the same way: there is no `bridge/index.test.ts`, so every gate
 // is proved in `bridge/cache/warden.test.ts` instead and this line must hold nothing that could be
@@ -195,8 +203,10 @@ const updateMonitor = new UpdateMonitor({
       tag: "collie:update",
       // No command in the body — the tap opens Settings (target below), and the update banner / linked
       // release page carry the location-independent Herdr actions. Keeps this off the cwd-dependent path.
-      title: "Collie update available",
-      body: `Version ${latest} is available`,
+        // No command in the body — the tap opens Settings (target below), and the update banner / linked
+        // release page carry the location-independent Herdr actions. Keeps this off the cwd-dependent path.
+        ...pushTitle("update.available"),
+        body: `Version ${latest} is available`,
       target: "settings",
     }),
 });
@@ -364,6 +374,7 @@ const server = startServer({
   journals: journals ?? undefined,
   cache: paneCache ?? undefined,
   cacheWatch,
+  folders,
   pairing,
 });
 

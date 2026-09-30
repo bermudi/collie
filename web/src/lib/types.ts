@@ -466,6 +466,15 @@ export interface TranscriptEntry {
   ts: string;
   role: "user" | "assistant" | "summary" | "note";
   parts: TranscriptPart[];
+  /**
+   * The agent rewound past this turn, so it is not on the session's current branch. HIDE IT.
+   *
+   * Only pi sets it: pi keeps every branch in one log and each row names its parent, so the reader
+   * can tell. Absent on every other harness and absent when false. The reader keeps the turn rather
+   * than dropping it, because a page cursor still has to resolve its uuid, so hiding is this side's
+   * job (`bridge/journal/types.ts` carries the long reasoning).
+   */
+  abandoned?: true;
 }
 
 /** A file's state against HEAD, staged and unstaged together (ADR 0065). `?` = untracked. */
@@ -825,6 +834,20 @@ export interface Launcher {
  */
 export interface LaunchersResponse {
   launchers: Launcher[];
+  home: string;
+}
+
+/**
+ * GET /api/folders, and the answer to POST /api/folders/star — ONE host's folder list for the
+ * new-space sheet (#289), read off that machine's own `folders.json`. `recent` is newest first (at
+ * most eight, only folders a space was created in), `favourites` in starred order (at most twelve),
+ * and the two never overlap. `home` is that host's home dir, never an entry, for shortening a folder
+ * to `~/…` without the client knowing which machine answered. A host on an older version answers
+ * 404, which the sheet reads as "no list" and never as an error.
+ */
+export interface FoldersResponse {
+  recent: string[];
+  favourites: string[];
   home: string;
 }
 

@@ -1,17 +1,17 @@
 {
-  "version": "1.13.3",
+  "version": "1.14.2",
   "platforms": {
     "linux-x64": {
-      "url": "https://github.com/AltanS/collie/releases/download/v1.13.3/collie-1.13.3-linux-x64.tar.gz",
-      "sha256": "67b417336f0f98aeefcbe8ce85b13e028b77982dcb4b780f6449eeeb47baacc9"
+      "url": "https://github.com/AltanS/collie/releases/download/v1.14.2/collie-1.14.2-linux-x64.tar.gz",
+      "sha256": "cfdd506ad534f5799f69966a2686a92db2f2f96b95ea9837ac8da20deb0885c6"
     },
     "linux-arm64": {
-      "url": "https://github.com/AltanS/collie/releases/download/v1.13.3/collie-1.13.3-linux-arm64.tar.gz",
-      "sha256": "10498b70fd9b46e02dda3c126829df64a4ebbcd42ce034a5a96a993f7b31c231"
+      "url": "https://github.com/AltanS/collie/releases/download/v1.14.2/collie-1.14.2-linux-arm64.tar.gz",
+      "sha256": "2cc93e1e8cf1ceedd11178e09f5ced2cb2b3b74849fdf773df5dd2ba864ff569"
     },
     "darwin-arm64": {
-      "url": "https://github.com/AltanS/collie/releases/download/v1.13.3/collie-1.13.3-macos-arm64.tar.gz",
-      "sha256": "cf272dc08467020fc0d7584d06ef832232f482ef325eedb454f1db64f74fc122"
+      "url": "https://github.com/AltanS/collie/releases/download/v1.14.2/collie-1.14.2-macos-arm64.tar.gz",
+      "sha256": "4fa88e2c9efcd6fb4d5f7fbd1cd09f1b988d2e66f377bf50a2888a190992847d"
     }
   }
 }

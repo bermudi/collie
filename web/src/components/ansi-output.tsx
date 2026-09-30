@@ -128,10 +128,32 @@ function preClass(
   const native = rendersNativeMirror(agent, nativeMirror);
   return cn(
     "m-0 font-mono leading-[1.25] tracking-normal text-foreground [font-variant-ligatures:none]",
+    // Opt the mirror back INTO text selection, so an operator can long-press a line and Copy it
+    // straight off the phone. An installed iOS PWA (display:standalone, which Collie is) suppresses
+    // long-press selection app-wide unless the element sets -webkit-user-select:text — the exact
+    // inverse of the `select-none [-webkit-touch-callout:none]` the strip pills carry to STOP the
+    // loupe. Both spellings, like those pills, so the -webkit prefix is present whatever the build
+    // does. The pane menu's "Copy output" is the one-tap path (robust while output keeps arriving);
+    // this is the direct-selection one, best on a pane you have scrolled up to freeze.
+    "select-text [-webkit-user-select:text]",
     native ? MUSE_MIRROR : MIRROR_SPACE,
     native ? null : MIRROR_INVERT,
     wrap
-      ? "whitespace-pre-wrap break-words"
+      ? // `text-pretty` (#302): a 133-column agent row rewraps at phone width, and greedy breaking
+        // strands one word on its last line ("form." alone under a bullet). Pretty pulls a word
+        // down instead. Line breaking only: the text nodes, find offsets, link hrefs and copied
+        // text are untouched, and no capture screen gained or lost a line, so the mirror's height
+        // and the tail-follow hold.
+        //
+        // WHERE IT ACTS, measured on 2026-09-27 at 390px over the 212 Claude, Codex, Muse and Grok
+        // screens in `fixtures/panes`: Chromium changes the breaks on 35, WebKit 26.5 on 12, and
+        // the stranded words drop from 220 to 141 and to 217. WebKit drops `pretty` for the whole
+        // <pre> once any row in it cannot break to fit (a rule wider than the phone, a status line
+        // padded with spaces, a table run), and nearly every screen holds one. Safari before 26
+        // ignores the value and breaks greedily. `web/e2e/issue-302.spec.ts` pins the prose case in
+        // both engines. Don't add `hyphens-none` for "multi-" / "session": `hyphens` governs soft
+        // and automatic hyphenation, never the break a printed hyphen allows.
+        "whitespace-pre-wrap break-words text-pretty"
       : // Horizontal pan for wide TUI tables. `overflow-x-auto` forces `overflow-y` to compute to
         // `auto` (CSS overflow quirk), and a flex item with non-visible overflow may shrink below its
         // content height — the <pre> then becomes the vertical scroller and ChatMessageList's

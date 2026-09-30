@@ -18,10 +18,13 @@
 //   {"type":"user",      "message":{"role":"user","content":"..." | [ {type:"tool_result",...} ]}, ...}
 //   {"type":"assistant", "message":{"role":"assistant","content":[ {type:"text"|"thinking"|"tool_use"} ]}}
 //   plus bookkeeping rows we ignore (mode, permission-mode, ai-title, file-history-*, queue-operation…).
-// Human turns carry a STRING content; a `user` row whose content is a LIST is tool-result traffic,
-// not something the user typed — we fold those into the tool call that produced them rather than
-// rendering 705 fake "user" turns. `isSidechain` marks subagent traffic (dropped by default);
-// `isCompactSummary` marks the summary Claude writes when a session is compacted.
+// Human turns carry a STRING content; a `user` row whose content is a LIST is usually tool-result
+// traffic, not something the user typed — we fold those into the tool call that produced them rather
+// than rendering fake "user" turns. `isMeta` marks a row the operator did not write. Most are
+// addressed to the model (a skill body, an attached image's source path, the local-command caveat)
+// and are dropped; a prompt Claude sent on its own (`promptSource: "system"`) becomes a note.
+// `isSidechain` marks subagent traffic (dropped by default); `isCompactSummary` marks the summary
+// Claude writes when a session is compacted.
 
 import { readdir, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -29,10 +32,32 @@ import { dirname, join } from "node:path";
 import { observedClaim, type Sourced } from "../cache/claims.ts";
 import type { CacheProbe } from "../cache/engine.ts";
 import type { JsonObject, JsonValue } from "../json.ts";
+import {
+  createUnknownCounter,
+  type KnownTypes,
+  NO_CHANGE,
+  noteBlockTypes,
+  parseWith,
+  reduction,
+  rememberPending,
+  type PendingTool,
+  type Reduction,
+  type RowReducer,
+} from "./reduce.ts";
 import { asRecord, asText, probeTail, tokenCount } from "./cache-probe.ts";
 import { claudeResets, lastTwoTurns } from "./claude-resets.ts";
-import { containedRealpath, exists, head, loadTail, rootList, statFile, tailBytes } from "./files.ts";
+import {
+  containedRealpath,
+  exists,
+  head,
+  loadTail,
+  readSinceFile,
+  rootList,
+  statFile,
+  tailBytes,
+} from "./files.ts";
 import { clamp, type Clamped, MAX_RESULT_CHARS, MAX_TEXT_CHARS, stripAnsi, summarizeToolInput } from "./text.ts";
+import { classifyToolCall, type Hunk, type ToolCall } from "./tool-call.ts";
 import type {
   AgentSessionRef,
   JournalAdapter,
@@ -118,14 +143,65 @@ function toolResultText(content: JsonValue | undefined): string {
 }
 
 /** A `tool` part's answered result — {@link Clamped} plus the error flag the result row carried. */
-type ToolResult = Clamped & { isError?: boolean };
+type ToolResult = Clamped & { isError?: boolean; denied?: boolean };
+
+/**
+ * An error result that is a REFUSAL, not a failure.
+ *
+ * Claude marks both with `is_error: true`, so the flag alone cannot tell "the command exited 1" from
+ * "the person said no". Only the text can, and these are the phrasings observed in real logs (Claude
+ * Code 2.1.146 to 2.1.284). A phrasing this misses degrades to `isError`, which is the old behaviour.
+ */
+const REFUSED =
+  /The user doesn't want to proceed|Request interrupted by user for tool use|user rejected|was rejected|dismissed the question/i;
 
 /** One row's `tool_result` payload, folded onto the call it answers. */
 function toolResult(text: string, isError: boolean): ToolResult {
   const result: ToolResult = clamp(text, MAX_RESULT_CHARS);
   // Assigned, never conditionally spread: `isError` is ABSENT when false, not `false`.
   if (isError) result.isError = true;
+  if (isError && REFUSED.test(text)) result.denied = true;
   return result;
+}
+
+/**
+ * Enrich a classified call from the row's `toolUseResult`, which is where Claude records what the
+ * call actually DID rather than what it was asked to do.
+ *
+ * Only an edit and a command carry anything worth reading there: `structuredPatch` is the diff Claude
+ * computed against the file it wrote, and it is strictly better than anything reconstructable from
+ * the input. The function MUTATES `call`, which already sits in an emitted entry — the same
+ * in-place fold the result text uses, and for the same reason.
+ */
+function enrichCall(call: ToolCall, raw: JsonValue | undefined): void {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return;
+  if (call.kind === "edit") {
+    const patch = raw.structuredPatch;
+    if (Array.isArray(patch) && patch.length > 0) {
+      const hunks: Hunk[] = [];
+      for (const h of patch) {
+        if (h === null || typeof h !== "object" || Array.isArray(h)) continue;
+        const lines = Array.isArray(h.lines) ? h.lines.filter((l): l is string => typeof l === "string") : [];
+        if (lines.length === 0) continue;
+        hunks.push({
+          header: `@@ -${String(h.oldStart ?? 0)},${String(h.oldLines ?? 0)} +${String(h.newStart ?? 0)},${String(h.newLines ?? 0)} @@`,
+          lines,
+        });
+      }
+      if (hunks.length > 0) {
+        const all = hunks.flatMap((h) => h.lines);
+        call.diff = hunks;
+        call.added = all.filter((l) => l.startsWith("+")).length;
+        call.removed = all.filter((l) => l.startsWith("-")).length;
+      }
+    }
+    // A Write against nothing is a NEW file. `originalFile` absent or empty says so, and it is the
+    // only signal here: the input looks identical either way.
+    if (typeof raw.originalFile !== "string" || raw.originalFile === "") call.created = true;
+  } else if (call.kind === "execute") {
+    const code = raw.exitCode ?? raw.exit_code ?? raw.returnCode;
+    if (typeof code === "number" && Number.isFinite(code)) call.exitCode = code;
+  }
 }
 
 /** A log line, once JSON.parse has admitted it is an object at all. */
@@ -148,46 +224,139 @@ export function parseClaudeTranscript(
   text: string,
   opts: { includeSidechains?: boolean } = {},
 ): TranscriptEntry[] {
-  const entries: TranscriptEntry[] = [];
-  // tool_use id → the part awaiting its result, so a `tool_result` row lands on the call that made it.
-  const pendingTools = new Map<string, Extract<TranscriptPart, { kind: "tool" }>>();
+  return parseWith(createClaudeReducer(opts), text);
+}
 
-  for (const line of text.split("\n")) {
-    if (line.trim() === "") continue;
+/**
+ * Every row type and content-block type this adapter has MET, rendered or dropped (`reduce.ts` §
+ * "what a reducer reports about what it could not read"). Anything else is counted and named.
+ *
+ * Measured on 2026-09-30 over the 500 newest session files in `~/.claude/projects`, which is the
+ * whole inventory those files carry; `continued-in` and `summary` are added from the grammar above,
+ * which reads both and which older logs carry.
+ *
+ * `image` IS DROPPED, and it is listed anyway: five of them across those 500 files, and a known list
+ * says "we have looked at this". A pasted picture in a Claude turn therefore never reaches the phone
+ * even though `TranscriptPart` has a place for it (pi's adapter fills it). That is a gap with a name,
+ * and a gap with a name is not drift — it does not belong in a counter that means "nobody has looked
+ * at this yet".
+ *
+ * There is no role list: Claude decides a row's kind with the row's own `type`, and `message.role`
+ * merely repeats it (measured: `user` and `assistant`, nothing else, in 84,525 rows). Nothing here
+ * dispatches on it, so there is nothing it could fail to recognise.
+ */
+const CLAUDE_KNOWN: KnownTypes = {
+  rows: [
+    // Speech, and the two rows the grammar above reads for something other than speech.
+    "user",
+    "assistant",
+    "continued-in",
+    "summary",
+    // Bookkeeping, in the order the 2026-09-30 sweep counted it.
+    "attachment",
+    "queue-operation",
+    "last-prompt",
+    "atis-latch",
+    "system",
+    "mode",
+    "permission-mode",
+    "custom-title",
+    "agent-name",
+    "ai-title",
+    "file-history-snapshot",
+    "file-history-delta",
+    "cost-state",
+    "fork-context-ref",
+    "started",
+    "result",
+    "launched",
+  ],
+  roles: [],
+  parts: ["text", "thinking", "tool_use", "tool_result", "image"],
+};
+
+/**
+ * The same reading, one row at a time (see `reduce.ts`).
+ *
+ * The loop this replaces was already a reducer wearing a `for`: `pendingTools` was carried across
+ * rows, and a `tool_result` MUTATED a part inside a turn the loop had already pushed. So the state a
+ * reducer needs is the state the loop always kept, and the only genuinely new thing here is that the
+ * mutation gets REPORTED — under a tail that turn is on somebody's screen.
+ */
+export function createClaudeReducer(opts: { includeSidechains?: boolean } = {}): RowReducer {
+  // tool_use id → the part awaiting its result and the turn it went out in, so a `tool_result` row
+  // lands on the call that made it and can name where that call is drawn.
+  const pendingTools = new Map<string, PendingTool>();
+  // What this reducer met and had no branch for, asked for once per session by the canary.
+  const unknown = createUnknownCounter(CLAUDE_KNOWN);
+
+  // A nested `function` rather than a method on the returned object: the body below is the old loop
+  // body at the indentation it always had, so this refactor is readable as the move it is.
+  function push(line: string): Reduction {
+    const entries: TranscriptEntry[] = [];
+    const changed = new Set<string>();
+    if (line.trim() === "") return NO_CHANGE;
     let parsed: JsonValue;
     try {
       // SAFETY: `JSON.parse` output IS a JsonValue by construction — string/number/boolean/null or
       // an array/object of those. Naming it here is what keeps every field read below checked.
       parsed = JSON.parse(line) as JsonValue;
     } catch {
-      continue; // partial trailing write, or the clipped first line of a tail read
+      return NO_CHANGE; // partial trailing write, or the clipped first line of a tail read
     }
     // A line that parses to a scalar (or a bare `null`, which used to reach `.type` and THROW) has
     // no row shape at all — skip it exactly as an unparseable line is skipped.
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) continue;
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return NO_CHANGE;
     const row: RawRow = parsed;
+    // `isMeta`: the operator did not write this row. Measured on Claude Code 2.1.146 to 2.1.283, a
+    // meta row that also carries `promptSource: "system"` is a prompt Claude sent on its own: another
+    // session's message, a scheduled or /loop wake-up, the continuation after a usage limit. The
+    // turn after it answers it, so it stays, as a note and never as "You". Every other meta row is
+    // addressed to the model (a skill body, an image's source path, a caveat) and is dropped.
+    if (row.isMeta === true && row.promptSource !== "system") return NO_CHANGE;
     const type = row.type;
-    if (type !== "user" && type !== "assistant") continue;
-    if (row.isSidechain === true && !opts.includeSidechains) continue;
+    // At the READ, not in the branch that declined: `CLAUDE_KNOWN.rows` holds every name below and
+    // the counter drops those, so a type nobody has listed is the one thing that lands in the tally.
+    unknown.row(type);
+    // EVERYTHING ELSE IS BOOKKEEPING, and it is a long list. Measured over 462 real session files on
+    // 2026-09-30: `attachment`, `last-prompt`, `atis-latch`, `file-history-snapshot`, `mode`,
+    // `permission-mode`, `ai-title`, `cost-state`, `queue-operation`, and `system` with subtypes
+    // `turn_duration` and `stop_hook_summary`. None of it is conversation and all of it would be
+    // noise on a phone. That list is a sample of the kinds; the COMPLETE inventory, including the
+    // rows the 2026-09-30 sweep found and this sentence predates, is `CLAUDE_KNOWN` above.
+    //
+    // The one row anybody has argued for is `system` / `subtype: "compact_boundary"`, 281 of them
+    // across those files, which is where Claude's own UI draws its compaction divider. It stays
+    // dropped, and the reason is the pairing: those 281 boundaries come with exactly 281 `user` rows
+    // carrying `isCompactSummary`, which this reducer keeps and gives `role: "summary"`. So a
+    // compaction is already visible and already set apart from speech; the boundary row would add a
+    // second mark for the same event, and widening this gate to admit it means admitting a subtype
+    // test into the one line that keeps 1,060 `attachment` rows off the screen.
+    if (type !== "user" && type !== "assistant") return NO_CHANGE;
+    if (row.isSidechain === true && !opts.includeSidechains) return NO_CHANGE;
 
     const message = row.message;
-    if (message === null || message === undefined || typeof message !== "object" || Array.isArray(message)) continue;
+    if (message === null || message === undefined || typeof message !== "object" || Array.isArray(message)) return NO_CHANGE;
     const content = message.content;
+    // The block walk below is an `else if` chain over four types; this is where a fifth is counted.
+    noteBlockTypes(unknown, content);
     const uuid = typeof row.uuid === "string" ? row.uuid : "";
     const ts = typeof row.timestamp === "string" ? row.timestamp : "";
     const parts: TranscriptPart[] = [];
-    // Set by a `user` row whose string content turns out to be injected plumbing rather than speech.
-    let roleOverride: "note" | undefined;
+    // Set by a `user` row that is not the operator's speech: a prompt Claude sent on its own (the
+    // only meta row left here), or string content that turns out to be injected plumbing.
+    let roleOverride: "note" | undefined = row.isMeta === true ? "note" : undefined;
 
     if (typeof content === "string") {
       // A string content is the HUMAN-turn carrier — but Claude Code also routes injected plumbing
       // through it, so classify before believing it (see classifyUserText).
       const classified = classifyUserText(content);
-      if (classified === null) continue;
+      if (classified === null) return NO_CHANGE;
       if (classified.role === "note") roleOverride = "note";
       parts.push({ kind: "text", ...clamp(classified.text, MAX_TEXT_CHARS) });
     } else if (Array.isArray(content)) {
       for (const b of content) {
+        // A `continue` over the BLOCK, not the row: the other blocks of this turn still count.
         if (b === null || typeof b !== "object" || Array.isArray(b)) continue;
         if (b.type === "text" && typeof b.text === "string") {
           if (b.text.trim() !== "")
@@ -196,12 +365,21 @@ export function parseClaudeTranscript(
           if (b.thinking.trim() !== "")
             parts.push({ kind: "thinking", ...clamp(stripAnsi(b.thinking), MAX_TEXT_CHARS) });
         } else if (b.type === "tool_use") {
+          const name = typeof b.name === "string" ? b.name : "tool";
+          const summary = summarizeToolInput(b.input);
           const part: Extract<TranscriptPart, { kind: "tool" }> = {
             kind: "tool",
-            name: typeof b.name === "string" ? b.name : "tool",
-            summary: summarizeToolInput(b.input),
+            name,
+            summary,
+            call: classifyToolCall(name, b.input, summary),
           };
-          if (typeof b.id === "string") pendingTools.set(b.id, part);
+          if (typeof b.id === "string") {
+            part.id = b.id;
+            // The turn is named here, before it exists, because `uuid` is read off the row above and
+            // the part is already the object the turn will carry. `rememberPending` is what keeps an
+            // orphan call from growing this map for the life of a session.
+            rememberPending(pendingTools, b.id, { part, uuid });
+          }
           parts.push(part);
         } else if (b.type === "tool_result") {
           // Fold onto the call that produced it. The awaited part is MUTATED in place — it already
@@ -213,7 +391,12 @@ export function parseClaudeTranscript(
           const resultText = stripAnsi(toolResultText(b.content));
           if (target) {
             pendingTools.delete(id);
-            target.result = toolResult(resultText, b.is_error === true);
+            target.part.result = toolResult(resultText, b.is_error === true);
+            // `toolUseResult` rides on the ROW, not on the content block: it is Claude's own record of
+            // what the call did, and it is the only place a diff or an exit code ever appears.
+            if (target.part.call) enrichCall(target.part.call, row.toolUseResult);
+            // The mutation above landed in a turn that went out rows ago. Name it.
+            changed.add(target.uuid);
           } else if (resultText.trim() !== "") {
             // Orphan result (its call fell outside a tail-read window) — keep it, unattached, so the
             // window never silently drops output.
@@ -228,7 +411,11 @@ export function parseClaudeTranscript(
       }
     }
 
-    if (parts.length === 0) continue; // bookkeeping row with nothing to show
+    // A row with nothing to SHOW, which is not the same as a row that did nothing: the common case
+    // here is a `tool_result` row whose result folded onto a call in an earlier turn, so it adds no
+    // turn of its own and has still changed one. `NO_CHANGE` here would drop that report on the floor
+    // and leave the folded result invisible to a tail, which is the one fault this spec exists to fix.
+    if (parts.length === 0) return reduction(entries, changed);
     const role: TranscriptEntry["role"] =
       row.isCompactSummary === true
         ? "summary"
@@ -236,9 +423,10 @@ export function parseClaudeTranscript(
           ? "assistant"
           : (roleOverride ?? "user");
     entries.push({ uuid, ts, role, parts });
+    return reduction(entries, changed);
   }
 
-  return entries;
+  return { push, unknowns: unknown.tally };
 }
 
 /**
@@ -528,6 +716,17 @@ export class ClaudeTranscriptSource implements TranscriptSource {
   stat = statFile;
 
   load = loadTail;
+
+  /**
+   * The live read, and the hand-over comes free with it.
+   *
+   * `resolve` already follows `continued-in` to the log the conversation moved to, so a hand-over
+   * shows up here as the KEY changing under a cursor taken on the old one. The cursor carries a hash
+   * of the key it was taken on, so it stops matching, and the read resets — which is the truth: the
+   * new log is a new file with its own byte offsets, and the turns in it are not an append to the
+   * turns in the old one. No hand-over code lives in this method, and none should.
+   */
+  readSince = readSinceFile;
 }
 
 /**
@@ -542,6 +741,7 @@ export function claudeJournal(roots: string | readonly string[]): JournalAdapter
     agent: "claude",
     source,
     parse: (text) => parseClaudeTranscript(text),
+    reducer: () => createClaudeReducer(),
     cacheProbe: (ref) => claudeCacheProbe(source, ref),
   };
 }

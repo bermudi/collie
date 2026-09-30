@@ -12,6 +12,20 @@ export const es: Dictionary = {
 
   // --- settings (page chrome) ---
   "settings.title": "Ajustes",
+  "pane.agentStart.handed": "Entregado a {agent}",
+  "transcript.tools.hidden.one": "{count} paso oculto, toca para mostrarlo",
+  "transcript.tools.hidden.other": "{count} pasos ocultos, toca para mostrarlos",
+  "settings.tools.title": "Llamadas a herramientas",
+  "settings.tools.description": "Muestra las lecturas, búsquedas, comandos y ediciones que ejecutó un agente. Desactivado, el hilo solo muestra lo que dijo.",
+  // --- settings sections ---
+  "settings.section.appearance.title": "Apariencia",
+  "settings.section.appearance.blurb": "Tema, idioma, fuentes",
+  "settings.section.device.title": "Dispositivo",
+  "settings.section.device.blurb": "Vibración, voz, modo zen",
+  "settings.section.alerts.title": "Avisos",
+  "settings.section.alerts.blurb": "Notificaciones, horas de silencio",
+  "settings.section.system.title": "Sistema",
+  "settings.section.system.blurb": "Actualizaciones, dispositivos, crew",
   "settings.nav.back": "Atrás",
 
   // --- settings.theme ---
@@ -217,6 +231,8 @@ export const es: Dictionary = {
   "composer.controls.agent": "Agente",
   "composer.controls.displayAria": "Ajustes de pantalla",
   "composer.controls.display": "Pantalla",
+  "composer.controls.clear": "Borrar mensaje",
+  "composer.controls.undoClear": "Deshacer borrado",
   "composer.sentPreview.label": "Enviado:",
   "composer.placeholder.gone": "El panel ya no existe",
   "composer.placeholder.readOnly": "Solo lectura: dispositivo no autorizado",
@@ -295,6 +311,9 @@ export const es: Dictionary = {
   "chat.strips.show.panes": "Mostrar paneles. {panes} ocultos.",
   "chat.find.label": "Buscar en la salida",
   "chat.history.label": "Historial de conversación",
+  "chat.copyOutput.label": "Copiar salida",
+  "chat.copyOutput.done": "Salida copiada al portapapeles",
+  "chat.copyOutput.failed": "No se pudo copiar la salida",
   "chat.paneMenu.aria": "Acciones del panel",
   "chat.header.openOverviewAria": "Abrir vista general de {workspace}{status}",
   "chat.header.statusAria": ": {label}",
@@ -305,7 +324,7 @@ export const es: Dictionary = {
   "chat.scrollback.noSessionReported":
     "{agent} no ha registrado ninguna sesión en Herdr. Instala o actualiza la integración de Herdr correspondiente y reinicia el agente en este panel.",
   "chat.scrollback.noSessionYet":
-    "{agent} reports its session to Herdr only after its first message, so there is no history yet. If this note stays after {agent} has replied, review its hooks with /hooks in {agent}, or update the Herdr integration and restart the agent.",
+    "{agent} informa de su sesión a Herdr solo después de su primer mensaje, por lo que todavía no hay historial. Si esta nota continúa después de que {agent} haya respondido, revise sus enlaces con /hooks en {agent}, o actualice la integración de Herdr y reinicie el agente.",
   "chat.fullReply.title": "Respuesta completa",
   "chat.fullReply.fromTranscript": "desde el registro",
   "chat.fullReply.showingTerminal": "mostrando la terminal",
@@ -314,6 +333,11 @@ export const es: Dictionary = {
   "chat.switcher.ariaNeedsYou": "Cambiar panel, otro panel te necesita",
   "chat.switcher.title": "Cambiar panel",
   "chat.switcher.launch.here": "aquí",
+  "paneOrder.aria": "Orden de los paneles",
+  "paneOrder.place": "Lugar",
+  "paneOrder.activity": "Actividad",
+  "paneOrder.recent": "Más reciente primero",
+  "settings.paneOrder.description": "Actividad pone arriba el panel donde pasó algo por última vez. Lugar mantiene el orden que tiene tu terminal.",
   "chat.status.feedbackSent": "Comentarios enviados",
   "chat.status.sent": "Enviado",
   "chat.status.menuChanged": "Menú modificado: recargando",
@@ -374,6 +398,10 @@ export const es: Dictionary = {
   "paneActions.focus.labelFallback": "Enfocar en el terminal",
   "paneActions.focus.done": "Enfocado en el terminal",
   "paneActions.focus.failed": "No se pudo enfocar en el terminal",
+  "paneActions.pin.label": "Fijar arriba",
+  "paneActions.unpin.label": "Desfijar",
+  "paneActions.pin.done": "Fijado arriba",
+  "paneActions.unpin.done": "Desfijado",
   "paneActions.empty.fallback": "Este multiplexor no admite acciones sobre paneles.",
   "paneActions.status.renamed": "Renombrado",
   "paneActions.status.labelCleared": "Etiqueta eliminada",
@@ -408,7 +436,13 @@ export const es: Dictionary = {
   "home.workspace.paneCount.one": "{count} panel",
   "home.workspace.paneCount.other": "{count} paneles",
   "home.workspace.hidden": "oculto",
+  "home.machineHidden.show": "Mostrar los paneles de {name}",
   "home.sidebar.shells": "Shells",
+  "home.pinned.title": "Fijado",
+  "home.pinHint.hold": "Mantenga presionado un panel para fijarlo aquí.",
+  "home.pinHint.rightClick": "Haga clic derecho en un panel para fijarlo aquí.",
+  "home.pinHint.dismiss": "Descartar sugerencia",
+  "home.group.newTab": "Nueva pestaña en {name}",
   "home.sidebar.paneActionsTitle": "Ver acciones del panel",
   "home.row.tabPosition": "pestaña {n}",
   "home.row.unseen": "sin ver",
@@ -586,6 +620,8 @@ export const es: Dictionary = {
   "connection.session.allAria": "Mostrando todas las sesiones. Cambiar sesión",
   "connection.server.title": "Máquinas",
   "connection.server.aria": "Host: {name}. Cambiar host",
+  "connection.server.show": "Mostrar en el panel de control",
+  "connection.server.showLocked": "La máquina en la que se encuentra siempre se muestra",
 
 
   // --- error (boot splash, route-level error recovery) ---
@@ -641,6 +677,7 @@ export const es: Dictionary = {
   "mirror.imageAlt": "Gráfico de terminal",
   "mirror.imageBadge": "[Imagen]",
   "mirror.imageMatchedByOrder": "emparejada por orden, abre el Historial para comprobarlo",
+  "mirror.turnImageCaption": "la imagen más reciente del agente, de su registro",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "ahora mismo",
@@ -752,6 +789,8 @@ export const es: Dictionary = {
   "apiError.tab.workspace_required": "No se especificó un espacio para la nueva pestaña.",
   "apiError.launch.not_allowlisted": "Ese comando no está en tus lanzadores",
   "apiError.launch.pane_unknown": "Ese panel ya no existe, no se inició nada",
+  "apiError.folders.unknown": "Esa carpeta ya no está en Recientes, por lo que no se puede marcar como favorita.",
+  "apiError.folders.favourites_full": "Los favoritos están llenos ({max}). Elimine uno primero.",
   "apiError.workspace.create_failed": "Error al crear el espacio: {reason}",
   "apiError.upload.too_large": "El archivo es demasiado grande, el límite es {maxMb} MB.",
   "apiError.upload.no_file": "No se especificó ningún archivo.",
@@ -803,6 +842,11 @@ export const es: Dictionary = {
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "Repositorio",
   "space.new.host.label": "Host",
+  "space.new.folders.favourites": "Favoritos",
+  "space.new.folders.recent": "Recientes",
+  "space.new.folders.use": "Usar {path}",
+  "space.new.folders.star": "Añadir {folder} a favoritos",
+  "space.new.folders.unstar": "Eliminar {folder} de favoritos",
   "worktree.orOpenExisting": "Abrir worktree existente",
   // --- apiError.update (POST /api/update refusals, M15/05) ---
 
@@ -975,4 +1019,13 @@ export const es: Dictionary = {
   "settings.changes.depth.hint": "Niveles de carpetas debajo de la carpeta del panel.",
   "settings.changes.depth.levels.one": "{count} nivel",
   "settings.changes.depth.levels.other": "{count} niveles",
+
+  // --- pushTitle ---
+  "pushTitle.agent.blocked": "{agent} requiere atención",
+  "pushTitle.agent.done": "{agent} ha completado su trabajo",
+  "pushTitle.herd.blocked": "{count} agentes requieren atención",
+  "pushTitle.herd.done": "{count} agentes han completado su trabajo",
+  "pushTitle.herd.mixed": "{count} agentes necesitan atención",
+  "pushTitle.update.available": "Actualización de Collie disponible",
+  "pushTitle.cache.cold_soon": "La caché se enfría en unos {minutes} min",
 };

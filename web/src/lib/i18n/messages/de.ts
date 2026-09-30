@@ -13,10 +13,24 @@ export const de: Dictionary = {
 
   // --- settings (page chrome) ---
   "settings.title": "Einstellungen",
+  "pane.agentStart.handed": "Übergeben an {agent}",
+  "transcript.tools.hidden.one": "{count} Schritt ausgeblendet, zum Anzeigen tippen",
+  "transcript.tools.hidden.other": "{count} Schritte ausgeblendet, zum Anzeigen tippen",
+  "settings.tools.title": "Werkzeugaufrufe",
+  "settings.tools.description": "Zeigt die Lesevorgänge, Suchen, Befehle und Änderungen eines Agenten. Aus bleibt der Verlauf beim Gesagten.",
+  // --- settings sections ---
+  "settings.section.appearance.title": "Darstellung",
+  "settings.section.appearance.blurb": "Design, Sprache, Schriften",
+  "settings.section.device.title": "Gerät",
+  "settings.section.device.blurb": "Haptik, Sprache, Zen-Modus",
+  "settings.section.alerts.title": "Hinweise",
+  "settings.section.alerts.blurb": "Mitteilungen, Ruhezeiten",
+  "settings.section.system.title": "System",
+  "settings.section.system.blurb": "Updates, Geräte, Crew",
   "settings.nav.back": "Zurück",
 
   // --- settings.theme ---
-  "settings.theme.title": "Erscheinungsbild",
+  "settings.theme.title": "Design",
   "settings.theme.description": "Systemeinstellung übernehmen oder festlegen.",
   "settings.theme.option.system": "System",
   "settings.theme.option.light": "Hell",
@@ -80,7 +94,7 @@ export const de: Dictionary = {
   "settings.notify.done.hint": "ein Agent schließt seine Aufgabe ab",
   "settings.notify.updates.label": "App-Updates",
   "settings.notify.updates.hint": "eine neue Collie-Version ist verfügbar",
-  "settings.notify.cache.label": "Cache wird bald inaktiv",
+  "settings.notify.cache.label": "Cache wird bald kalt",
   "settings.notify.cache.hint":
     "Der Prompt-Cache eines Panes läuft in wenigen Minuten ab; deckt auch Panes ab, die Sie einzeln beobachten",
   "settings.notify.watched.title": "Beobachtete Panes",
@@ -219,6 +233,8 @@ export const de: Dictionary = {
   "composer.controls.agent": "Agent",
   "composer.controls.displayAria": "Anzeigeeinstellungen",
   "composer.controls.display": "Anzeige",
+  "composer.controls.clear": "Nachricht löschen",
+  "composer.controls.undoClear": "Löschen rückgängig machen",
   "composer.sentPreview.label": "Gesendet:",
   "composer.placeholder.gone": "Pane existiert nicht mehr",
   "composer.placeholder.readOnly": "Schreibgeschützt: Gerät nicht autorisiert",
@@ -297,6 +313,9 @@ export const de: Dictionary = {
   "chat.strips.show.panes": "Panes anzeigen. {panes} ausgeblendet.",
   "chat.find.label": "In Ausgabe suchen",
   "chat.history.label": "Verlauf",
+  "chat.copyOutput.label": "Ausgabe kopieren",
+  "chat.copyOutput.done": "Ausgabe in die Zwischenablage kopiert",
+  "chat.copyOutput.failed": "Ausgabe konnte nicht kopiert werden",
   "chat.paneMenu.aria": "Pane-Aktionen",
   "chat.header.openOverviewAria": "Übersicht für {workspace} öffnen{status}",
   "chat.header.statusAria": ", {label}",
@@ -307,7 +326,7 @@ export const de: Dictionary = {
   "chat.scrollback.noSessionReported":
     "{agent} hat keine Sitzung an Herdr gemeldet. Herdr-Integration installieren oder aktualisieren und den Agenten in diesem Pane neu starten.",
   "chat.scrollback.noSessionYet":
-    "{agent} reports its session to Herdr only after its first message, so there is no history yet. If this note stays after {agent} has replied, review its hooks with /hooks in {agent}, or update the Herdr integration and restart the agent.",
+    "{agent} meldet seine Sitzung erst nach seiner ersten Nachricht an Herdr, daher gibt es noch keinen Verlauf. Wenn dieser Hinweis bestehen bleibt, nachdem {agent} geantwortet hat, überprüfen Sie die Hooks mit /hooks in {agent} oder aktualisieren Sie die Herdr-Integration und starten Sie den Agenten neu.",
   "chat.fullReply.title": "Vollständige Antwort",
   "chat.fullReply.fromTranscript": "aus dem Protokoll",
   "chat.fullReply.showingTerminal": "Terminal wird gezeigt",
@@ -316,6 +335,11 @@ export const de: Dictionary = {
   "chat.switcher.ariaNeedsYou": "Pane wechseln, ein anderes Pane braucht dich",
   "chat.switcher.title": "Pane wechseln",
   "chat.switcher.launch.here": "hier",
+  "paneOrder.aria": "Reihenfolge der Panes",
+  "paneOrder.place": "Ort",
+  "paneOrder.activity": "Aktivität",
+  "paneOrder.recent": "Neueste zuerst",
+  "settings.paneOrder.description": "Aktivität stellt das Pane, in dem zuletzt etwas passiert ist, oben in die Umschaltliste. Ort behält die Reihenfolge deines Terminals.",
   "chat.status.feedbackSent": "Feedback gesendet",
   "chat.status.sent": "Gesendet",
   "chat.status.menuChanged": "Menü geändert, Aktualisierung läuft",
@@ -353,7 +377,7 @@ export const de: Dictionary = {
 
   // --- paneSettings (one pane's own preferences; today the prompt-cache warning, ADR 0042) ---
   "paneSettings.title": "Pane-Einstellungen",
-  "paneSettings.cacheWatch.label": "Warnen, bevor der Cache dieses Panes inaktiv wird",
+  "paneSettings.cacheWatch.label": "Warnen, bevor der Cache dieses Panes kalt wird",
   "paneSettings.cacheWatch.hint": "etwa {minutes} Minuten vor dem Ablauf",
   "paneSettings.cacheWatch.pushOff": "Aktivieren Sie zuerst Benachrichtigungen für dieses Gerät in den Einstellungen.",
   "paneSettings.cacheWatch.globalOn": "Die Einstellungen warnen vor jedem Pane, dieses ist also abgedeckt.",
@@ -375,6 +399,10 @@ export const de: Dictionary = {
   "paneActions.focus.labelFallback": "Im Terminal fokussieren",
   "paneActions.focus.done": "Im Terminal fokussiert",
   "paneActions.focus.failed": "Fokussieren im Terminal fehlgeschlagen",
+  "paneActions.pin.label": "Oben anheften",
+  "paneActions.unpin.label": "Lösen",
+  "paneActions.pin.done": "Oben angeheftet",
+  "paneActions.unpin.done": "Gelöst",
   "paneActions.empty.fallback": "Dieser Multiplexer unterstützt keine Pane-Aktionen.",
   "paneActions.status.renamed": "Umbenannt",
   "paneActions.status.labelCleared": "Label entfernt",
@@ -409,7 +437,13 @@ export const de: Dictionary = {
   "home.workspace.paneCount.one": "{count} Pane",
   "home.workspace.paneCount.other": "{count} Panes",
   "home.workspace.hidden": "ausgeblendet",
+  "home.machineHidden.show": "Bereiche von {name} anzeigen",
   "home.sidebar.shells": "Shells",
+  "home.pinned.title": "Angeheftet",
+  "home.pinHint.hold": "Einen Bereich gedrückt halten, um ihn hier anzuheften.",
+  "home.pinHint.rightClick": "Einen Bereich mit der rechten Maustaste anklicken, um ihn hier anzuheften.",
+  "home.pinHint.dismiss": "Hinweis verwerfen",
+  "home.group.newTab": "Neuer Tab in {name}",
   "home.sidebar.paneActionsTitle": "Pane-Aktionen anzeigen",
   "home.row.tabPosition": "Tab {n}",
   "home.row.unseen": "ungesehen",
@@ -587,6 +621,8 @@ export const de: Dictionary = {
   "connection.session.allAria": "Alle Sitzungen werden angezeigt. Sitzung wechseln",
   "connection.server.title": "Rechner",
   "connection.server.aria": "Host: {name}. Host wechseln",
+  "connection.server.show": "Auf dem Dashboard anzeigen",
+  "connection.server.showLocked": "Der Computer, an dem Sie sich befinden, wird immer angezeigt",
 
 
   // --- error (boot splash, route-level error recovery) ---
@@ -642,6 +678,7 @@ export const de: Dictionary = {
   "mirror.imageAlt": "Terminal-Grafik",
   "mirror.imageBadge": "[Bild]",
   "mirror.imageMatchedByOrder": "nach Reihenfolge zugeordnet, zum Prüfen den Verlauf öffnen",
+  "mirror.turnImageCaption": "das neueste Bild des Agenten aus seinem Protokoll",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "gerade eben",
@@ -754,6 +791,8 @@ export const de: Dictionary = {
   "apiError.tab.workspace_required": "Für den neuen Tab wurde kein Space angegeben.",
   "apiError.launch.not_allowlisted": "Dieser Befehl ist kein definierter Launcher",
   "apiError.launch.pane_unknown": "Dieses Pane ist nicht mehr da, nichts wurde gestartet",
+  "apiError.folders.unknown": "Dieser Ordner ist nicht mehr unter „Zuletzt verwendet“, daher kann er nicht als Favorit markiert werden.",
+  "apiError.folders.favourites_full": "Die Favoriten sind voll ({max}). Entfernen Sie zuerst einen Eintrag.",
   "apiError.workspace.create_failed": "Space konnte nicht erstellt werden: {reason}",
   "apiError.upload.too_large": "Die Datei ist zu groß, maximal sind {maxMb} MB erlaubt.",
   "apiError.upload.no_file": "Es wurde keine Datei übermittelt.",
@@ -806,6 +845,11 @@ export const de: Dictionary = {
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "Repository",
   "space.new.host.label": "Host",
+  "space.new.folders.favourites": "Favoriten",
+  "space.new.folders.recent": "Zuletzt verwendet",
+  "space.new.folders.use": "{path} verwenden",
+  "space.new.folders.star": "{folder} zu Favoriten hinzufügen",
+  "space.new.folders.unstar": "{folder} aus Favoriten entfernen",
   "worktree.orOpenExisting": "Oder bestehenden öffnen",
   // --- apiError.update (POST /api/update refusals, M15/05) ---
 
@@ -978,4 +1022,13 @@ export const de: Dictionary = {
   "settings.changes.depth.hint": "Ordnerebenen unterhalb des Bereichsordners.",
   "settings.changes.depth.levels.one": "{count} Ebene",
   "settings.changes.depth.levels.other": "{count} Ebenen",
+
+  // --- pushTitle ---
+  "pushTitle.agent.blocked": "{agent} wartet auf Eingabe",
+  "pushTitle.agent.done": "{agent} hat die Arbeit abgeschlossen",
+  "pushTitle.herd.blocked": "{count} Agenten warten auf Eingabe",
+  "pushTitle.herd.done": "{count} Agenten haben die Arbeit abgeschlossen",
+  "pushTitle.herd.mixed": "{count} Agenten brauchen Aufmerksamkeit",
+  "pushTitle.update.available": "Collie-Update verfügbar",
+  "pushTitle.cache.cold_soon": "Cache wird in etwa {minutes} Min. kalt",
 };

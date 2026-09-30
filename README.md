@@ -7,8 +7,8 @@
 </p>
 
 <p align="center">
-  <a href="https://colliepwa.dev/demo"><b>Try it in your browser — no install</b></a> ·
-  <a href="https://colliepwa.dev">colliepwa.dev</a><br>
+  <a href="https://colliepwa.dev/demo?utm_source=github&amp;utm_medium=readme&amp;utm_campaign=collie&amp;utm_content=hero"><b>Try it in your browser — no install</b></a> ·
+  <a href="https://colliepwa.dev/?utm_source=github&amp;utm_medium=readme&amp;utm_campaign=collie&amp;utm_content=hero">colliepwa.dev</a><br>
   <sub>A real Collie build running in the page against faked data.</sub>
 </p>
 
@@ -66,7 +66,8 @@ public access, Collie isn't built for it. Read the
 A run through the herd from a phone: the dashboard floats the agent that **needs you** to the top,
 you drill into a space's tabs and panes (long-press a pane pill or a tab chip to rename or close it —
 and a Claude pane shows the name you gave it with `/rename`), answer an `AskUserQuestion` prompt with
-a tap, switch between herds, and pick up a push notification the moment an agent is waiting on input.
+Hold a dashboard row or a pane pill, or right-click it with a mouse, to pin that pane
+to the top of the dashboard and the switcher. a tap, switch between herds, and pick up a push notification the moment an agent is waiting on input.
 
 To drive it yourself instead of watching, the [interactive demo](https://colliepwa.dev/demo) runs the
 real app in your browser against faked data — nothing to install.

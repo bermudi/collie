@@ -13,10 +13,24 @@ export const zh: Dictionary = {
 
   // --- settings (page chrome) ---
   "settings.title": "设置",
+  "pane.agentStart.handed": "已交给 {agent}",
+  "transcript.tools.hidden.one": "已隐藏 {count} 个步骤，点按显示",
+  "transcript.tools.hidden.other": "已隐藏 {count} 个步骤，点按显示",
+  "settings.tools.title": "工具调用",
+  "settings.tools.description": "显示代理执行的读取、搜索、命令和编辑。关闭后只保留它说的话。",
+  // --- settings sections ---
+  "settings.section.appearance.title": "外观",
+  "settings.section.appearance.blurb": "主题、语言、字体",
+  "settings.section.device.title": "设备",
+  "settings.section.device.blurb": "触感、语音、禅模式",
+  "settings.section.alerts.title": "提醒",
+  "settings.section.alerts.blurb": "通知、免打扰时段",
+  "settings.section.system.title": "系统",
+  "settings.section.system.blurb": "更新、设备、crew",
   "settings.nav.back": "返回",
 
   // --- settings.theme ---
-  "settings.theme.title": "主题外观",
+  "settings.theme.title": "主题",
   "settings.theme.description": "跟随系统或指定固定外观。",
   "settings.theme.option.system": "跟随系统",
   "settings.theme.option.light": "浅色",
@@ -75,7 +89,7 @@ export const zh: Dictionary = {
   "settings.notify.done.hint": "Agent 已完成当前任务",
   "settings.notify.updates.label": "版本更新",
   "settings.notify.updates.hint": "Collie 有新版本可用",
-  "settings.notify.cache.label": "缓存即将失效",
+  "settings.notify.cache.label": "缓存即将变冷",
   "settings.notify.cache.hint":
     "窗格的 prompt cache 会在几分钟后过期；这也涵盖你逐个查看过的窗格",
   "settings.notify.watched.title": "已关注的 pane",
@@ -205,6 +219,8 @@ export const zh: Dictionary = {
   "composer.controls.agent": "智能体",
   "composer.controls.displayAria": "显示设置",
   "composer.controls.display": "显示",
+  "composer.controls.clear": "清除消息",
+  "composer.controls.undoClear": "撤销清除",
   "composer.sentPreview.label": "已发送：",
   "composer.placeholder.gone": "窗格已不存在",
   "composer.placeholder.readOnly": "只读模式，未授权",
@@ -279,6 +295,9 @@ export const zh: Dictionary = {
   "chat.strips.show.panes": "显示窗格，已隐藏 {panes}。",
   "chat.find.label": "在输出中查找",
   "chat.history.label": "对话历史",
+  "chat.copyOutput.label": "复制输出",
+  "chat.copyOutput.done": "已将输出复制到剪贴板",
+  "chat.copyOutput.failed": "无法复制输出",
   "chat.paneMenu.aria": "窗格菜单",
   "chat.header.openOverviewAria": "打开 {workspace} 概览{status}",
   "chat.header.statusAria": "（{label}）",
@@ -289,7 +308,7 @@ export const zh: Dictionary = {
   "chat.scrollback.noSessionReported":
     "{agent} 尚未向 Herdr 上报会话。请安装或更新对应的 Herdr 集成，并在当前窗格重启该 Agent。",
   "chat.scrollback.noSessionYet":
-    "{agent} reports its session to Herdr only after its first message, so there is no history yet. If this note stays after {agent} has replied, review its hooks with /hooks in {agent}, or update the Herdr integration and restart the agent.",
+    "{agent} 仅在发送第一条消息后才向 Herdr 报告其会话，因此目前尚无历史记录。如果 {agent} 回复后此提示仍未消失，请在 {agent} 中使用 /hooks 检查其 hook，或更新 Herdr 集成并重启该 agent。",
   "chat.fullReply.title": "完整回复",
   "chat.fullReply.fromTranscript": "来自日志",
   "chat.fullReply.showingTerminal": "正在显示终端",
@@ -298,6 +317,11 @@ export const zh: Dictionary = {
   "chat.switcher.ariaNeedsYou": "切换窗格，另一个窗格需要你",
   "chat.switcher.title": "切换窗格",
   "chat.switcher.launch.here": "当前位置",
+  "paneOrder.aria": "窗格顺序",
+  "paneOrder.place": "位置",
+  "paneOrder.activity": "活动",
+  "paneOrder.recent": "最新优先",
+  "settings.paneOrder.description": "“活动”把最近有动静的窗格放在切换列表的最上面。“位置”保持终端本身的顺序。",
   "chat.status.feedbackSent": "反馈已发送",
   "chat.status.sent": "已发送",
   "chat.status.menuChanged": "菜单已变动，正在刷新",
@@ -357,6 +381,10 @@ export const zh: Dictionary = {
   "paneActions.focus.labelFallback": "在终端中聚焦",
   "paneActions.focus.done": "已在终端中聚焦",
   "paneActions.focus.failed": "无法在终端中聚焦",
+  "paneActions.pin.label": "置顶",
+  "paneActions.unpin.label": "取消置顶",
+  "paneActions.pin.done": "已置顶",
+  "paneActions.unpin.done": "已取消置顶",
   "paneActions.empty.fallback": "当前多路复用器不支持窗格操作。",
   "paneActions.status.renamed": "已重命名",
   "paneActions.status.labelCleared": "已清除标签",
@@ -391,7 +419,13 @@ export const zh: Dictionary = {
   "home.workspace.paneCount.one": "{count} 个窗格",
   "home.workspace.paneCount.other": "{count} 个窗格",
   "home.workspace.hidden": "已隐藏",
+  "home.machineHidden.show": "显示 {name} 的窗格",
   "home.sidebar.shells": "终端实例",
+  "home.pinned.title": "已置顶",
+  "home.pinHint.hold": "按住窗格可将其固定在此处。",
+  "home.pinHint.rightClick": "右键点击窗格可将其固定在此处。",
+  "home.pinHint.dismiss": "关闭提示",
+  "home.group.newTab": "在 {name} 中打开新标签页",
   "home.sidebar.paneActionsTitle": "查看窗格操作选项",
   "home.row.tabPosition": "标签页 {n}",
   "home.row.unseen": "未读",
@@ -568,6 +602,8 @@ export const zh: Dictionary = {
   "connection.session.allAria": "正在显示全部会话。切换会话",
   "connection.server.title": "主机",
   "connection.server.aria": "主机：{name}。切换主机",
+  "connection.server.show": "在仪表板上显示",
+  "connection.server.showLocked": "始终显示您当前所在的机器",
 
 
   // --- error (boot splash, route-level error recovery) ---
@@ -622,6 +658,7 @@ export const zh: Dictionary = {
   "mirror.imageAlt": "终端图像",
   "mirror.imageBadge": "[图片]",
   "mirror.imageMatchedByOrder": "按顺序匹配，打开历史记录核对",
+  "mirror.turnImageCaption": "代理日志中的最新图片",
 
   // --- time (relative/clock formatting) ---
   "time.justNow": "刚刚",
@@ -726,6 +763,8 @@ export const zh: Dictionary = {
   "apiError.tab.workspace_required": "未指定新标签页的工作区。",
   "apiError.launch.not_allowlisted": "该命令不在你的启动器列表中",
   "apiError.launch.pane_unknown": "找不到该窗格，未启动任何内容",
+  "apiError.folders.unknown": "该文件夹已不在“最近”中，因此无法收藏。",
+  "apiError.folders.favourites_full": "收藏夹已满（{max}）。请先移除一个。",
   "apiError.workspace.create_failed": "创建工作区失败：{reason}",
   "apiError.upload.too_large": "文件过大，限制为 {maxMb} MB。",
   "apiError.upload.no_file": "未提供任何文件。",
@@ -774,6 +813,11 @@ export const zh: Dictionary = {
   "space.new.tab.worktree": "Worktree",
   "space.new.repo.label": "仓库",
   "space.new.host.label": "主机",
+  "space.new.folders.favourites": "收藏夹",
+  "space.new.folders.recent": "最近",
+  "space.new.folders.use": "使用 {path}",
+  "space.new.folders.star": "将 {folder} 添加到收藏夹",
+  "space.new.folders.unstar": "从收藏夹中移除 {folder}",
   "worktree.orOpenExisting": "或打开已有 Worktree",
   // --- apiError.update (POST /api/update refusals, M15/05) ---
 
@@ -946,4 +990,13 @@ export const zh: Dictionary = {
   "settings.changes.depth.hint": "窗格文件夹之下的文件夹层级数。",
   "settings.changes.depth.levels.one": "{count} 层",
   "settings.changes.depth.levels.other": "{count} 层",
+
+  // --- pushTitle ---
+  "pushTitle.agent.blocked": "{agent} 待处理",
+  "pushTitle.agent.done": "{agent} 已完成",
+  "pushTitle.herd.blocked": "{count} 个 Agent 待处理",
+  "pushTitle.herd.done": "{count} 个 Agent 已完成",
+  "pushTitle.herd.mixed": "{count} 个 Agent 需要关注",
+  "pushTitle.update.available": "Collie 有可用更新",
+  "pushTitle.cache.cold_soon": "缓存约 {minutes} 分钟后变冷",
 };

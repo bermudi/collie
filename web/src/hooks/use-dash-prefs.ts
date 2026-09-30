@@ -3,6 +3,7 @@ import { asJsonBoolean, asJsonObject, asJsonString, type JsonValue } from "@/lib
 
 import type { ChangesLayout } from "@/lib/changes-tree";
 import { coerceDashView, type DashView } from "@/lib/dash-view";
+import { coercePaneOrder, type PaneOrder } from "@/lib/pane-order";
 import type { RecentDir } from "@/lib/triage";
 
 // Dashboard layout preferences, persisted in localStorage. Deliberately separate from
@@ -52,6 +53,30 @@ export interface DashPrefs {
   beltScale: BeltScale;
   /** The dashboard's footer tab: Panes, Focus or Changes (ADR 0066, renamed by ADR 0068). Panes by default. */
   dashView: DashView;
+  /**
+   * Whether a session view draws the agent's tool calls: the reads, the searches, the commands and
+   * the edits it ran between saying things.
+   *
+   * OFF by default, and that is the decision rather than an accident. A working session is mostly
+   * tool calls — a single turn can be forty reads and a grep — so a transcript that draws them all
+   * is a transcript you scroll past to find the one paragraph you came for. What the agent SAID is
+   * what the page is for; what it DID is available in one tap.
+   *
+   * Read by the History page today (components/transcript-view.tsx) and by the Chat stream when it
+   * lands. One pref for both: two settings for one idea is how they drift apart.
+   */
+  showToolCalls: boolean;
+  /**
+   * The order a pane list runs in: `place` (machine, space, tab, position) or `activity` (whatever
+   * happened last, first). PLACE by default, which is the order ADR 0063 gave every surface.
+   *
+   * The operator's own request is the only thing that turns this on, and ADR 0071 holds the reason
+   * the list does not then re-sort itself on a poll: the reading is taken when the list opens and
+   * held while it is on screen. See lib/pane-order.ts, which owns both halves.
+   *
+   * Read by the pane switcher today (components/agent-sidebar.tsx).
+   */
+  paneOrder: PaneOrder;
 }
 
 const STORAGE_KEY = "collie:dash-prefs:v1";
@@ -78,6 +103,8 @@ const DEFAULTS: DashPrefs = {
   changesLayout: "list",
   beltScale: 1.15,
   dashView: "panes",
+  showToolCalls: false,
+  paneOrder: "place",
 };
 
 function coerceDepth(raw: JsonValue | undefined): number {
@@ -126,6 +153,8 @@ export function coerceDashPrefs(raw: JsonValue | undefined): DashPrefs {
     changesLayout: p.changesLayout === "tree" ? "tree" : DEFAULTS.changesLayout,
     beltScale: coerceBeltScale(p.beltScale),
     dashView: coerceDashView(p.dashView),
+    showToolCalls: asJsonBoolean(p.showToolCalls) ?? DEFAULTS.showToolCalls,
+    paneOrder: coercePaneOrder(p.paneOrder),
   };
 }
 
@@ -162,6 +191,8 @@ export interface UseDashPrefsReturn {
   setChangesLayout: (layout: ChangesLayout) => void;
   setBeltScale: (scale: number) => void;
   setDashView: (view: DashView) => void;
+  setShowToolCalls: (show: boolean) => void;
+  setPaneOrder: (order: PaneOrder) => void;
 }
 
 export function useDashPrefs(): UseDashPrefsReturn {
@@ -187,6 +218,8 @@ export function useDashPrefs(): UseDashPrefsReturn {
   );
 
   const setChangesLayout = useCallback((changesLayout: ChangesLayout) => update({ changesLayout }), [update]);
+  const setShowToolCalls = useCallback((showToolCalls: boolean) => update({ showToolCalls }), [update]);
+  const setPaneOrder = useCallback((paneOrder: PaneOrder) => update({ paneOrder }), [update]);
 
   const setBeltScale = useCallback(
     (scale: number) => update({ beltScale: coerceBeltScale(scale) }),
@@ -220,5 +253,7 @@ export function useDashPrefs(): UseDashPrefsReturn {
     setChangesLayout,
     setBeltScale,
     setDashView,
+    setShowToolCalls,
+    setPaneOrder,
   };
 }
