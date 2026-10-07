@@ -17,6 +17,7 @@ export const MUX_AGENT_NAMES: readonly string[] = [
   "antigravity",
   "claude",
   "codex",
+  "devin",
   "grok",
   "hermes",
   "muse",

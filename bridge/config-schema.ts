@@ -578,6 +578,15 @@ export const CONFIG_SETTINGS: readonly ConfigSetting[] = [
     configField: "journalRoots",
   },
   {
+    key: "devin_root",
+    env: "COLLIE_DEVIN_ROOT",
+    section: "journal",
+    kind: "roots",
+    default: [],
+    doc: "Where Devin keeps its session databases. Empty takes ~/.local/share/devin/cli (and cli-next).",
+    configField: "journalRoots",
+  },
+  {
     key: "muse_root",
     env: "COLLIE_MUSE_ROOT",
     section: "journal",

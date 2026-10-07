@@ -121,10 +121,16 @@
     },
     "devin": {
       "version": "3000.11.3",
-      "verified": "2026-09-27",
+      "verified": "2026-10-08",
       "how": "unverified",
       "adapter": false,
-      "evidence": "installed 2026-09-27, no adapter — raw mirror, one-shot send (registry.test.ts pins devin as unregistered). Pup's mirror layer is capture-pinned for it: blocks.test.ts clips Devin's two-label composer rules against fixture devin--composer-labelled-rules.txt (commit c2a12546). First canary run pending (no devin driver in scripts/harness-canary)"
+      "evidence": "installed 2026-09-27, no screen adapter — raw mirror, one-shot send (registry.test.ts pins devin as unregistered). Pup's mirror layer is capture-pinned for it: blocks.test.ts clips Devin's two-label composer rules against fixture devin--composer-labelled-rules.txt (commit c2a12546). First canary run pending (no devin driver in scripts/harness-canary)",
+      "journal": {
+        "version": "3000.11.3",
+        "verified": "2026-10-08",
+        "how": "unverified",
+        "evidence": "bridge/journal/devin.ts is unit-tested against synthetic databases only: the schema facts (word-pair ids, the message_nodes tree, chat_message's four roles, main_chain_id branch walks, dual cli/cli-next roots) were probed read-only off the real 9 GB store on 2026-10-08, structure only. No canary driver exists yet, so the first live read is unverified; scripts/journal-probe.ts is the drift check until one does."
+      }
     }
   }
 }

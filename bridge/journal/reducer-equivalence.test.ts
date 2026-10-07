@@ -4,6 +4,7 @@ import { KNOWN_HARNESS_NAMES } from "./registry.ts";
 import { createLineFeeder, type RowReducer } from "./reduce.ts";
 import { createClaudeReducer, parseClaudeTranscript } from "./claude.ts";
 import { createCodexReducer, parseCodexTranscript } from "./codex.ts";
+import { createDevinReducer, parseDevinTranscript } from "./devin.ts";
 import { createGrokReducer, parseGrokTranscript } from "./grok.ts";
 import { createHermesReducer, parseHermesTranscript } from "./hermes.ts";
 import { createMuseReducer, parseMuseTranscript } from "./muse.ts";
@@ -100,6 +101,7 @@ const COVERED = [
   "pi",
   "grok",
   "hermes",
+  "devin",
   "muse",
 ] as const;
 
@@ -342,6 +344,36 @@ describe("hermes: a reducer reads a torn stream the way the parser reads a whole
 
   test("the three readings agree", () => {
     expectEquivalent(() => createHermesReducer(), parseHermesTranscript, text);
+  });
+});
+
+describe("devin: a reducer reads a torn stream the way the parser reads a whole file", () => {
+  // The composed line the source projects (row_id/node_id/parent chain plus chat_message's three
+  // read fields), with an on_chain label — the shape a tail read of a devin session hands over.
+  const node = (o: Record<string, JsonValue>) => JSON.stringify(o);
+  const text = [
+    node({ row_id: 1, node_id: 1, parent_node_id: null, role: "system", content: "", tool_calls: null, tool_call_id: null, created_at: 1, on_chain: 1 }),
+    node({ row_id: 2, node_id: 2, parent_node_id: 1, role: "user", content: "show history", tool_calls: null, tool_call_id: null, created_at: 2, on_chain: 1 }),
+    node({ row_id: 3, node_id: 3, parent_node_id: 2, role: "assistant", content: "one\ntwo", tool_calls: null, tool_call_id: null, created_at: 3, on_chain: 1 }),
+    node({
+      row_id: 4,
+      node_id: 4,
+      parent_node_id: 3,
+      role: "assistant",
+      content: "Running it.",
+      tool_calls: JSON.stringify([{ id: "call-1", name: "bash", kind: "function", index: 0, arguments: { command: "pwd" } }]),
+      tool_call_id: null,
+      created_at: 4,
+      on_chain: 1,
+    }),
+    node({ row_id: 5, node_id: 5, parent_node_id: 4, role: "tool", content: "/home/you", tool_calls: null, tool_call_id: "call-1", created_at: 5, on_chain: 1 }),
+    // An off-branch node (a subagent tree): hidden from the start, never moving the leaf.
+    node({ row_id: 6, node_id: 6, parent_node_id: 2, role: "assistant", content: "scratch", tool_calls: null, tool_call_id: null, created_at: 6, on_chain: 0 }),
+    ...RUBBISH,
+  ].join("\n");
+
+  test("the three readings agree", () => {
+    expectEquivalent(() => createDevinReducer(), parseDevinTranscript, text);
   });
 });
 

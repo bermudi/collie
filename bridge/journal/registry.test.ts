@@ -22,14 +22,16 @@ const roots = {
   opencode: ["/o"],
   grok: ["/g"],
   hermes: ["/h"],
+  devin: ["/d"],
   muse: ["/m"],
 };
 
 describe("buildJournalRegistry", () => {
-  test("serves the seven verified harnesses", () => {
+  test("serves the eight verified harnesses", () => {
     expect(journalAgents(buildJournalRegistry(roots))).toEqual([
       "claude",
       "codex",
+      "devin",
       "grok",
       "hermes",
       "muse",
@@ -47,7 +49,7 @@ describe("buildJournalRegistry", () => {
 describe("adapterFor", () => {
   const registry = buildJournalRegistry(roots);
 
-  test.each(["claude", "codex", "pi", "opencode", "grok", "hermes", "muse"])("resolves %s", (agent) => {
+  test.each(["claude", "codex", "pi", "opencode", "grok", "hermes", "devin", "muse"])("resolves %s", (agent) => {
     expect(adapterFor(registry, agent)?.agent).toBe(agent);
   });
 

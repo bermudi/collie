@@ -259,9 +259,9 @@ describe("readSinceFile", () => {
   });
 });
 
-// Requirement: `readSince` is on `TranscriptSource` and implemented by ALL SIX harnesses. The type
-// checker proves it is present; this proves every one of them ANSWERS, including the two that are
-// SQLite and share none of the code above. A key no adapter can serve is the one input all six
+// Requirement: `readSince` is on `TranscriptSource` and implemented by every harness. The type
+// checker proves it is present; this proves every one of them ANSWERS, including the three that are
+// SQLite and share none of the code above. A key no adapter can serve is the one input they all
 // accept, and their answer to it is the same sentence: nothing new, hold what you have.
 describe("every harness answers a live read", () => {
   const registry = buildJournalRegistry({
@@ -271,12 +271,13 @@ describe("every harness answers a live read", () => {
     opencode: ["/nope/opencode"],
     grok: ["/nope/grok"],
     hermes: ["/nope/hermes"],
+    devin: ["/nope/devin"],
     muse: ["/nope/muse"],
   });
 
-  test("the seven this build ships are the seven under test", () => {
+  test("the adapters this build ships are the ones under test", () => {
     expect(Object.keys(registry).toSorted()).toEqual([...KNOWN_HARNESS_NAMES].toSorted());
-    expect(KNOWN_HARNESS_NAMES).toHaveLength(7);
+    expect(KNOWN_HARNESS_NAMES).toHaveLength(8);
   });
 
   test.each(Object.keys(registry))("%s reports nothing new for a key it cannot serve", async (agent) => {

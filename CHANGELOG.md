@@ -8,6 +8,16 @@ All notable changes to Collie are recorded here. The format follows
 
 ## [Unreleased]
 ### Added
+- **Devin panes get the Chat view — the journal adapter parity rule owed them.** A new
+  `bridge/journal/devin.ts` reads devin's on-disk store (`~/.local/share/devin/cli/sessions.db`, the
+  dormant `cli-next/` beside it) read-only: the `message_nodes` tree walked per session's
+  `main_chain_id`, so rewinds and regenerated turns render as the current conversation the way pi's
+  branches do, `system` prefix nodes drop, tool results fold onto their calls, and a live window
+  hears a rewind from the row that announces it. Registered under the `devin` agent string herdr's
+  v2 hook reports, with `COLLIE_DEVIN_ROOT` to relocate. On a devin pane the ⋮ Terminal/Chat row is
+  live and Chat draws the conversation; History answers too. Schema probed off the real 9 GB store
+  read-only (structure only — no transcript content), grammar pinned by synthetic-fixture tests,
+  and `bun scripts/journal-probe.ts` reads both real databases clean (26 and 130 turns).
 - **`collie-ctl.sh pair` — the pairing bootstrap ADR 0086 needs.** Upstream mints pairing codes
   with the `collie` CLI, which this fork strips; the first merged build with reads-gated-by-token
   therefore refused a phone that had never needed to pair. The verb mints through the bridge's own

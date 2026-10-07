@@ -12,6 +12,7 @@
 
 import { claudeJournal } from "./claude.ts";
 import { codexJournal } from "./codex.ts";
+import { devinJournal } from "./devin.ts";
 import { grokJournal } from "./grok.ts";
 import { hermesJournal } from "./hermes.ts";
 import { museJournal } from "./muse.ts";
@@ -42,6 +43,8 @@ export interface JournalRoots {
   grok: readonly string[];
   /** Hermes' SessionDB directory — `state.db` lives at its top level. */
   hermes: readonly string[];
+  /** Devin's data dir — one `sessions.db` per channel layout (`cli/`, `cli-next/`). */
+  devin: readonly string[];
   /** Muse's `sessions` directory — `YYYY/MM/DD/<uuid>/session.jsonl` lives under it. */
   muse: readonly string[];
 }
@@ -60,6 +63,7 @@ export function buildJournalRegistry(roots: JournalRoots): Record<string, Journa
     opencodeJournal(roots.opencode),
     grokJournal(roots.grok),
     hermesJournal(roots.hermes),
+    devinJournal(roots.devin),
     museJournal(roots.muse),
   ];
   return Object.fromEntries(adapters.map((a) => [a.agent, a]));
@@ -75,7 +79,7 @@ export function buildJournalRegistry(roots: JournalRoots): Record<string, Journa
  * COULD have a transcript (registry.test.ts fails when the two drift).
  *
  * An alias never adds an adapter, so it is absent from {@link KNOWN_HARNESS_NAMES}: that list
- * answers "which adapters does this build have", and the answer is still seven.
+ * answers "which adapters does this build have", and the answer is still eight.
  */
 export const AGENT_ALIASES = { omp: "pi" } as const;
 
@@ -165,5 +169,5 @@ export function journalAgents(registry: Record<string, JournalAdapter>): string[
  * identity off a match against it — see `bridge/mux/types.ts` § `MuxPane.agent`.
  */
 export const KNOWN_HARNESS_NAMES: readonly string[] = journalAgents(
-  buildJournalRegistry({ claude: [], codex: [], pi: [], opencode: [], grok: [], hermes: [], muse: [] }),
+  buildJournalRegistry({ claude: [], codex: [], pi: [], opencode: [], grok: [], hermes: [], devin: [], muse: [] }),
 );

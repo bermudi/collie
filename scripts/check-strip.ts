@@ -11,6 +11,7 @@
 // Usage: bun run scripts/check-strip.ts [--upstream <ref>]   (default ref: upstream/main)
 // Exit 0 = clean; anything else prints the offending paths and exits 1.
 
+import { fileURLToPath } from "node:url";
 
 
 /** The strip patterns, verbatim from AGENTS.md's own grep so the two can never drift in intent. */
@@ -62,7 +63,9 @@ if (leaked.length > 0) {
 }
 
 // ── Side B: every absence must be a decision ────────────────────────────────────────────
-const manifestPath = new URL("./strip-manifest.txt", import.meta.url).pathname;
+// `fileURLToPath`, not `.pathname`: a file URL's pathname is `/C:/x` on Windows, which is the
+// exact platform-blind spelling bridge/host-guard.test.ts exists to refuse.
+const manifestPath = fileURLToPath(new URL("./strip-manifest.txt", import.meta.url));
 let matchers: RegExp[];
 try {
   matchers = manifestMatchers(await Bun.file(manifestPath).text());
