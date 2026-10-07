@@ -60,6 +60,20 @@ public access, Collie isn't built for it. Read the
 - [Troubleshooting](#troubleshooting)
 - [Architecture](#architecture)
 - [Developing this plugin](#developing-this-plugin)
+||||||| 3d562ae5
+- **React Router + Vite** with TypeScript, Tailwind, shadcn, and a Bun bridge
+- **Status dashboard** led by what needs your input; every other pane sits under its own workspace, tab on the row
+- **Push notifications** when an agent blocks on user input
+- **Quick actions and slash commands** configured per agent
+- **Keypad for terminal control keys**: `Esc`, `Ctrl+C`, arrows, and modifier combinations
+- **Output search** and full conversation history beyond standard terminal scrollback
+- **Files screen**: the files of an agent's workspace folder with the changes marked, and a Changes segment with what it changed in its git repos, as diffs with syntax colour, and its last commit, read-only
+- **File attachments**: images from the camera roll, and markdown, text and code files
+- **Device pairing** as the write credential: once a device is paired, every write needs its token
+- **Crews**: several machines' Collies behind one URL, with operator-triggered failover
+- **Twelve UI languages** and a per-device typeface setting
+- **Herdr session switching** managed from the web interface
+- **PWA support** running locally on loopback with no external accounts or cloud dependencies
 
 ## Demo
 

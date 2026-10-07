@@ -28,6 +28,7 @@ import { useStableTerminalDraft } from "@/hooks/use-terminal-draft";
 import { useLocale } from "@/hooks/use-locale";
 import { isConnecting } from "@/lib/connection";
 import { t, type MessageKey } from "@/lib/i18n";
+import { savedAtLabel } from "@/lib/format";
 import { settleAfterSend } from "@/lib/harness/guard";
 import { setStatus } from "@/lib/status";
 import { setFollowing as publishFollowing } from "@/lib/poll-intent";
@@ -63,7 +64,7 @@ import { PaneMeta } from "@/components/pane-meta";
 import { CacheSheet } from "@/components/cache-sheet";
 import { PaneActionsSheet } from "@/components/pane-actions-sheet";
 import { CardWaitingCtx } from "@/components/chat-cards";
-import { chatStatusKey, SessionStream } from "@/components/session-stream";
+import { chatStatusKey, SavedCopyRow, SessionStream } from "@/components/session-stream";
 import { PaneSettingsSheet } from "@/components/pane-settings-sheet";
 import { CompactStripLabels, TAB_ROW_SQUARE_TAP_TARGET } from "@/components/ui/labelled-strip";
 import { ReadOnlyBanner } from "@/components/read-only-banner";
@@ -84,6 +85,9 @@ import { canGrowRequestedLines, growRequestedLines } from "@/lib/loaders";
 import { paneName, panePlaceParts } from "@/lib/pane-name";
 import { panesOfTab } from "@/lib/pane-ordinal";
 import { useMuxCapability } from "@/lib/mux-capability";
+import { branchOffRepos } from "@/lib/branch-off";
+import { useOptionalRootData } from "@/lib/route-data";
+import { NewSpaceSheet } from "@/components/new-space-sheet";
 import { hasJournalAdapter, reportsSessionOnFirstPrompt } from "@/lib/journal-agents";
 import { journalReadingOf, paneBody, type JournalReading } from "@/lib/chat-gate";
 import { paneRowKey, paneScope } from "@/lib/hosts";
@@ -133,6 +137,19 @@ interface AgentChatProps {
   bridge?: BridgeStatus | undefined;
   error?: boolean;
   stalled?: boolean;
+  /**
+   * The pane's text is the SAVED COPY (M46 spec 10, `PaneData.stale`): the bridge did not answer and
+   * this is what the phone kept. The view draws the saved-copy notice over either body, and hands the
+   * flag to the card dock and the composer, which act on nothing while it is set (spec 11).
+   */
+  stale?: boolean;
+  /** When the saved mirror was fetched, for the notice's "Saved copy from {time}". */
+  lastSeenAt?: number;
+  /**
+   * The pane's read got no answer and the phone keeps no text for it. The empty mirror then says so,
+   * rather than "no recent output", which would claim a read that never landed.
+   */
+  noSavedCopy?: boolean;
   /** Up one level: the header's back arrow (the Collie mark) and every exit from a pane that closed. */
   onBack: () => void;
   /**
@@ -216,6 +233,9 @@ export function AgentChat({
   bridge = "connected",
   error = false,
   stalled = false,
+  stale = false,
+  lastSeenAt,
+  noSavedCopy = false,
   onBack,
   onBackArrow,
   onSelect,
@@ -229,7 +249,7 @@ export function AgentChat({
   // current while we're reconnecting/lost, and restores instantly on recovery. Both marks dim
   // together — dimming only one of them would leave a frozen reading looking half live.
   const connecting = isConnecting({ bridge, error, stalled });
-  const { newTab, launch, launching, creatingTab } = useSpaceActions();
+  const { newTab, newSpace, launch, launching, creatingTab, branchOff } = useSpaceActions();
   // The pane's light-theme inversion override (lib/mirror-invert.ts). Read once at mount, which is
   // enough: DetailRoute keys this component by `paneScopeKey(scope, paneId)` — the full address, not
   // the id, for the reason that file records — so a walk to another pane, session or host remounts it
@@ -256,6 +276,15 @@ export function AgentChat({
   );
 
   const { launchers, home: launchersHome } = useLaunchers(scope);
+  // "New agent on a branch" (ADR 0089): the repo this pane sits in, read off the root snapshot's
+  // spaces. Null for a pane outside a Git repo, which is what keeps the ⋯ row away from it. The
+  // other two gates (the capability, the lead scope) are the actions sheet's own.
+  const rootSpaces = useOptionalRootData()?.workspaces;
+  const branchOffTarget = useMemo(
+    () => (agent === undefined || rootSpaces === undefined ? null : branchOffRepos(rootSpaces, agent.workspaceId)),
+    [agent, rootSpaces],
+  );
+  const [branchOffOpen, setBranchOffOpen] = useState(false);
   // Single display-prefs instance: the View controls (in <Composer>) write it, the mirror reads it.
   const { prefs, setWrap, stepFontSize, stepChatFontSize, setRawTerminal, setTapToFocus, setExpandClippedReply } =
     useDisplayPrefs();
@@ -450,7 +479,12 @@ export function AgentChat({
   // State rather than a ref: the composer portals into it, so it must re-render once it exists.
   const [draftNoticeSlot, setDraftNoticeSlot] = useState<HTMLDivElement | null>(null);
 
-  const gone = !agent;
+  // "GONE" IS A FACT ONLY A LIVE ANSWER CAN STATE (M46 spec 10). With the bridge away the herd on
+  // screen is what the phone kept, and a pane missing from it is a pane this phone cannot place, not
+  // a pane that closed: it may simply never have been kept. So `gone` needs a live herd, and the other
+  // case is `unplaced`: the header names the pane by its id, nothing says "gone", and nothing acts.
+  const gone = !agent && !error && !stale;
+  const unplaced = !agent && !gone;
 
   // Drag the ACTIONS BELT up to bring up the pane switcher, tracked finger-by-finger so the sheet
   // peeks up under the thumb rather than appearing on release. The whole belt is the drag surface —
@@ -850,7 +884,9 @@ export function AgentChat({
   // still on a pane.
   const switchSheetOpen = drawer === "paneMenu" || drawer === "display";
   const warming = historyAvailable && switchSheetOpen;
-  const chatFeed = useChatWindow({ paneId, scope, enabled: chatFetch || warming });
+  // `savedCopy`: when the loaders drew the mirror from the saved copy, an empty Chat window reads its
+  // own saved copy at once rather than waiting for its read to fail (M46 pass 3).
+  const chatFeed = useChatWindow({ paneId, scope, enabled: chatFetch || warming, savedCopy: stale });
   const chatStatus = chatFeed.window.status;
   const journal: JournalReading = journalReadingOf(chatStatus);
   // What this view has seen of how the agent began, for the gate (hooks/use-pane-start.ts): the
@@ -901,6 +937,19 @@ export function AgentChat({
     !chatFetch || chatStatus.kind !== "empty" || chatFeed.tried || handover.phase !== "idle";
   const chatReadyBody = useChatReady(chatBody, chatAnswered);
   const chatShown = useHeldBody(chatReadyBody, handover.phase);
+  // THE SAVED COPY'S DATE, for whichever body is on screen (M46 specs 09 and 10). Chat dates its own
+  // window, read back from the Chat tail the phone kept; the terminal dates the last-seen mirror the
+  // loader restored. The Terminal body has no offline read beyond that mirror: the raw screen is
+  // never cached as Chat. `null` while what is drawn is live.
+  const savedCopyAt = chatShown ? chatFeed.window.savedAt : stale ? (lastSeenAt ?? null) : null;
+  // The dated sentence both bodies draw at the top of their scrolled text (session-stream.tsx §
+  // SavedCopyRow). It stands in the top slot instead of "Load older" and "Start of the conversation".
+  const savedCopyLine = savedCopyAt === null ? null : t("chat.savedCopy", { time: savedAtLabel(savedCopyAt) });
+  // Nothing on a saved copy may act (spec 11): the dock and the composer read this. A Chat window
+  // read back from the store is a saved copy even when the mirror's own read is not.
+  // A pane this phone cannot place, or whose read got no answer with nothing kept, is no live pane
+  // either.
+  const actsDisabledByCache = stale || savedCopyAt !== null || unplaced || noSavedCopy;
   // Why this pane keeps the terminal, in the operator's own terms — and ONLY for the half of that
   // question this side can answer. There are two layers and the split is deliberate: a pane that
   // draws Chat says what it is waiting for in the stream, in its own words, while a pane that keeps
@@ -1770,7 +1819,7 @@ export function AgentChat({
             </div>
           ) : (
             <div className="min-w-0 flex-1">
-              <span className="truncate font-semibold">{t("chat.header.agentGone")}</span>
+              <span className="truncate font-semibold">{unplaced ? paneId : t("chat.header.agentGone")}</span>
             </div>
           )}
           </HeaderStatus>
@@ -2077,6 +2126,7 @@ export function AgentChat({
                   showCompactions={dash.prefs.showCompactions}
                   fontSize={prefs.chatFontSize}
                   listRef={listRef}
+                  savedCopy={savedCopyLine}
                 />
               </CardWaitingCtx.Provider>
             ) : (
@@ -2108,8 +2158,14 @@ export function AgentChat({
 
                       This used to be gated on `truncated`, which Herdr never sets true — so the button
                       rendered on no pane at all. `readableLines` (scrollback depth + viewport) is the
-                      signal that actually works. */}
-                  {historyAvailable ? (
+                      signal that actually works.
+
+                      A SAVED COPY takes the slot instead of either button (M46 specs 09 and 10):
+                      both reach the bridge, and there is no bridge. The dated sentence says so here,
+                      at the top of the text it dates, rather than in a bar above the mirror. */}
+                  {savedCopyLine !== null ? (
+                    <SavedCopyRow text={savedCopyLine} />
+                  ) : historyAvailable ? (
                     <button
                       type="button"
                       onClick={() => nav.down(historyPath(paneId, scope))}
@@ -2208,9 +2264,13 @@ export function AgentChat({
                       and only while the operator is following the tail. */}
                 </>
               ) : (
-                <div className="py-16 text-center text-sm text-muted-foreground">
-                  {t("chat.output.empty")}
-                </div>
+                <>
+                  {/* An empty saved copy still says what it is, unless there is no copy at all. */}
+                  {savedCopyLine !== null && !noSavedCopy && <SavedCopyRow text={savedCopyLine} />}
+                  <div className="py-16 text-center text-sm text-muted-foreground">
+                    {t(noSavedCopy ? "pane.saved.none" : "chat.output.empty")}
+                  </div>
+                </>
               )}
             </ChatMessageList>
             )}
@@ -2249,6 +2309,9 @@ export function AgentChat({
               onMenuAction={handleMenuAction}
               onUnreadDialogAction={handleUnreadDialogAction}
               promptDisabled={readOnly || gone}
+              paneId={paneId}
+              scope={scope}
+              stale={actsDisabledByCache}
               composing={composing}
               faceClassName={mirrorFace.className}
               faceStyle={mirrorFace.style}
@@ -2414,6 +2477,7 @@ export function AgentChat({
                   ref={composerRef}
                   paneId={paneId}
                   scope={scope}
+                  stale={actsDisabledByCache}
                   agent={agent?.agent}
                   isShell={isShell}
                   // NO `status` AND NO `stale` GO DOWN ANY MORE. The composer drew the state as a
@@ -2621,7 +2685,25 @@ export function AgentChat({
           // Pin to top / Unpin, the last read row (ADR 0070). No `onPinChange`: the Pinned group is
           // on the dashboard and in the switcher, not on this screen, so the sheet says it in a toast.
           herd={herd}
+          onBranchOff={branchOffTarget === null ? undefined : () => setBranchOffOpen(true)}
         />
+        {/* "New agent on a branch" (ADR 0089): the new-space sheet in worktree mode, on this pane's
+            repo, with a branch name typed and an agent picker. `onCreate` is the plain space create
+            the sheet's type requires; a branch-off sheet never shows that side. */}
+        {branchOffTarget !== null && (
+          <NewSpaceSheet
+            open={branchOffOpen}
+            onClose={() => setBranchOffOpen(false)}
+            onCreate={newSpace}
+            repos={branchOffTarget.repos}
+            scope={scope}
+            branchOff={{
+              workspaceId: branchOffTarget.selected,
+              launchers,
+              onCreate: (workspaceId, branch, extras) => branchOff(workspaceId, branch, extras, scope),
+            }}
+          />
+        )}
         {/* This pane's own settings — one switch today, the prompt-cache warning (ADR 0042). Scoped to
             the PANE's machine, because `?host=` there names where the pane lives; the preference itself
             lands on the collie this phone is talking to, which is the only one that can push. */}

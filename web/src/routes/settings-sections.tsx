@@ -8,6 +8,7 @@ import { t } from "@/lib/i18n";
 import { BeltSizeControl } from "@/components/belt-size-control";
 import { ChangesControl } from "@/components/changes-control";
 import { ConnectionInfo } from "@/components/connection-info";
+import { KeepChatControl } from "@/components/keep-chat-control";
 import { FontSettingsControl } from "@/components/font-settings";
 import { HapticsControl } from "@/components/haptics-control";
 import { HarnessBarControl } from "@/components/harness-bar-control";
@@ -101,6 +102,9 @@ export function SettingsDeviceRoute() {
       <ZenControl />
       {/* How a pane's Changes view finds repos (ADR 0065). Read by the pane menu, not by here. */}
       <ChangesControl />
+      {/* What this phone keeps of each pane's Chat, and for how long (M46 spec 09). Here, beside the
+          Changes search, because it is a standing decision about the device, not about a look. */}
+      <KeepChatControl />
       {/* The ONLY way back to a tour that was interrupted — the tour is marked seen the moment it
           opens. An action, so the row ends in a button rather than a Switch. */}
       <TourControl />

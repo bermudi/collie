@@ -238,7 +238,9 @@ export function HomeRoute() {
               glideKeyOf={paneOpen.glideKeyOf}
               onPress={paneOpen.press}
               error={data.error}
+              notPaired={notPaired}
               lastSeenAt={data.lastSeenAt}
+              stale={data.stale === true}
               tabs={data.tabs}
               servers={data.servers}
               // Each workspace heading's "+" (M40/03): the list resolves each heading's own machine and

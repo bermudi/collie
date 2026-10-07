@@ -7,13 +7,138 @@ All notable changes to Collie are recorded here. The format follows
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
 ## [Unreleased]
-
-## [Unreleased]
 ### Added
 - **The ledger tracks devin — Pup's row.** Upstream's carries no entry for the harness this fork serves daily; the row pins devin's installed version (3000.11.3, no adapter — raw mirror, one-shot send) with the mirror layer's capture evidence, so `bun run harness:drift` flags when a devin update moves past what the phone was last checked against.
 
-**Upstream 1.17.2 — 2026-10-06**
+**Upstream main — 2026-10-07**
+### Added
 
+- **Paths the agent prints are links.** A file path in the chat, on an Edit, Write or Read card, or in
+  the terminal mirror opens that file in Files, at the line when the path names one (`src/a.ts:42`).
+  The phone resolves the path against the pane's repo; a path outside it stays plain text, and only a
+  root-relative path ever reaches the bridge, and a path becomes a link only once the bridge has
+  confirmed the file is there, one batched check per view (ADR 0088).
+- **A second agent on a branch.** A pane's menu offers "New agent on a branch": the branch name is
+  prefilled, pick one of your launchers or a shell, and Collie creates a git worktree and starts the
+  session in it beside the first. Each create carries a request id and the bridge keeps a receipt, so
+  a retry after a lost answer never makes two worktrees. Herdr only, on the lead (ADR 0089).
+- **Collie speaks five more languages.** Русский, Italiano, Français, Português (Brazilian wording) and
+  Türkçe join the language list in Settings → Appearance, so the interface has twelve. Russian reads
+  every count in a form that fits both 2 to 4 and 5 or more.
+- **A paired device can carry an expiry you chose.** The bridge honours a lifetime on the token the
+  phone claims (upstream mints one with `collie pair --expires 30d`, also `h`, `w`; Pup carries the
+  bridge half and the phone's handling of an expired token). Without one a token never expires,
+  exactly as before, and no existing token changes. The Settings screen shows each expiry, and an
+  expired token is refused as `device expired` so the phone offers **Pair again**. An expired device
+  still keeps pairing on until you revoke it.
+- **Known secret shapes are masked before pane text leaves the machine.** API keys with a
+  known prefix, JWTs, PEM private keys, bearer tokens and `password=`-style values become `•` marks
+  of the same width on the bridge, so the mirror, the Chat and History views and every push
+  notification carry the mask, never the key. A mitigation, not a guarantee: plain passwords and
+  bare hex are not matched. `COLLIE_REDACT=off` turns it off. Push bodies now name a pane by the
+  label you gave it, never by the program's own title. File bodies in Files and diffs in Changes
+  are masked the same way.
+- **Stricter response headers, a private blob cache and a pair rate limit.** Every answer now
+  carries a `Permissions-Policy` that denies camera, location, payment and USB and keeps the
+  microphone for hands-free speech; the content policy adds `object-src 'none'` and
+  `form-action 'self'`; HSTS is sent when the request arrived over HTTPS. Pane images under
+  `/api/blobs` are no longer cached by the browser (they were public for a year). `/api/pair` refuses
+  more than ten attempts per source address per minute with `429`.
+- **Unpairing wipes what the pairing left on the phone.** One wipe routine clears the token, every
+  draft, the saved pane text, the push subscription and the runtime caches when you unpair, when
+  the bridge revokes or expires the device, and (for one pane only) when a password prompt shows.
+  Settings and the app shell stay. Before it wipes, the phone confirms the refusal with one more
+  call, and a wipe cut short resumes on the next open. Revoking a device now asks once more and
+  says what is cleared, and the pair screen names the cause afterwards. "Clear saved copies now"
+  in Settings → Device empties the store by hand.
+- **The phone keeps session content in one store.** The last herd snapshot and the last pane text
+  move from the tab's session storage into one IndexedDB database with a 24-hour lifetime, a
+  256 KiB cap per pane and a 10 MiB cap in all, purged on open and deleted whole on unpair
+  (ADR 0087). A cold open can read it back; nothing in it can trigger an action. Without IndexedDB
+  the store falls back to memory for the session.
+- **Read a session offline.** The phone keeps the newest Chat turns of each pane on the device
+  (Settings → Device → "Keep chat on this phone": off, 1 day, 7 days; 1 day is the default) and
+  reads them back when the bridge does not answer, under "Saved copy from {time}". A cold open with
+  no bridge shows the saved herd, dimmed, with every status in the past tense and "as of {time}" in
+  the header. The banner tells you whether the phone is offline or the bridge is unreachable. The
+  raw terminal mirror is never kept as chat, and a password prompt drops that pane's saved turns.
+  A failed poll never drops what is on screen: the view keeps its content, dims it and dates it.
+  A poll waits at most 6 seconds, one second longer than the bridge waits for the multiplexer, so a
+  phone whose VPN is up but whose radio is off learns within one poll that the bridge is gone. The
+  banner then says either "You are offline" or "No connection to the bridge"; the phone cannot tell
+  a dead internet from a dead Tailscale, so it no longer guesses.
+- **Nothing saved on the phone can act.** While the last read of a pane failed, the phone is
+  offline, or the screen is a saved copy, dialog options and the send button are disabled with
+  "Reconnect to answer" and "Reconnect to send". Typing still works and the draft still saves.
+  There is no queue, no retry and no send on reconnect.
+
+### Changed
+
+- **The connection strip floats under the header, and nothing moves for it.** The band that held
+  the connection, auth and update strips painted above the header and pushed the whole page when a
+  strip came or went. It is an overlay now, anchored to the header's bottom edge with a shadow: it
+  covers the pane strip or the filter row while it shows, and the X uncovers it. The header owns the
+  notch inset for good, the "as of" chip left it, and the brand column cannot be squeezed by the
+  chips beside it. "Saved copy from …" left its own bar too: it is the first line of the transcript
+  or the mirror, where "Start of the conversation" and "Load older" sit, and scrolls with the text.
+- **The connection strip can be hidden, and the Collie mark shows the state after that.** The red
+  strip keeps one button, Retry, and gets an X. Hidden, it stays hidden for the rest of that outage
+  and comes back on the next one; recovery after a hide shows no green flash. While the connection is
+  lost, the Collie mark in the header carries a small badge with the same icon as the strip, so the
+  state stays visible with the strip gone.
+- **The offline draft note floats above the belt and can be dismissed.** "The draft stays on this
+  phone" used to open under the input field and push the field up. It now shows in the same floating
+  card as the terminal-draft notice, one notice at a time, with an X, and moves nothing. It shows
+  only on the first keystroke while offline that leaves text in the field, not on going offline.
+- **The file screen in Changes: icons, a path row, and a clearer end of the list.** The Diff, Source
+  and Preview switcher shows icons, each with its word as the title and the accessible name. A thin
+  mono row under the name shows the path from the repo root and folds the middle folders to an
+  ellipsis when the row is too narrow, the file name last to go. Previous and Next lose their border
+  and go muted when there is nothing to step to.
+- **Pairing is always on, and every request needs the token, reads included.** A bridge with no
+  paired device answers `403 device not paired` to every `/api/*` route except `/api/health` and
+  `/api/pair`, so run `collie pair` on the host first; `collie doctor` and the installers now say so.
+  Reads (the herd, panes, history, chat, changes, files, images and fonts) need a valid pairing
+  token like writes did; the crew path between bridges keeps its own trust. The gate sits in front of
+  the router with a two-entry allowlist, and a corrupt pairing file answers 503, never "not paired". The worktree list route
+  had no gate at all and now has one. This is a break for unpaired browsers on the tailnet and for
+  scripted setups (ADR 0086). Unknown `/api/*` paths answer 403 then 404 instead of the app shell.
+  Desktop browsers and scripts on the tailnet must pair once: run `collie pair` (or
+  `collie pair --expires 30d` for a script), and the script claims the code with a label such as
+  `script`; the token comes back once, in the pair answer. A CLI on the host (`doctor`, `history`,
+  the crew update sweep) reads its own bridge with a local credential the bridge writes to the state
+  directory, so nothing changes there.
+- **Rolling back below 1.18.0 ignores token expiries.** An older bridge does not know the
+  `expiresAt` field, so an expired device works again until the bridge is updated; revoke it instead
+  if that matters.
+- **A file in Files gets the screen.** On a phone the All files | Changes control and the two-row
+  file bar held the top 227 px of 844 before the first line of the file, and stayed pinned while
+  you read. While a file is open the control leaves, and the file's name, size and Source | Preview
+  control share one 44 px row, so the file starts 122 px higher.
+
+### Fixed
+
+- **Herdr 0.9.3 hid every repository from Collie.** The workspace row no longer carries the repo, so
+  the New worktree tab listed nothing and the Files view lost the workspace folder. The bridge now
+  asks Herdr's worktree list once per workspace and caches it (ADR 0032 addendum).
+- **Six older translations had lost a placeholder.** "Show in {mux}" had become "Show in the
+  terminal" in German, Spanish, Japanese, Korean and both Chinese files, and the Korean status label
+  kept an em dash. A parity test now checks every translation against English for keys,
+  placeholders and em dashes.
+- **A pane opened while offline no longer reads as gone.** A pane address carries no dashboard
+  scope, so with the bridge away the herd for that address was empty and the pane looked closed:
+  "(agent gone)", "Pane is gone". "Gone" now needs a live answer. Offline, the pane's row comes
+  from any herd the phone kept for that machine, and a pane with no saved text says "No saved copy
+  of this pane on this phone." with Send off.
+
+- **Typed characters never reach the audit log.** Type mode sends one key per character, and the
+  audit trail listed `keys` as a parameter, so a password typed on the phone landed in `audit.log`
+  character by character, even with `COLLIE_AUDIT_CONTENT=none`. Typed characters, spaces and tabs
+  are now a body: redacted under `none`, a count of `•` marks under the default preview. Named keys
+  such as Enter and Ctrl+C stay readable. Audit files written before 1.18.0 may still hold typed
+  characters; rotate or delete them.
+
+**Upstream 1.17.2 — 2026-10-06**
 ### Fixed
 
 - **The question shows once on a prompt card.** In the Terminal view, a Codex, Grok, opencode, omp or Antigravity card whose rows the card already shows no longer prints the question twice, above the card and on it. A fade now shows at the bottom of the card's command or diff while more of it continues below.

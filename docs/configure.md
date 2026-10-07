@@ -93,7 +93,7 @@ The config file groups every setting under a `[section]`. The environment name o
 | `bridge` | poll cadence, how many lines are read, where state lives |
 | `network` | the port, the bind address, allowed hosts and origins |
 | `mux` | which multiplexer this collie mirrors, and where it lives |
-| `access` | the Tailscale identity gate, the device header, the audit trail |
+| `access` | the Tailscale identity gate, the device header, the audit trail, the secret mask |
 | `push` | the three Web Push (VAPID) values |
 | `uploads` | the attachment size cap and the extra text types accepted |
 | `journal` | where each harness keeps its own session log |
@@ -523,6 +523,23 @@ In a [crew](crew.md), each machine keeps the folders that exist on it, and the s
 of the machine you picked. A machine that runs an older Collie has no list, and the sheet then shows
 none for it.
 
+## Secret masking
+
+Collie masks known secret shapes in pane text before it reaches your phone.
+
+```bash
+# in your .env; the default is on
+COLLIE_REDACT=off
+```
+
+| variable | default | what it does |
+| --- | --- | --- |
+| `COLLIE_REDACT` | `on` | Masks API keys, JWTs, PEM private keys, bearer tokens and `password=` values in the mirror, Chat, History, push notifications, file bodies in Files and diffs in Changes. `off` sends them as they are. |
+
+In the config file this is `[access] redact`. The mask keeps the width of what it hides, so the
+mirror's layout holds. It catches high-confidence shapes only; the limits are in
+[Security](security.md#what-leaves-the-machine-is-masked).
+
 ## Multi-session
 
 By default, one Collie instance serves every Herdr session it finds.
@@ -623,6 +640,53 @@ row, so you can tell a missing hook from a missing feature. `collie doctor` list
 panes under `agent-sessions` and names the integration line (`integration-<agent>`) that fixes each.
 The [troubleshooting page](troubleshooting.md) has the steps, under **a pane has no Chat or History**.
 
+## Reading offline
+
+When the bridge is out of reach, the phone shows the last copy it saved, and you can read it but not act on it.
+
+The phone keeps two things for each pane: the last terminal text it saw, and the newest Chat turns as
+Chat drew them. It never keeps the raw terminal screen as Chat. When you open Collie and the bridge
+does not answer within about a second and a half, the phone draws this saved copy at once, and
+replaces it with live data when the bridge answers.
+
+A saved copy looks different from a live screen:
+
+- The agent list is dimmed, each status is in the past tense ("was working", "needed you"), and the
+  header shows **as of** and the time it was saved.
+- A Chat pane shows "Saved copy from" and the time. The bridge still holds the older turns.
+- Prompt buttons, cards and the send button are off. A tap on a saved copy cannot reach the agent.
+
+The connection bar names one of three causes:
+
+| Bar | Cause | What the phone shows |
+| --- | --- | --- |
+| You are offline | The phone says it has no network | The saved copy, with its time |
+| No connection to the bridge. Check your connection or Tailscale. | Any other read that failed | The saved copy, with its time |
+| Pair screen | The bridge refused this device: not paired, revoked or expired | Nothing saved. The refusal deletes the copy |
+
+A VPN such as Tailscale keeps the phone's network flag on in airplane mode, so the bar cannot always
+tell "no network" from "the bridge is down". It then says only that the bridge does not answer.
+
+While the app is open, the bar and the saved copy appear on the first poll that gets no answer. A
+poll waits at most 6 seconds, one second longer than the bridge waits for the multiplexer. A server
+error (5xx) counts on the second one in a row. What is on screen stays there, and the first live
+answer brings back the live view.
+
+**Keep chat on this phone**, in **Settings → Device**, sets how long the Chat turns stay on the phone:
+
+| Value | What it does |
+| --- | --- |
+| Off | Keeps no Chat turns, and deletes the ones already kept |
+| 1 day | The default |
+| 7 days | Keeps them for a week |
+
+The terminal text has its own lifetime of 24 hours, and this setting does not change it. In the
+terminal view, the only offline copy is that terminal text.
+
+> **Note.** The phone keeps only text the bridge already masked, and drops a pane's copy while the
+> pane asks for a password. [What the phone keeps](security.md#what-the-phone-keeps) lists every
+> item, its size bound and its lifetime.
+
 ## Changes
 
 The [Files screen](changes.md) shows what an agent changed in its workspace's git repos, under its
@@ -637,7 +701,7 @@ See [Which folder, and which repos](changes.md#which-folder-and-which-repos) for
 
 ## Language
 
-Collie's interface is available in six languages. Configure this under **Settings → Appearance → Language**.
+Collie's interface is available in twelve languages. Configure this under **Settings → Appearance → Language**.
 
 - English
 - Deutsch
@@ -645,6 +709,11 @@ Collie's interface is available in six languages. Configure this under **Setting
 - 한국어
 - 日本語
 - 中文
+- Русский
+- Italiano
+- Français
+- Português
+- Türkçe
 
 The selection is saved locally in the browser per device. The terminal mirror remains untranslated:
 it displays the raw output from the agent, while quick replies, menu labels, and key caps match the

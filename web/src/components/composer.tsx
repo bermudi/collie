@@ -46,14 +46,16 @@ import {
 } from "@/lib/attachments";
 import { ctrlPresetsFor } from "@/lib/operator-keys";
 import { isDestructiveInput } from "@/lib/destructive";
-import { clearDraft, fitsDraftStore, loadDraftEntry, saveDraft } from "@/lib/drafts";
+import { fitsDraftStore, loadDraftEntry, saveDraft } from "@/lib/drafts";
+import { wipeDevice } from "@/lib/wipe";
 import { AttachmentChip, type ComposerAttachment } from "@/components/attachment-chip";
 import { useHoldReload } from "@/lib/reload-guard";
 import { isSelfEcho, normalizeDraft } from "@/hooks/use-terminal-draft";
 import { adapterFor } from "@/lib/harness";
 import { keyLabel } from "@/lib/key-queue";
 import { sendGuardedReply } from "@/lib/reply-action";
-import { TerminalDraftPreview } from "@/components/terminal-draft-preview";
+import { useLive } from "@/lib/liveness";
+import { OfflineDraftNote, TerminalDraftPreview } from "@/components/terminal-draft-preview";
 import { scopeKey, type Scope } from "@/lib/scope";
 import { DirectTypingStrip } from "@/components/direct-typing-strip";
 import { NoEchoNotice } from "@/components/no-echo-notice";
@@ -156,6 +158,14 @@ interface ComposerProps {
   /** EXPERIMENT (operator, 2026-09-23): the Changes pill on the belt's pinned block, beside the
    *  switcher mark (actions-row.tsx's `changes`). Absent when the pane reports no folder. */
   changesPill?: { onClick: () => void; label: string };
+
+  /**
+   * The parent drew this pane from the on-device cache (M46 spec 10), so nothing it shows is proven
+   * current. Together with a lapsed liveness stamp (lib/liveness.ts) it turns the SEND paths off while
+   * typing, and the draft's own save, stay on. M46 spec 11: no queue, no retry and no auto-send when
+   * the bridge comes back, because the words may answer a screen that has moved on.
+   */
+  stale?: boolean;
 }
 
 // The composer cluster at the bottom of the pane view — everything a phone keyboard can't do on its
@@ -280,7 +290,7 @@ interface ClearedDraft {
 }
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { paneId, scope, agent, isShell, gone, readOnly, composing, dialogPresent, dialogUnread, text, terminalDraft, rawTerminalDraft, prefs, display, onSent, pullHandle, draftNoticeSlot, changesPill },
+  { paneId, scope, agent, isShell, gone, readOnly, composing, dialogPresent, dialogUnread, text, terminalDraft, rawTerminalDraft, prefs, display, onSent, pullHandle, draftNoticeSlot, changesPill, stale },
   ref,
 ) {
   const revalidator = useRevalidator();
@@ -321,6 +331,28 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   // or funnelled through `pressKeys`, which is synchronous with its own check.
   const lockedRef = useRef(locked);
   lockedRef.current = locked;
+  // M46 spec 11: nothing is sent from cached state. Deliberately NOT folded into `locked`: that one
+  // also disables the field, and a person may keep typing while the bridge is away (the draft saves
+  // as before, drafts.ts). It gates every path that reaches the pane (send, raw keys, the belt) and
+  // nothing else. There is no outbox: a send refused here is gone, the draft stays in the box.
+  const live = useLive(paneId, scope);
+  const offline = stale === true || !live;
+  const offlineRef = useRef(offline);
+  offlineRef.current = offline;
+  // The one-line note while Send is off for want of a live read: what happens to the words already
+  // typed. It floats in the terminal-draft notice's slot (see `floatingNotice`), so it moves nothing.
+  // It appears only on the first keystroke made while offline that leaves text in the field (see
+  // `noteOfflineKeystroke`): not on going offline, not for a draft restored from the store, not for
+  // an emptied field. Once per pane view (this component is keyed by pane): spent when its x is
+  // tapped or when the pane is live again, so a flaky link does not repeat it.
+  const [draftNote, setDraftNote] = useState<"idle" | "shown" | "spent">("idle");
+  useEffect(() => {
+    if (draftNote === "shown" && !offline) setDraftNote("spent");
+  }, [draftNote, offline]);
+  const noteOfflineKeystroke = (value: string) => {
+    if (value === "" || !offlineRef.current) return;
+    setDraftNote((note) => (note === "idle" ? "shown" : note));
+  };
 
   // The phone-owned draft, restored from (and written through to) the per-pane draft store — the
   // pane view is keyed by paneId, so without this, stepping over to another tab mid-reply ate the
@@ -512,11 +544,13 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   /** Raise or clear the password-prompt notice. Raising it also DROPS the stored draft: at that moment
    *  we know the field holds a secret the pane never accepted, and leaving it in a 48h store to be
    *  restored on the next visit is the leak #103 asked about. The in-memory value stays — the operator
-   *  can still read it, hand it to Type, or dismiss the notice and carry on. */
+   *  can still read it, hand it to Type, or dismiss the notice and carry on. The drop goes through the
+   *  one wipe routine with this pane named (lib/wipe.ts, M46 spec 02); its draft half is synchronous,
+   *  so the store is empty in this tick. */
   function noticeNoEcho(next: { prompt: string; typed: boolean } | null) {
     noEchoRef.current = next;
     setNoEcho(next);
-    if (next !== null) clearDraft(scope, paneId);
+    if (next !== null) void wipeDevice("password", { scope, paneId });
   }
 
   // The pane-change effect below is a LIFECYCLE handler, not a reactive computation: it must fire
@@ -697,6 +731,22 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       </div>
     ) : null;
 
+  // The offline draft note shares that slot, and the slot holds one notice: when both are due, the
+  // terminal draft wins and the note waits (still `shown`) until that notice is gone or dismissed.
+  const offlineNote =
+    draftNotice === null && draftNote === "shown" && offline ? (
+      <div
+        data-slot="offline-draft-note"
+        className={cn(
+          "pointer-events-none",
+          draftNoticeSlot ? undefined : "absolute inset-x-3 bottom-full z-20 mb-2",
+        )}
+      >
+        <OfflineDraftNote onDismiss={() => setDraftNote("spent")} />
+      </div>
+    ) : null;
+  const floatingNotice = draftNotice ?? offlineNote;
+
   // Take over: the explicit "I'll handle this on mobile now" action. One-shot COPY of the current raw
   // draft into the composer (set on an empty input, else appended on a new line so mobile-typed work
   // survives), mark that exact text handled (so it can't instantly re-latch the preview — the raw line
@@ -780,6 +830,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   async function send(value: string, isDraft: boolean, force = false): Promise<boolean> {
     const t = value.trim();
     if (!t || locked || sending) return false;
+    if (offlineRef.current) {
+      setStatus(translate("composer.send.reconnect"), "error");
+      return false;
+    }
     // A dialog on screen owns the TUI's keyboard: our text is swallowed and the submit key ANSWERS
     // the dialog, approving whatever option was highlighted (#34). Refuse BEFORE the destructive
     // pre-clear sweep below — those ctrl+k/Backspaces would land in the dialog too. The input is
@@ -1021,6 +1075,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   // the status channel; the echo just falls back to idle.
   async function pressKeys(k: string[]): Promise<boolean> {
     if (locked) return false;
+    if (offlineRef.current) {
+      setStatus(translate("composer.send.reconnect"), "error");
+      return false;
+    }
     // Every raw key reaches the pane through here — the Keys dock (NavTray's `onSend`), the direct
     // typing mode (useDirectTyping's `sendKeys`) and the prompt buttons that hand keys to the tray.
     // No stamp here: `api.sendKeys` starts the poll burst for every key written.
@@ -1329,7 +1387,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               onSend={pressKeys}
               presets={keyPresets}
               onQueueChange={setQueuedKeys}
-              disabled={locked}
+              disabled={locked || offline}
             />
           </ComposerDock>
         )}
@@ -1340,7 +1398,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               onClose={closeDrawer}
               agent={agent}
               isShell={isShell}
-              disabled={locked || sending}
+              disabled={locked || offline || sending}
             />
           </ComposerDock>
         )}
@@ -1507,8 +1565,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             stays here under that name is the verification half, and the strip itself says why. */}
         {/* The terminal-draft notice is NOT one of these strips any more (ADR 0061). It floats over
             the mirror's bottom edge, out of this flow, so a draft stranding or clearing on the host
-            never moves the belt or the field. See `draftNotice` above; it renders here. */}
-        {draftNoticeSlot ? createPortal(draftNotice, draftNoticeSlot) : draftNotice}
+            never moves the belt or the field. The offline draft note left this flow for the same
+            reason and shares that slot, one notice at a time. See `floatingNotice` above; it renders
+            here. */}
+        {draftNoticeSlot ? createPortal(floatingNotice, draftNoticeSlot) : floatingNotice}
         {/* The password-prompt notice (#103). Sits here, in the same in-flow slot as the other
             strips, because that is where the eye already is when a send is refused — and it is a
             NOTICE beside the unchanged "Type anyway?" override, never a replacement for it. */}
@@ -1645,6 +1705,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                 : (e) => {
                     rememberCaret(e);
                     updateInput(e.target.value);
+                    noteOfflineKeystroke(e.target.value);
                   }
             }
             onSelect={direct.active ? undefined : rememberCaret}
@@ -1819,8 +1880,9 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               variant="destructive"
               className={cn(TOOLBAR_TAP_TARGET, "h-9 shrink-0 rounded-md px-3 text-sm font-semibold")}
               onClick={onSendClick}
-              disabled={locked || !hasDraft || sending}
-              aria-label={translate("composer.send.typeAnyway")}
+              disabled={locked || offline || !hasDraft || sending}
+              title={offline ? translate("composer.send.reconnect") : undefined}
+              aria-label={offline ? translate("composer.send.reconnect") : translate("composer.send.typeAnyway")}
             >
               {translate("composer.send.typeAnyway")}
             </Button>
@@ -1829,8 +1891,9 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               variant="destructive"
               className={cn(TOOLBAR_TAP_TARGET, "h-9 shrink-0 rounded-md px-3 text-sm font-semibold")}
               onClick={onSendClick}
-              disabled={locked || !hasDraft || sending}
-              aria-label={translate("composer.send.reallySend")}
+              disabled={locked || offline || !hasDraft || sending}
+              title={offline ? translate("composer.send.reconnect") : undefined}
+              aria-label={offline ? translate("composer.send.reconnect") : translate("composer.send.reallySend")}
             >
               {translate("composer.send.reallySend")}
             </Button>
@@ -1839,11 +1902,14 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               size="icon"
               className={cn(TOOLBAR_TAP_TARGET, "size-9 shrink-0 rounded-full")}
               onClick={direct.active ? () => direct.deactivate() : onSendClick}
-              disabled={locked || sending}
+              disabled={locked || sending || (offline && !direct.active)}
+              title={offline && !direct.active ? translate("composer.send.reconnect") : undefined}
               aria-label={
                 direct.active
                   ? translate("composer.send.stopTypingAria")
-                  : translate("composer.send.sendAria")
+                  : offline
+                    ? translate("composer.send.reconnect")
+                    : translate("composer.send.sendAria")
               }
               aria-pressed={direct.active}
             >

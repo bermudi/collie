@@ -99,11 +99,10 @@ describe("StripHost — the top band, one winner", () => {
     expect(layers(container)).toHaveLength(0);
   });
 
-  it("owns the safe-area inset, so no strip carries one", () => {
-    // Three of the four strips this replaces set env(safe-area-inset-top) themselves and one does
-    // not, so which strip you are looking at decides whether the band clears the notch. One owner,
-    // one answer — and it is the row, because it is a fact about position in the viewport, not
-    // about the notice.
+  it("reserves no safe-area inset, and neither does any strip in it", () => {
+    // The band hangs UNDER the header since 2026-10-07, so it is never the first thing on the
+    // screen and the notch is never its to clear. The header owns the inset in every state
+    // (`app-header.tsx`); a reservation here would pay for the notch twice while a strip shows.
     const { container } = render(
       <StripHost>
         <StripSlot priority={10}>
@@ -113,10 +112,115 @@ describe("StripHost — the top band, one winner", () => {
         </StripSlot>
       </StripHost>,
     );
-    const row = container.querySelector("[class*='safe-area-inset-top']");
-    expect(row).not.toBeNull();
-    expect(row?.contains(layers(container)[0] ?? null)).toBe(true);
+    expect(layers(container)).toHaveLength(1);
+    expect(container.querySelectorAll("[class*='safe-area-inset-top']")).toHaveLength(0);
     expect(screen.getByText("copy").className).not.toMatch(/safe-area/);
+  });
+
+  it("paints the band BEFORE its children, which is what hangs it from the header's bottom edge", () => {
+    // `routes/root.tsx` mounts this host inside the header host, around the outlet. The anchor then
+    // comes right after the header (the header host renders its bar first) and before the route
+    // (this host renders the anchor first), so the band hangs from the bar's bottom edge, over the
+    // top of the route.
+    render(
+      <StripHost>
+        <StripSlot priority={10}>
+          <Notice tone="info" variant="strip">
+            copy
+          </Notice>
+        </StripSlot>
+        <main>route</main>
+      </StripHost>,
+    );
+    const strip = screen.getByText("copy");
+    const route = screen.getByText("route");
+    expect(strip.compareDocumentPosition(route) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("hangs the band as an overlay from a zero-height anchor, so it reserves no space", () => {
+    // 2026-10-07: an outage shoved the pane strip down, and the operator does not want layout
+    // shifts. The band covers whatever sits under the header instead. jsdom cannot measure, so the
+    // contract is asserted as classes: the anchor is in flow at zero height and owns the rung, and
+    // the band is absolutely positioned from its top edge with the page colour and a shadow.
+    const { container } = render(
+      <StripHost>
+        <StripSlot priority={10}>
+          <Notice tone="danger" variant="strip">
+            copy
+          </Notice>
+        </StripSlot>
+        <main>route</main>
+      </StripHost>,
+    );
+    const anchor = container.querySelector('[data-slot="strip-anchor"]');
+    expect(anchor).toHaveClass("relative", "z-30", "h-0", "shrink-0");
+    expect(anchor).toHaveAttribute("data-placement", "overlay");
+    const band = anchor?.querySelector(':scope > [data-slot="collapse"]');
+    expect(band).toHaveClass("absolute", "inset-x-0", "top-0", "bg-background", "shadow-md");
+    expect(band).toContainElement(screen.getByText("copy"));
+    // The route is the anchor's next sibling, not its child, so nothing it lays out depends on the band.
+    expect(anchor).not.toContainElement(screen.getByText("route"));
+  });
+
+  it("leaves the route's box untouched whether or not a strip is registered", () => {
+    // The route must not reserve, pad or offset anything for the band. Render the same tree with and
+    // without a strip: the route's wrapper and the anchor are byte-for-byte the same element both times.
+    const route = (
+      <div data-slot="route" className="flex min-h-0 flex-1 flex-col">
+        route
+      </div>
+    );
+    const bare = render(<StripHost>{route}</StripHost>);
+    const bareRoute = bare.container.querySelector('[data-slot="route"]')?.outerHTML;
+    const bareAnchorClass = bare.container.querySelector('[data-slot="strip-anchor"]')?.className;
+    bare.unmount();
+
+    const withStrip = render(
+      <StripHost>
+        <StripSlot priority={10}>
+          <Notice tone="danger" variant="strip">
+            copy
+          </Notice>
+        </StripSlot>
+        {route}
+      </StripHost>,
+    );
+    expect(withStrip.container.querySelector('[data-slot="route"]')?.outerHTML).toBe(bareRoute);
+    expect(withStrip.container.querySelector('[data-slot="strip-anchor"]')?.className).toBe(bareAnchorClass);
+    expect(bareRoute).not.toMatch(/\b(?:p|pt|m|mt)-|safe-area/);
+  });
+
+  it("casts no shadow while the band is empty", () => {
+    // The surface lives on the Collapse, which only exists while a strip is rendered, so an empty
+    // anchor paints nothing at all: no page-colour slab, no shadow line under the header.
+    const { container } = render(
+      <StripHost>
+        <main>route</main>
+      </StripHost>,
+    );
+    const anchor = container.querySelector('[data-slot="strip-anchor"]');
+    expect(anchor).toBeInTheDocument();
+    expect(anchor?.children).toHaveLength(0);
+    expect(container.querySelector(".shadow-md")).toBeNull();
+  });
+
+  it("paints the band in flow, with no overlay classes, only when a stage asks for it", () => {
+    // The playground's single-strip cards have no route under the band, so an overlay would hang
+    // outside their clipped box. `flow` is their escape, and the app never sets it.
+    const { container } = render(
+      <StripHost flow>
+        <StripSlot priority={10}>
+          <Notice tone="info" variant="strip">
+            copy
+          </Notice>
+        </StripSlot>
+      </StripHost>,
+    );
+    const anchor = container.querySelector('[data-slot="strip-anchor"]');
+    expect(anchor).toHaveAttribute("data-placement", "flow");
+    expect(anchor?.className ?? "").not.toMatch(/\b(?:h-0|absolute|z-30)\b/);
+    const band = anchor?.querySelector('[data-slot="collapse"]');
+    expect(band?.className).not.toMatch(/\b(?:absolute|shadow-md)\b/);
   });
 
   it("keeps painting the last strip while the band collapses", () => {

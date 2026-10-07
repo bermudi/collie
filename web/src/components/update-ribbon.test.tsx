@@ -12,7 +12,7 @@ import { UpdateRibbon } from "./update-ribbon";
 
 // The ONE update band. The reading behind it is pinned in `lib/update-ribbon.test.ts`; this file is
 // about the row that reaches the screen — its words, its tap, its dismiss, and what it does and does
-// NOT own now that the band above the header owns the row it appears in.
+// NOT own now that the band under the header owns the row it appears in.
 //
 // THE COMPONENT DRAWS NOTHING WHERE IT SITS. It registers a `StripSlot` and `ui/strip-host.tsx`
 // paints the winner, so every case here mounts the real host — a ribbon rendered without one is

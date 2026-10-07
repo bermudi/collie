@@ -24,6 +24,7 @@ import {
   SEEN_HEADER,
   deviceAuth,
   guard,
+  type PairingGate,
   historyParams,
   isHostAllowed,
   isLoopbackPeer,
@@ -56,12 +57,21 @@ import {
   type ReplySender,
   stripMount,
   mountIndexHtml,
+  withHsts,
+  arrivedOverHttps,
 } from "./server.ts";
+import {
+  createPairLimiter,
+  pairSourceKey,
+  PAIR_ATTEMPTS_PER_WINDOW,
+  PAIR_WINDOW_MS,
+} from "./pair-limit.ts";
 import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, truncate, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 
 import { AuditLog, type AuditEntry } from "./audit.ts";
+import { PairingStore, sha256Hex, type PairingIo } from "./pairing.ts";
 import { FolderStore, MAX_FAVOURITES, MAX_FOLDER_CHARS } from "./folders.ts";
 import type { SessionRuntime } from "./sessions.ts";
 import type { Config } from "./config.ts";
@@ -152,6 +162,7 @@ function cfg(overrides: Partial<Config> = {}): Config {
     accessTeam: "",
     accessAud: [],
     auditContent: "preview",
+    redact: true,
     deviceHeader: "",
     deviceAllowlist: [],
     allowedOrigins: [],
@@ -1108,6 +1119,20 @@ describe("paneReadResponse — pane read → REST body", () => {
     });
   });
 
+  // M46: the mirror's one choke point. Placeholder only, joined at runtime so no secret scan trips.
+  test("redact: a placeholder key is masked at the same width, its colours intact; off leaves it", () => {
+    const key = ["AKIA", "PLACEHOLDER00000"].join("");
+    const esc = String.fromCodePoint(0x1b);
+    const text = `$ env\n${esc}[32mAWS_ACCESS_KEY_ID${esc}[0m=${key}\n$ `;
+    const read: MuxGrid = { paneId: "w1:p1", text, truncated: false, revision: 7 };
+    const masked = paneReadResponse("w1:p1", read, `AWS_ACCESS_KEY_ID=${key}`, true);
+    expect(masked.text).toBe(`$ env\n${esc}[32mAWS_ACCESS_KEY_ID${esc}[0m=AKIA${"•".repeat(16)}\n$ `);
+    expect(masked.text.length).toBe(text.length);
+    expect(masked.logicalText).toBe(`AWS_ACCESS_KEY_ID=AKIA${"•".repeat(16)}`);
+    expect(masked.revision).toBe(7);
+    expect(paneReadResponse("w1:p1", read, undefined, false).text).toBe(text);
+  });
+
   test("carries a zero revision unchanged (fresh pane) rather than dropping the field", () => {
     const read: MuxGrid = { paneId: "w2:p1", text: "", truncated: false, revision: 0 };
     expect(paneReadResponse("w2:p1", read)).toEqual({
@@ -1279,9 +1304,10 @@ describe("guard applies the device gate to writes only", () => {
 
 // ── Device pairing composed into the write gate (bridge/pairing.ts) ────────────────────────────
 // The pairing module is exhaustively covered in bridge/pairing.test.ts. What is pinned HERE is the
-// wiring — which is where a security feature actually lives: that an empty registry changes nothing,
-// that a non-empty one gates writes and not reads, that the two device gates compose by AND rather
-// than either replacing the other, and that attribution prefers the label.
+// wiring — which is where a security feature actually lives: that pairing is always on, so an empty
+// registry refuses reads and writes alike; that a read needs the token as much as a write does
+// (ADR 0086); that the two device gates compose by AND rather than either replacing the other; and
+// that attribution prefers the label.
 describe("guard — the pairing gate composes with the header gate", () => {
   const HDR = "x-device-id";
   /** A minimal PairingGate: `labels` are the paired tokens, keyed by token. */
@@ -1293,14 +1319,16 @@ describe("guard — the pairing gate composes with the header gate", () => {
   const paired = gateOf({ "tok-phone": "phone" });
   const nothingPaired = gateOf({});
 
-  const write = (c: Config, headers: Record<string, string>, gate?: ReturnType<typeof gateOf>) =>
+  const write = (c: Config, headers: Record<string, string>, gate?: PairingGate) =>
     guard(req({ host: "collie.ts.net", origin: "https://collie.ts.net", ...headers }), c, "write", gate);
-  const read = (c: Config, headers: Record<string, string>, gate?: ReturnType<typeof gateOf>) =>
+  const read = (c: Config, headers: Record<string, string>, gate?: PairingGate) =>
     guard(req({ host: "collie.ts.net", ...headers }), c, "read", gate);
 
-  test("an empty registry enforces nothing — the feature is off until something is paired", () => {
-    expect(write(cfg(), {}, nothingPaired)).toBeNull();
-    // …and so is passing no gate at all, which is what every pre-pairing call site did.
+  test("empty registry: a read and a write are both refused as unpaired (always on, ADR 0086)", async () => {
+    expect(await write(cfg(), {}, nothingPaired)!.text()).toBe("device not paired");
+    expect(await read(cfg(), {}, nothingPaired)!.text()).toBe("device not paired");
+    expect(read(cfg(), { authorization: "Bearer anything" }, nothingPaired)!.status).toBe(403);
+    // Passing no gate at all is a server built without a store — a unit test's, never index.ts's.
     expect(write(cfg(), {})).toBeNull();
   });
 
@@ -1322,14 +1350,29 @@ describe("guard — the pairing gate composes with the header gate", () => {
     expect(write(cfg(), { authorization: "bearer  tok-phone " }, paired)).toBeNull();
   });
 
-  test("reads are unaffected — parity with the header gate, which is also write-only", () => {
-    expect(read(cfg(), {}, paired)).toBeNull();
-    expect(read(cfg(), { authorization: "Bearer wrong" }, paired)).toBeNull();
+  test("read: refused without a token or with a wrong one, and passes with a valid one (ADR 0086)", async () => {
+    const unpaired = read(cfg(), {}, paired)!;
+    expect(unpaired.status).toBe(403);
+    expect(await unpaired.text()).toBe("device not paired");
+    expect(await read(cfg(), { authorization: "Bearer wrong" }, paired)!.text()).toBe("device not paired");
+    // …with no Origin at all: a browser sends none on a same-origin GET.
+    expect(read(cfg(), { authorization: "Bearer tok-phone" }, paired)).toBeNull();
+  });
+
+  test("read: the header gate stays write-only, so an unlisted device with a token still reads", () => {
+    const c = cfg({ deviceHeader: HDR, deviceAllowlist: ["phone"] });
+    expect(read(c, { [HDR]: "tablet", authorization: "Bearer tok-phone" }, paired)).toBeNull();
+    expect(read(c, { authorization: "Bearer tok-phone" }, paired)).toBeNull();
+  });
+
+  test("read: an access refusal still comes first, so a cross-origin read names the origin", async () => {
+    const denied = read(cfg(), { origin: "https://evil.example" }, paired)!;
+    expect(await denied.text()).toBe("cross-origin rejected");
   });
 
   // The Files view (ADR 0083): a read that needs the write level's device factors, both of them,
   // without the write level's `Origin` rule — a browser sends no `Origin` on a same-origin GET.
-  const deviceRead = (c: Config, headers: Record<string, string>, gate?: ReturnType<typeof gateOf>) =>
+  const deviceRead = (c: Config, headers: Record<string, string>, gate?: PairingGate) =>
     guard(req({ host: "collie.ts.net", ...headers }), c, "device-read", gate);
 
   test("device-read: pairing refuses an unpaired device and lets a paired one read, with no Origin", async () => {
@@ -1338,8 +1381,8 @@ describe("guard — the pairing gate composes with the header gate", () => {
     expect(await denied!.text()).toBe("device not paired");
     expect(deviceRead(cfg(), { authorization: "Bearer wrong" }, paired)!.status).toBe(403);
     expect(deviceRead(cfg(), { authorization: "Bearer tok-phone" }, paired)).toBeNull();
-    // Nothing paired and no header gate: open, like a write is.
-    expect(deviceRead(cfg(), {}, nothingPaired)).toBeNull();
+    // Nothing paired and no header gate: refused, like a write and a read are (always on).
+    expect(await deviceRead(cfg(), {}, nothingPaired)!.text()).toBe("device not paired");
   });
 
   test("device-read: the header gate refuses an unlisted or absent device", async () => {
@@ -1369,10 +1412,42 @@ describe("guard — the pairing gate composes with the header gate", () => {
     expect(write(c, { "x-device-id": "phone", authorization: "Bearer tok-phone" }, paired)).toBeNull();
   });
 
-  test("the header gate is untouched when nothing is paired", async () => {
+  // M46 spec 01: the real PairingStore, not a stub, so the refusal text is the one the phone gets.
+  test("an expired token is refused with its own text, on a write and on a device-read", async () => {
+    const hash = sha256Hex;
+    const registry = {
+      devices: [
+        { label: "old", tokenHash: hash("tok-old"), createdAt: 1, lastSeenAt: 1, expiresAt: 1000 },
+        { label: "phone", tokenHash: hash("tok-phone"), createdAt: 1, lastSeenAt: 1 },
+      ],
+    };
+    const io: PairingIo = {
+      readPending: async () => null,
+      writePending: async () => {},
+      deletePending: async () => {},
+      readRegistry: async () => registry,
+      writeRegistry: async () => {},
+      readRegistrySync: () => registry,
+    };
+    const store = new PairingStore(io, () => 2000);
+    const expired = write(cfg(), { authorization: "Bearer tok-old" }, store)!;
+    expect(expired.status).toBe(403);
+    expect(await expired.text()).toBe("device expired");
+    expect(await deviceRead(cfg(), { authorization: "Bearer tok-old" }, store)!.text()).toBe("device expired");
+    // Not paired stays "not paired", and a live token still passes.
+    expect(await write(cfg(), { authorization: "Bearer nope" }, store)!.text()).toBe("device not paired");
+    expect(await write(cfg(), {}, store)!.text()).toBe("device not paired");
+    expect(write(cfg(), { authorization: "Bearer tok-phone" }, store)).toBeNull();
+    // A read is refused the same way (ADR 0086): an expired token reads nothing either.
+    expect(await read(cfg(), { authorization: "Bearer tok-old" }, store)!.text()).toBe("device expired");
+    expect(read(cfg(), { authorization: "Bearer tok-phone" }, store)).toBeNull();
+  });
+
+  test("with nothing paired the header gate still answers first, and pairing then refuses", async () => {
     const c = cfg({ deviceHeader: HDR, deviceAllowlist: ["phone"] });
     expect((await write(c, {}, nothingPaired)!.text())).toBe("device not authorised");
-    expect(write(c, { "x-device-id": "phone" }, nothingPaired)).toBeNull();
+    // An allowlisted header is no longer enough on its own: there is no "off until paired" state.
+    expect(await write(c, { "x-device-id": "phone" }, nothingPaired)!.text()).toBe("device not paired");
   });
 
   test("the same-origin gate still runs first — a token is no substitute for an Origin", () => {
@@ -1387,6 +1462,26 @@ describe("guard — the pairing gate composes with the header gate", () => {
   });
 });
 
+// The pairing refusals carry no `Clear-Site-Data` (it was M46 spec 02's backstop, and was dropped):
+// the header also clears the preferences in localStorage, unregisters the service worker and its
+// precache, and on a shared origin reaches a sibling mount. The phone's own wipe is the one mechanism.
+describe("guard — no pairing refusal carries Clear-Site-Data", () => {
+  const paired = {
+    resolve: (token: string | null) => (token === "tok-phone" ? { label: "phone" } : null),
+    expired: (token: string | null) => token === "tok-old",
+  };
+  test("neither \"device not paired\" nor \"device expired\" asks the browser to clear anything", async () => {
+    const write = (headers: Record<string, string>) =>
+      guard(req({ host: "collie.ts.net", origin: "https://collie.ts.net", ...headers }), cfg(), "write", paired)!;
+    const revoked = write({ authorization: "Bearer revoked" });
+    expect(await revoked.text()).toBe("device not paired");
+    expect(revoked.headers.get("clear-site-data")).toBeNull();
+    const expired = write({ authorization: "Bearer tok-old" });
+    expect(await expired.text()).toBe("device expired");
+    expect(expired.headers.get("clear-site-data")).toBeNull();
+  });
+});
+
 describe("requestDevice — attribution across both gates", () => {
   const HDR = "x-device-id";
   const gateOf = (tokens: Record<string, string>) => ({
@@ -1396,12 +1491,17 @@ describe("requestDevice — attribution across both gates", () => {
   });
   const paired = gateOf({ "tok-phone": "phone" });
 
-  test("with nothing paired it is exactly deviceAuth — an unpaired deployment sees no change", () => {
+  test("with no store it is exactly deviceAuth; with an empty registry it is enforced and unauthorised", () => {
     for (const c of [cfg(), cfg({ deviceHeader: HDR, deviceAllowlist: ["desk"] })]) {
       const cases: Record<string, string>[] = [{ host: "h" }, { host: "h", "x-device-id": "desk" }];
       for (const headers of cases) {
-        expect(requestDevice(req(headers), c, gateOf({}))).toEqual(deviceAuth(req(headers), c));
         expect(requestDevice(req(headers), c)).toEqual(deviceAuth(req(headers), c));
+        // Always on (ADR 0086): an empty registry reports enforcement and authorises nobody.
+        expect(requestDevice(req(headers), c, gateOf({}))).toEqual({
+          enforced: true,
+          device: deviceAuth(req(headers), c).device,
+          authorized: false,
+        });
       }
     }
   });
@@ -1441,6 +1541,67 @@ describe("requestDevice — attribution across both gates", () => {
       requestDevice(req({ host: "h", "x-device-id": "intruder", authorization: "Bearer tok-phone" }), c, paired),
     ).toEqual({ enforced: true, device: "phone", authorized: false });
   });
+});
+
+// ── Open routes (M46 specs 03 and 06, ADR 0086) ─────────────────────────────────────────────
+// Reads need the pairing token, and pairing is always on. The open-route list is short and named:
+// `/api/health` and `/api/pair`. The crew surface (`/crew/v1/*`) and the standby door have their own
+// admission and never reach `guard`. `bun test` cannot stand up `Bun.serve` (CLAUDE.md), so the
+// route table is read from the source, the way `solo-baseline.test.ts` pins it: every block that
+// claims an `/api` path must ask a gate before it answers, except the two named here.
+describe("open routes — every /api route but health and pair asks the pairing gate", () => {
+  const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
+  const SITE =
+    /^(\s*)(?:if \(|const \w+Match = )pathname(?: === ("\/api\/[^"]+"|MUX_LOGO_PATH)|\.startsWith\((OPERATOR_FONTS_PATH|"\/api\/")\)|\.match\((\w+_ROUTE)\))/;
+  const GATE = /guard\(req, cfg|caller\.gate\(|browserGate\(/;
+
+  /** Every route block in server.ts: the route's name and whether its body asks a gate. */
+  function routeBlocks(): { route: string; gated: boolean }[] {
+    const out: { route: string; gated: boolean }[] = [];
+    let offset = 0;
+    for (const line of src.split("\n")) {
+      const m = SITE.exec(line);
+      if (m !== null) {
+        const end = src.indexOf(`\n${m[1]}}\n`, offset);
+        const block = src.slice(offset, end);
+        out.push({ route: m[2] ?? m[3] ?? m[4]!, gated: GATE.test(block) });
+      }
+      offset += line.length + 1;
+    }
+    return out;
+  }
+
+  test("open routes: only /api/health and /api/pair answer without asking a gate", () => {
+    const blocks = routeBlocks();
+    // The scan found the table, not a handful of lines: the pane family, the blobs, the snapshot.
+    expect(blocks.length).toBeGreaterThan(30);
+    expect(blocks.map((b) => b.route)).toContain("BLOB_ROUTE");
+    expect(blocks.map((b) => b.route)).toContain('"/api/snapshot"');
+    expect(blocks.filter((b) => !b.gated).map((b) => b.route).toSorted()).toEqual(['"/api/health"', '"/api/pair"']);
+  });
+
+  test("open routes: the snapshot asks guard, not a bare checkAccess", () => {
+    const at = src.indexOf('if (pathname === "/api/snapshot")');
+    const handler = src.slice(at, src.indexOf("\n      }\n", at));
+    expect(handler).toContain('guard(req, cfg, "read", pairingGate)');
+    expect(handler).not.toContain("checkAccess(");
+  });
+
+  test("open routes: an /api path no route claims is gated, then 404, never the app shell", () => {
+    const at = src.indexOf('if (pathname.startsWith("/api/")) {');
+    expect(at).toBeGreaterThan(src.indexOf('if (pathname === "/api/devices/revoke"'));
+    expect(at).toBeLessThan(src.indexOf("return serveStatic(pathname"));
+    const handler = src.slice(at, src.indexOf("\n      }\n", at));
+    expect(handler).toContain('guard(req, cfg, "read", pairingGate)');
+    expect(handler).toContain('text("not found", 404)');
+  });
+
+  test("open routes: the pair bootstrap still asks the front door, as a write", () => {
+    const at = src.indexOf('if (pathname === "/api/pair" && req.method === "POST")');
+    const handler = src.slice(at, src.indexOf("\n      }\n", at));
+    expect(handler).toContain('checkAccess(req, cfg, "write")');
+  });
+
 });
 
 describe("parsePairRequest — the bootstrap body", () => {
@@ -1640,7 +1801,7 @@ describe("isLoopbackPeer", () => {
   // caller on a wide bind.
   test("the peer-address check is the first act of the fetch handler", () => {
     const src = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
-    const fetchAt = src.indexOf("async fetch(req) {");
+    const fetchAt = src.indexOf("withHsts(async (req: Request) => {");
     const peerCheck = src.indexOf("isLoopbackPeer(server.requestIP(req)?.address)");
     expect(fetchAt).toBeGreaterThan(-1);
     expect(peerCheck).toBeGreaterThan(fetchAt);
@@ -2149,6 +2310,9 @@ describe("the snapshot view — `?sessions=all` widens one machine's pane lists"
   });
 });
 
+// POST /api/launch — the launcher rows' one-tap: a Space whose cwd and label come from the row,
+// then the command plus a bare Enter typed into its fresh shell. The configured rows ARE the
+// allowlist, so the first thing asserted is that an unlisted command touches the multiplexer at all.
 describe("launch — an allowlisted space create, then the command and Enter", () => {
   /** What a phone posts here: a row's `command`, and optionally the pane to open a tab beside. */
   interface LaunchBody {
@@ -3018,7 +3182,7 @@ describe("GET /api/blobs/<hash> — one content-addressed image, off the disk th
   test("a name that is not a 64-hex digest is refused before any path exists", async () => {
     const { sessions, base } = await blobStore();
     for (const bad of ["not-a-hash", "1234", "../../etc/passwd", `${hash}x`]) {
-      const res = await blobRoute(bad, [sessions], null);
+      const res = await blobRoute(bad, [sessions]);
       expect(res.status).toBe(400);
     }
     await rm(base, { recursive: true, force: true });
@@ -3026,7 +3190,7 @@ describe("GET /api/blobs/<hash> — one content-addressed image, off the disk th
 
   test("a well-formed hash nothing holds is a 404 — the same answer containment failure gives", async () => {
     const { sessions, base } = await blobStore();
-    const res = await blobRoute(hash, [sessions], null);
+    const res = await blobRoute(hash, [sessions]);
     expect(res.status).toBe(404);
     await rm(base, { recursive: true, force: true });
   });
@@ -3037,21 +3201,22 @@ describe("GET /api/blobs/<hash> — one content-addressed image, off the disk th
     await writeFile(path, "");
     // Sparse, so the test costs no 16 MiB of bytes to prove the cap is on the SIZE.
     await truncate(path, BLOB_MAX_BYTES + 1);
-    const res = await blobRoute(hash, [sessions], null);
+    const res = await blobRoute(hash, [sessions]);
     expect(res.status).toBe(413);
     expect(await res.text()).toContain("too large");
     await rm(base, { recursive: true, force: true });
   });
 
-  test("a png answers 200 with its sniffed type, an immutable cache header, and the hash as ETag", async () => {
+  test("a png answers 200 with its sniffed type, private no-store, and no ETag", async () => {
     const { sessions, blobs, base } = await blobStore();
     await Bun.write(join(blobs, hash), PNG_HEAD);
-    const res = await blobRoute(hash, [sessions], null);
+    const res = await blobRoute(hash, [sessions]);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/png");
-    expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
-    // The ETag IS the hash: the store is content-addressed, so nothing is re-hashed to learn it.
-    expect(res.headers.get("etag")).toBe(`"${hash}"`);
+    // Session content: the browser's HTTP cache survives the phone's wipe, so nothing keeps it.
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    // No validator: with nothing stored, no browser has one to send back.
+    expect(res.headers.get("etag")).toBeNull();
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(PNG_HEAD);
     await rm(base, { recursive: true, force: true });
   });
@@ -3059,18 +3224,8 @@ describe("GET /api/blobs/<hash> — one content-addressed image, off the disk th
   test("a jpeg is sniffed from its own bytes — the file has no extension to guess from", async () => {
     const { sessions, blobs, base } = await blobStore();
     await Bun.write(join(blobs, hash), JPEG_HEAD);
-    const res = await blobRoute(hash, [sessions], null);
+    const res = await blobRoute(hash, [sessions]);
     expect(res.headers.get("content-type")).toBe("image/jpeg");
-    await rm(base, { recursive: true, force: true });
-  });
-
-  test("if-none-match on the hash is a 304 with no body", async () => {
-    const { sessions, blobs, base } = await blobStore();
-    await Bun.write(join(blobs, hash), PNG_HEAD);
-    const res = await blobRoute(hash, [sessions], `"${hash}"`);
-    expect(res.status).toBe(304);
-    expect(res.headers.get("etag")).toBe(`"${hash}"`);
-    expect(await res.text()).toBe("");
     await rm(base, { recursive: true, force: true });
   });
 
@@ -3259,5 +3414,116 @@ describe("an input written to a pane makes its engine hot", () => {
     expect(src).toContain("return afterPaneInput(rt.engine, await replyPane(");
     expect(src).toContain("return afterPaneInput(rt.engine, await keysPane(");
     expect([...src.matchAll(/afterPaneInput\(/g)]).toHaveLength(3); // the definition and two calls
+  });
+});
+
+// M46 spec 05: the response headers every answer carries, and the blob cache rule.
+describe("security headers on the app shell", () => {
+  async function shell() {
+    const dir = await mkdtemp(join(tmpdir(), "collie-shell-"));
+    await writeFile(join(dir, "index.html"), "<!doctype html><title>x</title>");
+    const res = await serveStatic("/", null, dir);
+    await rm(dir, { recursive: true, force: true });
+    return res;
+  }
+
+  test("Permissions-Policy denies the unused features and keeps microphone=(self)", async () => {
+    const policy = (await shell()).headers.get("permissions-policy") ?? "";
+    expect(policy).toContain("microphone=(self)");
+    for (const denied of ["camera=()", "geolocation=()", "payment=()", "usb=()"]) {
+      expect(policy).toContain(denied);
+    }
+  });
+
+  test("the CSP adds object-src 'none' and form-action 'self' and keeps the rest", async () => {
+    const csp = (await shell()).headers.get("content-security-policy") ?? "";
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("form-action 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("script-src 'self'");
+  });
+
+  test("Strict-Transport-Security is absent over plain HTTP", async () => {
+    const handler = withHsts(async () => new Response("ok"));
+    const res = await handler(new Request("http://bluefin:8788/"));
+    expect(res.headers.get("strict-transport-security")).toBeNull();
+  });
+
+  test("Strict-Transport-Security is sent when x-forwarded-proto says https", async () => {
+    const handler = withHsts(async () => new Response("ok"));
+    const res = await handler(new Request("http://127.0.0.1:8788/", { headers: { "x-forwarded-proto": "https" } }));
+    expect(res.headers.get("strict-transport-security")).toBe("max-age=63072000");
+  });
+
+  test("Strict-Transport-Security is sent on a TLS listener's own https URL", async () => {
+    const handler = withHsts(async () => new Response("ok"));
+    const res = await handler(new Request("https://collie.example/"));
+    expect(res.headers.get("strict-transport-security")).toBe("max-age=63072000");
+    expect(arrivedOverHttps(new Request("http://collie.example/", { headers: { "x-forwarded-proto": "http" } }))).toBe(false);
+  });
+});
+
+// M46 spec 05: the POST /api/pair outer brake. The route itself needs Bun.serve, so the limiter and
+// the source key are exercised directly.
+describe("pair attempt rate limit", () => {
+  test("the 11th attempt inside a minute is refused, and the burst is flagged once", () => {
+    const limiter = createPairLimiter();
+    for (let i = 0; i < PAIR_ATTEMPTS_PER_WINDOW; i++) {
+      expect(limiter.hit("100.64.0.9", 1_000 + i).allowed).toBe(true);
+    }
+    expect(limiter.hit("100.64.0.9", 2_000)).toEqual({ allowed: false, first: true });
+    expect(limiter.hit("100.64.0.9", 2_001)).toEqual({ allowed: false, first: false });
+  });
+
+  test("another address is not affected by the first one's burst", () => {
+    const limiter = createPairLimiter();
+    for (let i = 0; i < PAIR_ATTEMPTS_PER_WINDOW + 2; i++) limiter.hit("100.64.0.9", 1_000);
+    expect(limiter.hit("100.64.0.10", 1_001).allowed).toBe(true);
+  });
+
+  test("the window slides: attempts older than a minute stop counting", () => {
+    const limiter = createPairLimiter();
+    for (let i = 0; i < PAIR_ATTEMPTS_PER_WINDOW; i++) limiter.hit("a", 1_000);
+    expect(limiter.hit("a", 1_000 + PAIR_WINDOW_MS - 1).allowed).toBe(false);
+    expect(limiter.hit("a", 1_000 + PAIR_WINDOW_MS).allowed).toBe(true);
+  });
+
+  test("the counter map stays bounded and expired entries are pruned", () => {
+    const limiter = createPairLimiter(10, PAIR_WINDOW_MS, 8);
+    for (let i = 0; i < 100; i++) limiter.hit(`10.0.0.${String(i)}`, 1_000);
+    expect(limiter.size()).toBe(8);
+    limiter.hit("late", 1_000 + PAIR_WINDOW_MS + 1);
+    expect(limiter.size()).toBe(1);
+  });
+});
+
+describe("pair source key (forwarded header trust)", () => {
+  test("a non-loopback peer is keyed by its socket address; an untrusted x-forwarded-for does not change it", () => {
+    const a = pairSourceKey("100.64.0.9", false, "1.1.1.1");
+    const b = pairSourceKey("100.64.0.9", false, "2.2.2.2");
+    expect(a).toBe("100.64.0.9");
+    expect(b).toBe(a);
+  });
+
+  test("a loopback peer (the front door) is keyed by the RIGHTMOST x-forwarded-for entry, the one the proxy appended", () => {
+    expect(pairSourceKey("127.0.0.1", true, "203.0.113.7, 10.0.0.1")).toBe("10.0.0.1");
+    expect(pairSourceKey("127.0.0.1", true, "100.64.0.9")).toBe("100.64.0.9");
+  });
+
+  test("entries a client wrote to the left of the proxy's own cannot rotate the key", () => {
+    const a = pairSourceKey("127.0.0.1", true, "1.1.1.1, 100.64.0.9");
+    const b = pairSourceKey("127.0.0.1", true, "2.2.2.2, 3.3.3.3, 100.64.0.9");
+    expect(a).toBe("100.64.0.9");
+    expect(b).toBe(a);
+  });
+
+  test("blank entries are skipped, so a trailing comma is not an address", () => {
+    expect(pairSourceKey("127.0.0.1", true, "100.64.0.9, ")).toBe("100.64.0.9");
+    expect(pairSourceKey("127.0.0.1", true, " , ")).toBe("loopback");
+  });
+
+  test("a loopback peer with no forwarded header shares one local key", () => {
+    expect(pairSourceKey("127.0.0.1", true, null)).toBe("loopback");
+    expect(pairSourceKey(undefined, true, "")).toBe("loopback");
   });
 });

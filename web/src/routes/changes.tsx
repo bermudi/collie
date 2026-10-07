@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Code, Eye, GitCompareArrows, Loader2, RefreshCw } from "lucide-react";
 
 import { RouteHeader } from "@/components/app-header";
 import { FilesLoading, RefusedBody, TreeFolderBody, useFilesRead, type FilesReadState, type TreeRead } from "@/routes/changes-files";
@@ -101,6 +101,8 @@ import type {
   FileEntry,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { fitPath } from "@/lib/fit-path";
+import { useElementWidth } from "@/hooks/use-element-width";
 import { summarizeChanges, type WorkspaceChangeCount } from "@/lib/workspace-changes";
 
 // The Changes view (ADR 0065): what changed under a WORKSPACE's folder since the last commit,
@@ -255,6 +257,58 @@ const TREE_VIEW_LABEL = {
   preview: "files.view.preview",
 } satisfies Record<TreeView, MessageKey>;
 
+/** The switcher draws a glyph per view; the word rides along as the segment's name and tooltip. */
+export const TREE_VIEW_ICON = {
+  diff: <GitCompareArrows />,
+  source: <Code />,
+  preview: <Eye />,
+} satisfies Record<TreeView, ReactNode>;
+
+/**
+ * The previous / next button at the end of the file screen when there is nothing to step to. The
+ * primitive's `opacity-50` alone left an outline button looking tappable, so the box goes too: no
+ * border, no fill, no shadow, muted ink. The 1px border is already reserved (it only turns
+ * transparent), so the pair keeps its width and nothing moves.
+ */
+const STEP_OFF =
+  "disabled:border-transparent disabled:bg-transparent disabled:shadow-none disabled:text-muted-foreground disabled:opacity-40";
+
+/** The mono class the path row draws in, and the hidden `0` that measures one character of it. */
+const PATH_ROW_MONO = "font-mono text-[11px] leading-4";
+/** A mono character at 11px, when the measure gives 0 (jsdom has no layout). */
+const FALLBACK_CHAR_WIDTH = 6.6;
+
+/**
+ * The thin row under the file screen's name row: the whole path from the repo root, as much of it as
+ * the row's width holds (`fitPath`). The name row stays the title and gives the folder little; this
+ * row is where the reader sees where the file lives. `title` carries the full path for a pointer.
+ * Until the width is measured, the full path draws with `truncate`, so the row is one line either way.
+ */
+function FilePathRow({ path }: { path: string }) {
+  const [rowRef, width] = useElementWidth<HTMLDivElement>(0);
+  const probeRef = useRef<HTMLSpanElement>(null);
+  const [charWidth, setCharWidth] = useState(FALLBACK_CHAR_WIDTH);
+  useEffect(() => {
+    const w = probeRef.current?.getBoundingClientRect().width ?? 0;
+    if (w > 0) setCharWidth(w);
+  }, []);
+  // The row's padding is not text room: measure the content box by taking `px-4` (16 px) twice off.
+  const budget = width === 0 ? null : Math.max(0, Math.floor((width - 32) / charWidth));
+  return (
+    <>
+      <span ref={probeRef} aria-hidden className={cn("invisible absolute", PATH_ROW_MONO)}>0</span>
+      <div
+        ref={rowRef}
+        data-slot="file-path-row"
+        title={path}
+        className={cn("h-[18px] min-w-0 px-4 text-muted-foreground", PATH_ROW_MONO, budget === null && "truncate")}
+      >
+        {budget === null ? path : fitPath(path, budget)}
+      </div>
+    </>
+  );
+}
+
 /**
  * The Changes route: the tree or the list at the root, a folder or a file of the tree
  * (`…/changes/files`), one file's diff from the list, or the commit view (`…/changes/commit`).
@@ -293,6 +347,9 @@ function ChangesScreen() {
   const filesSplat = splat === "files";
   const dirParam = filesSplat ? (search.get("dir") ?? "") : "";
   const treePathParam = filesSplat ? (pathParam ?? "") : "";
+  // `&line=`: the line a path the agent printed named (ADR 0088). A file screen's own; never sent.
+  const lineParam = filesSplat && treePathParam !== "" ? Number(search.get("line") ?? "") : Number.NaN;
+  const treeLine = Number.isSafeInteger(lineParam) && lineParam > 0 ? lineParam : undefined;
   const fileRef: ChangeRef | null =
     !filesSplat && repoParam !== null && pathParam !== null ? { repo: repoParam, path: pathParam } : null;
   // The root: the screen itself, or `…/changes/files` with neither query, its address before the
@@ -529,7 +586,15 @@ function ChangesScreen() {
         ];
   const [viewChoice, setViewChoice] = useState<{ path: string; view: TreeView } | null>(null);
   const previewAsked = readPreviewAsked(location.state) && treeViews.includes("preview");
-  const treeDefault: TreeView = previewAsked ? "preview" : treeChange ? "diff" : defaultView(treeFile ?? "");
+  // A line asked for is a line of the Source, so a file opened at one opens on Source, changed or not.
+  const lineAsked = treeLine !== undefined && treeViews.includes("source");
+  const treeDefault: TreeView = previewAsked
+    ? "preview"
+    : lineAsked
+      ? "source"
+      : treeChange
+        ? "diff"
+        : defaultView(treeFile ?? "");
   const treeView: TreeView =
     treeFile !== null && viewChoice !== null && viewChoice.path === treeFile && treeViews.includes(viewChoice.view)
       ? viewChoice.view
@@ -919,7 +984,9 @@ function ChangesScreen() {
         )}
       </div>
 
-      {(rootScreen || treeAt !== null) && (
+      {/* Not while a file is open (2026-10-06): the control swaps the LIST's body, and a reader of
+          one file wants the screen for the file. It is back the moment the file closes. */}
+      {treeFile === null && (rootScreen || treeAt !== null) && (
         <FilesModeControl changesOnly={prefs.changesOnly} count={changedFiles} onChange={changeChangesOnly} />
       )}
 
@@ -969,6 +1036,7 @@ function ChangesScreen() {
             diff={fileState}
             read={filesState}
             links={fileLinks}
+            line={treeLine}
             onPair={pair}
           />
         ) : treeDir !== null ? (
@@ -1235,11 +1303,11 @@ function FileScreen({
       {/* Across what the list shows, repos included: the filtered files, in the layout's order.
           Disabled rather than hidden at either end, so the pair never moves. */}
       <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-rule bg-background p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        <Button variant="outline" className="h-11" disabled={!prev} onClick={() => prev && onStep(prev)}>
+        <Button variant="outline" className={cn("h-11", STEP_OFF)} disabled={!prev} onClick={() => prev && onStep(prev)}>
           <ChevronLeft className="size-4" />
           {t("changes.file.prev")}
         </Button>
-        <Button variant="outline" className="h-11" disabled={!next} onClick={() => next && onStep(next)}>
+        <Button variant="outline" className={cn("h-11", STEP_OFF)} disabled={!next} onClick={() => next && onStep(next)}>
           {t("changes.file.next")}
           <ChevronRight className="size-4" />
         </Button>
@@ -1299,6 +1367,7 @@ function TreeFileScreen({
   diff,
   read,
   links,
+  line,
   onPair,
 }: {
   path: string;
@@ -1313,6 +1382,8 @@ function TreeFileScreen({
   diff: FileState | null;
   read: FilesReadState<TreeRead>;
   links: FileLinks;
+  /** The line a printed path named, marked in the Source (ADR 0088). */
+  line?: number;
   onPair: () => void;
 }) {
   useLocale();
@@ -1333,12 +1404,16 @@ function TreeFileScreen({
   else if (!read.data.available) body = <Quiet>{t(unavailableKey(read.data.reason))}</Quiet>;
   // A link that led to a folder: the screen is moving there on its own.
   else if ("entries" in read.data) body = <FilesLoading />;
-  else body = <FileContent file={read.data} view={view} links={links} />;
+  else body = <FileContent file={read.data} view={view} links={links} line={line} />;
   return (
     <>
-      {/* Sticky, so the reader always knows which file this is, however far down the page. */}
-      <div className="sticky top-0 z-10 flex flex-col gap-2 border-b border-rule bg-background px-4 py-2">
-        <div className="flex min-h-7 items-center gap-3">
+      {/* Sticky, so the reader always knows which file this is, however far down the page. ONE ROW
+          (2026-10-06): the path, its size, and the view control at the right, each segment as wide as
+          its word. Two rows and the mode control above them held 166 px of a phone's 844 before the
+          first line of the file; this row holds 60. The name keeps its middle truncation and the
+          folder gives way first, so the control never pushes the file's name off the row. */}
+      <div className="sticky top-0 z-10 border-b border-rule bg-background">
+        <div className="flex min-h-11 items-center gap-3 px-4 py-2">
           {change && <StatusLetter status={change.status} />}
           <div className="min-w-0 flex-1">
             <ChangePath path={path} />
@@ -1352,16 +1427,22 @@ function TreeFileScreen({
           <span role="status" className="shrink-0 text-xs text-muted-foreground">
             {gone ? t("changes.file.gone") : ""}
           </span>
-          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{size === null ? "" : formatBytes(size)}</span>
+          {/* Three segments and the size would leave the name about 60 px at 390: the size, the least
+              needed word on the row, waits for a wider screen. */}
+          <span className={cn("shrink-0 text-xs text-muted-foreground tabular-nums", views.length >= 3 && "hidden sm:inline")}>
+            {size === null ? "" : formatBytes(size)}
+          </span>
+          {!waiting && views.length > 1 && (
+            <Segmented
+              label={t("files.view.aria")}
+              value={view}
+              onChange={onView}
+              className="shrink-0 [&>button]:flex-none [&>button]:px-3"
+              options={views.map((value) => ({ value, label: t(TREE_VIEW_LABEL[value]), icon: TREE_VIEW_ICON[value] }))}
+            />
+          )}
         </div>
-        {!waiting && views.length > 1 && (
-          <Segmented
-            label={t("files.view.aria")}
-            value={view}
-            onChange={onView}
-            options={views.map((value) => ({ value, label: t(TREE_VIEW_LABEL[value]) }))}
-          />
-        )}
+        <FilePathRow path={path} />
       </div>
       <div className="flex-1 py-2">{body}</div>
     </>

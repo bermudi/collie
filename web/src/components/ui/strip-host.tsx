@@ -14,9 +14,9 @@ import { OneOf } from "@/components/ui/one-of";
 import { cn } from "@/lib/utils";
 
 /**
- * The top band, and the rule that there is only ever ONE strip in it.
+ * The ribbon band, and the rule that there is only ever ONE strip in it.
  *
- * Four strips can be true above the header at once — connection amber, connection red, the auth
+ * Four strips can be true at once — connection amber, connection red, the auth
  * refusal, the update offer — and none of them excludes another. Two of them at once cost ~66px of
  * a 390×844 phone and double the number of times the page moves, and every pair of them has a
  * strict "which of these matters more" answer anyway: amber behind red is strictly less information
@@ -27,9 +27,35 @@ import { cn } from "@/lib/utils";
  * one of them still drew its own row it went on reserving the safe-area inset beside this one, and
  * an iPhone paid for the notch twice. `routes/root.tsx` mounts the one host.
  *
- * Arbitration here is height-invariant BY CONSTRUCTION, not by luck: every strip sits on the same
- * `min-h-[33px]` floor stated in `ui/notice.tsx`, so a replacement repaints the band and never
- * moves it. The band's height animates on APPEAR and on LEAVE, and at no other time.
+ * WHERE IT PAINTS: OVER the top of the route, as an overlay hung from the header's bottom edge
+ * (2026-10-07). The host renders a zero-height anchor and then its `children`, and `routes/root.tsx`
+ * mounts it INSIDE `AppHeaderHost`, so the anchor is the header's next sibling in the column and
+ * sits exactly on the bar's bottom edge. The band is absolutely positioned from that anchor, so it
+ * reserves no space: the pane strip on a pane page, the filter row on the dashboard, whatever is
+ * directly under the header, is COVERED while a strip shows, and nothing moves. The operator's
+ * report that decided it: an outage shoved the tab and pane rows down, and a layout shift under a
+ * thumb is worse than a row hidden for the length of an outage.
+ *
+ * Two earlier homes, both in flow. Above the header until the morning of 2026-10-07, which made it
+ * the first thing on the screen while open: it had to take the notch from the header and give it
+ * back, and the whole page, bar included, jumped. Then under the header, in flow, which kept the
+ * bar still but still pushed the route down by the band's height. The overlay moves neither.
+ *
+ * THE STACKING RUNG: `z-30`. Every in-flow surface in the app tops out at `z-20` (the sticky header,
+ * the composer dock, the Changes file bar, the agent-chat docks), so the band covers all of them.
+ * `z-40` is the toasts and the anchored menu's dismiss surface, `z-50` the sheets, the update screen
+ * and the idle lock, so all of those cover the band. The anchor is `relative` and in the root
+ * column's own stacking context, which is what lets the number compare against the route's.
+ *
+ * THE SURFACE. The band paints the page colour (`bg-background`) under the Notice's translucent
+ * tint, so the row it covers does not show through, and a `shadow-md` under its bottom edge, so it
+ * reads as floating over that row rather than as a row of its own. Both sit on the `Collapse`
+ * itself, which only exists while a strip is rendered, so an empty band casts no shadow.
+ *
+ * Arbitration does not move the band either: every strip sits on the same `min-h-[33px]` floor
+ * stated in `ui/notice.tsx`, so a replacement usually repaints the band at the same height, and a
+ * taller one covers a few more pixels of the row beneath. The band's height animates on APPEAR and
+ * on LEAVE through `Collapse`, which on an overlay moves nothing but the band's own bottom edge.
  *
  * The host is domain-blind and tone-blind. It does not know what a connection is, it styles
  * nothing, and it announces nothing — the Notice inside carries its own `announce`. Priorities
@@ -47,30 +73,24 @@ type Register = (id: string, entry: Registration | null) => void;
 
 const StripRegistry = createContext<Register | null>(null);
 
-/**
- * Whether the band currently HAS a winner, published to everything below the host.
- *
- * It exists for exactly one reader — the sticky header directly under the band — and for exactly
- * one reason: the safe-area inset must be reserved ONCE. The header used to reserve it
- * unconditionally, on the (then true) assumption that it was the first thing on the screen. It is
- * not first any more, so while the band is showing something the header must reserve nothing, or
- * the notch is paid for twice and the operator sees a dead strip above the notice.
- *
- * `false` outside a host, deliberately, and it is the same posture as `StripSlot`'s: a tree with no
- * band has nothing above the header, so the header goes on owning the inset. That is what keeps the
- * playground's bare-header cards, and every test that renders a header alone, correct.
- */
-const StripBandOpen = createContext(false);
-
-/** True while the band is showing a strip. See {@link StripBandOpen}. */
-export function useStripBandOpen(): boolean {
-  return useContext(StripBandOpen);
-}
-
 /** How long a replacement takes to dissolve. The app's "tap" speed — see COLLAPSE_MS on the tokens. */
 const SWAP_CLASS = "duration-[120ms]";
 
-export function StripHost({ children, className }: { children: ReactNode; className?: string }) {
+export function StripHost({
+  children,
+  className,
+  flow = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  /**
+   * Paint the band IN FLOW instead of over what follows it. The app never sets this. It is for a
+   * stage that shows a strip on its own, the playground's single-strip cards: with no route under
+   * the band there is nothing for it to cover, and an overlay on a zero-height anchor would hang
+   * outside the card's clipped box and show nothing at all.
+   */
+  flow?: boolean;
+}) {
   const [slots, setSlots] = useState<ReadonlyMap<string, Registration>>(() => new Map());
 
   // Identity-checked, so a feature re-rendering with the same copy does not churn the host. There
@@ -133,40 +153,39 @@ export function StripHost({ children, className }: { children: ReactNode; classN
       <div className="sr-only" role="status" data-slot="strip-live-polite" />
       <div className="sr-only" role="alert" data-slot="strip-live-assertive" />
 
-      <Collapse open={winner !== null} className={className}>
-        {/*
-          The safe-area inset lives HERE while the band is open, and nowhere else. Three of the four
-          strips this replaced set `env(safe-area-inset-top)` themselves and one did not, so which
-          strip you were looking at decided whether the band cleared the notch — and the header
-          under them reserved it a second time regardless, which is the reported iOS bug. One owner,
-          one answer, and it is the row rather than the Notice because it is a fact about the band's
-          position in the viewport. The header takes it back whenever the band is empty, through
-          `useStripBandOpen()`; between the two of them the notch is reserved exactly once, in every
-          state and during the handover.
-
-          All layers share ONE grid cell, so the band is as tall as the tallest of them and a swap
-          cannot change its height even for a frame. The winner is opaque, the losers fade out under
-          it — a dissolve inside the already-open Collapse, with no second height animation. The
-          stacking itself is `ui/one-of.tsx`, which is where the same idiom now serves the composer's
-          status slot; what stays here is what the band alone knows — which slot wins, how long the
-          dissolve takes, and the ghost that keeps painting through the exit.
-        */}
-        <OneOf
-          active={ghost ? ghost.id : winner}
-          options={layers}
-          className="[padding-top:env(safe-area-inset-top)]"
-          layerClassName={cn("transition-opacity ease-out motion-reduce:transition-none", SWAP_CLASS)}
-        />
-      </Collapse>
-
       {/*
-        The band's height and the header's inset are ONE reservation, split across two elements, so
-        the boolean has to reach the header for the pair to stay at one notch's worth between them.
-        Published on its own context rather than folded into the registry, so a slot registering
-        does not re-render every consumer of the flag and the header does not re-render on a copy
-        change that leaves the band open either way.
+        The anchor: in flow, zero high, so it costs the column nothing and lands on the header's
+        bottom edge. The band hangs from its top. See "WHERE IT PAINTS" above for the rung.
       */}
-      <StripBandOpen.Provider value={winner !== null}>{children}</StripBandOpen.Provider>
+      <div
+        data-slot="strip-anchor"
+        data-placement={flow ? "flow" : "overlay"}
+        className={flow ? undefined : "relative z-30 h-0 shrink-0"}
+      >
+        <Collapse
+          open={winner !== null}
+          className={cn(!flow && "absolute inset-x-0 top-0 bg-background shadow-md", className)}
+        >
+          {/*
+            No safe-area inset here, and none on any strip: the band hangs under the header, and the
+            header owns the notch in every state (`app-header.tsx`).
+
+            All layers share ONE grid cell, so the band is as tall as the tallest of them and a swap
+            cannot change its height even for a frame. The winner is opaque, the losers fade out under
+            it — a dissolve inside the already-open Collapse, with no second height animation. The
+            stacking itself is `ui/one-of.tsx`, which is where the same idiom now serves the composer's
+            status slot; what stays here is what the band alone knows — which slot wins, how long the
+            dissolve takes, and the ghost that keeps painting through the exit.
+          */}
+          <OneOf
+            active={ghost ? ghost.id : winner}
+            options={layers}
+            layerClassName={cn("transition-opacity ease-out motion-reduce:transition-none", SWAP_CLASS)}
+          />
+        </Collapse>
+      </div>
+
+      {children}
     </StripRegistry.Provider>
   );
 }

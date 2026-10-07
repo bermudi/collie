@@ -25,8 +25,9 @@ import { ribbonText, ribbonView } from "@/lib/update-ribbon";
 // what ended the band's original fault — this row, the connection bar and the auth refusal each
 // reserved the safe-area inset for themselves, on the assumption that each might be the first thing
 // on the screen, so any two of them at once paid for the notch twice and left a dead strip above
-// the notice. The inset now has one owner and the band has one winner. The losing fact is not lost:
-// the update offer keeps its footer line and its `/settings/updates` control.
+// the notice. The inset now has one owner (the header, which the band sits under) and the band has
+// one winner. The losing fact is not lost: the update offer keeps its footer line and its
+// `/settings/updates` control.
 //
 // ── FIXED HEIGHT, IN EVERY STATE ─────────────────────────────────────────────────────────────
 // The row is one height whatever it is saying, and only the text changes. A band that grew and

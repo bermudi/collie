@@ -4,6 +4,7 @@ import { server } from "@/test/setup";
 import { fixtureCrewSnapshot, fixtureSnapshot } from "@/test/handlers";
 import { __resetConnectionHealth, isLostLatched, lastHealthyAt } from "./connection-health";
 import { isConnecting } from "./connection";
+import { DEAD_DEBOUNCE_MS, isLive, resetLiveness } from "./liveness";
 import { resetBasePathForTests } from "./base-path";
 import { burstPaneId, resetPollIntent, sendCount } from "./poll-intent";
 import {
@@ -11,9 +12,12 @@ import {
   createTab,
   fetchChat,
   fetchConfig,
+  fetchHistory,
   fetchPane,
   fetchSnapshot,
   getNotifyPrefs,
+  POLL_TIMEOUT_MS,
+  readFailureKind,
   imageSrc,
   refreshNow,
   sendKeys,
@@ -257,13 +261,24 @@ describe("api client", () => {
 describe("api client — request timeouts", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("applies GET_TIMEOUT_MS (10s) to snapshot and pane reads", async () => {
+  // M46 pass 3: the poll reads get 6s, one second above the bridge's own 5s mux timeout. A request
+  // into a VPN with the radio off hangs instead of failing, and the old 10s leash made the phone slow
+  // to admit the network was gone.
+  it("applies POLL_TIMEOUT_MS (6s) to the four poll reads: herd, pane, Chat window, config", async () => {
+    expect(POLL_TIMEOUT_MS).toBe(6_000);
     const spy = vi.spyOn(AbortSignal, "timeout");
     await fetchSnapshot();
     await fetchPane("w1:p1");
-    expect(spy).toHaveBeenCalledWith(10_000);
-    // Both are GET reads, so the only budget requested is the GET one.
-    expect(spy.mock.calls.every(([ms]) => ms === 10_000)).toBe(true);
+    await fetchChat("w1:p1");
+    await fetchConfig();
+    expect(spy.mock.calls.map(([ms]) => ms)).toEqual([6_000, 6_000, 6_000, 6_000]);
+  });
+
+  it("keeps the 10s leash on the long reads: a `?before=` page and the History page", async () => {
+    const spy = vi.spyOn(AbortSignal, "timeout");
+    await fetchChat("w1:p1", { limit: 40, before: { seq: 1, uuid: "a" } }).catch(() => {});
+    await fetchHistory("w1:p1", { limit: 5000 }).catch(() => {});
+    expect(spy.mock.calls.map(([ms]) => ms)).toEqual([10_000, 10_000]);
   });
 
   it("applies MUTATION_TIMEOUT_MS (20s) to mutations", async () => {
@@ -316,6 +331,112 @@ describe("api client — request timeouts", () => {
         signal!.addEventListener("abort", () => reject(signal!.reason));
       }),
     ).rejects.toMatchObject({ name: "TimeoutError" });
+  });
+});
+
+// ── WHAT A FAILED READ SAYS ABOUT THE CONNECTION (M46 pass 3) ───────────────
+describe("api client — failed reads and the outage latch", () => {
+  beforeEach(() => __resetConnectionHealth());
+  afterEach(() => vi.restoreAllMocks());
+
+  // jsdom's DOMException is not an Error subclass, a browser's is; the stand-ins below are what a
+  // browser hands the catch.
+  const named = (name: string) => Object.assign(new Error(name), { name });
+
+  it("classifies a thrown fetch and a deadline as network, a 5xx as server, the rest as other", () => {
+    expect(readFailureKind(new TypeError("Failed to fetch"))).toBe("network");
+    expect(readFailureKind(named("TimeoutError"))).toBe("network");
+    // A superseded poll is the app's own abort, not the bridge failing.
+    expect(readFailureKind(named("AbortError"))).toBe("other");
+    expect(readFailureKind(new Error("anything"))).toBe("other");
+  });
+
+  it("classifies the bridge's own answers: a 5xx is server, a 4xx refusal is other", async () => {
+    server.use(http.get("/api/snapshot", () => new HttpResponse("bad gateway", { status: 502 })));
+    const server502 = await fetchSnapshot().then(() => null, (e: Error) => e);
+    expect(readFailureKind(server502)).toBe("server");
+    server.use(http.get("/api/snapshot", () => new HttpResponse("nope", { status: 404 })));
+    const refused = await fetchSnapshot().then(() => null, (e: Error) => e);
+    expect(readFailureKind(refused)).toBe("other");
+  });
+
+  it("a herd read that gets no answer latches the outage on the first failure", async () => {
+    server.use(http.get("/api/snapshot", () => HttpResponse.error()));
+    await expect(fetchSnapshot()).rejects.toBeInstanceOf(TypeError);
+    expect(isLostLatched()).toBe(true);
+  });
+
+  it("a herd read that runs out of time latches the outage too", async () => {
+    vi.spyOn(AbortSignal, "timeout").mockImplementation(() => AbortSignal.abort(named("TimeoutError")));
+    await expect(fetchSnapshot()).rejects.toMatchObject({ name: "TimeoutError" });
+    expect(isLostLatched()).toBe(true);
+  });
+
+  // WebKit rejects ANY aborted fetch with a generic AbortError ("Fetch is aborted"), a deadline
+  // included. The signal still carries its own reason, and the client reads it back.
+  const webkitFetch = () =>
+    vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => {
+      const signal = init?.signal;
+      return new Promise((_resolve, reject) => {
+        const fail = () => reject(named("AbortError"));
+        if (signal?.aborted) fail();
+        else signal?.addEventListener("abort", fail);
+      });
+    });
+
+  it("a deadline WebKit reports as an AbortError is still a TimeoutError, and latches the outage", async () => {
+    webkitFetch();
+    vi.spyOn(AbortSignal, "timeout").mockImplementation(() => AbortSignal.abort(named("TimeoutError")));
+    await expect(fetchSnapshot()).rejects.toMatchObject({ name: "TimeoutError" });
+    expect(isLostLatched()).toBe(true);
+  });
+
+  it("the app's own abort stays an AbortError on that engine and latches nothing", async () => {
+    webkitFetch();
+    const controller = new AbortController();
+    controller.abort(named("AbortError"));
+    await expect(fetchSnapshot(undefined, controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    expect(isLostLatched()).toBe(false);
+  });
+
+  it("the two-failure rule: one 5xx latches nothing, the second in a row does, and a live answer clears it", async () => {
+    server.use(http.get("/api/snapshot", () => new HttpResponse("bad gateway", { status: 502 })));
+    await fetchSnapshot().catch(() => {});
+    expect(isLostLatched()).toBe(false);
+    await fetchSnapshot().catch(() => {});
+    expect(isLostLatched()).toBe(true);
+    server.use(http.get("/api/snapshot", () => HttpResponse.json(fixtureSnapshot)));
+    await fetchSnapshot();
+    expect(isLostLatched()).toBe(false);
+  });
+
+  it("a live answer between two 5xx resets the count", async () => {
+    let status = 502;
+    server.use(
+      http.get("/api/snapshot", () =>
+        status === 200 ? HttpResponse.json(fixtureSnapshot) : new HttpResponse("bad gateway", { status }),
+      ),
+    );
+    await fetchSnapshot().catch(() => {});
+    status = 200;
+    await fetchSnapshot();
+    status = 502;
+    await fetchSnapshot().catch(() => {});
+    expect(isLostLatched()).toBe(false);
+  });
+
+  it("a read the app aborted itself counts nothing", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await fetchSnapshot(undefined, controller.signal).catch(() => {});
+    expect(isLostLatched()).toBe(false);
+  });
+
+  it("a refusal latches nothing: the bridge answered", async () => {
+    server.use(http.get("/api/snapshot", () => new HttpResponse("nope", { status: 404 })));
+    await fetchSnapshot().catch(() => {});
+    await fetchSnapshot().catch(() => {});
+    expect(isLostLatched()).toBe(false);
   });
 });
 
@@ -773,5 +894,38 @@ describe("fetchChat", () => {
       http.get("/api/pane/chat-502/chat", () => new HttpResponse("herdr down", { status: 502 })),
     );
     await expect(fetchChat("chat-502")).rejects.toThrow(/502/);
+  });
+});
+
+// M46 hardening: a pane is live while its LAST read succeeded (lib/liveness.ts). fetchPane is the
+// one writer: a success marks it, a failure takes it down after the debounce, an abort does neither.
+describe("fetchPane drives the pane's liveness", () => {
+  beforeEach(() => resetLiveness());
+
+  it("a 200 marks the pane live, and a failed read takes it down after the debounce", async () => {
+    await fetchPane("w1:p1");
+    expect(isLive("w1:p1")).toBe(true);
+    server.use(http.get(/\/api\/pane\/[^/]+$/, () => new HttpResponse("boom", { status: 500 })));
+    await expect(fetchPane("w1:p1")).rejects.toThrow(/500/);
+    expect(isLive("w1:p1")).toBe(true); // debounced: one dropped poll does not flicker
+    await new Promise((resolve) => setTimeout(resolve, DEAD_DEBOUNCE_MS + 50));
+    expect(isLive("w1:p1")).toBe(false);
+  });
+
+  it("a network error counts as a failed read", async () => {
+    await fetchPane("w1:p1");
+    server.use(http.get(/\/api\/pane\/[^/]+$/, () => HttpResponse.error()));
+    await expect(fetchPane("w1:p1")).rejects.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, DEAD_DEBOUNCE_MS + 50));
+    expect(isLive("w1:p1")).toBe(false);
+  });
+
+  it("a read the caller aborted says nothing about the bridge", async () => {
+    await fetchPane("w1:p1");
+    const controller = new AbortController();
+    controller.abort();
+    await expect(fetchPane("w1:p1", undefined, undefined, controller.signal)).rejects.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, DEAD_DEBOUNCE_MS + 50));
+    expect(isLive("w1:p1")).toBe(true);
   });
 });

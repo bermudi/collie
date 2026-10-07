@@ -48,7 +48,16 @@ import { NotificationCoordinator, makeNotifySink, type NotifyClock } from "./not
 import { pushTitle } from "./push-titles.ts";
 import { NotifyPrefsStore } from "./notify-prefs.ts";
 import { FolderStore } from "./folders.ts";
+import { WorktreeReceiptStore } from "./worktree-receipts.ts";
 import { filePairingIo, PairingStore } from "./pairing.ts";
+import {
+  LOCAL_SECRET_FILENAME,
+  type LocalCredential,
+  localCredentialOf,
+  mintLocalSecret,
+  removeLocalSecret,
+  writeLocalSecret,
+} from "./local-secret.ts";
 import { Push } from "./push.ts";
 import { pluginRoot } from "./root.ts";
 import { startServer } from "./server.ts";
@@ -152,10 +161,27 @@ await notifyPrefs.load();
 
 // Device pairing (bridge/pairing.ts). Constructed unconditionally and holding no state of its own:
 // it re-reads `<stateDir>/paired-devices.json` per request (cached on mtime), so pairing and device
-// revocation land on the RUNNING service without the restart every other backend change needs. An
-// empty registry — the state every existing install starts in — enforces nothing.
+// revocation land on the RUNNING service without the restart every other backend change needs.
+// Pairing is always on (ADR 0086): an empty registry answers only `/api/health` and `/api/pair`,
+// and this host's pairing screen is how the first device gets in.
 const pairing = new PairingStore(filePairingIo(cfg.stateDir));
 
+// The host's own read credential (bridge/local-secret.ts): a fresh secret per start, written
+// owner-only to `<stateDir>/local-secret`, and only its hash kept here. Reads only, from loopback
+// only. A write that fails costs loopback its reads (it falls back to the paired-device gate) and
+// nothing else. On this fork the file is carried machinery: the CLIs upstream wrote it for are not
+// carried, but the loopback read path it serves is.
+const localSecret = mintLocalSecret();
+let localCredential: LocalCredential | undefined;
+try {
+  await writeLocalSecret(cfg.stateDir, localSecret);
+  localCredential = localCredentialOf(localSecret);
+} catch (err) {
+  console.warn(
+    `[bridge] could not write ${LOCAL_SECRET_FILENAME}: ${err instanceof Error ? err.message : String(err)} — ` +
+      "loopback reads fall back to the paired-device gate until it can",
+  );
+}
 // When each pane last moved, and when you last looked at it — the two numbers the dashboard sorts
 // and triages by (see activity.ts). Process-global and keyed by session name, because pane ids are
 // session-scoped and collide across sessions.
@@ -184,6 +210,12 @@ await cacheWatch.load();
 // writes nothing: the file appears on the first create with a folder or the first star.
 const folders = new FolderStore(cfg);
 await folders.load();
+
+// One receipt per worktree create the phone tagged with a request id, so a retried create replays
+// instead of making a second worktree (ADR 0089, bridge/worktree-receipts.ts). Loading writes
+// nothing: the file appears on the first create that carries an id.
+const worktreeReceipts = new WorktreeReceiptStore(cfg.stateDir);
+await worktreeReceipts.load();
 
 // The warden that judges them. A DEPS LITERAL WITH NO LOGIC IN IT, for the reason
 // `bridge/update.ts`'s monitor is built the same way: there is no `bridge/index.test.ts`, so every gate
@@ -474,9 +506,11 @@ const server = startServer({
   cache: paneCache ?? undefined,
   cacheWatch,
   folders,
+  worktreeReceipts,
   // This machine's load and its alert rules (ADR 0084).
   machines: machineWatch,
   pairing,
+  localCredential,
 });
 
 const shutdown = async () => {
@@ -484,6 +518,8 @@ const shutdown = async () => {
   // Stop accepting new connections and let in-flight requests drain briefly (non-forced stop)
   // before we tear down the poll loops and exit.
   await server.stop();
+  // The CLI's read credential dies with the process that holds its hash (bridge/local-secret.ts).
+  await removeLocalSecret(cfg.stateDir, localSecret);
   clearInterval(refreshTimer);
   registry.disposeAll();
   // Writes are debounced, so the last few seconds of "you looked at this" live only in memory —

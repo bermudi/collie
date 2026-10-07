@@ -178,6 +178,20 @@ and the source shows instead.
 In **Changes**, a changed file whose type has a preview, and that is not deleted, shows a
 **Preview** button in the header of its diff. It opens the same file screen on Preview.
 
+### Paths the agent prints
+
+A file path the agent prints in Chat or in the terminal mirror is a link to that file in Files.
+`src/app.ts:42` opens the file on its Source at line 42, with that line marked. Chat draws the path
+as an underlined code chip, and the path on an Edit or a Read card works the same way.
+
+A path is a link only when it leads inside the workspace's folder, the folder Files reads, and a
+file or a folder is there. A path outside it, a web address, and a path the terminal broke across
+two lines stay plain text.
+
+Collie asks the bridge which printed paths exist, many in one request, and the bridge reads no file
+to answer. A path stays plain text until the answer comes, and for as long as the view is open when
+the answer is no. Offline, and on a crew member's pane, no path is a link.
+
 A folder or a file is read when you open it, and again when you tap refresh. It never updates on a
 timer. The change marks follow the list of changes, which updates every 5 seconds while you look.
 
@@ -203,13 +217,12 @@ open like any other row.
 
 ### Who may use it
 
-- **Files needs an authorised device**, the same check as typing into a pane. The check is on only
-  when a device is paired ([Security](security.md#pair-a-device--the-write-credential)) or
-  `COLLIE_DEVICE_HEADER` is set. Then a device that is not paired, or not on
-  `COLLIE_DEVICE_ALLOWLIST`, cannot open Files.
-- **Until then, every device that can read panes can use Files.** It can browse the workspace's
-  folder and read any file in it, `.env` files included. Pair your phone to close it.
-- Changes stays open to any device that can read, because it shows only what changed.
+- **Files needs an authorised device**, the same check as typing into a pane. A device must be
+  paired ([Security](security.md#pair-a-device--the-write-credential)), and with
+  `COLLIE_DEVICE_HEADER` set it must also be on `COLLIE_DEVICE_ALLOWLIST`.
+- **Every paired device can use Files.** It can browse the workspace's folder and read any file in
+  it, `.env` files included.
+- Changes is open to any paired device, because it shows only what changed.
 
 ### What it shows, and what it never shows
 

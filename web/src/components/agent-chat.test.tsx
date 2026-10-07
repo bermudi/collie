@@ -38,6 +38,16 @@ import type { AgentStatus, AgentView, TabView } from "@/lib/types";
 import { withHeaderHost } from "@/test/header-host";
 import { COLLAPSE_MS } from "./ui/collapse";
 import { AgentChat } from "./agent-chat";
+import { saveChatTail } from "@/lib/chat-tail";
+
+// M46 spec 11 turns every send off for a pane the bridge has not answered lately (lib/liveness.ts).
+// These suites drive sends against a mocked network and never poll first, so they pin the pane live;
+// the gating itself is covered by liveness.test.ts and the *-offline suites.
+vi.mock("@/lib/liveness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/liveness")>()),
+  isLive: () => true,
+  useLive: () => true,
+}));
 
 // The detail view's core job: type a reply and submit it to the bridge. This drives the whole wired
 // path (composer → api.sendReply → MSW → optimistic clear / error surfacing) end-to-end, which no
@@ -511,6 +521,52 @@ describe("AgentChat — read-only device", () => {
     renderChat({ device: { enforced: true, device: "my-phone", authorized: true } });
     expect(screen.queryByText(/read-only/i)).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText(/type a reply/i)).not.toBeDisabled();
+  });
+});
+
+// M46 specs 10 and 11: a pane drawn from the saved copy can be read and cannot be acted on. The pane
+// view dates it with one notice and hands `stale` to the card dock and the composer.
+describe("AgentChat — a stale saved copy", () => {
+  const SAVED_AT = new Date(2026, 0, 2, 14, 32).getTime();
+
+  it("dates the saved copy, and a stale render disables the card options", async () => {
+    renderChat({ text: MENU_TEXT, stale: true, lastSeenAt: SAVED_AT, error: true });
+    expect(screen.getByText(/^Saved copy from .+\. Older text is on the bridge\.$/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Yes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "No" })).toBeDisabled();
+  });
+
+  it("disables the send button on a stale render of a pane with a composer", async () => {
+    const user = userEvent.setup();
+    renderChat({ stale: true, lastSeenAt: SAVED_AT, error: true });
+    await user.type(screen.getByPlaceholderText(/type a reply/i), "hello");
+    // Spec 11 names why: the send button says what it waits for, and stays off.
+    expect(screen.getByRole("button", { name: "Reconnect to send" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  });
+
+  it("draws no notice and leaves the controls alone on a live render", async () => {
+    renderChat({ text: MENU_TEXT });
+    expect(await screen.findByRole("button", { name: "Yes" })).not.toBeDisabled();
+    expect(screen.queryByText(/Saved copy from/)).toBeNull();
+  });
+
+  // "Gone" is a fact only a live answer can state: a pane the phone cannot place while the herd on
+  // screen is not live is named by its id, and says what the phone does not have.
+  it("never says gone when the herd is not live and the pane is not in it", async () => {
+    renderChat({ agent: undefined, text: "", error: true, noSavedCopy: true });
+    expect(screen.getByText(fixtureAgents[0]!.paneId)).toBeInTheDocument();
+    expect(screen.getByText("No saved copy of this pane on this phone.")).toBeInTheDocument();
+    expect(screen.queryByText("(agent gone)")).toBeNull();
+    expect(screen.queryByText("(no recent output)")).toBeNull();
+    expect(screen.queryByPlaceholderText("Pane is gone")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  });
+
+  it("still says gone when a live herd does not hold the pane", () => {
+    renderChat({ agent: undefined, text: "" });
+    expect(screen.getByText("(agent gone)")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Pane is gone")).toBeInTheDocument();
   });
 });
 
@@ -1270,6 +1326,40 @@ describe("AgentChat — top-of-mirror history affordance", () => {
     const agent = { ...fixtureAgents[0]!, kind: "shell" as const, readableLines: 700 };
     renderChat({ agent, agents: [agent], requestedLines: 1000 }); // at the cap, past the content
     expect(loadOlder()).not.toBeInTheDocument();
+  });
+
+  // 2026-10-07: a saved copy has no bridge to page from, so the dated line stands where the button
+  // would, at the top of the mirror's scrolled text, and no bar sits above the mirror.
+  const SAVED_AT = new Date(2026, 0, 2, 14, 32).getTime();
+  it.each([
+    ["Load older", { kind: "shell" as const, readableLines: 6946 }],
+    ["Show entire history", { hasSession: true, readableLines: 51 }],
+  ])("a saved copy puts its line in the top slot instead of %s", (_name, paneFacts) => {
+    const agent = { ...fixtureAgents[0]!, ...paneFacts };
+    const { container } = renderChat({
+      agent,
+      agents: [agent],
+      requestedLines: 600,
+      stale: true,
+      lastSeenAt: SAVED_AT,
+      error: true,
+    });
+    const line = screen.getByText(/^Saved copy from .+\. Older text is on the bridge\.$/);
+    const slot = line.closest('[data-slot="saved-copy"]')!;
+    expect(slot).not.toBeNull();
+    // The first thing in the mirror's scroller, so it scrolls with the text it dates.
+    expect(slot.parentElement!.className).toContain("overflow-y-auto");
+    expect(slot.parentElement!.firstElementChild).toBe(slot);
+    expect(loadOlder()).not.toBeInTheDocument();
+    expect(showHistory()).not.toBeInTheDocument();
+    expect(container.querySelector('[data-slot="notice"]')).toBeNull();
+  });
+
+  it("live, the mirror's top slot has no saved line and keeps its button", () => {
+    const agent = { ...fixtureAgents[0]!, kind: "shell" as const, readableLines: 6946 };
+    const { container } = renderChat({ agent, agents: [agent], requestedLines: 600 });
+    expect(loadOlder()).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="saved-copy"]')).toBeNull();
   });
 
   it("stays hidden when readableLines is unknown (older bridge) rather than offering a dud tap", () => {
@@ -2986,6 +3076,38 @@ describe("AgentChat — the chat body", () => {
     expect(screen.queryByText(/recent pane output/)).toBeNull();
   });
 
+  // M46 spec 09: no bridge, and the phone kept this pane's Chat tail. The body draws it, dated, with
+  // nothing to act on.
+  it("stale render: draws the saved Chat tail with its notice when the chat read fails", async () => {
+    chooseChat("chat");
+    // Within the 1-day lifetime: an older record would read as a miss.
+    const at = Date.now() - 60_000;
+    await saveChatTail(undefined, fixtureAgents[0]!.paneId, [
+      { uuid: "s1", seq: 7, ts: "", role: "assistant", parts: [{ kind: "text", text: "the saved reply" }] },
+    ], "1d", at);
+    server.use(http.get(/\/api\/pane\/[^/]+\/chat/, () => HttpResponse.error()));
+    renderChat({ agent: journalAgent(), stale: true, lastSeenAt: at, error: true });
+    expect(await screen.findByText("the saved reply")).toBeInTheDocument();
+    expect(screen.getByText(/^Saved copy from .+\. Older text is on the bridge\.$/)).toBeInTheDocument();
+    expect(screen.queryByText(/recent pane output/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  });
+
+  // M46 pass 3, the blank Altan saw: the PWA reopened with Tailscale up and the radio off. The chat
+  // read does not fail there, it hangs, and the body stood empty until its deadline. A pane whose
+  // mirror is already the saved copy now draws its saved Chat at once.
+  it("stale render: draws the saved Chat tail at once while the chat read hangs", async () => {
+    chooseChat("chat");
+    const at = Date.now() - 60_000;
+    await saveChatTail(undefined, fixtureAgents[0]!.paneId, [
+      { uuid: "s1", seq: 7, ts: "", role: "assistant", parts: [{ kind: "text", text: "the saved reply" }] },
+    ], "1d", at);
+    server.use(http.get(/\/api\/pane\/[^/]+\/chat/, () => new Promise<Response>(() => {})));
+    renderChat({ agent: journalAgent(), stale: true, lastSeenAt: at, error: true });
+    expect(await screen.findByText("the saved reply")).toBeInTheDocument();
+    expect(screen.getByText(/^Saved copy from .+\. Older text is on the bridge\.$/)).toBeInTheDocument();
+  });
+
   it("keeps the composer, the belt and the header in the chat body", async () => {
     chooseChat("chat");
     renderChat({ agent: journalAgent() });
@@ -3432,5 +3554,131 @@ describe("AgentChat: a new agent pane draws Chat from the first frame", () => {
     await act(() => vi.advanceTimersByTimeAsync(100));
     expect(container.querySelector('[data-slot="session-stream"]')).toBeNull();
     expect(screen.getByText(/has not reported a session to Herdr/i)).toBeInTheDocument();
+  });
+});
+
+// ── A FAILED POLL NEVER BLANKS THE CHAT (M46 pass 3, 2026-10-07) ────────────────────────────────────
+// Altan, airplane mode with Tailscale up, a pane open in Chat: the body went blank under a strip that
+// said "showing what was saved". The rule now: what the Chat body holds stays on screen through any
+// failed poll, and it is marked as the saved copy (the dated line above the body) on the read that
+// proves the outage: at once for a read that got no answer, on the second 5xx in a row. The line stays
+// until a live answer.
+describe("AgentChat — a failed poll keeps the Chat on screen", () => {
+  const journalAgent = () => ({ ...fixtureAgents[0]!, hasSession: true });
+  type ChatMode = "live" | "drop" | "502";
+  let mode: ChatMode = "live";
+
+  beforeEach(() => {
+    mode = "live";
+    localStorage.setItem("collie:dash-prefs:v1", JSON.stringify({ paneView: "chat", showToolCalls: true }));
+    server.use(
+      http.get(/\/api\/pane\/[^/]+\/chat/, () => {
+        if (mode === "drop") return HttpResponse.error();
+        if (mode === "502") return new HttpResponse("bad gateway", { status: 502 });
+        return undefined; // the fixture window (test/handlers.ts)
+      }),
+    );
+  });
+
+  function renderPolled() {
+    let revalidate: () => void = () => {};
+    function Host() {
+      revalidate = useRevalidator().revalidate;
+      const agent = journalAgent();
+      return (
+        <AgentChat
+          paneId={agent.paneId}
+          agent={agent}
+          agents={[agent]}
+          shellPanes={[]}
+          tabs={[]}
+          text={paneTextWithDraft("recent pane output")}
+          onBack={vi.fn()}
+          onSelect={vi.fn()}
+        />
+      );
+    }
+    // A loader that takes a beat, so a revalidation is a real poll with a loading→idle edge.
+    const loader = () => new Promise<null>((resolve) => setTimeout(() => resolve(null), 20));
+    const router = createMemoryRouter([{ path: "/", loader, element: withHeaderHost(<Host />) }]);
+    const { container } = render(<RouterProvider router={router} />);
+    const blocks = () => container.querySelectorAll('[data-slot="session-stream"] [data-block]').length;
+    const poll = async () => {
+      await act(async () => {
+        void revalidate();
+      });
+      // Let the loader's beat pass and the Chat read that rides its idle edge come back.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 80)));
+    };
+    return { blocks, poll };
+  }
+
+  const savedLine = () => screen.queryByText(/^Saved copy from .+\. Older text is on the bridge\.$/);
+
+  it("online, content shown, then a poll that gets no answer: the blocks stay and the saved line appears", async () => {
+    const view = renderPolled();
+    expect(await screen.findByText("what changed today?")).toBeInTheDocument();
+    const shown = view.blocks();
+    expect(shown).toBeGreaterThan(0);
+    expect(savedLine()).toBeNull();
+
+    mode = "drop";
+    await view.poll();
+    await waitFor(() => expect(savedLine()).toBeInTheDocument());
+    expect(view.blocks()).toBe(shown);
+    expect(screen.getByText("what changed today?")).toBeInTheDocument();
+    expect(screen.getByText("One commit: abc1234.")).toBeInTheDocument();
+
+    // It stays through further failures, once, and goes with the first live answer.
+    await view.poll();
+    expect(screen.getAllByText(/^Saved copy from/)).toHaveLength(1);
+    expect(view.blocks()).toBe(shown);
+    mode = "live";
+    await view.poll();
+    await waitFor(() => expect(savedLine()).toBeNull());
+    expect(view.blocks()).toBe(shown);
+  });
+
+  it("the two-failure rule: one 5xx keeps the Chat unmarked, the second in a row marks it", async () => {
+    const view = renderPolled();
+    expect(await screen.findByText("what changed today?")).toBeInTheDocument();
+    const shown = view.blocks();
+
+    mode = "502";
+    await view.poll();
+    expect(savedLine()).toBeNull();
+    expect(view.blocks()).toBe(shown);
+
+    await view.poll();
+    await waitFor(() => expect(savedLine()).toBeInTheDocument());
+    expect(view.blocks()).toBe(shown);
+  });
+
+  // 2026-10-07, Altan: the dated line was a bar of its own under the pane strip. It is the top of the
+  // transcript now, where "Start of the conversation" and "Load older" stand, and it replaces both.
+  it("the saved line takes the transcript's top slot, and the live slot comes back with the bridge", async () => {
+    const view = renderPolled();
+    expect(await screen.findByText("what changed today?")).toBeInTheDocument();
+    expect(screen.getByText("Start of the conversation")).toBeInTheDocument();
+    expect(document.querySelector('[data-slot="saved-copy"]')).toBeNull();
+
+    mode = "drop";
+    await view.poll();
+    await waitFor(() => expect(savedLine()).toBeInTheDocument());
+    const stream = document.querySelector('[data-slot="session-stream"]')!;
+    const slot = stream.firstElementChild!;
+    expect(slot).toHaveAttribute("data-slot", "saved-copy");
+    expect(slot).toContainElement(savedLine());
+    expect(screen.queryByText("Start of the conversation")).toBeNull();
+    expect(screen.queryByRole("button", { name: /load older/i })).toBeNull();
+    // No bar above the body any more: the line is the only one, and it lives in the scroller.
+    expect(document.querySelector('[data-slot="notice"]')).toBeNull();
+    expect(screen.getAllByText(/^Saved copy from/)).toHaveLength(1);
+
+    mode = "live";
+    await view.poll();
+    await waitFor(() => expect(savedLine()).toBeNull());
+    expect(document.querySelector('[data-slot="saved-copy"]')).toBeNull();
+    expect(screen.getByText("Start of the conversation")).toBeInTheDocument();
   });
 });

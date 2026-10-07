@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, spyOn, test } from "bun:test";
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,12 +22,17 @@ import {
   generateCode,
   generateToken,
   hashesEqual,
+  isExpired,
+  MAX_LIFETIME_MS,
   newPending,
   normalizeCode,
   normalizeLabel,
   PairingStore,
+  parseLifetime,
   PENDING_FILENAME,
+  RegistryUnreadableError,
   removeDevice,
+  setDeviceExpiry,
   sha256Hex,
   toDeviceWire,
   touchDevice,
@@ -335,15 +340,21 @@ describe("bearerToken", () => {
 });
 
 describe("PairingStore", () => {
-  test("an empty registry means pairing is not enforced", () => {
+  // M46 spec 03 (ADR 0086): pairing is always on. An empty registry is a bridge waiting for its
+  // first device, not an open one.
+  test("always on: an empty registry is enforced", () => {
     const { io } = memoryIo();
-    expect(new PairingStore(io).enforced()).toBe(false);
+    const store = new PairingStore(io);
+    expect(store.enforced()).toBe(true);
+    // Nothing paired means no token resolves, so every gated route refuses.
+    expect(store.resolve(null)).toBeNull();
+    expect(store.resolve("anything")).toBeNull();
   });
 
-  test("one paired device turns enforcement on for every device", async () => {
+  test("always on: enforcement does not change when the first device pairs", async () => {
     const { io } = memoryIo({ pending: newPending("ABCD2345", 0) });
     const store = new PairingStore(io, () => 1000);
-    expect(store.enforced()).toBe(false);
+    expect(store.enforced()).toBe(true);
     const claimed = await store.claim("ABCD2345", "phone");
     expect(claimed.ok).toBe(true);
     expect(store.enforced()).toBe(true);
@@ -437,8 +448,9 @@ describe("PairingStore", () => {
     if (!claimed.ok) throw new Error("claim failed");
     expect(await store.revoke("phone")).toBe(true);
     expect(store.resolve(claimed.token)).toBeNull();
-    // …and with the last device gone, pairing switches back off rather than locking everyone out.
-    expect(store.enforced()).toBe(false);
+    // …and with the last device gone, pairing stays on (always on, ADR 0086): no state of the
+    // registry opens the bridge again. `collie pair` on the host is the way back in.
+    expect(store.enforced()).toBe(true);
     expect(await store.revoke("phone")).toBe(false);
   });
 
@@ -451,6 +463,186 @@ describe("PairingStore", () => {
   });
 });
 
+// ── Token expiry (M46 spec 01) ───────────────────────────────────────────────────────────────
+
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
+
+describe("parseLifetime", () => {
+  test("a whole number and h, d or w", () => {
+    expect(parseLifetime("12h")).toEqual({ ok: true, ms: 12 * HOUR });
+    expect(parseLifetime("30d")).toEqual({ ok: true, ms: 30 * DAY });
+    expect(parseLifetime("90d")).toEqual({ ok: true, ms: 90 * DAY });
+    expect(parseLifetime("2w")).toEqual({ ok: true, ms: 14 * DAY });
+    expect(parseLifetime(" 7D ")).toEqual({ ok: true, ms: 7 * DAY });
+  });
+
+  test("zero, negative, fractional, unit-less, minutes and junk are refused with a sentence", () => {
+    for (const bad of ["0d", "0h", "-1d", "1.5d", "30", "30m", "30 days", "d", "", "abc", "1e3d"]) {
+      const parsed = parseLifetime(bad);
+      expect({ bad, ok: parsed.ok }).toEqual({ bad, ok: false });
+      if (!parsed.ok) expect(parsed.reason.length).toBeGreaterThan(10);
+    }
+  });
+
+  test("more than ten years is refused — that is what leaving the flag out means", () => {
+    expect(parseLifetime("3650d")).toEqual({ ok: true, ms: MAX_LIFETIME_MS });
+    expect(parseLifetime("3651d").ok).toBe(false);
+    expect(parseLifetime("99999999999999999999w").ok).toBe(false);
+  });
+});
+
+describe("token expiry in the registry", () => {
+  const live = { label: "phone", tokenHash: sha256Hex("t"), createdAt: 1, lastSeenAt: 1 };
+
+  test("isExpired: no expiry never expires; the instant of expiry is already expired", () => {
+    expect(isExpired(live, Number.MAX_SAFE_INTEGER)).toBe(false);
+    expect(isExpired({ ...live, expiresAt: 1000 }, 999)).toBe(false);
+    expect(isExpired({ ...live, expiresAt: 1000 }, 1000)).toBe(true);
+  });
+
+  test("coerceRegistry keeps a numeric expiresAt, reads null as none, and garbage as expired", () => {
+    const reg = coerceRegistry({
+      devices: [
+        { ...live, label: "a", expiresAt: 5000 },
+        { ...live, label: "b", expiresAt: null },
+        { ...live, label: "c", expiresAt: "2030-01-01" },
+        { ...live, label: "d" },
+      ],
+    });
+    expect(reg.devices[0]!.expiresAt).toBe(5000);
+    expect("expiresAt" in reg.devices[1]!).toBe(false);
+    // A garbled limit fails closed: an expiry of 0 is long past.
+    expect(reg.devices[2]!.expiresAt).toBe(0);
+    expect("expiresAt" in reg.devices[3]!).toBe(false);
+  });
+
+  test("a registry with no expiry loads unchanged and is written back byte for byte", async () => {
+    // The file exactly as every release before expiry wrote it.
+    const dir = await tempStateDir();
+    const before = JSON.stringify(
+      {
+        devices: [
+          { label: "pixel", tokenHash: sha256Hex("a"), createdAt: 1_700_000_000_000, lastSeenAt: 1_700_000_100_000 },
+          { label: "ipad", tokenHash: sha256Hex("b"), createdAt: 1_700_000_000_001, lastSeenAt: 0 },
+        ],
+      },
+      null,
+      2,
+    );
+    await writeFile(join(dir, DEVICES_FILENAME), before);
+    const io = filePairingIo(dir);
+    const loaded = coerceRegistry(await io.readRegistry());
+    for (const d of loaded.devices) expect(Object.keys(d)).toEqual(["label", "tokenHash", "createdAt", "lastSeenAt"]);
+    await io.writeRegistry(loaded);
+    expect(await readFile(join(dir, DEVICES_FILENAME), "utf8")).toBe(before);
+
+    // And through the store's own read-modify-write: a lastSeenAt stamp leaves the shape alone.
+    const store = new PairingStore(io, () => 1_800_000_000_000);
+    expect(store.resolve("a")?.label).toBe("pixel");
+    await store.idle();
+    const stamped = JSON.parse(await readFile(join(dir, DEVICES_FILENAME), "utf8"));
+    expect(Object.keys(stamped.devices[0])).toEqual(["label", "tokenHash", "createdAt", "lastSeenAt"]);
+    expect(stamped.devices[0].lastSeenAt).toBe(1_800_000_000_000);
+    expect(JSON.stringify(stamped.devices[1])).toBe(JSON.stringify(JSON.parse(before).devices[1]));
+  });
+
+  test("a token with no expiry is accepted as before, at any time", async () => {
+    const { io } = memoryIo({ pending: newPending("ABCD2345", 0) });
+    let now = 1000;
+    const store = new PairingStore(io, () => now);
+    const claimed = await store.claim("ABCD2345", "phone");
+    if (!claimed.ok) throw new Error("claim failed");
+    now = 100 * 365 * DAY;
+    expect(store.resolve(claimed.token)?.label).toBe("phone");
+    expect(store.expired(claimed.token)).toBe(false);
+  });
+
+  test("the pending code's lifetime becomes the token's expiry, counted from the claim", async () => {
+    const { io, state } = memoryIo({ pending: newPending("ABCD2345", 0, undefined, 30 * DAY) });
+    let now = 5 * 60_000; // claimed five minutes after `collie pair`
+    const store = new PairingStore(io, () => now);
+    const claimed = await store.claim("ABCD2345", "phone");
+    if (!claimed.ok) throw new Error("claim failed");
+    const entry = coerceRegistry(state.registry).devices[0]!;
+    expect(entry.expiresAt).toBe(5 * 60_000 + 30 * DAY);
+
+    now = entry.expiresAt! - 1;
+    expect(store.resolve(claimed.token)?.label).toBe("phone");
+    now = entry.expiresAt!;
+    expect(store.resolve(claimed.token)).toBeNull();
+    expect(store.expired(claimed.token)).toBe(true);
+  });
+
+  test("an expired device is refused but still listed, and still keeps pairing enforced", async () => {
+    const { io, state } = memoryIo({
+      registry: { devices: [{ ...live, expiresAt: 1000 }] },
+    });
+    const store = new PairingStore(io, () => 2000 + SEEN_WINDOW);
+    expect(store.resolve("t")).toBeNull();
+    expect(store.expired("t")).toBe(true);
+    expect(store.expired("other")).toBe(false);
+    expect(store.expired(null)).toBe(false);
+    expect(store.enforced()).toBe(true);
+    // A refused request is not the device being seen: no stamp.
+    await store.idle();
+    expect(state.writes).toBe(0);
+    expect(store.registry().devices).toHaveLength(1);
+  });
+
+  test("a pending file's lifetime is kept only when it is a positive number", () => {
+    const base = { codeHash: "h", expiresAt: 1, attemptsLeft: 5 };
+    expect(coercePending({ ...base, tokenLifetimeMs: DAY })?.tokenLifetimeMs).toBe(DAY);
+    for (const bad of [0, -1, "30d", null]) {
+      const p = coercePending({ ...base, tokenLifetimeMs: bad });
+      expect(p).not.toBeNull();
+      expect("tokenLifetimeMs" in p!).toBe(false);
+    }
+    expect(Object.keys(newPending("ABCD2345", 0))).toEqual(["codeHash", "expiresAt", "attemptsLeft"]);
+  });
+
+  test("setDeviceExpiry sets or removes the key on one device; an unknown label is null", () => {
+    const reg = { devices: [live, { ...live, label: "tablet" }] };
+    const set = setDeviceExpiry(reg, "phone", 9000)!;
+    expect(set.devices[0]!.expiresAt).toBe(9000);
+    expect("expiresAt" in set.devices[1]!).toBe(false);
+    const cleared = setDeviceExpiry(set, "phone", null)!;
+    expect(cleared.devices[0]).toEqual(live);
+    expect(Object.keys(cleared.devices[0]!)).toEqual(["label", "tokenHash", "createdAt", "lastSeenAt"]);
+    expect(setDeviceExpiry(reg, "nope", 1)).toBeNull();
+    // Never mutates its input.
+    expect("expiresAt" in reg.devices[0]!).toBe(false);
+  });
+
+  test("toDeviceWire carries expiresAt (null when none) and an expired flag", () => {
+    const reg = { devices: [live, { ...live, label: "old", expiresAt: 500 }, { ...live, label: "new", expiresAt: 5000 }] };
+    const wire = toDeviceWire(reg, "phone", 1000);
+    expect(wire.map((w) => [w.label, w.expiresAt, w.expired])).toEqual([
+      ["phone", null, false],
+      ["old", 500, true],
+      ["new", 5000, false],
+    ]);
+    expect(JSON.stringify(wire)).not.toContain(live.tokenHash);
+  });
+
+  test("adopt carries a synced expiry, and adds none where there was none", async () => {
+    const { io, state } = memoryIo();
+    const store = new PairingStore(io, () => 1000);
+    expect(
+      await store.adopt([
+        { label: "a", tokenHash: sha256Hex("a"), createdAt: 1, expiresAt: 7000 },
+        { label: "b", tokenHash: sha256Hex("b"), createdAt: 1 },
+      ]),
+    ).toEqual([]);
+    const devices = coerceRegistry(state.registry).devices;
+    expect(devices[0]!.expiresAt).toBe(7000);
+    expect("expiresAt" in devices[1]!).toBe(false);
+  });
+});
+
+/** Past the lastSeenAt throttle, so a resolve WOULD stamp if it were going to. */
+const SEEN_WINDOW = 61_000;
+
 // ── The crew surface is not a pairing surface ────────────────────────────────────────────────
 // A lead is admitted by pinned mutual TLS plus the crew secret (CREW_PROTOCOL.md §6, ADR 0013) and
 // holds none of this collie's pairing tokens. If pairing ever leaked into the peer's dispatch, every
@@ -458,6 +650,55 @@ describe("PairingStore", () => {
 // handing a lead a browser credential, which is precisely the thing §6 forbids. The wiring lives
 // inside `Bun.serve`, which `bun test` cannot stand up (CLAUDE.md), so it is pinned at the source —
 // the same technique bridge/solo-baseline.test.ts uses on the route table.
+describe("the pairing gate is on every guard", () => {
+  const source = readFileSync(join(import.meta.dir, "server.ts"), "utf8");
+
+  // ── THE OPTIONAL-PARAMETER FOOTGUN ─────────────────────────────────────────────────────────
+  // `guard(req, cfg, level, pairing?)` takes the pairing gate as an OPTIONAL fourth argument, and it
+  // has to: the parameter was added to a function with a dozen existing call sites, and the tests
+  // that build a server without a store still call it with three. The cost of that convenience is
+  // that `guard(req, cfg, "write")` — the spelling every existing route used, and therefore the one
+  // a future route will be copy-pasted into — compiles, passes review, and silently skips the whole
+  // pairing gate. TypeScript cannot catch it and no runtime test would either: the route would work
+  // perfectly, just unguarded.
+  //
+  // So the arity is pinned here, at the source, exactly as the crew seam above is. If you are
+  // reading this because the test failed: you added a `guard(` call without `pairingGate` (the
+  // store plus the host's local read credential), and that is the bug. `apiFrontGate` forwards its
+  // own `pairing` parameter, which is the same gate one call up.
+  test("every guard() call in server.ts passes the pairing gate", () => {
+    // Comment lines are dropped first — this file's prose mentions `guard()` and `guard(…, "write")`
+    // many times, and those are not call sites.
+    const code = source
+      .split("\n")
+      .filter((line) => {
+        const t = line.trim();
+        return !(t.startsWith("//") || t.startsWith("*") || t.startsWith("/*"));
+      })
+      .join("\n");
+
+    /** The argument text of each `guard(` call, paren-balanced so a nested call can't truncate it. */
+    const callArgs: string[] = [];
+    for (const match of code.matchAll(/(\bfunction\s+)?\bguard\(/g)) {
+      if (match[1] !== undefined) continue; // the definition itself
+      let depth = 1;
+      let i = match.index + match[0].length;
+      for (; i < code.length && depth > 0; i++) {
+        if (code[i] === "(") depth++;
+        else if (code[i] === ")") depth--;
+      }
+      callArgs.push(code.slice(match.index + match[0].length, i - 1));
+    }
+
+    // A negative control on the scanner itself: if it found nothing, it is broken, and a broken
+    // scanner passes this test vacuously forever.
+    expect(callArgs.length).toBeGreaterThanOrEqual(8);
+    const unguarded = callArgs.filter((args) => !/\bpairing(Gate)?\b/.test(args));
+    expect(unguarded).toEqual([]);
+    // Every call is the browser gate: `checkAccess` plus the pairing token, in one spelling.
+    expect(callArgs.every((args) => args.includes("req, cfg"))).toBe(true);
+  });
+});
 
 describe("filePairingIo", () => {
   test("writes are owner-only and land under the state dir", async () => {
@@ -483,13 +724,54 @@ describe("filePairingIo", () => {
     expect(io.readRegistrySync()).toBeNull();
   });
 
-  test("corrupt JSON reads as null rather than throwing into the request path", async () => {
+  // A torn file is NOT "nobody is paired": that reading made every phone wipe itself on the 403.
+  test("a file that is there and not a registry throws RegistryUnreadableError, sync and async", async () => {
     const stateDir = await tempStateDir();
-    await writeFile(join(stateDir, DEVICES_FILENAME), "{not json");
     const io = filePairingIo(stateDir);
-    expect(io.readRegistrySync()).toBeNull();
-    expect(await io.readRegistry()).toBeNull();
-    expect(coerceRegistry(io.readRegistrySync())).toEqual({ devices: [] });
+    // Truncated mid-write, not JSON at all, empty, and JSON that is not an object.
+    for (const body of ['{"devices":[{"label":"pho', "{not json", "", "null", "[]", '"x"']) {
+      await writeFile(join(stateDir, DEVICES_FILENAME), body);
+      expect(() => io.readRegistrySync()).toThrow(RegistryUnreadableError);
+      await expect(io.readRegistry()).rejects.toThrow(RegistryUnreadableError);
+    }
+  });
+
+  test("an unreadable read is never cached: the repaired file is read on the next call", async () => {
+    const stateDir = await tempStateDir();
+    const io = filePairingIo(stateDir);
+    const store = new PairingStore(io);
+    const good = JSON.stringify({ devices: [{ label: "phone", tokenHash: sha256Hex("t"), createdAt: 1, lastSeenAt: 1 }] });
+    await writeFile(join(stateDir, DEVICES_FILENAME), good.slice(0, 20));
+    expect(() => store.registry()).toThrow(RegistryUnreadableError);
+    expect(() => store.resolve("t")).toThrow(RegistryUnreadableError);
+    expect(() => store.expired("t")).toThrow(RegistryUnreadableError);
+    // Still broken on a second ask: the error was not turned into a cached "empty".
+    expect(() => store.resolve("t")).toThrow(RegistryUnreadableError);
+    await writeFile(join(stateDir, DEVICES_FILENAME), good);
+    expect(store.resolve("t")?.label).toBe("phone");
+    expect(store.registry().devices).toHaveLength(1);
+  });
+
+  test("an unreadable registry is never written over: claim and revoke throw and leave the file as it was", async () => {
+    const stateDir = await tempStateDir();
+    const io = filePairingIo(stateDir);
+    const store = new PairingStore(io, () => 0);
+    await io.writePending(newPending("ABCD2345", 0));
+    const torn = '{"devices":[{"label":"phone","tokenHash":"';
+    await writeFile(join(stateDir, DEVICES_FILENAME), torn);
+    await expect(store.claim("ABCD2345", "tablet")).rejects.toThrow(RegistryUnreadableError);
+    await expect(store.revoke("phone")).rejects.toThrow(RegistryUnreadableError);
+    await store.idle();
+    expect(await readFile(join(stateDir, DEVICES_FILENAME), "utf8")).toBe(torn);
+    // The code was right and is still claimable once the file is whole again.
+    expect(await io.readPending()).not.toBeNull();
+  });
+
+  test("a missing file is still the empty registry, never an error", async () => {
+    const store = new PairingStore(filePairingIo(await tempStateDir()));
+    expect(store.registry()).toEqual({ devices: [] });
+    expect(store.resolve("t")).toBeNull();
+    expect(store.expired("t")).toBe(false);
   });
 
   test("deletePending is idempotent", async () => {
@@ -508,7 +790,8 @@ describe("filePairingIo", () => {
     expect(store.resolve("t")?.label).toBe("phone");
     // `bin/collie devices revoke phone` — a different process, no restart.
     await writeFile(join(stateDir, DEVICES_FILENAME), JSON.stringify({ devices: [] }));
-    expect(store.enforced()).toBe(false);
+    // Always on: the emptied registry does not open the bridge (ADR 0086).
+    expect(store.enforced()).toBe(true);
     expect(store.resolve("t")).toBeNull();
   });
 });
