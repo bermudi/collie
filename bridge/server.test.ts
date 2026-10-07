@@ -191,6 +191,7 @@ function cfg(overrides: Partial<Config> = {}): Config {
       opencode: ["/nope/opencode"],
       grok: ["/nope/grok"],
       hermes: ["/nope/hermes"],
+      devin: ["/nope/devin"],
       muse: ["/nope/muse"],
       openclaw: ["/nope/openclaw"],
     },

@@ -35,6 +35,7 @@ const KEYS = [
   "COLLIE_GROK_ROOT",
   "COLLIE_HERMES_ROOT",
   "COLLIE_OPENCLAW_ROOT",
+  "COLLIE_DEVIN_ROOT",
   // Each harness's own home var participates in journal-root resolution, so the suite must own them
   // too — otherwise a developer with CODEX_HOME set gets different results than CI.
   "CODEX_HOME",
@@ -102,6 +103,12 @@ describe("loadConfig", () => {
     expect(cfg.journalRoots.grok).toEqual([join(homedir(), ".grok", "sessions")]);
     expect(cfg.journalRoots.hermes).toEqual([join(homedir(), ".hermes")]);
     expect(cfg.journalRoots.openclaw).toEqual([join(homedir(), ".openclaw")]);
+    // Devin keeps one sessions.db per channel layout; cli/ is the active one and cli-next/ the
+    // layout a channel switch left behind, so both are searched in that order.
+    expect(cfg.journalRoots.devin).toEqual([
+      join(homedir(), ".local", "share", "devin", "cli"),
+      join(homedir(), ".local", "share", "devin", "cli-next"),
+    ]);
     expect(cfg.submitKeys).toEqual(["Enter"]);
     expect(cfg.trustedUser).toBe("");
     expect(cfg.trustedUserOptional).toBe(false);
@@ -253,6 +260,11 @@ describe("loadConfig", () => {
     expect(loadConfig().journalRoots.openclaw).toEqual(["/srv/openclaw-state"]);
     process.env.COLLIE_OPENCLAW_ROOT = "/srv/a,/srv/b";
     expect(loadConfig().journalRoots.openclaw).toEqual(["/srv/a", "/srv/b"]);
+  });
+
+  test("COLLIE_DEVIN_ROOT relocates both Devin databases", () => {
+    process.env.COLLIE_DEVIN_ROOT = "/srv/devin";
+    expect(loadConfig().journalRoots.devin).toEqual(["/srv/devin"]);
   });
 
   // The operator's rows sit beside their .env, and the launcher hands us that dir precisely so the

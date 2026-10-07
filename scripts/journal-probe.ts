@@ -162,6 +162,59 @@ async function candidateRefsUnder(
 
   if (agent === "openclaw") return openclawCandidates(root);
 
+  if (agent === "devin") {
+    // Same shape again: ONE sqlite database per root (`sessions.db` under the channel layout dir).
+    // Every sessions row is a root session — devin's subagent trees are nodes inside a session, not
+    // sessions of their own — so the newest-by-activity list is already the pane-population.
+    let db: Database;
+    try {
+      db = new Database(join(root, "sessions.db"), { readonly: true });
+    } catch {
+      return { refs: [], total: 0 };
+    }
+    try {
+      const rows = db
+        .query<{ id: string }, [number]>(
+          "select id from sessions order by last_activity_at desc limit ?",
+        )
+        .all(MAX_CANDIDATES);
+      const refs: AgentSessionRef[] = rows.map((r) => ({ kind: "id", value: r.id }));
+      return { refs, total: refs.length };
+    } catch {
+      return { refs: [], total: 0 };
+    } finally {
+      db.close();
+    }
+  }
+
+  if (agent === "hermes") {
+    // Same shape as opencode: ONE sqlite database per root, root sessions only — a
+    // `parent_session_id` row is a compaction child the adapter walks at load time, not a pane
+    // herdr would ever name. This branch is what makes the probe the drift check CLAUDE.md
+    // promises for the sixth adapter: without it a schema the adapter cannot read surfaced as
+    // "no logs found" instead of a red row.
+    let db: Database;
+    try {
+      db = new Database(join(root, "state.db"), { readonly: true });
+    } catch {
+      return { refs: [], total: 0 };
+    }
+    try {
+      const rows = db
+        .query<{ id: string }, [number]>(
+          "select id from sessions where parent_session_id is null order by started_at desc limit ?",
+        )
+        .all(MAX_CANDIDATES);
+      const refs: AgentSessionRef[] = rows.map((r) => ({ kind: "id", value: r.id }));
+      return { refs, total: refs.length };
+    } catch {
+      return { refs: [], total: 0 };
+    } finally {
+      db.close();
+    }
+  }
+
+
   const logs = await logsNewestFirst(root);
   const refs: AgentSessionRef[] = [];
   for (const log of logs.slice(0, MAX_CANDIDATES)) {

@@ -12,6 +12,7 @@
 
 import { claudeJournal } from "./claude.ts";
 import { codexJournal } from "./codex.ts";
+import { devinJournal } from "./devin.ts";
 import { durableJournal } from "./durable.ts";
 import { grokJournal } from "./grok.ts";
 import { hermesJournal } from "./hermes.ts";
@@ -44,6 +45,8 @@ export interface JournalRoots {
   grok: readonly string[];
   /** Hermes' SessionDB directory — `state.db` lives at its top level. */
   hermes: readonly string[];
+  /** Devin's data dir — one `sessions.db` per channel layout (`cli/`, `cli-next/`). */
+  devin: readonly string[];
   /** Muse's `sessions` directory — `YYYY/MM/DD/<uuid>/session.jsonl` lives under it. */
   muse: readonly string[];
   /**
@@ -71,6 +74,7 @@ export function buildJournalRegistry(roots: JournalRoots): Record<string, Journa
     opencodeJournal(roots.opencode),
     grokJournal(roots.grok),
     hermesJournal(roots.hermes),
+    devinJournal(roots.devin),
     museJournal(roots.muse),
     openclawJournal(roots.openclaw),
   ];
@@ -180,5 +184,5 @@ export function journalAgents(registry: Record<string, JournalAdapter>): string[
  * identity off a match against it — see `bridge/mux/types.ts` § `MuxPane.agent`.
  */
 export const KNOWN_HARNESS_NAMES: readonly string[] = journalAgents(
-  buildJournalRegistry({ claude: [], codex: [], pi: [], opencode: [], grok: [], hermes: [], muse: [], openclaw: [] }),
+  buildJournalRegistry({ claude: [], codex: [], pi: [], opencode: [], grok: [], hermes: [], devin: [], muse: [], openclaw: [] }),
 );

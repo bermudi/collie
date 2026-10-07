@@ -31,7 +31,7 @@
 
 /** The Herdr `agent` strings this build can read a session log for. Mirrors `journalAgents()` plus
  *  every alias in the bridge's `AGENT_ALIASES` — `omp` is Oh My Pi, which writes pi's log in pi's
- *  format, so it is a second NAME for the pi adapter and not an eighth adapter.
+ *  format, so it is a second NAME for the pi adapter and not an adapter of its own.
  *
  *  Exported for the version ledger's test (M41/05), which owes a `journal` line to every agent on
  *  this list and cannot ask for one without the list. Still a NAME LIST and still never a detector:
@@ -39,6 +39,7 @@
 export const JOURNAL_AGENT_NAMES: ReadonlySet<string> = new Set([
   "claude",
   "codex",
+  "devin",
   "grok",
   "hermes",
   "muse",

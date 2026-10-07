@@ -555,6 +555,17 @@ export function resolveJournalRoots(
       env,
     ),
     hermes: envRoots("COLLIE_HERMES_ROOT", join(home, ".hermes"), env),
+    // TWO defaults, one database name: devin keeps a `sessions.db` per channel layout, and `cli/` is
+    // the active one while `cli-next/` is the layout a channel switcher left behind — the same
+    // shape as pi's two homes, so both are searched and the first holding the session wins.
+    devin: envRoots(
+      "COLLIE_DEVIN_ROOT",
+      [
+        join(env.XDG_DATA_HOME ?? join(home, ".local", "share"), "devin", "cli"),
+        join(env.XDG_DATA_HOME ?? join(home, ".local", "share"), "devin", "cli-next"),
+      ],
+      env,
+    ),
     // Muse keeps date-partitioned session logs under the XDG data dir, one session.jsonl per
     // session uuid. Muse publishes no home var of its own, so the Collie override is the only
     // relocation.
