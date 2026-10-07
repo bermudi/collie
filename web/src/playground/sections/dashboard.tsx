@@ -1,13 +1,19 @@
 // Dashboard section of the states playground. Split out of app.tsx; see that file's header comment
 // for the whole page's rules.
 
+import { ListTree, Rows3 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MemoryRouter } from "react-router";
 
 import { AgentList, type HeadingNewTab } from "@/components/agent-list";
 import { BuildStamp } from "@/components/build-stamp";
 import { ListGroup } from "@/components/ui/list-group";
+import { TabBar } from "@/components/ui/tab-bar";
+import type { DashView } from "@/lib/dash-view";
+import { countBlocked, hasReady } from "@/lib/triage";
+import { t, tn } from "@/lib/i18n";
 import { PaneStrip } from "@/components/pane-strip";
+import type { PaneOrder } from "@/lib/pane-order";
 import { ReadOnlyBanner } from "@/components/read-only-banner";
 import { SessionSwitcher } from "@/components/session-switcher";
 import { SpaceStrip } from "@/components/space-strip";
@@ -55,6 +61,87 @@ export const DEF: SectionDef = {
  *  dashboard draws it, and a tap goes nowhere. */
 const HEADING_NEW_TAB: HeadingNewTab = { scope: {}, creating: new Set(), onNewTab: () => {} };
 
+/** The dashboard with its order toggle live (ADR 0071): tap a segment and the list re-ranks, the way
+ *  the route does, with the reading held between taps. */
+function OrderedAgentList({ initial }: { initial: PaneOrder }) {
+  const [order, setOrder] = useState<PaneOrder>(initial);
+  return (
+    <AgentList
+      agents={herd}
+      bridge="connected"
+      onOpen={() => {}}
+      newTab={HEADING_NEW_TAB}
+      order={order}
+      onOrderChange={setOrder}
+    />
+  );
+}
+
+/** A tab body this card does not build for real: one quiet line saying what the tab would hold. */
+const body = (label: string) => () => (
+  <p className="rounded-md border border-border px-3 py-6 text-center text-sm text-muted-foreground">{label}</p>
+);
+
+/**
+ * The dashboard's footer tabs and its needs-you switch (ADR 0085), composed from the real parts: the
+ * real `AgentList` with the switch live, and the real `TabBar` with the items `routes/home.tsx`
+ * builds. A mock of the route, not a mount of it: the route reads its tab and its switch from
+ * localStorage, and the cards cannot share one store. The Changes tab's body is a placeholder,
+ * because its own component fetches the changes and this page has no API.
+ */
+function DashboardTabsPhone({
+  initialOn,
+  initialView = "dashboard",
+}: {
+  initialOn: boolean;
+  initialView?: DashView;
+}) {
+  const [on, setOn] = useState(initialOn);
+  const [view, setView] = useState<DashView>(initialView);
+  const [order, setOrder] = useState<PaneOrder>("place");
+  const blocked = countBlocked(herd);
+  return (
+    <>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <AgentList
+          agents={herd}
+          bridge="connected"
+          onOpen={() => {}}
+          newTab={HEADING_NEW_TAB}
+          order={order}
+          onOrderChange={setOrder}
+          needsYouOnly={view === "dashboard" && on}
+          onNeedsYouOnlyChange={setOn}
+          renderBody={
+            view === "changes"
+              ? body("The Changes tab's body, one row per workspace")
+              : undefined
+          }
+        />
+      </div>
+      <TabBar<DashView>
+        label={t("home.tabs.aria")}
+        active={view}
+        onSelect={setView}
+        items={[
+          {
+            value: "dashboard",
+            label: t("home.tabs.dashboard"),
+            icon: <Rows3 className="size-5" />,
+            badge: blocked,
+            dot: blocked === 0 && hasReady(herd),
+            badgeLabel: blocked > 0 ? tn("home.tabs.blocked", blocked) : t("home.tabs.unseen"),
+          },
+          { value: "changes", label: t("files.title"), icon: <ListTree className="size-5" /> },
+        ]}
+      />
+    </>
+  );
+}
+
+const TABS_REACH =
+  "the dashboard's footer. Dashboard is the list and the default, under the thumb; the old Focus tab is the circle-dot switch in the summary line's row, beside the order toggle.";
+
 export function DashboardSection() {
   return (
     <Section def={DEF}>
@@ -72,6 +159,18 @@ export function DashboardSection() {
         >
           <PhoneFrameCard>
             <AgentList agents={herd} bridge="connected" onOpen={() => {}} newTab={HEADING_NEW_TAB} />
+          </PhoneFrameCard>
+        </Card>
+
+        <Card
+          state="agent-list-activity-order"
+          label="agent list, ordered by activity"
+          reach="the operator taps the clock beside the status line. The workspace groups give way to one list, newest first, and each row names its workspace on line 2."
+          note="The toggle is live: tap Place, Activity or Cache. The reading is taken when the order changes or the selected segment is tapped again, never on a poll. Check the controls row at 390px: the counts wrap before the toggle shrinks."
+          span={2}
+        >
+          <PhoneFrameCard>
+            <OrderedAgentList initial="activity" />
           </PhoneFrameCard>
         </Card>
 
@@ -104,6 +203,31 @@ export function DashboardSection() {
 
       <Group title="Write gate">
         <WriteGateCard />
+      </Group>
+
+      <Group title="Tabs and the needs-you switch">
+        <Card
+          state="dashboard-tabs-solo-switch-off"
+          label="tabs, solo, switch off"
+          reach={TABS_REACH}
+          note="Two tabs, Dashboard and Changes. The switch is off: the Spaces navigator and the launch strip trail the list on the real route, and the pin hint sits under the summary line. The footer's red count is on Dashboard."
+        >
+          <PhoneFrameCard height={640}>
+            <DashboardTabsPhone initialOn={false} />
+          </PhoneFrameCard>
+        </Card>
+
+        <Card
+          state="dashboard-tabs-solo-switch-on"
+          label="tabs, solo, switch on"
+          reach={TABS_REACH}
+          note="The switch wears the primary tint and reads pressed. Each workspace keeps only its panes that need you, a group with none is dropped, and every heading still counts its whole workspace. The mark stays on Dashboard."
+        >
+          <PhoneFrameCard height={640}>
+            <DashboardTabsPhone initialOn />
+          </PhoneFrameCard>
+        </Card>
+
       </Group>
 
       <Group title="Navigation strips">

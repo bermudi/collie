@@ -1,14 +1,16 @@
 // The pure parts of driving an agent: options, startup answers, draft clearing, colour answers.
 
 import { describe, expect, test } from "bun:test";
+import { resolve } from "node:path";
 import { claude } from "./agents/claude";
 import { codex } from "./agents/codex";
 import { backspaceSweep, launchLine } from "./agents/profile";
 import { CANARY_AGENTS, parseArgs } from "./args";
 import { colorAnswers, unfinishedTail } from "./client";
 import { cleanEnv } from "./herdr";
-import { JOURNAL_MESSAGE, MESSAGES, NARROW_DRAFT_IDS, SEND_IDS, messageById } from "./messages";
+import { JOURNAL_MESSAGE, MESSAGES, README_TOKEN, NARROW_DRAFT_IDS, SEND_IDS, messageById } from "./messages";
 import { lastPointedRow } from "./dialogs";
+import { answeredBelow } from "./scenarios";
 import { DEFAULT_SCENARIOS } from "./verdict";
 
 const ESC = String.fromCodePoint(0x1b);
@@ -32,7 +34,8 @@ describe("parseArgs", () => {
     expect(o.agents).toEqual(["claude", "codex"]);
     expect(o.scenarios).toEqual(["idle", "drafts"]);
     expect(o.cols).toBe(80);
-    expect(o.readers).toBe("/tmp/c1131");
+    // The flag is resolved against the host: `/tmp/c1131` is `C:\tmp\c1131` on Windows.
+    expect(o.readers).toBe(resolve("/tmp/c1131"));
   });
 
   test("refuses what it does not know", () => {
@@ -75,6 +78,10 @@ describe("startup answers", () => {
     expect(codex.startupAnswer(onYes)).toEqual(["Enter"]);
     expect(codex.startupAnswer(onQuit)).toEqual(["Up"]);
     expect(codex.startupAnswer(["› Ask Codex to do anything"])).toBeNull();
+  });
+
+  test("Codex starts without its update prompt, which would answer Update now", () => {
+    expect(codex.launch(null)).toContain("-c check_for_update_on_startup=false");
   });
 
   test("Codex is never cleared with Ctrl+C", () => {
@@ -124,6 +131,36 @@ describe("drafts and messages", () => {
     expect(JOURNAL_MESSAGE.id).toBe("16-read");
     expect(JOURNAL_MESSAGE.text).toContain("Read the file README.md");
     expect(JOURNAL_MESSAGE.text).not.toMatch(/\brun\b|`|echo/i);
+  });
+});
+
+describe("answeredBelow", () => {
+  const plain = messageById("01-plain");
+  const read = JOURNAL_MESSAGE;
+
+  test("the read send expects the token the README holds, and no other message declares an answer", () => {
+    expect(read.answer).toBe(README_TOKEN);
+    for (const m of MESSAGES) expect(m.answer).toBeUndefined();
+  });
+
+  test("the token below the read prompt counts, with a bullet, a period or neither", () => {
+    for (const row of [README_TOKEN, `• ${README_TOKEN}`, `⏺ ${README_TOKEN}.`, `  ${README_TOKEN}  `]) {
+      expect(answeredBelow([`› ${read.text}`, row], read.text, read.answer)).toBe(true);
+    }
+  });
+
+  test("an OK row still answers a message with no declared answer", () => {
+    for (const row of ["OK", "• OK", "⏺ OK."]) expect(answeredBelow([`› ${plain.text}`, row], plain.text)).toBe(true);
+  });
+
+  test("a token reply does not satisfy an OK message, and OK does not satisfy the read", () => {
+    expect(answeredBelow([`› ${plain.text}`, README_TOKEN], plain.text)).toBe(false);
+    expect(answeredBelow([`› ${read.text}`, "OK"], read.text, read.answer)).toBe(false);
+  });
+
+  test("prose that holds the token mid-sentence, or a token above the prompt, does not count", () => {
+    expect(answeredBelow([`› ${read.text}`, `The token is ${README_TOKEN}, as the file says.`], read.text, read.answer)).toBe(false);
+    expect(answeredBelow([README_TOKEN, `› ${read.text}`], read.text, read.answer)).toBe(false);
   });
 });
 

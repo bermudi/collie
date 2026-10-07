@@ -184,9 +184,39 @@ export interface ApiTag {
 }
 
 /** The endpoint the banner reads — never `releases/latest`, which hides prereleases and stalls a
- *  whole beta train. */
-export function githubTagsUrl(repo: string): string {
-  return `https://api.github.com/repos/${repo}/tags?per_page=100`;
+ *  whole beta train. `page` 1 is the URL it always was; a later page adds `&page=N` (GitHub's own
+ *  paging). */
+export function githubTagsUrl(repo: string, page = 1): string {
+  return `https://api.github.com/repos/${repo}/tags?per_page=${TAG_PAGE_SIZE}${page > 1 ? `&page=${page}` : ""}`;
+}
+
+/** GitHub's largest page. A page that comes back shorter than this is the last one. */
+export const TAG_PAGE_SIZE = 100;
+/** The most pages read: a thousand tags, far past this repository's, and a bound on a mirror that never ends. */
+export const TAG_PAGES_MAX = 10;
+
+/** One page of `/tags` as a caller fetched it: the JSON, or the caller's own failure. */
+export type TagPage<F> = { readonly ok: true; readonly value: JsonValue } | { readonly ok: false; readonly failure: F };
+
+/**
+ * Every tag, page after page, until a page is shorter than {@link TAG_PAGE_SIZE} (or
+ * {@link TAG_PAGES_MAX} pages). One page held every tag until the repository passed 100; the next
+ * tag after that would have been missed wherever the API's order put it. The first failure fails
+ * the whole read: a partial list could name the wrong newest release. Which tag wins is still the
+ * caller's own semver choice, so a repository with one page picks exactly what it picked before.
+ */
+export async function readAllTags<F>(
+  repo: string,
+  fetchPage: (url: string) => Promise<TagPage<F>>,
+): Promise<{ ok: true; tags: ApiTag[] } | { ok: false; failure: F }> {
+  const tags: ApiTag[] = [];
+  for (let page = 1; page <= TAG_PAGES_MAX; page++) {
+    const answer = await fetchPage(githubTagsUrl(repo, page));
+    if (!answer.ok) return answer;
+    tags.push(...parseTagsResponse(answer.value));
+    if (!Array.isArray(answer.value) || answer.value.length < TAG_PAGE_SIZE) break;
+  }
+  return { ok: true, tags };
 }
 
 // ── The GitHub credential (#254) ─────────────────────────────────────────────
@@ -263,9 +293,8 @@ export function githubTagsFetcher(
   repo: string,
   credential: GithubCredential | null = null,
 ): () => Promise<string[]> {
-  const url = githubTagsUrl(repo);
   let refusedSaid = false;
-  return async () => {
+  const fetchPage = async (url: string): Promise<TagPage<never>> => {
     const res = await fetch(url, {
       headers: githubHeaders(url, credential, {
         accept: "application/vnd.github+json",
@@ -283,15 +312,13 @@ export function githubTagsFetcher(
       );
     }
     if (!res.ok) throw new Error(`github tags: HTTP ${res.status}`);
-    const data: unknown = await res.json();
-    if (!Array.isArray(data)) return [];
-    return data
-      .map((t) => {
-        // SAFETY: `t` is untrusted JSON; the typeof guard is the whole check before the read.
-        const name = (t as { name?: unknown }).name;
-        return typeof name === "string" ? name : "";
-      })
-      .filter(Boolean);
+    // SAFETY: `Response.json()` output IS a JsonValue by construction; `parseTagsResponse` checks
+    // every field before it is kept.
+    return { ok: true, value: (await res.json()) as JsonValue };
+  };
+  return async () => {
+    const all = await readAllTags(repo, fetchPage);
+    return all.ok ? all.tags.map((t) => t.name).filter(Boolean) : [];
   };
 }
 

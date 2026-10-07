@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 
 import { COLLAPSE_MS } from "@/components/ui/collapse";
 import { StripHost } from "@/components/ui/strip-host";
+import * as api from "@/lib/api";
 import { ConnectionBanner, GREEN_MS } from "./connection-banner";
 
 // THE BAR IS A STRIP, and this file mounts the band it appears in. `ConnectionBanner` registers a
@@ -50,6 +51,7 @@ let rerenderBanner: () => void = () => {};
 function renderBanner(
   props: {
     bridge?: "connected" | "disconnected";
+    host?: string;
     error?: boolean;
     authError?: boolean;
     lastSeenAt?: number;
@@ -61,6 +63,7 @@ function renderBanner(
     return (
       <ConnectionBanner
         bridge={props.bridge ?? "disconnected"}
+        host={props.host}
         error={props.error ?? false}
         authError={props.authError ?? false}
         lastSeenAt={props.lastSeenAt}
@@ -155,6 +158,35 @@ describe("ConnectionBanner — the single connection surface", () => {
     expect(announced("alert")).toHaveTextContent("Herdr is down on the host");
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /reload/i })).toBeInTheDocument();
+  });
+
+  it("does not infer mux failure from a successful config probe after a failed snapshot", async () => {
+    h.lost = true;
+    renderBanner({ bridge: "connected", error: true });
+    await act(async () => {});
+    expect(announced("alert")).toHaveTextContent("Can't reach Collie");
+  });
+
+  it("does not reuse a cached disconnected mux as evidence during a snapshot failure", async () => {
+    h.lost = true;
+    renderBanner({ bridge: "disconnected", error: true });
+    await act(async () => {});
+    expect(announced("alert")).toHaveTextContent("Can't reach Collie");
+  });
+  it("probes the lead with no host argument, on a member view too", async () => {
+    h.lost = true;
+    renderBanner({ host: "workshop", bridge: "disconnected" });
+    await act(async () => {});
+    expect(api.fetchConfig).toHaveBeenCalled();
+    expect(vi.mocked(api.fetchConfig).mock.calls.every((call) => call.length === 0)).toBe(true);
+  });
+
+  // Solo: there is no member attribution at all — the banner is about this bridge or nothing.
+  it("never names a member: a solo install has one machine", async () => {
+    h.lost = true;
+    renderBanner({ bridge: "connected", error: true });
+    await act(async () => {});
+    expect(announced("alert")).toHaveTextContent("Can't reach Collie");
   });
 
   it("says 'Offline' in red when the probe fails AND the browser reports offline", async () => {

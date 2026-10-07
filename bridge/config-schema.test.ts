@@ -33,6 +33,8 @@ const EXEMPT = {
   COLLIE_CONFIG: "names the base config file itself",
   // The launcher's statement about this process, not the operator's about this Collie.
   COLLIE_PLUGIN_ROOT: "the checkout this binary runs from, injected by the launcher",
+  COLLIE_NO_ACL_REPAIR:
+    "the Windows off switch for the access-list repair (bridge/owner-only.ts), documented in docs/security.md only, never a settings card",
 } satisfies Record<string, string>;
 
 /** Just the names, so a lookup by a grepped string does not need an index signature. */

@@ -75,7 +75,7 @@ describe("ViewportFrame", () => {
       viewport.dispatchEvent(new Event("resize"));
     });
     await waitFor(() => expect(frame?.style.height).toBe(""));
-    expect(frame).toHaveClass("h-[100dvh]");
+    expect(frame).toHaveClass("h-(--app-h)");
   });
 
   it("drops a stale inline height when the browser reports an invalid sample", async () => {
@@ -105,7 +105,7 @@ describe("ViewportFrame", () => {
 
     const { container } = render(<ViewportFrame>herd</ViewportFrame>);
     const frame = container.querySelector<HTMLElement>("[data-viewport-frame]");
-    expect(frame).toHaveClass("h-[100dvh]");
+    expect(frame).toHaveClass("h-(--app-h)");
     expect(frame?.style.height).toBe("");
   });
 
@@ -153,7 +153,7 @@ describe("ViewportFrame", () => {
     const { container } = render(<ViewportFrame>herd</ViewportFrame>);
     const frame = container.querySelector<HTMLElement>("[data-viewport-frame]");
     expect(frame?.style.height).toBe("");
-    expect(frame).toHaveClass("h-[100dvh]");
+    expect(frame).toHaveClass("h-(--app-h)");
 
     Object.defineProperty(window.navigator, "userAgent", { configurable: true, value: origUA });
   });

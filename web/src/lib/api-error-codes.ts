@@ -94,6 +94,10 @@ export const API_ERROR_CODES = [
 
   // Addressing — the `(host, session)` a request named does not exist
   "session.unknown",
+  "host.unknown",
+
+  // The machines surface (ADR 0084)
+  "crew.not_lead",
 ] as const;
 
 /** Every code the bridge can send. Derived from the list, so there is exactly one place to edit. */

@@ -8,7 +8,7 @@
 // therefore costs 32 MB of reading and a full re-parse of it. That is the cost this module removes.
 //
 // ── THE ONE FACT THE WHOLE DESIGN RESTS ON ───────────────────────────────────
-// A raw `\n` byte is always a row boundary, in all six formats. The three file harnesses write JSONL,
+// A raw `\n` byte is always a row boundary, in all seven formats. The five file harnesses write JSONL,
 // and the two SQLite harnesses serialise their rows through `JSON.stringify`, which escapes a newline
 // inside a string value as `\n` (two characters) and never emits a raw one. So a reader may cut the
 // byte stream anywhere: a fragment either completes with the next chunk or is a fragment of exactly
@@ -65,7 +65,7 @@ export interface Reduction {
 /**
  * A role name in a tally wears this prefix, so a name always says which field produced it.
  *
- * Two of the six formats decide a row's kind with a `type` AND a role (codex and pi); claude and grok
+ * Two of the seven formats decide a row's kind with a `type` AND a role (codex and pi); claude and grok
  * never read one, and opencode and hermes have nothing else. Without the prefix a tally saying
  * `developer` would not say where to look. Not exported: it is a spelling inside the names this
  * module produces, and a caller reads those names rather than composing one.
@@ -165,7 +165,7 @@ export function createUnknownCounter(known: KnownTypes): UnknownCounter {
 }
 
 /**
- * An empty tally, for a `RowReducer` that is not one of the six grammars.
+ * An empty tally, for a `RowReducer` that is not one of the seven grammars.
  *
  * A function rather than a shared constant: `Object.freeze` does not stop `Map.set`, so a shared
  * empty tally would be a shared mutable handed to every caller.
@@ -233,6 +233,25 @@ export interface RowReducer {
    * later `push`. A reducer with no grammar of its own answers {@link noUnknowns}.
    */
   unknowns(): UnknownTally;
+  /**
+   * What the operator has typed that the agent has NOT started on yet, oldest first.
+   *
+   * A METHOD and a SNAPSHOT for `unknowns()`'s reasons, and one more that is its own: a queued message
+   * is live STATE, not a turn. It appears, then it is gone. `Reduction` has `added` and `changed` and
+   * no removal, on purpose (see this file's header), so a queue drawn as turns could never be undrawn
+   * without throwing the whole window away.
+   *
+   * ONE harness writes this. Claude Code records the queue in `queue-operation` rows; the other five
+   * formats have no queue in their log at all and answer {@link noQueue}. That is a statement about
+   * the format, the same way an empty {@link KnownTypes} list is.
+   *
+   * UNDER-REPORTING IS THE SAFE DIRECTION and this deliberately takes it. A tail read can begin after
+   * an enqueue and before its dequeue, so the reducer can be asked to take an item off a list that
+   * never had it. It then takes the wrong one off, or none, and the answer is short. A queued message
+   * missing from the screen is a screen that says less than it could. A queued message that is NOT
+   * waiting any more, still on screen, is a screen that lies.
+   */
+  queued(): readonly string[];
 }
 
 /** The answer for a row that did nothing. Frozen, because it is handed to every caller. */
@@ -278,9 +297,28 @@ export function rememberPending<V>(map: Map<string, V>, key: string, value: V): 
 }
 
 /**
+ * The most queued messages a reducer reports.
+ *
+ * A bound for {@link PENDING_MAX}'s reason: the list is filled from a file a process we do not control
+ * writes, so without one it grows for as long as that file does. The number is far past anything real
+ * — measured over 400 sessions on one host, 367 of them never had a queue at all and the deepest
+ * reached six. What falls off is the OLDEST, which is the opposite of that map's rule and is right
+ * here: the newest queued message is the one the operator just typed and is looking for.
+ */
+export const QUEUE_MAX = 16;
+
+/** The answer for a format with no queue in its log. Frozen, because it is handed to every caller. */
+const NO_QUEUE: readonly string[] = Object.freeze<string[]>([]);
+
+/** What a reducer answers when its format records no message queue. */
+export function noQueue(): readonly string[] {
+  return NO_QUEUE;
+}
+
+/**
  * Build one row's answer.
  *
- * Two rules live here rather than in six adapters. A `uuid` of `""` is dropped from `changed`,
+ * Two rules live here rather than in seven adapters. A `uuid` of `""` is dropped from `changed`,
  * because a turn with no name cannot be addressed by one. And a `uuid` that is in `added` is dropped
  * too: a row that both makes a turn and folds a result into it has not changed anything the caller
  * held, it has simply handed over a finished turn.

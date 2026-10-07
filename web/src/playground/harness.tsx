@@ -15,6 +15,7 @@ import { ConnectionBanner } from "@/components/connection-banner";
 import { UpdateRibbon } from "@/components/update-ribbon";
 import { StripHost } from "@/components/ui/strip-host";
 import { CONNECTION_LOST_MS, TROUBLE_MS } from "@/hooks/use-connection-lost";
+import type { MachineHistoryState } from "@/hooks/use-machine-history";
 import { __resetConnectionHealth, markLive } from "@/lib/connection-health";
 import { saveDraft } from "@/lib/drafts";
 import {
@@ -23,6 +24,7 @@ import {
   type DevicesData,
   type HistoryData,
   type HomeData,
+  type MachinesData,
   type PaneData,
 } from "@/lib/loaders";
 import { internScope, scopeFromUrl, scopeKey } from "@/lib/scope";
@@ -31,6 +33,8 @@ import { cn } from "@/lib/utils";
 import { DetailRoute } from "@/routes/detail";
 import { HistoryRoute } from "@/routes/history";
 import { HomeRoute } from "@/routes/home";
+import { MachineRoute } from "@/routes/machine";
+import { MachinesRoute } from "@/routes/machines";
 import { BootSplash, RootError, RootLayout } from "@/routes/root";
 import { SettingsRoute } from "@/routes/settings";
 import { SpaceRoute } from "@/routes/space";
@@ -709,4 +713,50 @@ export function useSelectedSection(sections: readonly SectionDef[], forced?: str
   };
 
   return { activeId: state.id, selectTab, cardHandle: state.card };
+}
+
+/**
+ * The machines pages inside a router of their own: Settings → Machines → one machine, with the
+ * header above them. Upstream's copy wraps `CrewProvider` for the host-aware chrome; Pup is solo
+ * (ADR 9004) and the machines pages read no host scope, so the router is the pages and the header.
+ *
+ * `history`, when a card hands it in, is the day of points the page would otherwise read live —
+ * the same prop `MachineRoute`'s own header describes. The alert card still posts for real, and
+ * with no bridge behind the page that shows its "could not save" line, which is a state worth
+ * seeing.
+ */
+export function MachinesRouter({
+  home,
+  machines,
+  start,
+  history,
+}: {
+  home: HomeData;
+  machines: MachinesData;
+  start: string;
+  history?: MachineHistoryState;
+}) {
+  const [router] = useState(() =>
+    createMemoryRouter(
+      [
+        {
+          id: ROOT_ROUTE_ID,
+          path: "/",
+          loader: () => home,
+          element: (
+            <AppHeaderHost bridge={home.bridge} error={false}>
+              <Outlet />
+            </AppHeaderHost>
+          ),
+          children: [
+            { index: true, element: <div className="p-4 text-sm text-muted-foreground">home</div> },
+            { path: "machines", loader: () => machines, element: <MachinesRoute /> },
+            { path: "machines/:id", loader: () => machines, element: <MachineRoute history={history} /> },
+          ],
+        },
+      ],
+      { initialEntries: [start] },
+    ),
+  );
+  return <RouterProvider router={router} />;
 }

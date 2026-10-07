@@ -22,6 +22,7 @@ function renderSettings() {
     [
       { path: "/settings", element: withHeaderHost(<SettingsRoute />) },
       { path: "/settings/:section", element: <div data-testid="section" /> },
+      { path: "/machines", element: <div data-testid="machines" /> },
       { path: "/", element: <div data-testid="home" /> },
     ],
     { initialEntries: ["/settings"] },
@@ -97,6 +98,31 @@ describe("SettingsRoute — the index", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Appearance/ }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/settings/appearance"));
     expect(screen.getByTestId("section")).toBeInTheDocument();
+  });
+
+  // The fifth row, and the only one that can be absent: it renders while `lib/experiments.ts` holds
+  // something, because a row that opens an empty page is noise. Chat was the last thing filed
+  // there and left in 1.17.0 (ADR 0082), so the index shows four rows.
+  it("shows no Experiments row while nothing is filed under it", async () => {
+    renderSettings();
+    await screen.findByRole("button", { name: /Appearance/ });
+    expect(screen.queryByRole("button", { name: /Experiments/ })).toBeNull();
+  });
+
+  // Machines is a page of its own and not a section, so its row is the one that opens `/machines`. It is
+  // always there, solo included: a solo collie is one machine with a load worth watching.
+  it("offers Machines on a solo install, after System, and opens its own page", async () => {
+    const router = renderSettings();
+    const row = await screen.findByRole("button", { name: /Machines/ });
+    const all = screen.getAllByRole("button").map((b) => b.textContent ?? "");
+    const at = (word: string) => all.findIndex((text) => text.includes(word));
+    expect(at("System")).toBeLessThan(at("Machines"));
+    // No Experiments row exists while the list is empty (ADR 0082), so Machines closes the index. When
+    // one returns it sits after Machines, which is where its section is placed.
+    expect(at("Experiments")).toBe(-1);
+    await userEvent.click(row);
+    await waitFor(() => expect(router.state.location.pathname).toBe("/machines"));
+    expect(router.state.location.state).toMatchObject({ from: "/settings" });
   });
 
   it("renders no setting of its own: every switch moved behind a row", async () => {

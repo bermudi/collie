@@ -1,4 +1,4 @@
-import { ArrowLeft, Bell, ChevronRight, Palette, Server, SlidersHorizontal } from "lucide-react";
+import { Activity, ArrowLeft, Bell, ChevronRight, FlaskConical, Palette, Server, SlidersHorizontal } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { RouteHeader } from "@/components/app-header";
@@ -6,15 +6,18 @@ import { Button } from "@/components/ui/button";
 import { BuildStamp } from "@/components/build-stamp";
 import { Card } from "@/components/ui/card";
 import { InstallControl } from "@/components/install-control";
+import { hasExperiments } from "@/lib/experiments";
 import { useLocale } from "@/hooks/use-locale";
 import { useNav } from "@/hooks/use-nav";
 import { t, type MessageKey } from "@/lib/i18n";
-import { homePath, settingsSectionPath, type SettingsSection } from "@/lib/nav";
+import { homePath, machinesPath, settingsSectionPath } from "@/lib/nav";
+import type { Scope } from "@/lib/scope";
 import { useScope } from "@/lib/session";
 
 // ── THE SETTINGS INDEX ──────────────────────────────────────────────────────────────────────────
 //
-// Four rows, each opening a section (routes/settings-sections.tsx, which explains the split).
+// Four rows, each opening a section (routes/settings-sections.tsx, which explains the split), then
+// Machines (a page, not a section) and, while Experiments holds anything, Experiments.
 //
 // This page used to BE the settings: seventeen cards in one column, over a thousand pixels of
 // scroll on a phone, with no headings to skim by — the file argued for that, on the grounds that
@@ -34,7 +37,10 @@ import { useScope } from "@/lib/session";
 // where it sits with the rest of the diagnostics.
 
 interface Row {
-  section: SettingsSection;
+  /** The row's own key, and for a section the word in its path. */
+  id: string;
+  /** Where the row opens. A section is `/settings/<section>`; Machines is a page of its own. */
+  to: (scope: Scope | undefined) => string;
   icon: LucideIcon;
   title: MessageKey;
   blurb: MessageKey;
@@ -42,21 +48,63 @@ interface Row {
 
 // The order is the order of how standing a choice is. Appearance is changed most and changed first;
 // System is the page you open when something is wrong, which is rarely and deliberately.
+//
+// Experiments trails all four, and it is the only row that can be absent: it renders while
+// `lib/experiments.ts` holds something, because a row that opens an empty page is noise. It is last
+// rather than beside Appearance because its members are not a subject, they are a CONTRACT — read
+// `routes/settings-sections.tsx` for the whole argument, including why Chat's switch is not a card
+// on Appearance.
+//
+// Machines sits between System and Experiments and is the one row that is not a section: it opens
+// `/machines`, a page with a list and a detail of its own, and it is always offered, solo included
+// (a solo collie is one machine with a load worth watching).
 const ROWS: Row[] = [
   {
-    section: "appearance",
+    id: "appearance",
+    to: (scope) => settingsSectionPath("appearance", scope),
     icon: Palette,
     title: "settings.section.appearance.title",
     blurb: "settings.section.appearance.blurb",
   },
   {
-    section: "device",
+    id: "device",
+    to: (scope) => settingsSectionPath("device", scope),
     icon: SlidersHorizontal,
     title: "settings.section.device.title",
     blurb: "settings.section.device.blurb",
   },
-  { section: "alerts", icon: Bell, title: "settings.section.alerts.title", blurb: "settings.section.alerts.blurb" },
-  { section: "system", icon: Server, title: "settings.section.system.title", blurb: "settings.section.system.blurb" },
+  {
+    id: "alerts",
+    to: (scope) => settingsSectionPath("alerts", scope),
+    icon: Bell,
+    title: "settings.section.alerts.title",
+    blurb: "settings.section.alerts.blurb",
+  },
+  {
+    id: "system",
+    to: (scope) => settingsSectionPath("system", scope),
+    icon: Server,
+    title: "settings.section.system.title",
+    blurb: "settings.section.system.blurb",
+  },
+  {
+    id: "machines",
+    to: (scope) => machinesPath(scope),
+    icon: Activity,
+    title: "settings.section.machines.title",
+    blurb: "settings.section.machines.blurb",
+  },
+  ...(hasExperiments()
+    ? [
+        {
+          id: "experiments",
+          to: (scope) => settingsSectionPath("experiments", scope),
+          icon: FlaskConical,
+          title: "settings.section.experiments.title",
+          blurb: "settings.section.experiments.blurb",
+        } satisfies Row,
+      ]
+    : []),
 ];
 
 export function SettingsRoute() {
@@ -98,9 +146,9 @@ export function SettingsRoute() {
         <Card className="gap-0 py-0">
           {ROWS.map((row, i) => (
             <button
-              key={row.section}
+              key={row.id}
               type="button"
-              onClick={() => nav.down(settingsSectionPath(row.section, scope))}
+              onClick={() => nav.down(row.to(scope))}
               className={`flex w-full items-center gap-3 p-4 text-left active:bg-muted/60 ${i > 0 ? "border-t border-border" : ""}`}
             >
               <row.icon className="size-5 shrink-0 text-muted-foreground" />

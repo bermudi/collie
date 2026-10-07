@@ -6,6 +6,10 @@ import type {
   CacheRuleWire,
   ChangeCommitDiffResponse,
   ChangeCommitResponse,
+  FileEntry,
+  FileReadResponse,
+  FilesListResponse,
+  MachineAlerts,
   PaneChangeDiffResponse,
   PaneChangesResponse,
   ServerSummary,
@@ -15,6 +19,8 @@ import type {
   TranscriptEntry,
   WorkspaceView,
 } from "@/lib/types";
+
+import { censusFor, fixtureMachinesSolo, historyFor } from "./machine-fixtures";
 
 // A couple of fixture agents covering the triage groups, reused across tests.
 export const fixtureAgents: AgentView[] = [
@@ -237,6 +243,11 @@ export const fixtureNewSpace: Extract<CreateResponse, { ok: true }> = {
 };
 
 /** A minimal two-turn transcript: a human ask and the agent's tool-call-plus-answer reply. */
+/** The window's numbering, and where its turns sit. Both mirror the bridge: a `gen` is clock-seeded
+ *  and `seq` starts at 1,000,000 so a `?before=` page can number DOWN without signs. */
+export const FIXTURE_CHAT_GEN = 1_759_000_000_000;
+export const FIXTURE_SEQ_BASE = 1_000_000;
+
 export const fixtureTranscript: TranscriptEntry[] = [
   {
     uuid: "t1",
@@ -502,6 +513,114 @@ export function fixtureCommitDiff(repo: string, path: string): ChangeCommitDiffR
   };
 }
 
+// The Changes tree (ADR 0083): a small tree under the same root the Changes fixture names, holding
+// every changed file the Changes fixture lists, so the marks join the two. Shared by the unit suite,
+// the e2e stub and the playground, so a folder or a file means the same everywhere.
+const FILES_ROOT = "/home/you/webapp";
+const FILES_HEAD = { paneId: "w1:p1", workspaceId: "w1", workspaceLabel: "webapp" };
+
+const FIXTURE_FOLDERS = new Map<string, FileEntry[]>([
+  [
+    "",
+    [
+      { name: "docs", kind: "dir" },
+      { name: "packages", kind: "dir" },
+      { name: "public", kind: "dir" },
+      { name: "src", kind: "dir" },
+      { name: "README.md", kind: "file", size: 1240 },
+      { name: "index.html", kind: "file", size: 468 },
+      { name: "logo.png", kind: "file", size: 20480 },
+      { name: "package.json", kind: "file", size: 312 },
+      { name: "current", kind: "link" },
+      // What git ignores in this folder. The Files view hides these until the operator asks, so the
+      // rows above are the visible ones; a member that predates the field sends no `ignored` at all.
+      { name: "node_modules", kind: "dir", ignored: true },
+      { name: "debug.log", kind: "file", size: 8200, ignored: true },
+    ],
+  ],
+  ["node_modules", [{ name: "react", kind: "dir", ignored: true }]],
+  ["docs", [{ name: "guide.md", kind: "file", size: 640 }]],
+  // The nested repo of the Changes fixture: a renamed handler and an untracked note.
+  ["packages", [{ name: "api", kind: "dir" }]],
+  [
+    "packages/api",
+    [
+      { name: "server", kind: "dir" },
+      { name: "notes.md", kind: "file", size: 38 },
+    ],
+  ],
+  ["packages/api/server", [{ name: "handlers", kind: "dir" }]],
+  ["packages/api/server/handlers", [{ name: "orders.ts", kind: "file", size: 96 }]],
+  ["public", [{ name: "logo.png", kind: "file", size: 20480 }]],
+  [
+    "src",
+    [
+      { name: "lib", kind: "dir" },
+      { name: "routes", kind: "dir" },
+      { name: "cart.ts", kind: "file", size: 214 },
+    ],
+  ],
+  ["src/lib", [{ name: "cart.ts", kind: "file", size: 120 }]],
+  ["src/routes", [{ name: "checkout.tsx", kind: "file", size: 388 }]],
+]);
+
+const FIXTURE_FILE_TEXT = new Map<string, string>([
+  [
+    "README.md",
+    [
+      "# Webapp",
+      "",
+      "A small shop. **Run it** with `bun dev`, then open the [docs](https://example.com/docs).",
+      "",
+      "- carts",
+      "- checkout",
+      "",
+      "<script>alert(1)</script>",
+      "",
+    ].join("\n"),
+  ],
+  ["docs/guide.md", "# Guide\n\nRead the cart code first.\n"],
+  [
+    "package.json",
+    JSON.stringify({ name: "webapp", version: "1.2.0", private: true, scripts: { dev: "vite", build: "vite build" }, files: ["dist", "src"] }, null, 2) + "\n",
+  ],
+  [
+    "index.html",
+    '<!doctype html><html><body style="font-family:sans-serif"><h1>Hello from a file</h1><p>Scripts, forms and remote files stay off.</p></body></html>\n',
+  ],
+  ["src/cart.ts", 'export function cartTotal(items: { price: number }[]): number {\n  return items.reduce((sum, item) => sum + item.price, 0);\n}\n'],
+  ["src/lib/cart.ts", 'export function cartTotal(items: { price: number }[]): number {\n  return items.reduce((sum, item) => sum + item.price, 0);\n}\n'],
+  ["packages/api/notes.md", "# Notes\nOrders moved under handlers/.\n"],
+  ["packages/api/server/handlers/orders.ts", "export function orders() {\n  return [];\n}\n"],
+  ["src/routes/checkout.tsx", 'export function Checkout() {\n  return <h1>Checkout</h1>;\n}\n'],
+]);
+
+const FIXTURE_BINARY = new Map<string, number>([
+  ["logo.png", 20480],
+  ["public/logo.png", 20480],
+]);
+
+/** The fixture folder `dir`, answered the way the bridge answers it, or null for a folder it has none of. */
+export function fixtureFilesDir(dir: string): FilesListResponse | null {
+  const entries = FIXTURE_FOLDERS.get(dir);
+  if (entries === undefined) return null;
+  return { ...FILES_HEAD, available: true, root: FILES_ROOT, dir, entries, truncated: false };
+}
+
+/** The fixture file `path`, answered the way the bridge answers it, or null for a path it has none of. */
+export function fixtureFileRead(path: string): FileReadResponse | null {
+  const bytes = FIXTURE_BINARY.get(path);
+  if (bytes !== undefined) {
+    return { ...FILES_HEAD, available: true, root: FILES_ROOT, path, size: bytes, binary: true, truncated: false, text: "" };
+  }
+  const text = FIXTURE_FILE_TEXT.get(path);
+  if (text === undefined) return null;
+  return { ...FILES_HEAD, available: true, root: FILES_ROOT, path, size: text.length, binary: false, truncated: false, text };
+}
+
+/** The route's one answer for a path that is not there, outside the root or denied. */
+export const FIXTURE_FILES_UNKNOWN = { error: "unknown-path" } as const;
+
 export const handlers = [
   http.get("/api/snapshot", () => HttpResponse.json(fixtureSnapshot)),
   http.get(/\/api\/pane\/[^/]+$/, () =>
@@ -519,6 +638,13 @@ export const handlers = [
     if (repo !== null && path !== null) return HttpResponse.json(fixtureChangeDiff(repo, path));
     return HttpResponse.json(fixtureChanges);
   }),
+  // The Files view: a folder (`?dir=`, none for the root) or one file (`?path=`).
+  http.get(/\/api\/(?:pane|workspace)\/[^/]+\/files$/, ({ request }) => {
+    const q = new URL(request.url).searchParams;
+    const path = q.get("path");
+    const answer = path !== null ? fixtureFileRead(path) : fixtureFilesDir(q.get("dir") ?? "");
+    return answer === null ? HttpResponse.json(FIXTURE_FILES_UNKNOWN, { status: 404 }) : HttpResponse.json(answer);
+  }),
   // Pane transcript history. Two turns, newest-anchored, with nothing older behind them.
   http.get(/\/api\/pane\/[^/]+\/history/, () =>
     HttpResponse.json({
@@ -528,6 +654,23 @@ export const handlers = [
       hasMore: false,
       total: fixtureTranscript.length,
       fileTruncated: false,
+    }),
+  ),
+  // The live session window (ADR 0073). The same two turns the transcript fixture has, numbered
+  // into one generation, with nothing older behind them — so a Chat body drawn over this fixture
+  // shows the same conversation the History page does, which is the point of one store under both.
+  http.get(/\/api\/pane\/[^/]+\/chat/, () =>
+    HttpResponse.json({
+      paneId: "w1:p1",
+      available: true,
+      page: "live",
+      gen: FIXTURE_CHAT_GEN,
+      rev: 1,
+      head: FIXTURE_SEQ_BASE + fixtureTranscript.length - 1,
+      oldest: FIXTURE_SEQ_BASE,
+      hasOlder: false,
+      // `Object.assign` onto a fresh object rather than a spread — `no-map-spread`.
+      upserts: fixtureTranscript.map((e, i) => Object.assign({}, e, { seq: FIXTURE_SEQ_BASE + i })),
     }),
   ),
   http.post<never, { text?: string; submit?: boolean }>(/\/api\/pane\/[^/]+\/reply$/, async ({ request }) => {
@@ -561,6 +704,14 @@ export const handlers = [
       },
     }),
   ),
+  // The machines census. The DEFAULT world is solo, which is a lead with one row, so the page has
+  // something to show; a test that wants a crew (or a peer's 404) overrides these. The POST echoes the
+  // body, which is what the bridge answers: the rules as stored.
+  http.get("/api/machines", ({ request }) => HttpResponse.json(censusFor(fixtureMachinesSolo, new URL(request.url)))),
+  http.get("/api/machines/:id/history", ({ request }) => HttpResponse.json(historyFor(new URL(request.url)))),
+  http.post<never, MachineAlerts>("/api/machines/:id/alerts", async ({ request }) =>
+    HttpResponse.json({ alerts: await request.json() }),
+  ),
   http.get("/api/config", () => HttpResponse.json({ push: false, vapidPublicKey: "" })),
   // Default world: no `launchers.toml`. Session-scoped (server.ts), so a test that wants rows
   // overrides this with its own `/api/launchers` handler rather than adding a field to `/api/config`.
@@ -578,11 +729,11 @@ export const handlers = [
     return HttpResponse.json({ snoozedUntil });
   }),
   http.get("/api/notifications/prefs", () =>
-    HttpResponse.json({ blocked: true, done: false, updates: true, cache: false }),
+    HttpResponse.json({ blocked: true, done: false, updates: true, cache: false, machines: true }),
   ),
   http.post<never, Partial<{ blocked: boolean; done: boolean; updates: boolean; cache: boolean }>>("/api/notifications/prefs", async ({ request }) => {
     const patch = await request.json();
-    return HttpResponse.json({ blocked: true, done: false, updates: true, cache: false, ...patch });
+    return HttpResponse.json({ blocked: true, done: false, updates: true, cache: false, machines: true, ...patch });
   }),
   // The prompt-cache watch list (ADR 0042). The default world watches NOTHING and has the global switch
   // off, which is a fresh install: a test that wants a watched pane overrides these three.

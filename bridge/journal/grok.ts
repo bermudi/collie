@@ -27,15 +27,16 @@ import { join } from "node:path";
 
 import type { JsonObject, JsonValue } from "../json.ts";
 import {
+  parseWith,
   createUnknownCounter,
   type KnownTypes,
   NO_CHANGE,
+  noQueue,
   noteBlockTypes,
-  parseWith,
-  reduction,
-  rememberPending,
   type PendingTool,
+  reduction,
   type Reduction,
+  rememberPending,
   type RowReducer,
 } from "./reduce.ts";
 import { containedRealpath, exists, loadTail, readSinceFile, rootList, statFile } from "./files.ts";
@@ -114,7 +115,7 @@ export function parseGrokTranscript(text: string): TranscriptEntry[] {
  * what it could not read"). Anything else is counted and named.
  *
  * The rows are this file's own header inventory, verified on disk on 2026-08-21; there are no local
- * Grok logs on the canary host, so unlike the other five this list has NOT been re-swept since.
+ * Grok logs on the canary host, so unlike the other six this list has NOT been re-swept since.
  *
  * `parts` covers the two block lists: a row's `content` (`text`) and a `reasoning` row's `summary`
  * (`summary_text`). Both are read by FIELD — `contentText` takes any block's `.text` — so a block
@@ -322,7 +323,8 @@ export function createGrokReducer(): RowReducer {
     return reduction(entries, changed);
   }
 
-  return { push, unknowns: unknown.tally };
+  // No queue in this format's log: see `RowReducer.queued`.
+  return { push, unknowns: unknown.tally, queued: noQueue };
 }
 
 /**

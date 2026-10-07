@@ -1,6 +1,10 @@
 import { useLoaderData } from "react-router";
+import { FlaskConical } from "lucide-react";
 
 import { SettingsPage } from "@/components/settings-page";
+import { Notice } from "@/components/ui/notice";
+import { useLocale } from "@/hooks/use-locale";
+import { t } from "@/lib/i18n";
 import { BeltSizeControl } from "@/components/belt-size-control";
 import { ChangesControl } from "@/components/changes-control";
 import { ConnectionInfo } from "@/components/connection-info";
@@ -14,6 +18,7 @@ import { PairedDevices } from "@/components/paired-devices";
 import { PushControl, usePushAvailability } from "@/components/push-control";
 import { SnoozeControl } from "@/components/snooze-control";
 import { ThemeControl } from "@/components/theme-control";
+import { CompactionsControl } from "@/components/compactions-control";
 import { ToolCallsControl } from "@/components/tool-calls-control";
 import { TourControl } from "@/components/tour-control";
 import { TypefaceControl } from "@/components/typeface-control";
@@ -23,20 +28,20 @@ import { useServerBuild } from "@/hooks/use-server-build";
 import { EMPTY_DEVICES, type DevicesData } from "@/lib/loaders";
 import { useOptionalRootData } from "@/lib/route-data";
 
-// ── THE FOUR SETTINGS SECTIONS ──────────────────────────────────────────────────────────────────
+// ── THE SETTINGS SECTIONS ───────────────────────────────────────────────────────────────────────
 //
 // Settings was one column of seventeen cards, and the file said so: "Settings is a flat stack of
 // cards and has no headings at all; introducing the first one here would imply four more." It
 // implied four more. On a phone the stack was over a thousand pixels of scroll with nothing to
 // skim by, so a person looking for one switch had to read every card to find it.
 //
-// It is an index of four rows now, each opening one of these. Each page is short enough to take in
-// at once, which is the whole reason for the split: not fewer settings, fewer at a time.
+// It is an index now, each row opening one of these. Each page is short enough to take in at once,
+// which is the whole reason for the split: not fewer settings, fewer at a time.
 //
-// ── WHY FOUR FILES' WORTH OF ROUTES LIVE IN ONE ──────────────────────────────
+// ── WHY A FILE'S WORTH OF ROUTES EACH LIVE IN ONE ────────────────────────────
 // Every other route in this directory is its own file because every other route has behaviour.
-// These four have none: each is an ordered list of cards that already exist, and the order IS the
-// design. Four files of eight lines each would hide four one-line decisions in four places. The
+// These have none: each is an ordered list of cards that already exist, and the order IS the
+// design. Five files of eight lines each would hide five one-line decisions in five places. The
 // order within each page is commented where it is not obvious; the split between pages is
 // commented once, here.
 //
@@ -47,6 +52,8 @@ import { useOptionalRootData } from "@/lib/route-data";
 //              offer. Nothing here changes a pixel until you do something.
 // Alerts     — when Collie speaks up, on this device and bridge-wide.
 // System     — what this thing is talking to, and whether it is well. Diagnostics and access.
+// Experiments— what is not finished. The odd one out: it is the only section that can be absent,
+//              and the only one whose CONTRACT, not whose subject, decides membership.
 //
 // The line that took the most argument is Changes (`ChangesControl`): it decides how a pane's
 // Changes view FINDS repos, which sounds like appearance and is not. It is read by the pane menu
@@ -78,6 +85,7 @@ export function SettingsAppearanceRoute() {
           answers is the same question — what do I want on screen — and filing it under Device would
           put a rendering choice beside haptics. */}
       <ToolCallsControl />
+      <CompactionsControl />
     </SettingsPage>
   );
 }
@@ -117,6 +125,47 @@ export function SettingsAlertsRoute() {
           <SnoozeControl snoozedUntil={root?.snoozedUntil ?? null} />
         </>
       )}
+    </SettingsPage>
+  );
+}
+
+/**
+ * What the Experiments heading promises, said once at the top.
+ *
+ * A SCOPE NOTICE (DESIGN.md §11): it outlives the operator's next interaction and it is about this
+ * view, so it holds space rather than floating. No `Collapse` around it, because it never appears
+ * or disappears — it is a standing property of the page, not a state the page enters. `announce`
+ * stays `"none"` for the same reason: a notice that never changes must not claim a live region.
+ */
+function ExperimentsContract() {
+  useLocale();
+  return (
+    <Notice variant="box" tone="caution" icon={<FlaskConical className="size-4" />}>
+      {t("settings.experiments.contract")}
+    </Notice>
+  );
+}
+
+/**
+ * The fifth section, and the one whose heading is a promise rather than a subject.
+ *
+ * "Experimental" is a property of this SECTION'S CONTRACT, not an adjective on a card: everything
+ * filed here may change shape, lose settings, or be withdrawn in a patch release, and that sentence
+ * is worth saying once at the top rather than repeating per row. Which is also why an experiment's
+ * switch is not a card in Appearance: read that page's own header above — every card there answers
+ * "what do I want on screen", the ordering is argued card by card, and `ToolCallsControl` is
+ * already flagged as "the odd one". An unstable toggle dropped in beside it breaks the rule the
+ * page states about itself.
+ *
+ * The section renders even when `lib/experiments.ts` is empty, because the route stays; the
+ * SETTINGS INDEX is what hides the row (routes/settings.tsx). A bookmark then lands on a page
+ * carrying its contract and nothing else, which is the honest answer to "where did it go".
+ */
+export function SettingsExperimentsRoute() {
+  return (
+    <SettingsPage title="settings.section.experiments.title">
+      <ExperimentsContract />
+      {/* Nothing is filed here since Chat graduated (ADR 0082). The next experiment is a card here. */}
     </SettingsPage>
   );
 }

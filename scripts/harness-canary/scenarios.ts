@@ -27,7 +27,18 @@ export const POLL_MS = 150;
 const START_TIMEOUT_MS = 45_000;
 const DRAFT_TIMEOUT_MS = 4_000;
 const CLEAR_TIMEOUT_MS = 4_000;
+/**
+ * How long an "only OK" turn may take. Three of the four sends ask for exactly that and finish in
+ * about a second, so this is generous already.
+ */
 const TURN_TIMEOUT_MS = 120_000;
+/**
+ * How long a turn that must USE A TOOL may take, which is a different kind of work: the agent has to
+ * think, ask for a read, get its result and then answer. One budget for both was the fault — on
+ * 2026-09-30 codex 0.156.1 went past 120 s on the journal send, so `sends` reached no verdict and the
+ * `journal` scenario had nothing of its own to read either.
+ */
+const TOOL_TURN_TIMEOUT_MS = 300_000;
 const SEND_TIMEOUT_MS = 60_000;
 const EXIT_TIMEOUT_MS = 12_000;
 /** How long the exit window keeps sampling once the shell is back. */
@@ -173,18 +184,31 @@ export function wordsOnScreen(texts: readonly string[], text: string): boolean {
   return probes(text).some((p) => flat.includes(p));
 }
 
-/** The reply every canary message asks for: a row that is just "OK", after a bullet or not. */
-const OK_ROW = /^\s*(?:[⏺•●▣>*-]\s*)?OK[.。!]?\s*$/u;
+/** The bullet glyphs an agent puts before its reply row. */
+const REPLY_BULLET = "(?:[⏺•●▣>*-]\\s*)?";
 
-/** Whether an "OK" row stands below the last row that carries `text`'s last line. */
-export function answeredBelow(texts: readonly string[], text: string): boolean {
+/** The reply most canary messages ask for: a row that is just "OK", after a bullet or not. */
+const OK_ROW = new RegExp(`^\\s*${REPLY_BULLET}OK[.。!]?\\s*$`, "u");
+
+/** A row that is just `answer`, with the same tolerance as {@link OK_ROW}. */
+function answerRow(answer: string): RegExp {
+  const escaped = answer.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^\\s*${REPLY_BULLET}${escaped}[.。!]?\\s*$`, "u");
+}
+
+/**
+ * Whether the expected reply stands on a row below the last row that carries `text`'s last line.
+ * The reply is `answer` when the message declares one (`CanaryMessage.answer`), "OK" otherwise.
+ */
+export function answeredBelow(texts: readonly string[], text: string, answer?: string): boolean {
   const last = probes(text).at(-1);
   if (last === undefined) return false;
   let at = -1;
   texts.forEach((t, i) => {
     if (t.replace(/\s+/g, "").includes(last)) at = i;
   });
-  return at >= 0 && texts.slice(at + 1).some((t) => OK_ROW.test(t));
+  const row = answer === undefined ? OK_ROW : answerRow(answer);
+  return at >= 0 && texts.slice(at + 1).some((t) => row.test(t));
 }
 
 export class Driver {
@@ -425,7 +449,8 @@ export class Driver {
     }
     let s = await this.screen();
     let settledPolls = 0;
-    const deadline = Date.now() + TURN_TIMEOUT_MS;
+    const budget = m.usesTool === true ? TOOL_TURN_TIMEOUT_MS : TURN_TIMEOUT_MS;
+    const deadline = Date.now() + budget;
     while (Date.now() < deadline) {
       const info = this.ctx.session.paneInfo(this.paneId);
       s = await this.screen();
@@ -434,7 +459,7 @@ export class Driver {
       // Herdr's idle can flicker between the submit and the turn, so it must hold for two polls,
       // and the answer must sit BELOW the message: an earlier send's OK does not count.
       settledPolls = info.agent === this.agent && (info.status === "idle" || info.status === "done") ? settledPolls + 1 : 0;
-      if (shown && answeredBelow(s.texts, m.text) && settledPolls >= 2) {
+      if (shown && answeredBelow(s.texts, m.text, m.answer) && settledPolls >= 2) {
         await Bun.sleep(800);
         this.save(`sends-${m.id}`, await this.screen());
         return { result: passCase(m.id, "sent, shown, answered"), idleAfter: true, submitted: true, answered: true };
@@ -447,7 +472,7 @@ export class Driver {
       return { result: failCase(m.id, "outcome sent, but the message is still in the input box"), idleAfter: false, submitted: true, answered: false };
     }
     return {
-      result: notReachedCase(m.id, `outcome sent; the turn did not finish in ${TURN_TIMEOUT_MS / 1000} s`),
+      result: notReachedCase(m.id, `outcome sent; the turn did not finish in ${budget / 1000} s`),
       idleAfter: false,
       submitted: true,
       answered: false,

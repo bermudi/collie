@@ -98,7 +98,7 @@ export function ViewportFrame({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <div ref={frameRef} className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden" data-viewport-frame>
+    <div ref={frameRef} className="flex h-(--app-h) max-h-(--app-h) flex-col overflow-hidden" data-viewport-frame>
       {children}
     </div>
   );

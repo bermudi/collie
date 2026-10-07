@@ -109,9 +109,9 @@ export function RootLayout() {
           (each route root is `min-h-0 flex-1`). This is what keeps a banner from covering the
           route's sticky header — it reserves real space instead of overlaying. */}
       <ViewportFrame>
-        {/* THE BAND, and the rule that there is only ever one strip in it. Three facts can be true at
-            once above the header — the auth refusal, a lost connection, a degraded one — and none of
-            them excludes another. Before this host arbitrated them, each row
+        {/* THE BAND, and the rule that there is only ever one strip in it. Four facts can be true at
+            once above the header — the auth refusal, a lost connection, a degraded one, an update on
+            offer — and none of them excludes another. Before this host arbitrated them, each row
             reserved the notch for itself (each was written assuming it might be the first thing on
             screen), so ribbon + header on an iPhone paid for the safe-area inset twice and left a
             dead band at the top of the app. One winner, one inset, one owner.
@@ -132,6 +132,7 @@ export function RootLayout() {
               same shared-clock signals as the header dog, so the two always agree. */}
           <ConnectionBanner
             bridge={data.bridge}
+            host={data.scope.host}
             error={data.error}
             authError={data.authError}
             lastSeenAt={shownLastSeenAt(data, pane)}
@@ -183,7 +184,7 @@ export function BootSplash() {
   const stuck = useConnectionLost(true);
   if (!stuck) {
     return (
-      <div className="flex h-[100dvh] flex-col items-center justify-center gap-3 text-muted-foreground">
+      <div className="flex h-(--app-h) flex-col items-center justify-center gap-3 text-muted-foreground">
         {/* The bloom: the same mark as the rest state below, but turning and at full chroma. It is
             a COLOUR as well as motion, which is the half a reduced-motion reader still gets —
             `prefers-reduced-motion` stops the orbit and cannot stop the accents. `paper` is this
@@ -196,7 +197,7 @@ export function BootSplash() {
     );
   }
   return (
-    <div className="flex h-[100dvh] flex-col items-center justify-center gap-3 p-6 text-center">
+    <div className="flex h-(--app-h) flex-col items-center justify-center gap-3 p-6 text-center">
       {/* Rest = the Collie mark still, muted (grayscale + dimmed) to read asleep
           — never the gallop's own rest frame, whose full-stretch mid-stride pose looks frozen
           mid-run. No `loading`: we have stopped trying, and a blooming mark would say otherwise.
@@ -226,7 +227,7 @@ export function RootError() {
   // language; anything else (a render-phase throw, a router error) keeps its own message.
   const message = error instanceof Error ? describeThrownError(error) : t("error.root.unknown");
   return (
-    <div className="flex h-[100dvh] flex-col items-center justify-center gap-3 p-6 text-center">
+    <div className="flex h-(--app-h) flex-col items-center justify-center gap-3 p-6 text-center">
       <p className="font-medium text-destructive">{t("error.root.title")}</p>
       <p className="max-w-xs text-sm text-muted-foreground">{message}</p>
       <button

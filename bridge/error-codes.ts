@@ -165,6 +165,16 @@ export const ERROR_CODES = {
 
   // ── Addressing: the `(host, session)` a request named does not exist ───────────────
   "session.unknown": "unknown session: {session}",
+  /** A machine the route named — the Machines routes' unknown-id refusal (ADR 0084). */
+  "host.unknown": "unknown host: {host}",
+
+  // ── The machines surface: GET /api/machines (ADR 0084) ────────────────────────────
+  /**
+   * Upstream's shared refusal for a bridge with no machines surface (a crew peer). Pup always
+   * wires the watch, so this arm is unreachable here — but the handler is upstream's, shared
+   * verbatim, and the carried tests pin the code.
+   */
+  "crew.not_lead": "this collie is not the lead of a crew",
 
 } as const;
 

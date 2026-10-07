@@ -1490,6 +1490,78 @@ describe("parseOpencodeTranscript: the structured tool call", () => {
     expect(part.result).toBeUndefined();
   });
 
+  // Input and metadata shapes verified on a real 1.18.x / 2.x store: `{questions:[{question, header,
+  // options:[{label, description}], multiple?}]}` in, `metadata.answers: string[][]` out, and a
+  // dismissal is `status: "error"` with the text "The user dismissed this question" and no metadata.
+  describe("a question call", () => {
+    const input = {
+      questions: [
+        {
+          question: "Which color?",
+          header: "Color choice",
+          options: [
+            { label: "Red", description: "The color red" },
+            { label: "Blue", description: "The color blue" },
+          ],
+          multiple: false,
+        },
+      ],
+    };
+    const asked = [
+      {
+        header: "Color choice",
+        question: "Which color?",
+        multiple: false,
+        options: [
+          { label: "Red", description: "The color red" },
+          { label: "Blue", description: "The color blue" },
+        ],
+      },
+    ];
+
+    test("a running one carries what was asked and no answers", () => {
+      const part = firstTool(one(toolPart("question", { status: "running", input })));
+      expect(part.call).toEqual({ kind: "question", name: "question", summary: "Which color?", questions: asked });
+      expect(part.summary).toBe("Which color?");
+      expect(part.result).toBeUndefined();
+    });
+
+    test("a completed one carries the chosen labels, one list per question", () => {
+      const part = firstTool(
+        one(
+          toolPart("question", {
+            status: "completed",
+            input,
+            output: 'User has answered your questions: "Which color?"="Blue".',
+            metadata: { answers: [["Blue"]], truncated: false },
+          }),
+        ),
+      );
+      expect(part.call).toEqual({
+        kind: "question",
+        name: "question",
+        summary: "Which color?",
+        questions: asked,
+        answers: [["Blue"]],
+      });
+    });
+
+    test("a dismissed one is denied and has no answers", () => {
+      const part = firstTool(
+        one(toolPart("question", { status: "error", input, error: "The user dismissed this question" })),
+      );
+      expect(part.result).toEqual({ text: "The user dismissed this question", isError: true, denied: true });
+      expect(part.call).toEqual({ kind: "question", name: "question", summary: "Which color?", questions: asked });
+    });
+
+    test("an answers field of the wrong shape is ignored", () => {
+      const part = firstTool(
+        one(toolPart("question", { status: "completed", input, output: "ok", metadata: { answers: ["Blue", 3] } })),
+      );
+      expect(part.call).not.toHaveProperty("answers");
+    });
+  });
+
   test("a tool outside the nine kinds is `other` and reads exactly as its row did", () => {
     const part = firstTool(one(toolPart("todowrite", { status: "completed", input: { todos: [] }, output: "ok" })));
     expect(part.call).toEqual({ kind: "other", name: "todowrite", summary: part.summary });
@@ -1689,8 +1761,12 @@ describe("OpencodeTranscriptSource — readSince, V1", () => {
   });
 
   test("a first read is bounded by rows, so a long session is not composed to be thrown away", async () => {
+    // One transaction: a commit per row is one disk sync per row, which is seconds on Windows
+    // (NTFS flushes are slow) and a load flake on a busy Linux runner. The rows are the same.
     const f = await lab();
-    for (let n = 1; n <= FIRST_TAIL_ROWS + 5; n++) f.turn(`msg_${String(n).padStart(4, "0")}`, n, n, `turn ${n}`);
+    f.db.transaction(() => {
+      for (let n = 1; n <= FIRST_TAIL_ROWS + 5; n++) f.turn(`msg_${String(n).padStart(4, "0")}`, n, n, `turn ${n}`);
+    })();
     const { src, key } = await opened(f.root);
 
     const first = await src.readSince(key, NO_CURSOR);
@@ -1719,8 +1795,12 @@ describe("OpencodeTranscriptSource — readSince, V1", () => {
     expect(next.fromStart).toBe(false);
     await short.clean();
 
+    // One transaction: a commit per row is one disk sync per row, which is seconds on Windows
+    // (NTFS flushes are slow) and a load flake on a busy Linux runner. The rows are the same.
     const long = await lab();
-    for (let n = 1; n <= FIRST_TAIL_ROWS + 5; n++) long.turn(`msg_${String(n).padStart(4, "0")}`, n, n, `turn ${n}`);
+    long.db.transaction(() => {
+      for (let n = 1; n <= FIRST_TAIL_ROWS + 5; n++) long.turn(`msg_${String(n).padStart(4, "0")}`, n, n, `turn ${n}`);
+    })();
     const two = await opened(long.root);
     const longRead = await two.src.readSince(two.key, NO_CURSOR);
     expect(longRead.reset).toBe(true);
@@ -1806,10 +1886,14 @@ describe("OpencodeTranscriptSource — readSince, V2", () => {
   });
 
   test("a first read is bounded by rows in this store too", async () => {
+    // One transaction: a commit per row is one disk sync per row, which is seconds on Windows
+    // (NTFS flushes are slow) and a load flake on a busy Linux runner. The rows are the same.
     const f = await lab();
-    for (let n = 1; n <= FIRST_TAIL_ROWS + 5; n++) {
-      f.row(`msg_${String(n).padStart(4, "0")}`, "user", n, n, v2UserData(`turn ${n}`, n));
-    }
+    f.db.transaction(() => {
+      for (let n = 1; n <= FIRST_TAIL_ROWS + 5; n++) {
+        f.row(`msg_${String(n).padStart(4, "0")}`, "user", n, n, v2UserData(`turn ${n}`, n));
+      }
+    })();
     const src = new OpencodeTranscriptSource(f.root);
     const key = (await src.resolve({ kind: "id", value: V2_SID }))!;
 
@@ -1818,5 +1902,87 @@ describe("OpencodeTranscriptSource — readSince, V2", () => {
     expect(ids(first.lines).at(0)).toBe("msg_0006");
 
     await f.clean();
+  });
+});
+
+// ── patch, file and the V1 compaction role (spec M41/12) ────────────────────
+//
+// Shapes measured 2026-10-01 against the local store, READ-ONLY: 34 `patch` parts of
+// `{ hash, files }`, 5 `file` parts of `{ mime, filename, url, source }` with a `data:` url, and one
+// `compaction` part that is a marker with no prose at all. Rows are built here; no store is a fixture.
+const patchPart = (files: string[]) => ({ type: "patch", hash: "29d778d84269551f32b6739a38f8124f", files });
+const filePart = (mime: string, url: string) => ({ type: "file", mime, filename: "shot.png", url, source: undefined });
+
+describe("parseOpencodeTranscript — patch and file parts", () => {
+  test("a patch reads as one edit naming every file it touched", () => {
+    const entries = parseOpencodeTranscript(
+      line("msg_a", assistantData(), [patchPart(["/repo/.tracker/00-INDEX.md", "/repo/src/a.ts"])]),
+    );
+    expect(entries).toHaveLength(1);
+    const part = entries[0]!.parts[0]!;
+    if (part.kind !== "tool") throw new Error("not a tool part");
+    expect(part.name).toBe("patch");
+    // The basenames, because a phone column cannot hold two absolute paths.
+    expect(part.summary).toBe("00-INDEX.md, a.ts");
+    // No hunks in the row, so no counts are invented.
+    expect(part.call).toEqual({ kind: "edit", path: "/repo/.tracker/00-INDEX.md", added: 0, removed: 0 });
+  });
+
+  test("a patch with no files renders nothing", () => {
+    const entries = parseOpencodeTranscript(line("msg_a", assistantData(), [patchPart([])]));
+    expect(entries).toHaveLength(0);
+  });
+
+  test("an attached image becomes an image part", () => {
+    const entries = parseOpencodeTranscript(
+      line("msg_a", userData(), [filePart("image/png", "data:image/png;base64,AAAA")]),
+    );
+    expect(entries[0]!.parts).toEqual([
+      { kind: "image", url: "data:image/png;base64,AAAA", mimeType: "image/png" },
+    ]);
+  });
+
+  test("an http url on the agent's word never becomes a fetch the phone makes", () => {
+    const entries = parseOpencodeTranscript(
+      line("msg_a", userData(), [filePart("image/png", "http://evil.example/x.png"), textPart("look")]),
+    );
+    expect(entries[0]!.parts).toEqual([{ kind: "text", text: "look" }]);
+  });
+
+  test("a non-image attachment contributes no part", () => {
+    const entries = parseOpencodeTranscript(
+      line("msg_a", userData(), [filePart("application/pdf", "data:application/pdf;base64,AAAA"), textPart("read it")]),
+    );
+    expect(entries[0]!.parts).toEqual([{ kind: "text", text: "read it" }]);
+  });
+});
+
+describe("parseOpencodeTranscript — V1 compaction is a summary, not speech", () => {
+  test("mode compaction reads as the summary role", () => {
+    const entries = parseOpencodeTranscript(
+      line("msg_a", { ...assistantData(), mode: "compaction", agent: "compaction", summary: true }, [
+        textPart("## Objective\nThe work so far."),
+      ]),
+    );
+    expect(entries[0]!.role).toBe("summary");
+  });
+
+  test("the older summary flag reads the same way", () => {
+    const entries = parseOpencodeTranscript(
+      line("msg_a", { ...assistantData(), summary: true }, [textPart("earlier history")]),
+    );
+    expect(entries[0]!.role).toBe("summary");
+  });
+
+  test("a user turn's summary OBJECT is not a compaction", () => {
+    // V1 writes `summary: { diffs: [] }` on an ordinary user message. Reading that as a compaction
+    // would set every human turn apart from speech.
+    const entries = parseOpencodeTranscript(line("msg_a", userData(), [textPart("hi")]));
+    expect(entries[0]!.role).toBe("user");
+  });
+
+  test("an ordinary assistant turn stays speech", () => {
+    const entries = parseOpencodeTranscript(line("msg_a", assistantData(), [textPart("on it")]));
+    expect(entries[0]!.role).toBe("assistant");
   });
 });

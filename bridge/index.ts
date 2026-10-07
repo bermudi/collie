@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
+import { mkdir, readFile as readFileAsync, realpath as realpathAsync, stat as statAsync, statfs as statfsAsync } from "node:fs/promises";
+import { cpus, freemem, homedir, hostname, loadavg, totalmem } from "node:os";
 import { join } from "node:path";
 
 import { ActivityLedger } from "./activity.ts";
@@ -7,15 +8,28 @@ import { trackActivity } from "./activity-tracking.ts";
 import { CacheTracker } from "./cache/tracker.ts";
 import { CacheWarden } from "./cache/warden.ts";
 import { CacheWatchStore } from "./cache/watch.ts";
+import { MachineAlertStore } from "./machine-alerts.ts";
+import { loadMachineHistory, saveMachineHistory } from "./machine-history.ts";
+import { DiskWatch } from "./machine-disks.ts";
+import { MachineSampler } from "./machine-stats.ts";
+import { machineRosterOf, MachineWatch, SOLO_MACHINE_ID, type MachineRosterEntry } from "./machines.ts";
 import { localWatchPane } from "./cache/watch-key.ts";
 import { buildJournalRegistry } from "./journal/registry.ts";
 import { createCacheRulesReader } from "./operator-cache-rules.ts";
 import { AuditLog, fileAuditAppender } from "./audit.ts";
-import { loadConfig, nonLoopbackBindRefusal, type Config } from "./config.ts";
+import { loadConfig, loadConfigLayer, nonLoopbackBindRefusal, resolveConfigDir, type Config } from "./config.ts";
 
-import { loadConfigLayer } from "./config.ts";
 import { applyConfigLayer } from "./config-source.ts";
+import {
+  aclRepairAllowed,
+  dirOutcomeLine,
+  ensureOwnerOnlyDir,
+  flushAclBackups,
+  privateRoot,
+  type PrivateRoot,
+} from "./owner-only.ts";
 import type { AgentView } from "./types.ts";
+import { HOST } from "./host.ts";
 import { EventPoker } from "./event-poker.ts";
 import { HERDR_DIAL_MODE_OPTION } from "./mux/herdr/adapter.ts";
 import { DEFAULT_TIMEOUT_MS } from "./mux/herdr/client.ts";
@@ -26,6 +40,7 @@ import {
   DEFAULT_MUX,
   describeMux,
 } from "./mux/registry.ts";
+import { TERN_BINARY_OPTION } from "./mux/tern/adapter.ts";
 import { TMUX_BINARY_OPTION } from "./mux/tmux/adapter.ts";
 import type { MuxAdapter } from "./mux/types.ts";
 import { ZELLIJ_BINARY_OPTION } from "./mux/zellij/adapter.ts";
@@ -61,7 +76,7 @@ const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 // Entry point: resolve config, wire the pieces, start polling and serving.
 //
 // Pup is a SOLO bridge by construction: the crew/pack machinery, the speech-to-text seam and the
-// staged update runner are not carried in this fork (see .adr/0053), so everything below wires
+// staged update runner are not carried in this fork (see .adr/9004), so everything below wires
 // exactly one machine's herd — no trust store, no peer listeners, no second door.
 //
 // The config files come FIRST, and they come in under the environment (ADR 0040): `~/.collie/config.toml`
@@ -69,7 +84,18 @@ const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 // One read, one application point, so every module that resolves its own settings from the
 // environment sees the file without learning about it. A broken file warns and the bridge still
 // starts; that is the whole posture, and it is why nothing here can throw.
-const configLayer = await loadConfigLayer(process.env, undefined, (line) => console.warn(line));
+//
+// Windows only (M43 spec 04): the config folder is made private FIRST, so the files read next are
+// already behind its list. The bridge is the one process that may change an access list, and only
+// in Collie's own folders (`bridge/acl-policy.ts`); `COLLIE_NO_ACL_REPAIR=1` leaves every list as it
+// is and still warns.
+const aclRepair = HOST.platform === "win32" && aclRepairAllowed(process.env);
+const securePrivateRoot = (dir: string, id: PrivateRoot["id"], createdNow: boolean): void => {
+  const line = dirOutcomeLine(dir, ensureOwnerOnlyDir(dir, HOST, { root: privateRoot(id), repair: aclRepair, createdNow }));
+  if (line !== null) console.warn(line);
+};
+if (HOST.platform === "win32" && existsSync(resolveConfigDir())) securePrivateRoot(resolveConfigDir(), "config", false);
+const configLayer = await loadConfigLayer(process.env, undefined, (line) => console.warn(line), aclRepair);
 applyConfigLayer(configLayer);
 
 // loadConfig throws on config it cannot parse at all. Print the reason alone — a stack trace here
@@ -95,7 +121,18 @@ try {
 
 // Ensure the state dir exists with private (0700) perms before push/snooze/uploads write into it —
 // it holds push subscription endpoints and uploaded images, so keep it owner-only.
+const stateDirExisted = HOST.platform === "win32" ? existsSync(cfg.stateDir) : true;
 await mkdir(cfg.stateDir, { recursive: true, mode: 0o700 });
+
+// On Windows the mode above does nothing: NTFS keeps an access list, not mode bits (M43 spec 04). So
+// the state folder gets a private list here, once per start, and every file a store writes into it
+// later inherits it from its birth. A folder that is already private costs one `icacls` read per
+// secret file; a loose one is repaired when it is Collie's own, and the line says so only after a
+// second read confirms it. The old lists of anything changed are saved into the state folder.
+if (HOST.platform === "win32") {
+  securePrivateRoot(cfg.stateDir, "state", !stateDirExisted);
+  for (const line of flushAclBackups(cfg.stateDir)) console.warn(line);
+}
 
 // Append-only audit trail of write-level actions (see audit.ts). A write failure here is swallowed
 // inside record() so it can never break the user action it's auditing.
@@ -203,10 +240,8 @@ const updateMonitor = new UpdateMonitor({
       tag: "collie:update",
       // No command in the body — the tap opens Settings (target below), and the update banner / linked
       // release page carry the location-independent Herdr actions. Keeps this off the cwd-dependent path.
-        // No command in the body — the tap opens Settings (target below), and the update banner / linked
-        // release page carry the location-independent Herdr actions. Keeps this off the cwd-dependent path.
-        ...pushTitle("update.available"),
-        body: `Version ${latest} is available`,
+      ...pushTitle("update.available"),
+      body: `Version ${latest} is available`,
       target: "settings",
     }),
 });
@@ -247,6 +282,7 @@ const makeSession: SessionFactory = (name, socketPath, isPrimary) => {
       [HERDR_DIAL_MODE_OPTION]: cfg.dialMode ?? "auto",
       [TMUX_BINARY_OPTION]: cfg.tmuxBin,
       [ZELLIJ_BINARY_OPTION]: cfg.zellijBin,
+      [TERN_BINARY_OPTION]: cfg.ternBin,
     },
   };
   const herdr: MuxAdapter = createMux(muxRegistry, cfg.mux, target);
@@ -360,6 +396,69 @@ void sweepNow(" at startup");
 const sweepTimer = setInterval(() => void sweepNow(""), SWEEP_INTERVAL_MS);
 sweepTimer.unref();
 
+// ── Machines: this machine's load (ADR 0084, solo shape) ─────────────────────
+// Every collie samples itself. The sampler reads `/proc` (Linux) or `node:os` and nothing else, and
+// never spawns a process. Upstream's watch also carries a crew's members and their samples; Pup is a
+// solo bridge by construction (ADR 9004), so the roster is this machine alone and there is no peer
+// arm to switch off.
+const machineSampler = new MachineSampler({
+  host: HOST,
+  readText: (path) => {
+    try {
+      return readFileSync(path, "utf8");
+    } catch {
+      return null;
+    }
+  },
+  os: { cpus, totalmem, freemem, loadavg },
+  now: Date.now,
+  // The disks that hold the home folder, the root (the system drive on Windows) and the state folder.
+  // Every read is async and started, never awaited, from the sampler's tick (machine-disks.ts).
+  disks: new DiskWatch({
+    platform: HOST.platform,
+    paths: [homedir(), HOST.platform === "win32" ? `${process.env.SystemDrive ?? "C:"}\\` : "/", cfg.stateDir],
+    statfs: (path) => statfsAsync(path),
+    dev: async (path) => (await statAsync(path)).dev,
+    realpath: (path) => realpathAsync(path),
+    mounts: () => readFileAsync("/proc/self/mounts", "utf8").catch(() => null),
+    now: Date.now,
+  }),
+});
+
+/**
+ * The machines this collie answers for, read on every call: this machine, always the lead of a
+ * one-machine list. Upstream derives a lead's list from the crew overview; the solo roster is one
+ * row and cannot name a machine two ways.
+ */
+function machineRoster(): MachineRosterEntry[] {
+  return machineRosterOf({ id: SOLO_MACHINE_ID, name: hostname() });
+}
+
+const machineWatch = new MachineWatch({
+  now: Date.now,
+  roster: machineRoster,
+  history: await loadMachineHistory(cfg.stateDir, Date.now()),
+  alerts: await MachineAlertStore.load(cfg.stateDir),
+  saveHistory: (history, now) => saveMachineHistory(cfg.stateDir, history, now),
+  // The cache warning's two gates, for the cache warning's reason (ADR 0042): quiet hours apply,
+  // and the operator's switch for the kind is read live.
+  muted: () => snooze.isMuted(),
+  enabled: () => notifyPrefs.current().machines,
+  send: (msg) => void push.send(msg),
+});
+
+// The same tick the sweep rides: no second timer. The sampler reads at most once every 15 s, or
+// every 5 s while a phone has the Machines list open (the watch says which, `machines.ts` holds the
+// arithmetic). The watch judges once a minute.
+registry.get()?.engine.onTick(() => {
+  const sample = machineSampler.tick(machineWatch.sampleEveryMs());
+  if (sample !== null) {
+    const self = machineRoster().find((m) => m.isLead);
+    if (self !== undefined) machineWatch.observe(self.id, sample, Date.now());
+  }
+  machineWatch.tick();
+});
+
 const server = startServer({
   cfg,
   registry,
@@ -375,6 +474,8 @@ const server = startServer({
   cache: paneCache ?? undefined,
   cacheWatch,
   folders,
+  // This machine's load and its alert rules (ADR 0084).
+  machines: machineWatch,
   pairing,
 });
 
@@ -389,6 +490,8 @@ const shutdown = async () => {
   // persist them before exiting, or every restart quietly resurrects alerts you'd already cleared.
   activity.stop();
   await activity.flush();
+  // The day of minutes is saved every five minutes from the tick; the last few go to disk here.
+  await machineWatch.flush();
   clearInterval(sweepTimer);
   clearTimeout(updateFirstCheck);
   clearInterval(updateTimer);

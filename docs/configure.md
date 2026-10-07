@@ -266,7 +266,7 @@ items = ["yes", "no"]        # sent verbatim, one per button
 
 When a pane matches your rules, your groups replace the default ones
 ([ADR 0018](../.adr/0018-operator-command-rows-replace-the-catalog.md)). The default phrases are
-English (`yes`, `commit and push`).
+English (`yes`, `commit and push`, `drastically simplify`).
 
 Use this file to run in other languages, or to send words like `approve` to specific harnesses.
 Setting `scope = "agent"` targets every harness and never a shell; `scope = "shell"` targets
@@ -580,39 +580,60 @@ The terminal mirror continues polling in Zen mode, and interactive buffer elemen
 functional. Prompt buttons, "Load older", and "Show entire history" controls stay available because
 they are part of the content stream rather than chrome.
 
+## Chat view
+
+> **Note.** Chat is the default view of an agent pane since 1.17.0. Terminal is one tap away.
+
+An agent pane opens in **Chat**. Chat draws the agent's own conversation instead of the terminal:
+your turns, its replies, thinking behind a fold and a card per step. The composer,
+the belt and the pane menu stay where they were. To read the terminal instead, open the pane's **⋮**
+menu and tap **Terminal view**. The choice is one setting for the whole device, stored in the
+browser, and a device that already chose the terminal keeps it. **Chat view** in the same menu
+switches back.
+
+One thing in Chat is known to be incomplete. Hermes can remove a turn from its log after Collie
+read it, for example when it compacts. Chat then keeps showing that turn until the session is read
+again. The terminal never has this problem.
+
+Chat reads the agent's session log, not the screen. That means a pane gets Chat only when Collie
+knows which session the pane is running, and the agent has to tell the multiplexer. The pane itself
+cannot work this out.
+
+| Multiplexer | What reports the session | Chat works for |
+| --- | --- | --- |
+| Herdr | The matching Herdr integration for that agent, installed once with `herdr integration install <agent>` (for example `claude`, `codex`, `opencode`, `pi`, `omp`, `grok`, `hermes`), then restart the agent | Every agent that has an integration and a session log Collie reads |
+| tmux, zellij, Tern (experimental) | Collie's [beacon hooks](multiplexers.md#agent-beacons-optional-linux) | Claude Code only, after `collie hooks install claude` |
+| tuios | The tuios daemon | The agents the daemon reports |
+
+`herdr integration status` shows which integrations are installed. A hook is read when the agent
+starts, so an agent that was already running when you installed it needs a restart. Oh My Pi is the
+`omp` integration, not the `pi` one: they are two agents with two hooks, and they share one log
+format.
+
+A new agent pane shows Chat at once, before it has anything to read, with one line: "Send a
+message to start". Codex reports its session only after your first message, and pi writes its log
+only after its first reply, so both start this way. The conversation appears as soon as there is one.
+
+A pane falls back to the terminal when something happens that Chat cannot show: the agent asks you a
+question before there is anything to read, or its first turn ends and it still has no session, or no
+log file to read. The terminal then shows a line that names what is missing, and the **⋮** row says
+why. A first turn that runs for a minute with nothing to read and no other sign also falls back. A pane that was already busy when you first opened it, with no session, shows the terminal at
+once. When the session or the log arrives later, the pane goes back to Chat. Chat never hides the
+row, so you can tell a missing hook from a missing feature. `collie doctor` lists those
+panes under `agent-sessions` and names the integration line (`integration-<agent>`) that fixes each.
+The [troubleshooting page](troubleshooting.md) has the steps, under **a pane has no Chat or History**.
+
 ## Changes
 
-The pane menu's **Changes** row shows what changed in the pane's workspace since the last commit.
-
-Open a pane, tap the ⋮, then **Changes**. The list groups the changed files by git repo, with
-added and removed line counts. Tap a file to read its diff, and use **Previous file** and
-**Next file** to step through the list. The refresh button reads the folder again; the list does
-not update on its own.
-
-The diff is against the last commit, so staged and unstaged changes show together. A new file
-shows as all added lines. A binary file shows no lines.
-
-The list covers the pane's whole workspace, so every pane in one workspace shows the same list.
-The header names the workspace and its folder. Collie picks that folder in this order:
-
-| Order | Folder |
-| --- | --- |
-| 1 | The workspace's own folder, when the multiplexer keeps one: herdr's worktree, tmux's session folder |
-| 2 | The deepest folder that holds every pane of the workspace |
-| 3 | The pane's own folder, when the first two would be `/`, your home folder, or above it |
+The [Files screen](changes.md) shows what an agent changed in its workspace's git repos, under its
+**Changes** segment. Two per-device settings decide how far it looks for repos, in **Settings → Device → Changes**:
 
 | Setting | Default | What it does |
 | --- | --- | --- |
 | Look for repos inside this folder | on | Also lists repos in folders below the workspace folder, even ones the parent repo ignores |
 | How deep to look | 2 | How many folder levels below the workspace folder the search goes, 1 to 4 |
 
-Both live in **Settings → Device → Changes** and are stored per device.
-
-> **Note.** Changes only reads. It never stages, commits or edits, and a repo's own hooks, filters
-> and diff programs never run while Collie reads it
-> ([ADR 0065](../.adr/0065-the-changes-view-reads-git-read-only.md)).
-
-zellij panes have no Changes row, because zellij does not report a pane's folder.
+See [Which folder, and which repos](changes.md#which-folder-and-which-repos) for how the search works.
 
 ## Language
 

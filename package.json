@@ -15,7 +15,7 @@
     "lint:fix": "oxlint --fix --max-warnings 0",
     "test": "bun test ./bridge ./scripts && bash scripts/collie-ctl.test.sh",
     "test:ctl": "bash scripts/collie-ctl.test.sh",
-    "typecheck": "bunx tsc --noEmit",
+    "typecheck": "bunx tsc --noEmit && bunx tsc --noEmit -p tsconfig.contract.json",
     "harness:drift": "bun scripts/harness-drift.ts",
     "canary": "bun scripts/harness-canary/run.ts"
   },

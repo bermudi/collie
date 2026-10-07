@@ -577,7 +577,7 @@ isn't in the path at all, [`DEPLOYMENT.md`](./DEPLOYMENT.md) has the rest:
 - **[D — off-host identity proxy over the tailnet](./DEPLOYMENT.md#variant-d--off-host-identity-proxy-over-the-tailnet)** — one central ingress node fronting Collie among your other services.
 - **[E — any other mesh or tunnel](./DEPLOYMENT.md#variant-e--any-other-mesh-or-tunnel-netbird-zerotier-cloudflare-tunnel)** — NetBird, ZeroTier, Cloudflare Tunnel: you own the ingress, Collie publishes nothing.
 
-## Windows (experimental)
+## Windows
 
 The **bridge** runs on Windows against Herdr's Windows beta; the **launcher** does not. Herdr there
 exposes its control socket as a *named pipe* named after the full socket path, not an AF_UNIX

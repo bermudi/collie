@@ -148,7 +148,7 @@ function ToolPart({
             </div>
           )}
           {result.text && (
-            <pre className="overflow-x-auto px-2 py-1.5 font-mono text-[11px] leading-snug whitespace-pre-wrap">
+            <pre className="overflow-x-auto px-2 py-1.5 font-mono text-[11px] leading-snug [font-variant-ligatures:none] whitespace-pre-wrap">
               {result.text}
               {result.truncated && (
                 <span className="text-muted-foreground">{`\n${t("transcript.outputTruncated")}`}</span>
@@ -193,16 +193,30 @@ function Turn({
   showHeader,
   query,
   scope,
+  drawCompactions,
 }: {
   entry: TranscriptEntry;
   agent?: string;
   /** False for a turn continuing the same speaker's run — see the grouping note in TranscriptView. */
   showHeader: boolean;
   query: string;
+  /** Whether a compaction's recap is drawn, or only the one-line marker where it happened. */
+  drawCompactions: boolean;
   /** Which machine + session this pane lives on — an image's bytes live there, not on the lead. */
   scope?: Scope;
 }) {
   const time = clockTime(entry.ts);
+
+  // The recap is the agent's own history of itself, thousands of characters long. Unless the reader
+  // asked for it, the page keeps the place it happened and none of the text.
+  if (entry.role === "summary" && !drawCompactions) {
+    return (
+      <p className="py-1 text-center text-xs text-muted-foreground">
+        {t("transcript.summaryLabel")}
+        {time && ` · ${time}`}
+      </p>
+    );
+  }
 
   // Neither of these is speech, so both render dashed-and-muted — visibly set apart from the
   // conversation rather than attributed to the user or the agent.
@@ -222,16 +236,20 @@ function Turn({
   }
 
   const isUser = entry.role === "user";
+  // The reader's own turn wears the brand's orange, so it is findable by colour in a column of
+  // grey. Chat's stream draws the same well for the same reason (chat-cards.tsx § UserTurn) — one
+  // treatment, two surfaces. Orange and not the info blue: inline code owns that blue, and a code
+  // chip inside a user turn would otherwise sit on a ground of its own hue.
   return (
-    <div className={isUser ? "rounded-lg border bg-muted/50 px-3 py-2" : "px-1"}>
+    <div className={isUser ? "rounded-lg border border-status-working/25 bg-status-working/8 px-3 py-2" : "px-1"}>
       {showHeader && (
         <div className="mb-1 flex items-center gap-1.5">
           {isUser ? (
-            <User className="size-3.5 text-muted-foreground" />
+            <User className="size-3.5 text-status-working" />
           ) : (
             <AgentIcon agent={agent ?? "claude"} className="size-4" />
           )}
-          <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          <span className={`text-[11px] font-semibold tracking-wide uppercase ${isUser ? "text-status-working" : "text-muted-foreground"}`}>
             {isUser ? t("transcript.youLabel") : (agent ?? t("transcript.agentFallback"))}
           </span>
           {time && <span className="text-[11px] text-muted-foreground">{time}</span>}
@@ -294,6 +312,7 @@ function TurnBody({
   query,
   scope,
   drawTools,
+  drawCompactions,
   onShowTools,
 }: {
   entry: TranscriptEntry;
@@ -302,10 +321,20 @@ function TurnBody({
   query: string;
   scope?: Scope;
   drawTools: boolean;
+  drawCompactions: boolean;
   onShowTools: () => void;
 }) {
   if (drawTools) {
-    return <Turn entry={entry} agent={agent} showHeader={showHeader} query={query} scope={scope} />;
+    return (
+      <Turn
+        entry={entry}
+        agent={agent}
+        showHeader={showHeader}
+        query={query}
+        scope={scope}
+        drawCompactions={drawCompactions}
+      />
+    );
   }
   const { entry: trimmed, hidden } = withoutTools(entry);
   // A turn that was NOTHING but tool calls has no header worth keeping either — drawing the speaker
@@ -315,7 +344,14 @@ function TurnBody({
   }
   return (
     <>
-      <Turn entry={trimmed} agent={agent} showHeader={showHeader} query={query} scope={scope} />
+      <Turn
+        entry={trimmed}
+        agent={agent}
+        showHeader={showHeader}
+        query={query}
+        scope={scope}
+        drawCompactions={drawCompactions}
+      />
       {hidden > 0 && <HiddenTools count={hidden} onShow={onShowTools} />}
     </>
   );
@@ -348,6 +384,8 @@ export function TranscriptView({
   // and then drew nothing would be a silent wrong answer — the worst kind. While a query is on
   // screen every part is drawn, whatever the setting says.
   const drawTools = prefs.showToolCalls || query !== "";
+  // Same rule for a compaction's recap: a search must be able to land inside it.
+  const drawCompactions = prefs.showCompactions || query !== "";
   // Consecutive turns from the same speaker are GROUPED — only the first of a run carries the
   // role/time header. A real thread is overwhelmingly long runs of assistant turns (892 of 914 in a
   // measured session), so repeating "CLAUDE 06:43 PM" above every tool call would roughly double the
@@ -392,6 +430,7 @@ export function TranscriptView({
               query={query}
               scope={scope}
               drawTools={drawTools || shown[entry.uuid] === true}
+              drawCompactions={drawCompactions}
               onShowTools={() => setShown((s) => ({ ...s, [entry.uuid]: true }))}
             />
           </div>
