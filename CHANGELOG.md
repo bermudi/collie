@@ -8,6 +8,12 @@ All notable changes to Collie are recorded here. The format follows
 
 ## [Unreleased]
 ### Added
+- **The upstream merge is tooling now.** `scripts/merge-upstream.sh` runs the ADR 9004 ritual
+  start-to-finish (DU cleanup, policy sheet, then the whole verification battery at `--finish`);
+  `scripts/check-strip.ts` + `strip-manifest.txt` fail loudly on strip leaks and on upstream files
+  that vanished silently (the rename/delete casualty git never reports); `scripts/i18n-align.ts`
+  aligns new locales to Pup's dictionary; `herdr-plugin.toml` and `README.md` now merge=ours. No
+  bump: dev tooling, nothing the phone or bridge ships.
 - **The ledger tracks devin — Pup's row.** Upstream's carries no entry for the harness this fork serves daily; the row pins devin's installed version (3000.11.3, no adapter — raw mirror, one-shot send) with the mirror layer's capture evidence, so `bun run harness:drift` flags when a devin update moves past what the phone was last checked against.
 
 **Upstream main — 2026-10-07**

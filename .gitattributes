@@ -8,3 +8,11 @@
 # A shell script is read by `sh`, which cannot take a CRLF line. A Windows checkout with autocrlf would
 # turn the installer the CLI embeds (and `crew add` sends to a POSIX host) into one.
 *.sh text eol=lf
+
+# Fork-owned files merge whole from Pup (ADR 9004 / ADR 0020): the plugin manifest's version is
+# 0.x forever and never rides a merge, and the README is the fork's own narrative — every merge
+# took our side by hand anyway, so the hand is now the driver. Needs the one-time
+# `git config merge.ours.driver true`, which scripts/merge-upstream.sh ensures on every run.
+# NOT package.json: upstream's real script changes there must arrive, conflict and all.
+herdr-plugin.toml merge=ours
+README.md merge=ours

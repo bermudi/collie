@@ -46,16 +46,23 @@ prompt-cache chip and watch (kept from upstream 1.10).
 
 ## Maintaining the strip (merge workflow)
 
+**Start with `bash scripts/merge-upstream.sh` and end with `bash scripts/merge-upstream.sh --finish`.**
+The start fetches, merges `--no-ff --no-commit`, resolves every DU conflict as stays-deleted, and
+prints the remaining conflicts with the policy sheet below; the finish runs the whole battery
+(markers, strip gate, version, three typechecks, lint, bridge+scripts suites, build) so nothing is
+forgotten at the end of a long round. The web suite stays out of it on purpose (test-load policy).
+
 - `git fetch upstream && git merge upstream/main` is the normal way upstream work arrives. Expect
   conflicts exactly where upstream touches the strip list (`cli/`, `bridge/crew/`, `bridge/stt/`,
-  beacons, the staged update runner, the crew ADRs) — resolve every one as **stays deleted**, then
-  re-check the strip-list grep: `git ls-tree -r --name-only HEAD | grep -iE '^(cli/|bridge/crew/|bridge/stt/)|beacon'`
-  must come back empty. Watch for silent rename/delete drops: when upstream *renames* a file the
-strip deleted (1.13.x renamed `components/update-screen.tsx` → `routes/updates.tsx`), git resolves
-it to the delete with no conflict — the renamed target vanishes without appearing in the conflict
-list. After each merge, diff the full file lists
-(`comm -23 <(git ls-tree -r --name-only upstream/main | sort) <(git ls-files | sort)`) and confirm
-every absence is a strip decision, not a casualty.
+  beacons, the staged update runner, the crew ADRs) — resolve every one as **stays deleted**. The
+  strip-list grep and the silent-rename casualty check are `bun run scripts/check-strip.ts` now:
+  it fails on any tracked strip file and on any upstream file absent without a line in
+  `scripts/strip-manifest.txt` (a decision you renew by adding the line, a casualty you restore).
+  When upstream *renames* a file the strip deleted (1.13.x renamed `components/update-screen.tsx` →
+  `routes/updates.tsx`), git resolves it to the delete with no conflict — the renamed target
+  vanishes without appearing in the conflict list, and only the manifest check names it. The bare
+  `comm -23 <(git ls-tree -r --name-only upstream/main | sort) <(git ls-files | sort)` still works
+  for eyeballing; the script is the same check with the decisions written down.
 - The bridge's update path is Pup's own: `bridge/update.ts` is the fork's check-only monitor
   watching `bermudi/collie` tags (ADR 0020's gate rides it), and `POST /api/update/check` is the only
   update route. Upstream's update-run/runner machinery never merges in.
@@ -64,9 +71,25 @@ every absence is a strip decision, not a casualty.
   and the CHANGELOG carries upstream's release entries **demoted under `## [Unreleased]`** (headings
   become bold text like `**Upstream 1.14.2 — 2026-09-28**`) — a `## [x.y.z]` heading from upstream
   becomes the newest numbered heading and trips `check-version.sh`. Pup's own `## [0.x]` headings
-  stay the only numbered ones. When upstream's tests assume their raw-cwd passthrough, adapt them to
+  stay the only numbered ones. Upstream's **unreleased** work demotes as `**Upstream main — date**`,
+  newest block above the older ones. When upstream's tests assume their raw-cwd passthrough, adapt them to
   `resolvePaneCwd` semantics (create a real `~/dir` under homedir; assert the mux gets the expanded
   path and Recent gets what the mux reported).
+- CONFLICT MECHANICS (learned the hard way, 2026-10-06/07 — twice each):
+  - The index stages (`git show :2:<path>` = ours, `:3:` = theirs, `:1:` = base) **die at the first
+    `git add`**. If a file needs re-deriving after that, rebuild the sides from the commits —
+    `git show <merge-base>:<path>`, `git show HEAD:<path>`, `git show upstream/main:<path>` — and
+    re-run `git merge-file --diff3 -p ours base theirs` to get clean markers.
+  - **Never `sed`/glob-delete conflict marker lines.** A stray `sed '/^>>>>>>>/d'` took the closers
+    out of *unresolved* conflicts and left the file structurally ambiguous; a regex resolving
+    "every conflict" can cross boundaries and splice two files together. Resolve by exact
+    replacement (the edit tool) or by span indices found from the markers themselves.
+  - New upstream locales arrive with 300+ keys for stripped machinery:
+    `bun run scripts/i18n-align.ts --fix` deletes them; `mirror.blankLines` and
+    `machines.health.*` are Pup's own and need a hand translation per language.
+  - `herdr-plugin.toml` and `README.md` carry `merge=ours` (.gitattributes); the driver config
+    (`git config merge.ours.driver true`) is ensured by `scripts/merge-upstream.sh`, so clones
+    that never run it just get ordinary conflicts back — degrading, never wrong.
 - `scripts/collie-ctl.sh` + `herdr-plugin.toml` are Pup's operating surface (build / restart / update /
   doctor / serve). Upstream equivalents live in their stripped cli — don't port them back.
 - Version line stays **0.x** (ADR 0020). A merge never bumps the version by itself; releases are cut

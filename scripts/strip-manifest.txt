@@ -1,0 +1,166 @@
+# scripts/strip-manifest.txt — every upstream path Pup deliberately does not carry (ADR 9004).
+#
+# `scripts/check-strip.ts` reads this file and fails the merge when an upstream file is absent
+# from Pup WITHOUT a line here (a silent casualty — the rename/delete drops git resolves without
+# conflict), or when a file matching the strip patterns IS tracked (the strip leaked back in).
+#
+# Line shapes (fnmatch, `*` matches within one path segment only):
+#   exact/path.ts        that file
+#   dir/prefix/          everything under the directory
+#   name-*.ts            glob
+# Keep each entry commented with the reason. Adding a line is a decision: name the ADR.
+
+# ── The strip proper: pack/crew, STT, beacons, the staged update runner ──────
+cli/                                      # the CLI surface — Pup's front door is collie-ctl.sh (ADR 9004)
+bridge/crew/                              # the crew runtime: lead/peer/deputy/standby
+bridge/stt/                               # speech-to-text gate and providers (ADR 0029 territory)
+bridge/beacon/                              # the beacon directory (and see beacon-* below for its loose files)
+bridge/beacon-*                            # beacon-io.ts and friends sit loose in bridge/
+bridge/mux/tern/markers.ts                # tern's beacon matcher (panes read as shells, like tmux/zellij)
+bridge/mux/tmux/markers.ts
+bridge/mux/tmux/markers.test.ts
+bridge/mux/zellij/markers.ts
+bridge/mux/zellij/markers.test.ts
+CREW_PROTOCOL.md                          # the crew wire spec
+PACK_DEPUTY_RFC.md                        # the standby/deputy RFC
+integration/                              # the crew integration harness
+bridge/crew-level-contract.test.ts        # crew tier wire contract
+bridge/removal-schedule.test.ts           # crew's staged-removal ledger
+bridge/solo-baseline.test.ts              # crew's "solo still routes today's set" grep — Pup IS solo
+bridge/fixtures/solo-baseline/            # its fixtures
+bridge/staging-log.ts                     # the staged update runner's log
+bridge/staging-log.test.ts
+bridge/update-action.ts                   # the runner's preflight/action seam; Pup's update.ts is check-only (ADR 0020)
+bridge/update-action.test.ts
+bridge/update-run.ts                      # the run record the phone drives
+bridge/update-run.test.ts
+bridge/front-door.ts                      # the crew TLS front door
+bridge/front-door.test.ts
+
+# ── Docs for the stripped machinery (Pup keeps its own README/DEPLOYMENT/AGENTS) ──
+docs/commands.md                          # the CLI reference
+docs/crew.md
+docs/deployment.md                        # upstream deployment guide; Pup has DEPLOYMENT.md
+docs/install.md
+docs/upgrading.md
+docs/voice-and-push.md                    # STT voice notes
+docs/images/                              # crew/update-screen art
+
+# ── CI and release machinery ─────────────────────────────────────────────────
+.github/workflows/release.yml             # releases are hand-cut on Pup (ADR 0020)
+.github/workflows/triage.yml
+scripts/build-cli.ts                      # CLI build/install surface
+scripts/build-cli.test.ts
+scripts/install.sh
+scripts/install.test.ts
+scripts/install.ps1                       # Windows installer (rides the CLI)
+scripts/install-ps1.test.ts
+scripts/windows-suites.ps1
+scripts/build-windows-payload.ps1
+scripts/upstream-bun.sh
+scripts/upstream-bun.test.sh
+scripts/check-crew-wire.sh                # crew wire lint
+scripts/crew-mux-probe.ts                 # crew mux probe
+scripts/check-payload-links.sh            # release-payload lint
+scripts/check-payload-links.test.sh
+scripts/check-tag.sh                      # release tag lint
+scripts/check-tag.test.sh                      # its test
+scripts/check-flake-bun.test.ts           # flake/Nix build (Pup is not a flake)
+scripts/collie-cli.test.sh
+scripts/release-reading.ts                # release-notes reading for the update runner
+scripts/release-reading.test.ts
+scripts/release-workflow.test.ts          # asserts .github/workflows/release.yml, which Pup does not carry
+
+# ── Web: crew chrome, STT, mirror images, the staged-update UI ───────────────
+web/src/components/crew-provider.tsx      # the crew roster context
+web/src/components/crew-formation.tsx
+web/src/components/crew-footer-link.tsx
+web/src/components/crew-settings-card.tsx
+web/src/components/host-chip.tsx          # tier-2 host chrome
+web/src/components/host-chip.test.tsx
+web/src/components/host-stale-banner.tsx
+web/src/components/host-stale-banner.test.tsx
+web/src/components/server-switcher.tsx
+web/src/components/server-switcher.test.tsx
+web/src/components/session-chip.tsx       # crew session chrome
+web/src/components/session-chip.test.tsx
+web/src/lib/crew-level.ts
+web/src/lib/host-health.ts
+web/src/lib/host-health.test.ts
+web/src/routes/crew.tsx
+web/src/routes/crew.test.tsx
+web/src/routes/updates.tsx                # the staged-update screen
+web/src/routes/updates.test.tsx
+web/src/playground/sections/crew.tsx
+web/src/playground/sections/update-screen.tsx
+web/src/playground/sections/update-screen.test.tsx
+web/src/components/update-screen.tsx      # the staged update UI family
+web/src/components/update-screen.test.tsx
+web/src/components/update-screen-provider.tsx
+web/src/components/update-screen-provider.test.tsx
+web/src/components/update-run-strip.tsx
+web/src/components/update-run-strip.test.tsx
+web/src/components/update-card.tsx
+web/src/components/update-card.test.tsx
+web/src/components/updates-settings-card.tsx
+web/src/components/updates-settings-card.test.tsx
+web/src/lib/update-screen.ts
+web/src/lib/update-screen.test.ts
+web/src/lib/update-run-store.ts
+web/src/lib/update-run-store.test.ts
+web/src/lib/update-ask.ts
+web/src/lib/update-ask.test.ts
+web/src/lib/update-crew.ts
+web/src/lib/update-crew.test.ts
+web/src/lib/i18n/update-ribbon-budget.test.ts
+web/src/hooks/use-update-screen.ts
+web/src/hooks/use-update-screen.test.tsx
+web/src/components/composer-stt.test.tsx   # STT mic in the composer
+web/src/components/recording-strip.tsx
+web/src/components/hands-free-control.tsx
+web/src/lib/stt.ts
+web/src/hooks/use-stt-recorder.ts
+web/src/lib/solo-baseline.test.ts         # crew solo-baseline mirror of the bridge test
+web/src/lib/mirror-images.ts              # the mirror does not guess images (ADR 9003)
+web/src/lib/mirror-images.test.ts
+web/src/hooks/use-mirror-images.ts
+web/src/hooks/use-mirror-images.test.ts
+
+# ── e2e for the stripped surfaces ────────────────────────────────────────────
+web/e2e/fixtures/mirror.ts
+web/e2e/m24-crew.spec.ts
+web/e2e/m39-pi-pictures.spec.ts           # mirror-images flow
+web/e2e/machine-filter.spec.ts            # the multi-host filter (dropped at rebranch; the feature is unit-covered)
+web/e2e/issue-180.spec.ts                 # mirror fixtures
+web/e2e/issue-357.spec.ts                 # multi-host member outage
+web/e2e/live/crew.spec.ts
+web/e2e/live/redirect.spec.ts
+web/e2e/live/updates.spec.ts
+web/e2e/update-screen.spec.ts
+web/e2e/update-band-overflow.spec.ts
+
+# ── Upstream ADR rows reserved-but-empty on Pup (crew/STT/pack/CLI decisions) ──
+# Pup's own ADRs live in the 9000 series; these numbers stay reserved (see .adr/README.md).
+.adr/0011-*.md
+.adr/0012-*.md
+.adr/0013-*.md
+.adr/0014-*.md
+.adr/0015-*.md
+.adr/0016-*.md
+.adr/0021-*.md
+.adr/0023-*.md
+.adr/0024-*.md
+.adr/0025-*.md
+.adr/0026-*.md
+.adr/0027-*.md
+.adr/0028-*.md
+.adr/0029-*.md
+.adr/0035-*.md
+.adr/0037-*.md
+.adr/0038-*.md
+.adr/0039-*.md
+.adr/0044-*.md
+.adr/0045-*.md
+.adr/0050-*.md
+.adr/0062-*.md
+.adr/0064-*.md
