@@ -110,6 +110,11 @@ forgotten at the end of a long round. The web suite stays out of it on purpose (
 - Major gate ([ADR 0020](./.adr/0020-a-major-upgrade-is-consented-by-flag.md)), menu digit ban
   ([ADR 0009](./.adr/0009-a-generic-menu-is-driven-by-the-keys-it-names.md)). Don't regress.
 - Same-origin + CSP, React text nodes for pane output. Don't regress.
+- The devin store (`~/.local/share/devin/cli/sessions.db`, 9 GB of REAL transcripts) is probed
+  schema-only: `json_tree`/`json_type` with KEYS and TYPES, `json_extract` on enum fields at most —
+  never `json_each(<col>, '$.…').value`, which prints whole JSON values (tool calls, args, diffs —
+  a slip on 2026-10-08). Message content never enters agent context or the repo; the adapter's
+  fixtures are synthetic.
 
 ## Workflow
 
