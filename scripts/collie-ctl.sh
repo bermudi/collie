@@ -1463,6 +1463,21 @@ cmd_push_test() {
   "$BUN" run "${PLUGIN_ROOT}/scripts/push-test.ts" "$@"
 }
 
+# Mint a device-pairing code — Pup's `collie pair` (ADR 0086's bootstrap; the CLI is stripped,
+# ADR 9004). Prints the code and, when a front door is up, a QR that lands the phone on the pair
+# form with the code prefilled. [--expires 30d|h|w] puts a lifetime on the minted token.
+cmd_pair() {
+  [ -n "$BUN" ] || { echo "error: bun not found on PATH" >&2; exit 1; }
+  if [ "${COLLIE_SKIP_SERVE:-}" != "1" ]; then
+    local url; url="$(bridge_url)"
+    case "$url" in
+      *"(Tailscale name unavailable)"*) ;;
+      *) export COLLIE_PAIR_URL="$url" ;;
+    esac
+  fi
+  "$BUN" run "${PLUGIN_ROOT}/scripts/pair.ts" "$@"
+}
+
 # Generate the VAPID keypair Web Push needs and write it into the plugin .env. This exists because the
 # config dir is the hard part: it is resolved four different ways (see resolve_config_dir), so an
 # operator following a "put these in your .env" instruction has to first work out WHICH .env — and
@@ -1569,7 +1584,8 @@ case "${1:-}" in
   version) cmd_version ;;
   push-keys) shift || true; cmd_push_keys "$@" ;;
   push-test) shift || true; cmd_push_test "$@" ;;
+  pair)    shift || true; cmd_pair "$@" ;;
   doctor)  cmd_doctor ;;
   logs)    cmd_logs "${2:-50}" ;;
-  *) echo "usage: collie-ctl.sh {start|stop|restart|uninstall|update|version|push-keys|push-test|doctor|build|serve|unserve|status|url|qr|logs}" >&2; exit 2 ;;
+  *) echo "usage: collie-ctl.sh {start|stop|restart|uninstall|update|version|push-keys|push-test|pair|doctor|build|serve|unserve|status|url|qr|logs}" >&2; exit 2 ;;
 esac

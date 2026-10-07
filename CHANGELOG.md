@@ -8,6 +8,12 @@ All notable changes to Collie are recorded here. The format follows
 
 ## [Unreleased]
 ### Added
+- **`collie-ctl.sh pair` — the pairing bootstrap ADR 0086 needs.** Upstream mints pairing codes
+  with the `collie` CLI, which this fork strips; the first merged build with reads-gated-by-token
+  therefore refused a phone that had never needed to pair. The verb mints through the bridge's own
+  pairing primitives, prints the code, and QR-lands the phone on the prefilled pair form
+  (`--expires 30d|h|w` for a limited token, as upstream). Verified end-to-end: mint → claim →
+  token → snapshot.
 - **The upstream merge is tooling now.** `scripts/merge-upstream.sh` runs the ADR 9004 ritual
   start-to-finish (DU cleanup, policy sheet, then the whole verification battery at `--finish`);
   `scripts/check-strip.ts` + `strip-manifest.txt` fail loudly on strip leaks and on upstream files

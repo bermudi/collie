@@ -91,7 +91,10 @@ forgotten at the end of a long round. The web suite stays out of it on purpose (
     (`git config merge.ours.driver true`) is ensured by `scripts/merge-upstream.sh`, so clones
     that never run it just get ordinary conflicts back — degrading, never wrong.
 - `scripts/collie-ctl.sh` + `herdr-plugin.toml` are Pup's operating surface (build / restart / update /
-  doctor / serve). Upstream equivalents live in their stripped cli — don't port them back.
+  doctor / serve). Upstream equivalents live in their stripped cli — don't port them back. **`pair` is the
+  one cli verb Pup had to re-home**: ADR 0086 made reads need the pairing token, and upstream's
+  bootstrap (`collie pair`) is stripped code — `collie-ctl.sh pair [--expires 30d]` mints the code
+  through the bridge's own `pairing.ts` primitives and QR-lands the phone on the prefilled form.
 - Version line stays **0.x** (ADR 0020). A merge never bumps the version by itself; releases are cut
   by hand — `release.yml` is not carried, so the hand-cut procedure in this file stands. (Actions
   was enabled on 2026-09-20 via the API; CI runs on every push to main.)
