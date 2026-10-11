@@ -63,6 +63,14 @@ forgotten at the end of a long round. The web suite stays out of it on purpose (
   vanishes without appearing in the conflict list, and only the manifest check names it. The bare
   `comm -23 <(git ls-tree -r --name-only upstream/main | sort) <(git ls-files | sort)` still works
   for eyeballing; the script is the same check with the decisions written down.
+- **The strip is file-based, but CI jobs merge whole.** Upstream's workflow files are not on the
+  strip list, so a merge carries their job definitions too — including jobs that invoke stripped
+  scripts. 1.18/1.19 rode in the crew drill (`bun run test:crew`, a script the re-branch removed)
+  and the Windows lane (`scripts/windows-suites.ps1`, manifest-stripped), and every push from
+  2026-10-07 to 2026-10-10 stayed red on them unnoticed — the `--finish` battery doesn't run CI.
+  After each merge, check `.github/workflows/*.yml` for jobs whose scripts are absent from the
+  tree, and strip the job the same as the file (the `windows.yml` deletion and its manifest line
+  are the precedent).
 - The bridge's update path is Pup's own: `bridge/update.ts` is the fork's check-only monitor
   watching `bermudi/collie` tags (ADR 0020's gate rides it), and `POST /api/update/check` is the only
   update route. Upstream's update-run/runner machinery never merges in.
