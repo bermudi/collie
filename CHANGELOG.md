@@ -7,6 +7,14 @@ All notable changes to Collie are recorded here. The format follows
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
 ## [Unreleased]
+
+## [0.51.0] - 2026-10-10
+
+Merged from upstream through their 1.19.2 and main (2026-10-10). The pack, crew and
+speech-to-text machinery and the staged update runner that arrived in the same window stay stripped
+([ADR 9004](./.adr/9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md),
+[ADR 0020](./.adr/0020-a-major-upgrade-is-consented-by-flag.md)); everything below ships here.
+
 ### Added
 - **Devin panes get the Chat view — the journal adapter parity rule owed them.** A new
   `bridge/journal/devin.ts` reads devin's on-disk store (`~/.local/share/devin/cli/sessions.db`, the
