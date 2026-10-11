@@ -58,6 +58,7 @@ scripts/install.ps1                       # Windows installer (rides the CLI)
 scripts/install-ps1.test.ts
 scripts/windows-suites.ps1
 scripts/build-windows-payload.ps1
+.github/workflows/windows.yml             # the Windows CI lane — its one job runs the stripped windows-suites.ps1 (ADR 9004)
 scripts/upstream-bun.sh
 scripts/upstream-bun.test.sh
 scripts/check-crew-wire.sh                # crew wire lint

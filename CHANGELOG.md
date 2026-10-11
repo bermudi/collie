@@ -8,6 +8,12 @@ All notable changes to Collie are recorded here. The format follows
 
 ## [Unreleased]
 
+### Packaging
+- **CI runs only what this fork ships.** The crew drill job — whose `test:crew` script the strip
+  removed at the re-branch — leaves ci.yml, and the Windows workflow, whose one job runs the
+  stripped `scripts/windows-suites.ps1`, is deleted and recorded in the strip manifest; both had
+  arrived with the 1.18/1.19 merges and kept every push since 2026-10-07 red.
+
 ## [0.51.0] - 2026-10-10
 
 Merged from upstream through their 1.19.2 and main (2026-10-10). The pack, crew and
