@@ -9,7 +9,7 @@
 #   - resolves every delete/modify (DU) conflict as STAYS DELETED (`git rm`), which is the
 #     documented answer for the whole strip list;
 #   - leaves the content conflicts to you, printed in working order with the standing policy.
-# What FINISH runs, in order: marker grep → strip gate → version check → typechecks (root,
+# What FINISH runs, in order: conflict-marker grep → strip gate → version check → typechecks (root,
 # contract, web) → lint → bridge+scripts suites → build. The web suite is deliberately NOT run
 # here (test-load policy, AGENTS.md): run it targeted during the round and let CI carry the tier.
 set -euo pipefail
@@ -29,8 +29,7 @@ if [ "${1:-}" = "--finish" ]; then
   if git status --short | grep -qE '^(UU|DU|UA|AA)'; then
     echo "✗ unresolved conflicts remain:"; git status --short | grep -E '^(UU|DU|UA|AA)'; exit 1
   fi
-  if grep -rn '^<<<<<<< ' --include='*.ts' --include='*.tsx' --include='*.md' --include='*.sh' \
-      --include='*.json' --include='*.toml' bridge scripts web/src web/e2e .adr *.md 2>/dev/null | grep -q .; then
+  if git grep -nI -E '^[<>=|]{7}' -- .; then
     echo "✗ conflict markers remain:"; exit 1
   fi
   echo "· markers clear"
