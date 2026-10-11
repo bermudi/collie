@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -68,13 +68,13 @@ function renderHome(data: HomeData, initialPath?: string) {
   return router;
 }
 
-/** Wait for the herd list to be on screen. The Spaces filter strip (components/agent-list.tsx) is
- *  the one landmark every render with at least one pane produces — there is no "Needs you" heading
- *  to wait on any more, since a pane no longer moves to a section of its own. */
-const settled = () => screen.findByRole("navigation", { name: /spaces/i });
+/** Wait for the herd list to be on screen. The workspace select (components/agent-list.tsx) is the one
+ *  control every render with at least one pane produces — there is no "Needs you" heading to wait
+ *  on any more, since a pane no longer moves to a section of its own. */
+const settled = () => screen.findByRole("combobox", { name: "Workspace" });
 
-/** The `<section>` a workspace heading owns, scoped away from the Spaces strip's own chips, which
- *  now carry the same workspace name a heading does (agent-list.tsx). */
+/** The `<section>` a workspace heading owns, scoped away from the workspace select's own options,
+ *  which carry the same workspace name a heading does (agent-list.tsx). */
 const groupSection = (label: string) => screen.getByRole("heading", { name: label }).closest("section")!;
 
 /** A workspace group's pane rows: the buttons in its list, never the "+" at the end of its heading
@@ -235,9 +235,6 @@ describe("the dashboard's footer (ADR 0066, ADR 0085)", () => {
     expect(within(footer()).queryByRole("button", { name: /^Crew/ })).not.toBeInTheDocument();
   });
 
-
-
-
   it("a stored crew tab with no crew shows the Dashboard and leaves the stored value alone", async () => {
     localStorage.setItem("collie:dash-prefs:v1", JSON.stringify({ dashView: "crew" }));
     renderHome(solo());
@@ -322,9 +319,9 @@ describe("the dashboard's footer (ADR 0066, ADR 0085)", () => {
     expect(needsSwitch()).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("heading", { name: "webapp" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "collie" })).not.toBeInTheDocument();
-    // The strip still offers every workspace: the filter removes rows, never places.
-    const strip = screen.getByRole("navigation", { name: /spaces/i });
-    expect(within(strip).getByRole("button", { name: /collie/ })).toBeInTheDocument();
+    // The select still offers every workspace: the filter removes rows, never places.
+    const select = screen.getByRole("combobox", { name: "Workspace" });
+    expect(within(select).getByRole("option", { name: /^collie/ })).toBeInTheDocument();
     expect(stored().needsYouOnly).toBe(true);
     // A new mount reads it back.
     cleanup();
@@ -348,12 +345,64 @@ describe("the dashboard's footer (ADR 0066, ADR 0085)", () => {
     expect(screen.queryByRole("heading", { name: "collie" })).not.toBeInTheDocument();
   });
 
-  it("the Order toggle stays beside the switch in both states", async () => {
+  it("the order select stays in the control row in both states", async () => {
     renderHome(solo());
     await settled();
-    expect(screen.getByRole("radiogroup", { name: "Pane order" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Pane order" })).toBeInTheDocument();
     await userEvent.click(needsSwitch());
-    expect(screen.getByRole("radiogroup", { name: "Pane order" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Pane order" })).toBeInTheDocument();
+  });
+
+  it("the workspace select shows one workspace alone, and the choice is remembered", async () => {
+    renderHome(solo());
+    const select = await settled();
+    expect(select).toHaveValue("all");
+    expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "All workspaces",
+      expect.stringMatching(/^webapp/),
+      expect.stringMatching(/^collie/),
+    ]);
+    await userEvent.selectOptions(select, within(select).getByRole("option", { name: /^collie/ }));
+    expect(screen.queryByRole("heading", { name: "webapp" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "collie" })).toBeInTheDocument();
+    expect(stored().isolatedSpace).toEqual(expect.stringContaining("collie"));
+    // A new mount reads it back, and "All workspaces" clears it.
+    cleanup();
+    renderHome(solo());
+    const again = await settled();
+    expect(within(again).getByRole("option", { name: /^collie/ })).toHaveProperty("selected", true);
+    expect(screen.queryByRole("heading", { name: "webapp" })).not.toBeInTheDocument();
+    await userEvent.selectOptions(again, "all");
+    expect(screen.getByRole("heading", { name: "webapp" })).toBeInTheDocument();
+    expect(stored().isolatedSpace).toBeNull();
+  });
+
+  it("the order select changes the list to one ranked list, and the choice is remembered", async () => {
+    renderHome(solo());
+    await settled();
+    const order = screen.getByRole("combobox", { name: "Pane order" });
+    expect(within(order).getAllByRole("option").map((o) => o.textContent)).toEqual(["Place", "Activity", "Cache"]);
+    expect(order).toHaveValue("place");
+    await userEvent.selectOptions(order, "activity");
+    expect(screen.getByRole("heading", { name: /^Newest first/ })).toBeInTheDocument();
+    expect(stored().paneOrder).toBe("activity");
+    cleanup();
+    renderHome(solo());
+    await settled();
+    expect(screen.getByRole("combobox", { name: "Pane order" })).toHaveValue("activity");
+  });
+
+  it("the summary words and the switch share one row, above the two selects", async () => {
+    renderHome(solo());
+    const workspace = await settled();
+    const summary = screen.getByRole("button", { name: /need you/i });
+    const order = screen.getByRole("combobox", { name: "Pane order" });
+    // One row holds the line and the switch; one row holds both selects, workspace first.
+    expect(summary.parentElement).toContainElement(needsSwitch());
+    const selectRow = workspace.closest('[data-slot="select"]')!.parentElement!;
+    expect(selectRow).toContainElement(order);
+    expect(selectRow).not.toContainElement(summary);
+    expect(summary.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("the launch strip, the Spaces navigator and the pin hint show only while the switch is off", async () => {
@@ -391,5 +440,46 @@ describe("the dashboard's footer (ADR 0066, ADR 0085)", () => {
     expect(rows.map((r) => r.textContent)).toEqual(["webapp5 files+10 −2", "collieNo folder"]);
     await userEvent.click(rows[0]!);
     await waitFor(() => expect(url(router)).toBe("/space/w1/changes"));
+  });
+});
+
+// NOTHING SAVED CAN ACT (M46, ADR 0087 rule 8). A cold open draws the saved herd while the bridge is
+// still being asked; a row's hold and a heading's "+" must not write at ids read from it.
+describe("the dashboard on a saved copy", () => {
+  const saved = (): HomeData => ({ ...solo(), stale: true });
+  const REFUSAL = "Saved copy. Reconnect to make changes.";
+
+  it("a row's hold opens the sheet with a note in place of Rename, Focus and Close", async () => {
+    renderHome(saved());
+    await settled();
+    const [row] = rowsOf(groupSection("webapp"));
+    fireEvent.contextMenu(row!);
+    expect(await screen.findByText(REFUSAL)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Rename" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Close pane" })).toBeNull();
+  });
+
+  it("the same hold on a live herd still offers Rename and Close", async () => {
+    renderHome(solo());
+    await settled();
+    const [row] = rowsOf(groupSection("webapp"));
+    fireEvent.contextMenu(row!);
+    expect(await screen.findByRole("button", { name: "Rename" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close pane" })).toBeInTheDocument();
+  });
+
+  it("a workspace heading's '+' sends no create and says why", async () => {
+    const created: string[] = [];
+    server.use(
+      http.post(/\/api\/workspace\/[^/]+\/tab$/, ({ request }) => {
+        created.push(request.url);
+        return HttpResponse.json({ ok: false, error: "no" });
+      }),
+    );
+    renderHome(saved());
+    await settled();
+    await userEvent.click(screen.getByRole("button", { name: "New tab in webapp" }));
+    expect(await screen.findByText(REFUSAL)).toBeInTheDocument();
+    expect(created).toEqual([]);
   });
 });

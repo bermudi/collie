@@ -17,8 +17,10 @@ import { useNav } from "@/hooks/use-nav";
 import { useDashPrefs, openForCount } from "@/hooks/use-dash-prefs";
 import { useAgentStart } from "@/hooks/use-agent-start";
 import { useLaunchers } from "@/lib/launchers";
+import { shortenHome } from "@/lib/shorten-home";
+import { useNoPromptsGuard } from "@/hooks/use-no-prompts-guard";
 import { buzz } from "@/lib/haptics";
-import { mirrorFont, useDisplayPrefs } from "@/hooks/use-display-prefs";
+import { handOf, mirrorFont, useDisplayPrefs } from "@/hooks/use-display-prefs";
 import { useChatWindow } from "@/hooks/use-chat-window";
 import { useChatReady } from "@/hooks/use-chat-ready";
 import { usePaneStart } from "@/hooks/use-pane-start";
@@ -27,6 +29,7 @@ import { useLatestReply } from "@/hooks/use-latest-reply";
 import { useStableTerminalDraft } from "@/hooks/use-terminal-draft";
 import { useLocale } from "@/hooks/use-locale";
 import { isConnecting } from "@/lib/connection";
+import { canCopyText, copyText } from "@/lib/clipboard";
 import { t, type MessageKey } from "@/lib/i18n";
 import { savedAtLabel } from "@/lib/format";
 import { settleAfterSend } from "@/lib/harness/guard";
@@ -52,6 +55,7 @@ import { splitLines } from "@/lib/blocks";
 import { adapterFor, buildBlocks, rendersNativeMirror } from "@/lib/harness";
 import { waitingQuestionNote } from "@/lib/question-waiting";
 import { blockOwnsKeyboard } from "@/lib/harness/dialog-contract";
+import { isLive, useLive } from "@/lib/liveness";
 import { FindBar } from "@/components/find-bar";
 import { LatestReply } from "@/components/latest-reply";
 import { Composer, type ComposerHandle } from "@/components/composer";
@@ -61,6 +65,8 @@ import { TabStrip } from "@/components/tab-strip";
 import { PaneStrip } from "@/components/pane-strip";
 import { StripsSummary } from "@/components/strips-summary";
 import { PaneMeta } from "@/components/pane-meta";
+import { BranchLabel } from "@/components/ui/branch-label";
+import { paneGitHead } from "@/lib/git-head";
 import { CacheSheet } from "@/components/cache-sheet";
 import { PaneActionsSheet } from "@/components/pane-actions-sheet";
 import { CardWaitingCtx } from "@/components/chat-cards";
@@ -68,6 +74,12 @@ import { chatStatusKey, SavedCopyRow, SessionStream } from "@/components/session
 import { PaneSettingsSheet } from "@/components/pane-settings-sheet";
 import { CompactStripLabels, TAB_ROW_SQUARE_TAP_TARGET } from "@/components/ui/labelled-strip";
 import { ReadOnlyBanner } from "@/components/read-only-banner";
+import { MaskedHint } from "@/components/masked-hint";
+import { ModelTag } from "@/components/model-tag";
+import { useModelOnScreen } from "@/hooks/use-model-on-screen";
+import { modelLabel } from "@/lib/model-label";
+import { useMaskedHintRetired } from "@/lib/masked-hint";
+import { entriesHoldMask, holdsMask } from "@/lib/masked-text";
 import { StatusArea } from "@/components/status-area";
 import { ToastViewport } from "@/components/ui/toast-viewport";
 import { StatusDot } from "@/components/status-badge";
@@ -76,7 +88,7 @@ import { submitWizardKeys } from "@/lib/wizard-action";
 import { submitPreviewKeys, submitPreviewNote, submitPreviewOption } from "@/lib/preview-action";
 import { submitMultiSelectIntent, type MultiSelectIntent } from "@/lib/multi-select-action";
 import { submitMenuKeys } from "@/lib/menu-action";
-import { sendGuardedKeys } from "@/lib/dialog-guard";
+import { sendBoundKeys, sendGuardedKeys } from "@/lib/dialog-guard";
 import type { PromptBlockAction } from "@/components/prompt-select-block";
 import type { PreviewBlockAction } from "@/components/preview-select-block";
 import type { MenuBlockAction } from "@/components/menu-block";
@@ -85,15 +97,15 @@ import { canGrowRequestedLines, growRequestedLines } from "@/lib/loaders";
 import { paneName, panePlaceParts } from "@/lib/pane-name";
 import { panesOfTab } from "@/lib/pane-ordinal";
 import { useMuxCapability } from "@/lib/mux-capability";
-import { branchOffRepos } from "@/lib/branch-off";
+import { paneInRepo } from "@/lib/branch-off";
 import { useOptionalRootData } from "@/lib/route-data";
-import { NewSpaceSheet } from "@/components/new-space-sheet";
 import { hasJournalAdapter, reportsSessionOnFirstPrompt } from "@/lib/journal-agents";
 import { journalReadingOf, paneBody, type JournalReading } from "@/lib/chat-gate";
 import { paneRowKey, paneScope } from "@/lib/hosts";
 import { paneScopeKey } from "@/lib/scope";
 import { usePins } from "@/lib/pins";
-import { changesPath, historyPath, panePath, spacePath } from "@/lib/nav";
+import { paneFilesDir } from "@/lib/file-paths";
+import { changesPath, filesPath, historyPath, newPath, panePath, spacePath } from "@/lib/nav";
 import { isReadOnly, statusLabel } from "@/lib/types";
 import { usePairing } from "@/lib/pairing";
 import type { AgentView, BridgeStatus, DeviceAuth, ServerSummary, TabView } from "@/lib/types";
@@ -160,6 +172,14 @@ interface AgentChatProps {
   onBackArrow?: () => void;
   onSelect: (paneId: string) => void;
 }
+
+/** How many rows at the raw screen's tail count as its footer when the model label asks if it is named. */
+const RAW_FOOTER_ROWS = 8;
+const NO_ROWS: readonly string[] = [];
+
+/** The plain text of one parsed terminal row. */
+const rowText = (line: { segments: readonly { text: string }[] }): string =>
+  line.segments.map((segment) => segment.text).join("");
 
 /**
  * The fold chevron's accessible name, chosen for what is actually on screen. The glyph names
@@ -249,7 +269,12 @@ export function AgentChat({
   // current while we're reconnecting/lost, and restores instantly on recovery. Both marks dim
   // together — dimming only one of them would leave a frozen reading looking half live.
   const connecting = isConnecting({ bridge, error, stalled });
-  const { newTab, newSpace, launch, launching, creatingTab, branchOff } = useSpaceActions();
+  // The pane view's own liveness for the structural writes (a "+", a launcher row, a branch-off): the
+  // hook already refuses on a saved HERD, and this adds what only this view knows, that THIS pane's
+  // last read failed or its screen is a saved copy. Set below, once both facts exist.
+  const structuralWritesOff = useRef(false);
+  const canWriteHere = useCallback(() => !structuralWritesOff.current, []);
+  const { newTab, launch, launching, creatingTab } = useSpaceActions(canWriteHere);
   // The pane's light-theme inversion override (lib/mirror-invert.ts). Read once at mount, which is
   // enough: DetailRoute keys this component by `paneScopeKey(scope, paneId)` — the full address, not
   // the id, for the reason that file records — so a walk to another pane, session or host remounts it
@@ -276,15 +301,13 @@ export function AgentChat({
   );
 
   const { launchers, home: launchersHome } = useLaunchers(scope);
-  // "New agent on a branch" (ADR 0089): the repo this pane sits in, read off the root snapshot's
-  // spaces. Null for a pane outside a Git repo, which is what keeps the ⋯ row away from it. The
-  // other two gates (the capability, the lead scope) are the actions sheet's own.
+  // A row that skips permission prompts is confirmed once per device before it starts (ADR 0094).
+  const { guard: guardNoPrompts, sheet: noPromptsSheet } = useNoPromptsGuard(servers);
+  // "New agent in a worktree" (ADR 0089, M48): offered for a pane whose space sits in a Git repo, read
+  // off the root snapshot's spaces. The other two gates (the capability, the lead scope) are the
+  // actions sheet's own. It goes to the New page on this pane's folder with the worktree switch on.
   const rootSpaces = useOptionalRootData()?.workspaces;
-  const branchOffTarget = useMemo(
-    () => (agent === undefined || rootSpaces === undefined ? null : branchOffRepos(rootSpaces, agent.workspaceId)),
-    [agent, rootSpaces],
-  );
-  const [branchOffOpen, setBranchOffOpen] = useState(false);
+  const branchOffOffered = agent !== undefined && rootSpaces !== undefined && paneInRepo(rootSpaces, agent.workspaceId);
   // Single display-prefs instance: the View controls (in <Composer>) write it, the mirror reads it.
   const { prefs, setWrap, stepFontSize, stepChatFontSize, setRawTerminal, setTapToFocus, setExpandClippedReply } =
     useDisplayPrefs();
@@ -308,6 +331,8 @@ export function AgentChat({
   // were the same pane. The address did not vanish, it moved down one line, where an address belongs.
   const name = agent === undefined ? "" : paneName(agent);
   const workspace = agent === undefined ? "" : panePlaceParts(agent, tabs).space;
+  // The branch the pane's folder is on, beside the workspace on line 2 (lib/git-head.ts).
+  const gitHead = agent === undefined ? null : paneGitHead(agent);
   // The panes that share this tab (agents + shells), in the strip's stable order (lib/pane-ordinal.ts
   // § panesOfTab: position in the tab, never status). Computed here, once: the row is far from the
   // header in this file and the two must not disagree about which panes there are.
@@ -653,6 +678,21 @@ export function AgentChat({
   // Fold state for the "Switch pane" sheet's two long tails, shared with the dashboard so one
   // "hide the long tail" preference means the same thing in both places.
   const dash = useDashPrefs();
+  // Where the belt's Files button goes. The root of Files is the workspace's folder (ADR 0083), and a
+  // pane that has `cd`-ed into a subfolder would land above where it works, so the tree opens ON the
+  // pane's folder when that lies below the root. The root screen stays as it was when the pane sits
+  // at the root, outside it or reports no folder, and when the operator chose Changes only: the root
+  // then opens as the list, and a folder would have shown the tree instead. The arrow from that folder
+  // steps back to this pane (`from`), and the breadcrumb still reaches the root.
+  const filesDir = useMemo(
+    () =>
+      agent === undefined || rootSpaces === undefined
+        ? null
+        : paneFilesDir({ pane: agent, panes: herd, workspaces: rootSpaces, home: launchersHome }),
+    [agent, herd, rootSpaces, launchersHome],
+  );
+  const filesEntryPath =
+    filesDir === null || dash.prefs.changesOnly ? changesPath(paneId, scope) : filesPath(paneId, scope, { dir: filesDir });
 
   // Mirror freeze: at the bottom we follow live output; the moment you scroll up to read backscroll
   // we hold the text steady (no reflow / no re-pin) until you jump back to latest — so a long
@@ -810,13 +850,13 @@ export function AgentChat({
   // is looking at (`shown`, not the live props) so a poll landing mid-tap can't swap what gets
   // copied. Prefer the unwrapped logical text — the buffer without the phone-width hard wraps, so a
   // paste reads as real lines — and fall back to the display text when the agent reports no unwrapped
-  // form. `navigator.clipboard` is absent over plain HTTP (an insecure context, a supported deploy —
-  // see status-detail-sheet's copy), so this can reject; `canCopyOutput` keeps the row off that
-  // deploy, and the catch keeps a failure honest rather than claiming a copy that never happened.
-  const canCopyOutput = !!navigator.clipboard;
+  // form. `navigator.clipboard` is absent over plain HTTP (an insecure context, a supported deploy), so
+  // `copyText` falls back to the legacy copy command there; `canCopyOutput` keeps the row off a browser
+  // with neither, and the catch keeps a failure honest rather than claiming a copy that never happened.
+  const canCopyOutput = canCopyText();
   async function copyOutput() {
     try {
-      await navigator.clipboard.writeText(shown.logicalText || shown.text);
+      await copyText(shown.logicalText || shown.text);
       setStatus(t("chat.copyOutput.done"), "success");
     } catch {
       setStatus(t("chat.copyOutput.failed"), "error");
@@ -937,6 +977,37 @@ export function AgentChat({
     !chatFetch || chatStatus.kind !== "empty" || chatFeed.tried || handover.phase !== "idle";
   const chatReadyBody = useChatReady(chatBody, chatAnswered);
   const chatShown = useHeldBody(chatReadyBody, handover.phase);
+  // Whether the text the operator is looking at holds the bridge's mask, for the one-time hint that
+  // explains the dots. One check over whichever body is on screen, from data already in scope (no new
+  // fetch): the Chat window's turns, or the mirror as `shown` last settled (`display`).
+  const chatEntries = chatFeed.window.entries;
+  const maskOnScreen = useMemo(
+    () => (chatShown ? entriesHoldMask(chatEntries) : holdsMask(display)),
+    [chatShown, chatEntries, display],
+  );
+  const maskedHintRetired = useMaskedHintRetired();
+  // THE MODEL LABEL STANDS DOWN WHILE THE SCREEN NAMES THE MODEL. The label above the belt would say it
+  // twice beside a statusline or footer that already prints it (Claude's configured statusline, Codex's
+  // footer, pi's footer). The rows judged are the ones this phone DRAWS near the bottom: the lifted
+  // statusline strip for a harness with an adapter, in either body (the strip stands below Chat too),
+  // and the last rows of the raw screen for one without (pi) or in raw-terminal mode, which only the
+  // Terminal body draws. Zen hides the strip, so it hides the footer for the adapter case. The bridge
+  // parses no screen, so the already-computed `statusLines` is the signal; hooks/use-model-on-screen.ts
+  // holds the answer across frames so a dialog or a redraw cannot blink the label.
+  const modelWords = modelLabel(agent?.model);
+  const footerLifted = grammarsOn && adapterFor(agent?.agent) !== undefined;
+  const footerRows = useMemo(() => {
+    if (footerLifted) return statusLines.map(rowText);
+    if (chatShown) return NO_ROWS; // Chat draws no raw footer, so there is nothing to parse
+    return splitLines(parseAnsi(display)).slice(-RAW_FOOTER_ROWS).map(rowText);
+  }, [footerLifted, statusLines, display, chatShown]);
+  const modelOnScreen = useModelOnScreen(
+    `${paneId}|${modelWords ?? ""}`,
+    footerLifted ? !zen : !chatShown,
+    footerRows,
+    modelWords,
+  );
+  const maskedHintOpen = maskOnScreen && !maskedHintRetired;
   // THE SAVED COPY'S DATE, for whichever body is on screen (M46 specs 09 and 10). Chat dates its own
   // window, read back from the Chat tail the phone kept; the terminal dates the last-seen mirror the
   // loader restored. The Terminal body has no offline read beyond that mirror: the raw screen is
@@ -1336,6 +1407,50 @@ export function AgentChat({
       }
     },
     [refuseWrite, paneId, scope, requestedLines, shown.revision, agent?.agent, revalidator, showAfterSend],
+  );
+
+  // Chat's "Send now" on the Waiting to send card: press the keys the BRIDGE declared for this
+  // session's harness (`ChatWindow.sendQueuedNow`), through the one-shot key door every dialog tap
+  // ends in. The write is unbound, exactly like a key from the Keys tray, which is why it must never
+  // be reachable while a dialog is up: a queue is non-empty exactly while the agent works, which is
+  // when a permission or question dialog appears, and the declared keys (Enter, Ctrl+Enter) would
+  // ANSWER that dialog. So the card is not given the handler while one is on screen, and the handler
+  // refuses on its own as the backstop behind it. Same write gates as every handler above;
+  // `refuseWrite` and the saved-copy rule decide whether the card was given this handler at all, and
+  // `isLive` is the liveness backstop `sendGuardedReply` and the Keys tray have (M46 spec 11).
+  // Resolves false when no key went out, which is the card's cue to drop its pending face at once.
+  const dialogPresentRef = useRef(dialogPresent);
+  dialogPresentRef.current = dialogPresent;
+  const paneLive = useLive(paneId, scope);
+  // The same fact for the structural writes: the tab and pane sheets (rename, close, focus) take it
+  // as `savedCopy`, and the create hook above reads it through the ref. Nothing saved can act.
+  const savedCopyWrites = actsDisabledByCache || !paneLive;
+  structuralWritesOff.current = savedCopyWrites;
+  const handleSendQueuedNow = useCallback(
+    async (keys: readonly string[]): Promise<boolean> => {
+      const refusal = refuseWrite();
+      if (refusal) {
+        setStatus(refusal, "error");
+        return false;
+      }
+      if (dialogPresentRef.current) {
+        setStatus(t("chat.status.screenChanged"), "warn");
+        return false;
+      }
+      if (!isLive(paneId, scope)) {
+        setStatus(t("composer.send.reconnect"), "error");
+        return false;
+      }
+      const result = await sendBoundKeys({ paneId, scope }, [...keys]);
+      if (result.status === "sent") {
+        setStatus(t("chat.status.sent"), "success");
+        revalidator.revalidate();
+        return true;
+      }
+      setStatus(result.status === "error" && result.error ? result.error : t("chat.status.sendFailed"), "error");
+      return false;
+    },
+    [refuseWrite, paneId, scope, revalidator],
   );
 
   // NOTE: the composer is deliberately NOT auto-focused on open/switch — that would pop the Android
@@ -1804,10 +1919,14 @@ export function AgentChat({
                 <div className="flex h-3 min-w-0 items-baseline gap-2">
                   <span
                     data-slot="pane-place"
-                    className="min-w-0 truncate text-[11px] leading-3 text-muted-foreground"
+                    className="min-w-0 shrink-[3] truncate text-[11px] leading-3 text-muted-foreground"
                   >
                     {workspace}
                   </span>
+                  {/* The branch the pane's folder is on, after the workspace and in the same 12px
+                      line box, so the 36px block above holds with or without it. The workspace gives
+                      way first, then the branch, keeping its tail; the meta never does. */}
+                  {gitHead !== null && <BranchLabel head={gitHead} className="shrink leading-3 text-muted-foreground" />}
                   <PaneMeta
                     cache={agent.cache}
                     onOpenCache={() => setCacheSheetOpen(true)}
@@ -1923,6 +2042,11 @@ export function AgentChat({
             {/* Read-only notice when this device isn't allowlisted (the composer below is disabled too). */}
             <ReadOnlyBanner device={device} />
 
+            {/* The one-time line that explains the dots (lib/masked-hint.ts). In the same chrome band
+                as the banners, so it leaves with them in zen, and in a Collapse of its own so it
+                slides in and out rather than pushing the mirror by a jump. */}
+            <MaskedHint open={maskedHintOpen} className="mx-3 mt-1.5" />
+
             {/* THE TWO STRIPS, AND THE THIN BAR THAT STANDS IN FOR THEM — one band that morphs, not
                 two rows taking turns. `CollapseSwap` is nested inside zen's `Collapse`, so zen still
                 takes the whole band folded or not: the bar is chrome about the pane exactly as the
@@ -1978,6 +2102,7 @@ export function AgentChat({
                     allowAll={false}
                     scope={scope}
                     readOnly={readOnly}
+                    savedCopy={savedCopyWrites}
                     onRenamed={() => revalidator.revalidate()}
                     // Closing the tab this pane lives in must not eject you to Home — see closeCurrentTab:
                     // it lands you on a neighbouring tab of this space, and only falls back to onBack() when
@@ -1985,8 +2110,8 @@ export function AgentChat({
                     // drops out of the strip.
                     onClosed={(tabId) => (agent?.tabId === tabId ? closeCurrentTab(tabId) : revalidator.revalidate())}
                     // The fold's own control, pinned to the row's trailing end where it costs no height:
-                    // a 28px circle centred in the 30px tab row, its 44px reach hanging down out of the
-                    // row the way every tab's does. Same square recipe as the "+" beside it, transparent
+                    // a 28px circle centred in the 30px tab row, its hit box the row itself and no
+                    // lower (the way every tab's is: a reach below the row steals taps from the content). Same square recipe as the "+" beside it, transparent
                     // border included (the reach's numbers assume one): they are two controls of the
                     // same rank in the same row, and drawing them differently would rank them.
                     trailing={
@@ -2018,6 +2143,7 @@ export function AgentChat({
                     onSelect={switchTo}
                     scope={scope}
                     readOnly={readOnly}
+                    savedCopy={savedCopyWrites}
                     onRenamed={() => revalidator.revalidate()}
                     // Mirror closePane's success branch: closing the open pane returns Home, else revalidate.
                     onClosed={(id) => (id === paneId ? onBack() : revalidator.revalidate())}
@@ -2127,11 +2253,21 @@ export function AgentChat({
                   fontSize={prefs.chatFontSize}
                   listRef={listRef}
                   savedCopy={savedCopyLine}
+                  // Withheld, not disabled, wherever nothing may act: a read-only device, a saved
+                  // copy, a frozen read (M46: nothing saved on the phone can act), a
+                  // pane the bridge has not answered lately, and a dialog on screen (its answer
+                  // is the dialog's, and these keys would give it).
+                  onSendQueuedNow={
+                    readOnly || actsDisabledByCache || connecting || dialogPresent || !paneLive
+                      ? undefined
+                      : handleSendQueuedNow
+                  }
                 />
               </CardWaitingCtx.Provider>
             ) : (
             <ChatMessageList
               ref={listRef}
+              clearBand={0}
               dep={display}
               onAtBottomChange={setFollowing}
               hasNew={hasNew}
@@ -2285,6 +2421,9 @@ export function AgentChat({
               data-slot="draft-notice-slot"
               className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-3 pb-2"
             />
+            {/* The pane's model, small on the mirror's bottom-right corner, over both bodies alike
+                and under the notice slot above (model-tag.tsx says why there). */}
+            <ModelTag model={modelOnScreen ? undefined : agent?.model} />
           </div>
 
           {/* THE CARD DOCK (.adr/0059). The lifted card used to render inside the scroller above,
@@ -2313,6 +2452,7 @@ export function AgentChat({
               scope={scope}
               stale={actsDisabledByCache}
               composing={composing}
+              wrap={prefs.wrap}
               faceClassName={mirrorFace.className}
               faceStyle={mirrorFace.style}
               onClick={focusFromMirror}
@@ -2495,6 +2635,8 @@ export function AgentChat({
                   terminalDraft={terminalDraft}
                   rawTerminalDraft={rawTerminalDraft}
                   prefs={prefs}
+                  // Settings → Hand: which thumb the belt and the reply box are laid out for.
+                  hand={handOf(prefs)}
                   // The belt's ⚙: the button is the composer's, the sheet it opens is mounted below
                   // beside the switcher's, for the stacking-context reason the pane-menu note gives.
                   display={{
@@ -2507,11 +2649,11 @@ export function AgentChat({
                   pullHandle={pullHandle}
                   // EXPERIMENT (operator, 2026-09-23): the Changes entry rides the belt's pinned
                   // block beside the switcher mark instead of the ⋮ sheet. Hidden when the pane
-                  // reports no folder: zellij gives an empty cwd, and the view would only be able
-                  // to say so (ADR 0065).
+                  // reports no folder: zellij before 0.44 gives an empty cwd, and the view would
+                  // only be able to say so (ADR 0065).
                   changesPill={
                     agent?.cwd
-                      ? { onClick: () => nav.down(changesPath(paneId, scope)), label: t("chat.changes.label") }
+                      ? { onClick: () => nav.down(filesEntryPath), label: t("chat.changes.label") }
                       : undefined
                   }
                   draftNoticeSlot={draftNoticeSlot}
@@ -2561,13 +2703,21 @@ export function AgentChat({
               readOnly
                 ? undefined
                 : (command: string) => {
-                    // Close first: the launch navigates into the new pane, and a sheet still up
-                    // while the route changes under it would have to be dismissed on the screen
-                    // you just arrived at (same order the deleted LaunchSheet used).
-                    closeDrawer();
-                    // Beside THIS pane — the switcher's launch always opens a tab in this pane's
-                    // Space, on this pane's own host (server.ts resolves `paneId` there).
-                    void launch(command, paneId);
+                    const row = launchers.find((l) => l.command === command);
+                    guardNoPrompts({
+                      item: row ?? { command },
+                      machine: scope?.host ?? "",
+                      folder: shortenHome(row?.cwd ?? agent?.cwd ?? launchersHome, launchersHome) || "~",
+                      go: () => {
+                        // Close first: the launch navigates into the new pane, and a sheet still up
+                        // while the route changes under it would have to be dismissed on the screen
+                        // you just arrived at (same order the deleted LaunchSheet used).
+                        closeDrawer();
+                        // Beside THIS pane — the switcher's launch always opens a tab in this pane's
+                        // Space, on this pane's own host (server.ts resolves `paneId` there).
+                        void launch(command, paneId);
+                      },
+                    });
                   }
             }
             launching={launching}
@@ -2649,6 +2799,7 @@ export function AgentChat({
           pane={agent ?? null}
           scope={scope}
           readOnly={readOnly}
+          savedCopy={savedCopyWrites}
           onRenamed={() => revalidator.revalidate()}
           onClosed={(id) => (id === paneId ? onBack() : revalidator.revalidate())}
           // Find searches the MIRROR, and highlights its hits there. In chat mode the mirror is
@@ -2685,25 +2836,12 @@ export function AgentChat({
           // Pin to top / Unpin, the last read row (ADR 0070). No `onPinChange`: the Pinned group is
           // on the dashboard and in the switcher, not on this screen, so the sheet says it in a toast.
           herd={herd}
-          onBranchOff={branchOffTarget === null ? undefined : () => setBranchOffOpen(true)}
+          onBranchOff={
+            branchOffOffered
+              ? () => nav.down(newPath({ machine: scope?.host, pane: paneId, session: scope?.session }))
+              : undefined
+          }
         />
-        {/* "New agent on a branch" (ADR 0089): the new-space sheet in worktree mode, on this pane's
-            repo, with a branch name typed and an agent picker. `onCreate` is the plain space create
-            the sheet's type requires; a branch-off sheet never shows that side. */}
-        {branchOffTarget !== null && (
-          <NewSpaceSheet
-            open={branchOffOpen}
-            onClose={() => setBranchOffOpen(false)}
-            onCreate={newSpace}
-            repos={branchOffTarget.repos}
-            scope={scope}
-            branchOff={{
-              workspaceId: branchOffTarget.selected,
-              launchers,
-              onCreate: (workspaceId, branch, extras) => branchOff(workspaceId, branch, extras, scope),
-            }}
-          />
-        )}
         {/* This pane's own settings — one switch today, the prompt-cache warning (ADR 0042). Scoped to
             the PANE's machine, because `?host=` there names where the pane lives; the preference itself
             lands on the collie this phone is talking to, which is the only one that can push. */}
@@ -2724,6 +2862,8 @@ export function AgentChat({
               : undefined
           }
         />
+        {/* "Start without prompts?" for a Launch row that skips permission prompts. */}
+        {noPromptsSheet}
       </div>
     </CompactStripLabels>
   );

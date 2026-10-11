@@ -19,7 +19,8 @@ import { HeaderStatus } from "@/components/header-status";
 import { StatusArea } from "@/components/status-area";
 import { setStatus, clearStatus, type StatusTone } from "@/lib/status";
 
-import { Card, Group, RootRouter, Section, Segmented, Stage, type SectionDef } from "../harness";
+import { RootRouter } from "../harness";
+import { Card, CardControls, Group, Section, Segmented, Stage, type SectionDef } from "../layout";
 import { homeSolo } from "../fixtures";
 import { Replay, SlowStage } from "./motion-harness";
 import "./motion.css";
@@ -125,14 +126,14 @@ function NoticeMatrixCard() {
         refuse."
       span={2}
     >
-      <div className="mb-2">
+      <CardControls>
         <Segmented
           name="Interaction"
           value={interaction}
           options={INTERACTIONS}
           onChange={setInteraction}
         />
-      </div>
+      </CardControls>
       <Stage>
         <div className="flex flex-col gap-4 p-4">
           {VARIANTS.map((variant) => (
@@ -257,12 +258,12 @@ function StripBandCard() {
         floor never lets the band's height move, only its content."
       span={2}
     >
-      <div className="mb-2 flex flex-wrap gap-3">
+      <CardControls className="flex flex-wrap gap-3">
         <ToggleField label="Auth" value={auth} onChange={setAuth} />
         <ToggleField label="Outage" value={outage} onChange={setOutage} />
         <ToggleField label="Degraded" value={degraded} onChange={setDegraded} />
         <ToggleField label="Update" value={update} onChange={setUpdate} />
-      </div>
+      </CardControls>
       <SlowStage>
         <Stage>
           <StripToggleContext.Provider value={toggles}>
@@ -339,7 +340,7 @@ function ConnectionRecoveryStage() {
 
   return (
     <div>
-      <div className="mb-2">
+      <CardControls>
         <Button
           type="button"
           size="sm"
@@ -350,7 +351,7 @@ function ConnectionRecoveryStage() {
         >
           {playing ? "Playing…" : "Play"}
         </Button>
-      </div>
+      </CardControls>
       <Stage>
         <ConnectedContext.Provider value={connected}>
           <RootRouter data={homeSolo}>
@@ -420,7 +421,7 @@ function StatusToastCard() {
         unmount, since switching tabs mid-toast must not leave the next section inheriting one."
       span={2}
     >
-      <div className="mb-2 flex flex-wrap gap-1.5">
+      <CardControls className="flex flex-wrap gap-1.5">
         {STATUS_TONES.map((tone) => (
           <Button
             key={tone.value}
@@ -442,7 +443,7 @@ function StatusToastCard() {
         >
           Clear
         </Button>
-      </div>
+      </CardControls>
       <Stage>
         <div className="flex flex-col gap-3 p-4">
           <div>

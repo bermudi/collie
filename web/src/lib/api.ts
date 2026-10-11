@@ -6,6 +6,7 @@ import { trackBusy } from "./busy";
 import {
   markLive,
   noteNetworkFailure,
+  noteReadStart,
   noteServerFailure,
   type ReadFailureKind,
 } from "./connection-health";
@@ -14,6 +15,7 @@ import { abortSignalAfter, abortSignalAny } from "./env";
 import { asJsonString, parseJsonObject, type JsonObject } from "./json";
 import { authHeader, clearNotPaired, EXPIRED_BODY, markExpired, markNotPaired, NOT_PAIRED_BODY } from "./pairing";
 import { pairingRefused } from "./wipe";
+import { fileVersionOf } from "./file-image-cache";
 import { isLead, normalizeScope, paneScopeKey, type Scope } from "./scope";
 import { stampSend } from "./poll-intent";
 import { observeServerBuild, SERVER_BUILD_HEADER } from "./server-build";
@@ -21,6 +23,7 @@ import { mounted } from "./base-path";
 import { CHAT_UNCHANGED, type ChatAnswer } from "./chat-window";
 import type {
   ActionResponse,
+  AddedLauncherResponse,
   BridgeConfig,
   ChatAfter,
   ChatBefore,
@@ -32,6 +35,8 @@ import type {
   CacheWatchState,
   FoldersResponse,
   LaunchersResponse,
+  LaunchCheckResponse,
+  RecentRunsResponse,
   NotifyPrefs,
   ChangeCommitDiffResponse,
   ChangeCommitResponse,
@@ -48,9 +53,10 @@ import type {
   SnapshotResponse,
   UpdateInfo,
   UploadResponse,
-  WorktreeListResponse,
+  WorktreeBaseChoice,
   WorktreeCreateResponse,
-  WorktreeOpenResponse,
+  WorktreeFolderChoice,
+  WorktreePlanResponse,
 } from "./types";
 import type { SubscribeBody } from "./push";
 
@@ -275,6 +281,11 @@ export function isPairingRefusal<TThrown>(error: TThrown): boolean {
  * as every other call here spells it; the mount is applied by `apiFetch`.
  */
 export async function fetchAuthedBytes(path: string, signal?: AbortSignal): Promise<Blob> {
+  return (await fetchAuthedAnswer(path, signal)).blob;
+}
+
+/** {@link fetchAuthedBytes} with the answer's headers, for a caller that reads a version off them. */
+async function fetchAuthedAnswer(path: string, signal?: AbortSignal): Promise<{ blob: Blob; headers: Headers }> {
   const res = await apiFetch(path, {
     signal: withTimeout(signal, GET_TIMEOUT_MS),
     headers: { [XHR_HEADER]: XHR_HEADER_VALUE, ...authHeader() },
@@ -286,7 +297,7 @@ export async function fetchAuthedBytes(path: string, signal?: AbortSignal): Prom
     notePairingAnswer(res.status, detail);
     throw new ApiError(`${path} → ${res.status} ${detail}`, res.status, parseApiErrorFields(detail));
   }
-  return res.blob();
+  return { blob: await res.blob(), headers: res.headers };
 }
 
 // Best-effort human-readable failure detail: the response body if present, else the status text.
@@ -474,6 +485,9 @@ export async function fetchSnapshot(
 ): Promise<SnapshotResponse> {
   const path = withScope("/api/snapshot", scope);
   let snap: SnapshotResponse;
+  // When this read began, and whether the page was hidden: a read with no answer right after a wake
+  // is one strike, not the outage (lib/connection-health.ts `noteNetworkFailure`).
+  noteReadStart();
   try {
     snap = await req<SnapshotResponse>(all ? `${path}${path.includes("?") ? "&" : "?"}sessions=all` : path, {
       signal,
@@ -672,6 +686,13 @@ export type ChatRequest =
 // 6). A `?before=` page is a one-shot tap like fetchHistory's, so there is no repeat fetch for a
 // validator to save. The body alone is NOT cached beside the tag: a 304 here means "you already
 // hold this", and what the client holds is the merged window (lib/chat-window.ts), not this answer.
+//
+// THE TAG IS SENT ONLY WITH A CURSOR. A read with no `after` is the client saying it holds nothing: a
+// view that mounted again (back from the Files screen), or a pane switched to. The tag outlives the
+// view, so on such a read it could still match: the answer to a first read, when nothing moved since,
+// hashes to the very bytes the tag was made from, and the 304 then told an EMPTY window "you already
+// hold this". The Chat body stood blank until the session next changed. Only a read that names the
+// window it holds can be told "unchanged".
 const chatEtags = new Map<string, string>();
 // One Chat screen is open at a time and a second device makes two; eight covers any plausible
 // come-and-go across a session, and matches MAX_WINDOWS on the bridge side.
@@ -709,7 +730,7 @@ export async function fetchChat(
     scope,
   );
   const cacheKey = opts.before ? null : paneScopeKey(scope, paneId);
-  const cached = cacheKey === null ? undefined : chatEtags.get(cacheKey);
+  const cached = cacheKey === null || !opts.after ? undefined : chatEtags.get(cacheKey);
 
   const headers = new Headers({
     [XHR_HEADER]: XHR_HEADER_VALUE,
@@ -954,6 +975,52 @@ export function fetchFileText(
   return filesRead<FileReadResponse>(`${filesBase(target)}?${new URLSearchParams({ path }).toString()}`, scope, signal);
 }
 
+/**
+ * The address of one picture under the Files root, as bytes (ADR 0090): `files/image` beside the
+ * Files read, in the same pane or workspace form and with the same scope.
+ */
+export function filesImagePath(target: ChangesTarget, path: string, scope?: Scope): string {
+  return withScope(`${filesBase(target)}/image?${new URLSearchParams({ path }).toString()}`, scope);
+}
+
+/**
+ * What an image read came to. `image` is the bytes, typed by the bridge's sniff. `too-large` is the
+ * bridge's 413 (over 16 MiB), `not-image` its 415 (the bytes are none of the types it serves), and
+ * `failed` everything else: a refusal, an older member's 404, the network. The screen then shows the
+ * file's size as it did before, with the reason. `version` is the size and mtime the bridge sent with
+ * the bytes, when it sent them (an older bridge sends none; a crew lead relays a member's as they came).
+ */
+export type FileImageAnswer =
+  | { outcome: "image"; blob: Blob; version?: string }
+  | { outcome: "too-large" }
+  | { outcome: "not-image" }
+  | { outcome: "failed" };
+
+/**
+ * One picture under the Files root, fetched WITH the pairing token (an `<img src>` cannot carry it)
+ * and handed back as a Blob the caller turns into an object URL and revokes. Never through
+ * `lib/authed-url.ts`'s table: that one keeps one URL per path for the life of the page, which is
+ * right for content-addressed blobs and wrong for a file whose bytes change under one name. An abort
+ * rethrows, so a caller that moved on hears nothing.
+ */
+export async function fetchFileImage(
+  target: ChangesTarget,
+  path: string,
+  scope?: Scope,
+  signal?: AbortSignal,
+): Promise<FileImageAnswer> {
+  try {
+    const { blob, headers } = await fetchAuthedAnswer(filesImagePath(target, path, scope), signal);
+    const version = fileVersionOf(headers.get("x-collie-file-size"), headers.get("x-collie-file-mtime"));
+    return version === null ? { outcome: "image", blob } : { outcome: "image", blob, version };
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    if (err instanceof ApiError && err.status === 413) return { outcome: "too-large" };
+    if (err instanceof ApiError && err.status === 415) return { outcome: "not-image" };
+    return { outcome: "failed" };
+  }
+}
+
 /** The most paths one existence check may name: the bridge's `MAX_EXIST_PATHS` (ADR 0088). */
 export const FILES_EXIST_MAX = 64;
 
@@ -1173,6 +1240,159 @@ export function launch(command: string, besidePaneId?: string, scope?: Scope): P
 }
 
 /**
+ * What the New page starts (ADR 0091): a `launchers.toml` row by its command, an agent by its id,
+ * or a plain shell. Exactly one, which is what the bridge checks first.
+ */
+export type StartWhat =
+  | { kind: "row"; command: string }
+  | { kind: "harness"; id: string }
+  | { kind: "shell" }
+  /** A one-off line the person typed, or took from the machine's history (ADR 0095). Never on a branch. */
+  | { kind: "run"; line: string };
+
+/** What can start on a new worktree: everything but a one-off line (`launch.run_no_branch`). */
+export type BranchableWhat = Exclude<StartWhat, { kind: "run" }>;
+
+/** POST /api/launch's body from the New page. A named contract so `startLaunch` infers against it. */
+interface StartLaunchBody {
+  command?: string;
+  harness?: string;
+  shell?: true;
+  cwd?: string;
+  requestId: string;
+}
+
+/**
+ * POST /api/launch from the New page: one kind, an optional folder, and a request id the phone
+ * minted for this intent. A retry with the same id answers the first pane (`replayed: true`).
+ */
+export function startLaunch(what: BranchableWhat, opts: { cwd?: string; requestId: string }, scope?: Scope): Promise<CreateResponse> {
+  const body: StartLaunchBody = { requestId: opts.requestId };
+  if (what.kind === "row") body.command = what.command;
+  else if (what.kind === "harness") body.harness = what.id;
+  else body.shell = true;
+  if (opts.cwd !== undefined) body.cwd = opts.cwd;
+  return req<CreateResponse>(withScope("/api/launch", scope), { method: "POST", body: JSON.stringify(body) });
+}
+
+// ── One-off commands and their history, per machine (ADR 0095) ──────────────────────────────────
+//
+// A line the person wrote, typed into a fresh shell on that machine. The bridge checks a paired
+// device, the operator's `[phone] run` switch and the character rule (200 characters, no control,
+// separator or bidi character) before anything runs. A run that works joins that machine's history,
+// which `fetchLaunchers` lists as `recentRuns`; running an entry again is this same call. A `scope`
+// with `host` reaches that member through the lead's ordinary forward.
+
+/** POST /api/launch's body for a one-off run. A named contract so `startRun` infers against it. */
+interface StartRunBody {
+  run: string;
+  cwd?: string;
+  requestId: string;
+}
+
+/**
+ * POST /api/launch `{ run }`. `requestId` is minted per intent (`mintRequestId`): a retry with it
+ * answers the first pane (`replayed: true`) and runs nothing. The answer's `noPrompts` says whether
+ * the line carries a flag known to skip permission prompts. Refusals: `launch.no_device`,
+ * `launch.run_off`, `launch.bad_line` (`detail.problem`, `detail.max`), `launch.bad_folder`,
+ * `launch.folder_missing`.
+ */
+export function startRun(line: string, opts: { cwd?: string; requestId: string }, scope?: Scope): Promise<CreateResponse> {
+  const body: StartRunBody = { run: line, requestId: opts.requestId };
+  if (opts.cwd !== undefined) body.cwd = opts.cwd;
+  return req<CreateResponse>(withScope("/api/launch", scope), { method: "POST", body: JSON.stringify(body) });
+}
+
+/**
+ * POST /api/launch/check: what a typed line would be, before it runs. A read, forwarded with `?host=`:
+ * it runs nothing and stores nothing, and the answer is that machine's own scan. `problem` is the
+ * character rule's refusal; `noPrompts` says whether the line skips permission prompts, which the
+ * history can only say after a first run (ADR 0095, amendment).
+ */
+export function checkRun(line: string, scope?: Scope): Promise<LaunchCheckResponse> {
+  return req<LaunchCheckResponse>(withScope("/api/launch/check", scope), {
+    method: "POST",
+    body: JSON.stringify({ run: line }),
+  });
+}
+
+/** POST /api/launch/recent/remove: remove one line from that machine's history. */
+export function removeRecentRun(line: string, scope?: Scope): Promise<RecentRunsResponse> {
+  return req<RecentRunsResponse>(withScope("/api/launch/recent/remove", scope), {
+    method: "POST",
+    body: JSON.stringify({ line }),
+  });
+}
+
+/** POST /api/launch/recent/clear: remove every line from that machine's history. */
+export function clearRecentRuns(scope?: Scope): Promise<RecentRunsResponse> {
+  return req<RecentRunsResponse>(withScope("/api/launch/recent/clear", scope), { method: "POST", body: "{}" });
+}
+
+/**
+ * GET /api/worktree/plan — what a branch from `cwd` would be (ADR 0093). A read, lead-local: the
+ * sheet asks it only of the lead. `branch` and `parent` add the folder answers.
+ */
+export function planWorktree(query: { cwd: string; branch?: string; parent?: string }, scope?: Scope): Promise<WorktreePlanResponse> {
+  const params = new URLSearchParams({ cwd: query.cwd });
+  if (query.branch !== undefined && query.branch !== "") params.set("branch", query.branch);
+  if (query.parent !== undefined && query.parent !== "") params.set("parent", query.parent);
+  return req<WorktreePlanResponse>(withScope(`/api/worktree/plan?${params.toString()}`, scope));
+}
+
+/** POST /api/worktree's body. A named contract so `createWorktreeAt` infers against it. */
+interface WorktreeAtBody {
+  cwd: string;
+  branch: string;
+  base: WorktreeBaseChoice;
+  folder: WorktreeFolderChoice;
+  requestId: string;
+  harness?: string;
+  /** An agent row (an operator's with a harness, or one a phone added): the allowlisted line. */
+  command?: string;
+  shell?: true;
+}
+
+/**
+ * POST /api/worktree — a new branch in its own folder from the folder `cwd` names, opened as a
+ * space, with an agent or a shell in it (ADR 0093). Lead-local, like every worktree call.
+ */
+export function createWorktreeAt(
+  ask: {
+    cwd: string;
+    branch: string;
+    base: WorktreeBaseChoice;
+    folder: WorktreeFolderChoice;
+    requestId: string;
+    what: BranchableWhat;
+  },
+  scope?: Scope,
+): Promise<WorktreeCreateResponse> {
+  const body: WorktreeAtBody = { cwd: ask.cwd, branch: ask.branch, base: ask.base, folder: ask.folder, requestId: ask.requestId };
+  if (ask.what.kind === "harness") body.harness = ask.what.id;
+  else if (ask.what.kind === "row") body.command = ask.what.command;
+  else body.shell = true;
+  return req<WorktreeCreateResponse>(withScope("/api/worktree", scope), {
+    method: "POST",
+    body: JSON.stringify(body),
+    timeoutMs: WORKTREE_TIMEOUT_MS,
+  });
+}
+
+/**
+ * Whether a Start that threw may still have happened on the host (ADR 0091). A refusal (a 4xx) is an
+ * answer: nothing ran. So is a crew member that was never reached (503 `host_unreachable`,
+ * `host_incompatible`). Everything else, a transport failure, a timeout, a 5xx or the crew's 504
+ * `write_outcome_unknown`, says nothing about the host, so the phone must not guess.
+ */
+export function outcomeUnknown<TThrown>(thrown: TThrown): boolean {
+  if (!(thrown instanceof ApiError)) return true;
+  if (thrown.status < 500) return false;
+  const code = thrown.fields?.code;
+  return !(thrown.status === 503 && (code === "host_unreachable" || code === "host_incompatible"));
+}
+
+/**
  * GET /api/launchers — THIS scope's own host's launcher rows, read live off its `launchers.toml`.
  * Never cached alongside `/api/config`: rows must come from the host that runs them, and the
  * operator file is read live on the bridge, so this is fetched on mount and again whenever the
@@ -1182,10 +1402,55 @@ export function fetchLaunchers(scope?: Scope): Promise<LaunchersResponse> {
   return req<LaunchersResponse>(withScope("/api/launchers", scope));
 }
 
+// ── Rows a phone adds on one machine (ADR 0094) ─────────────────────────────────────────────────
+//
+// Each machine keeps its own list: a `scope` with `host` writes THAT member's store through the
+// lead's ordinary forward, and nothing is copied anywhere else. All three are writes on the write gate.
+
+/** What "Add your own" sends: a recipe the bridge builds, or a line typed by hand. */
+export type AddLauncherAsk =
+  | { recipe: { harness: string; options: string[] }; label?: string }
+  | {
+      text: string;
+      kind: "agent" | "command";
+      /** Required for an agent line: which harness reads it. */
+      harness?: string;
+      /** The person's own tick: an alias hides its flags. */
+      noPrompts?: boolean;
+      label?: string;
+    };
+
 /**
- * GET /api/folders — THIS scope's own host's folder list for the new-space sheet (#289), off that
+ * POST /api/launchers/added. `requestId` is a UUID minted per add (`mintRequestId`); a retry with the
+ * same id answers the stored row with `replayed: true` and adds nothing.
+ */
+export function addLauncher(ask: AddLauncherAsk, requestId: string, scope?: Scope): Promise<AddedLauncherResponse> {
+  return req<AddedLauncherResponse>(withScope("/api/launchers/added", scope), {
+    method: "POST",
+    body: JSON.stringify({ ...ask, requestId }),
+  });
+}
+
+/** POST /api/launchers/added/remove — remove one row a phone added on that machine. */
+export function removeAddedLauncher(id: string, scope?: Scope): Promise<{ ok: true; removed: number }> {
+  return req<{ ok: true; removed: number }>(withScope("/api/launchers/added/remove", scope), {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+}
+
+/** POST /api/launchers/added/rename — a new label for one row a phone added. */
+export function renameAddedLauncher(id: string, label: string, scope?: Scope): Promise<AddedLauncherResponse> {
+  return req<AddedLauncherResponse>(withScope("/api/launchers/added/rename", scope), {
+    method: "POST",
+    body: JSON.stringify({ id, label }),
+  });
+}
+
+/**
+ * GET /api/folders — THIS scope's own host's folder list for the New page (#289), off that
  * machine's `folders.json`. Session-scoped only so `?host=` reaches the machine whose folders they
- * are; the list itself is one per machine. Read when the sheet opens and when its chosen machine
+ * are; the list itself is one per machine. Read when the page opens and when its chosen machine
  * changes (lib/folders.ts), never polled and never part of the snapshot.
  */
 export function fetchFolders(scope?: Scope): Promise<FoldersResponse> {
@@ -1200,8 +1465,8 @@ interface StarFolderBody {
 
 /**
  * POST /api/folders/star — star (`true`) or unstar (`false`) one folder on THIS scope's host. The
- * bridge refuses a folder that is not already in its lists, so the sheet only ever sends one it read.
- * Answers the whole new list, so the sheet redraws from the bridge's word rather than guessing.
+ * bridge refuses a folder that is not already in its lists, so the page only ever sends one it read.
+ * Answers the whole new list, so the page redraws from the bridge's word rather than guessing.
  */
 export function starFolder(folder: string, starred: boolean, scope?: Scope): Promise<FoldersResponse> {
   const body: StarFolderBody = { folder, starred };
@@ -1223,60 +1488,6 @@ export function starFolder(folder: string, starred: boolean, scope?: Scope): Pro
 export function fetchCacheRules(): Promise<CacheRulesResponse> {
   return req<CacheRulesResponse>("/api/cache-rules");
 }
-
-/** The worktrees of the repo a space sits in. Empty-handed when the space is not in one. */
-export function listWorktrees(workspaceId: string, scope?: Scope): Promise<WorktreeListResponse> {
-  return req<WorktreeListResponse>(
-    withScope(`/api/workspace/${encodeURIComponent(workspaceId)}/worktrees`, scope),
-  );
-}
-
-/**
- * What a worktree create may carry beyond the branch (ADR 0089). Both are optional, and the
- * dashboard's sheet sends neither, which is the body the route has always taken.
- */
-export interface WorktreeCreateExtras {
-  /** One id per intent, minted by the phone. A retry with the same id replays, never re-creates. */
-  requestId?: string;
-  /** A launcher row's `command`, typed into the new shell. Absent is a plain shell. */
-  launcher?: string;
-}
-
-/** The create's wire body: the branch, plus the two extras when the caller has them. */
-interface WorktreeCreateBody {
-  branch: string;
-  requestId?: string;
-  launcher?: string;
-}
-
-/** Create a worktree on a new branch and open it as its own space, optionally starting an agent in it. */
-export function createWorktree(
-  workspaceId: string,
-  branch: string,
-  scope?: Scope,
-  extras: WorktreeCreateExtras = {},
-): Promise<WorktreeCreateResponse> {
-  const body: WorktreeCreateBody = { branch };
-  if (extras.requestId !== undefined) body.requestId = extras.requestId;
-  if (extras.launcher !== undefined) body.launcher = extras.launcher;
-  return req<WorktreeCreateResponse>(
-    withScope(`/api/workspace/${encodeURIComponent(workspaceId)}/worktree`, scope),
-    { method: "POST", body: JSON.stringify(body), timeoutMs: WORKTREE_TIMEOUT_MS },
-  );
-}
-
-/** Show a worktree that already exists. Answers `alreadyOpen` rather than refusing. */
-export function openWorktree(
-  workspaceId: string,
-  path: string,
-  scope?: Scope,
-): Promise<WorktreeOpenResponse> {
-  return req<WorktreeOpenResponse>(
-    withScope(`/api/workspace/${encodeURIComponent(workspaceId)}/worktree/open`, scope),
-    { method: "POST", body: JSON.stringify({ path }), timeoutMs: WORKTREE_TIMEOUT_MS },
-  );
-}
-
 
 /**
  * The bridge's startup config: push setup, the build id, the operator's own rows, and the

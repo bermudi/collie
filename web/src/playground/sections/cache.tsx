@@ -12,7 +12,7 @@ import { CacheChip } from "@/components/cache-chip";
 import { CacheSheet } from "@/components/cache-sheet";
 import type { PaneCache } from "@/lib/types";
 import { cacheNow, paneCache } from "../fixtures";
-import { Card, Group, Section, Stage, type SectionDef } from "../harness";
+import { Card, Group, Section, Stage, type SectionDef } from "../layout";
 
 export const DEF: SectionDef = {
   id: "cache",

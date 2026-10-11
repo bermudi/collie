@@ -2,11 +2,13 @@
 //
 // A MITIGATION, NOT A GUARANTEE. Text a pane shows can hold a secret: an `env` dump, a `cat .env`,
 // a curl line with a bearer token, a key an agent echoed back. Every path that carries that text
-// toward a phone runs it through this module first: the terminal mirror (`paneReadResponse` in
-// server.ts), the journal reader's Chat and History bodies (`journal/text.ts` § redactEntry), every
-// push payload (`push.ts` § Push.send), and file content: the Changes view's diffs and the Files
-// view's file bodies (`maskDiff` and `maskFileBody` in server.ts). One pattern list serves them all,
-// so a shape caught in one place is caught in every one.
+// toward a phone runs it through this module first: the terminal mirror, the journal reader's Chat
+// and History bodies (`journal/text.ts` § redactEntry), every push payload (`push.ts` § Push.send),
+// and file content: the Changes view's diffs and the Files view's file bodies. The per-answer masks
+// live in `answer-mask.ts`, shared by this bridge's own routes and by a crew lead re-masking what a
+// member sent (`crew/mask.ts`). One pattern list serves them all, so a shape caught in one place is
+// caught in every one. Every mask is idempotent: `MASK` matches no pattern, so masked text masks to
+// itself, which is what lets a lead mask an answer a member may already have masked.
 //
 // ── ONLY HIGH-CONFIDENCE SHAPES ──────────────────────────────────────────────
 // The list below matches shapes that are secrets by construction: a vendor prefix that exists only
@@ -43,6 +45,15 @@
 
 /** The one mask character. One column wide, and never matched by any pattern below. */
 export const MASK = "•";
+
+/**
+ * The version of the pattern list below. **Bump it whenever a pattern is added or widened.** A crew
+ * lead masks a member's answer and passes the member's ETag on, salted with this number
+ * (`bridge/crew/forward.ts`); a phone that holds a copy masked under an older list then sends a tag
+ * the lead no longer vouches for, and gets the body again, masked under this one. A local answer
+ * needs no salt: its tag is hashed over the masked body, so a new pattern changes the tag by itself.
+ */
+export const MASK_VERSION = 1;
 
 /** One pattern family. `group` names the capture to mask when the whole match is not the secret. */
 interface Family {
@@ -124,6 +135,17 @@ const PEM_BODY_LINE = /^[A-Za-z0-9+/=:,\- \t]*$/;
 const PEM_BODY = /^[A-Za-z0-9+/=:,\\\-\s]*$/;
 /** A 4096-bit RSA key is about 3.2 KB of body; past this the END line is not this block's. */
 const PEM_MAX_BODY = 16_384;
+
+/**
+ * Every pattern this module masks with, as one string, for the test that pins {@link MASK_VERSION}:
+ * a changed pattern changes this, the pinned hash in `redact.test.ts` fails, and its message says to
+ * bump the version with the hash. A forgotten bump fails nothing else, it only leaves a phone holding
+ * a copy masked under the old list, so the test is the one place that can catch it.
+ */
+export function maskPatternsSource(): string {
+  const res = [...FAMILIES.map((f) => `${f.re.source}/${f.re.flags}/${f.keep}/${f.group ?? ""}`), NOT_A_VALUE, PREFIXED, PEM_BEGIN, PEM_END, PEM_BODY_LINE, PEM_BODY];
+  return [...res.map(String), String(PEM_MAX_BODY)].join("\n");
+}
 
 /** A half-open `[start, end)` span of code units to mask. */
 type Span = readonly [number, number];
@@ -208,22 +230,32 @@ function widestRow(text: string): number {
 /** Append the body of every PEM private key block: every line between BEGIN and END. */
 function pemSpans(text: string, spans: Span[]): void {
   PEM_BEGIN.lastIndex = 0;
+  // LINEAR, NOT ONE SEARCH PER BEGIN. The next END line is looked for once and reused by every BEGIN
+  // before it, and "no END after here" stays true for every later BEGIN. One search per BEGIN read
+  // the rest of the text each time: a megabyte of BEGIN lines (a file in Files, a diff) held the
+  // bridge for 36 s. `undefined` is "not looked for yet".
+  let nextEnd: RegExpExecArray | null | undefined;
   for (let m = PEM_BEGIN.exec(text); m !== null; m = PEM_BEGIN.exec(text)) {
     const bodyStart = m.index + m[0].length;
-    PEM_END.lastIndex = bodyStart;
-    const end = PEM_END.exec(text);
+    if (nextEnd === undefined || (nextEnd !== null && nextEnd.index < bodyStart)) {
+      PEM_END.lastIndex = bodyStart;
+      nextEnd = PEM_END.exec(text);
+    }
+    const end = nextEnd;
     if (end !== null && end.index - bodyStart <= PEM_MAX_BODY && PEM_BODY.test(text.slice(bodyStart, end.index))) {
       spans.push([bodyStart, end.index]);
       PEM_BEGIN.lastIndex = end.index + end[0].length;
       continue;
     }
-    // No END on screen: the block runs off the bottom. Mask the lines that still look like a body.
+    // No END on screen: the block runs off the bottom. Mask the lines that still look like a body,
+    // up to a key's worth of them. A line with `-----` is a marker, never base64, so the next BEGIN
+    // ends this body rather than being read as part of it (and every BEGIN after it again).
     let cursor = text.indexOf("\n", bodyStart);
     let last = bodyStart;
-    while (cursor !== -1) {
+    while (cursor !== -1 && cursor - bodyStart <= PEM_MAX_BODY) {
       const lineEnd = text.indexOf("\n", cursor + 1);
       const line = text.slice(cursor + 1, lineEnd === -1 ? text.length : lineEnd);
-      if (line.trim() === "" || !PEM_BODY_LINE.test(line)) break;
+      if (line.trim() === "" || line.includes("-----") || !PEM_BODY_LINE.test(line)) break;
       last = lineEnd === -1 ? text.length : lineEnd;
       cursor = lineEnd;
     }

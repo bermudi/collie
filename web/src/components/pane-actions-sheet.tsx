@@ -28,6 +28,13 @@ interface PaneActionsSheetProps {
   scope?: Scope;
   /** This device isn't authorised to write — show a read-only note instead of the actions. */
   readOnly?: boolean;
+  /**
+   * What is on screen is a SAVED COPY, or the pane has not answered lately (`lib/liveness.ts`): the
+   * ids here may name panes that no longer exist or have been reused, so Rename, Focus, Close and
+   * the branch-off are replaced by a note, exactly as `readOnly` replaces them. Pin stays: it is
+   * this device's own preference and writes nothing to the machine.
+   */
+  savedCopy?: boolean;
   /** Fired after a successful rename so the parent can revalidate (the label lands on the next poll). */
   onRenamed: () => void;
   /** Fired after a successful close, with the closed pane id — the parent navigates Home if it's the
@@ -111,7 +118,7 @@ interface PaneActionsSheetProps {
    */
   onPinChange?: (pane: AgentView, pinned: boolean) => void;
   /**
-   * Open "New agent on a branch" for this pane (ADR 0089): the new-space sheet in worktree mode,
+   * Open "New agent in a worktree" for this pane (ADR 0089): the New page with "New worktree" on,
    * on this pane's repo.
    *
    * Absence is the first gate, as it is for the read rows: the caller passes it only for a pane whose
@@ -143,6 +150,7 @@ export function PaneActionsSheet({
   pane,
   scope,
   readOnly = false,
+  savedCopy = false,
   onRenamed,
   onClosed,
   onFind,
@@ -216,7 +224,7 @@ export function PaneActionsSheet({
   }, [mode]);
 
   async function save() {
-    if (!pane || saving) return;
+    if (!pane || saving || savedCopy) return;
     const next = label.trim();
     setSaving(true);
     try {
@@ -242,7 +250,7 @@ export function PaneActionsSheet({
   // own words (`closeFailed` is the fallback for a body that carried none), so it is not a swallow
   // site. `pane` is copied to a local first — narrowing does not survive into the async closure.
   async function requestClose() {
-    if (!pane || closeEcho.pending) return;
+    if (!pane || closeEcho.pending || savedCopy) return;
     const target = pane;
     if (!confirm(target.paneId)) return;
     await closeEcho.run(target.paneId, async () => {
@@ -279,7 +287,7 @@ export function PaneActionsSheet({
    * screen and the operator is about to look there.
    */
   async function showInTerminal() {
-    if (!pane || focusing) return;
+    if (!pane || focusing || savedCopy) return;
     setFocusing(true);
     try {
       const res = await api.focusPane(pane.paneId, scope);
@@ -443,6 +451,8 @@ export function PaneActionsSheet({
       )}
       {readOnly ? (
         <p className="py-2 text-sm text-muted-foreground">{t("paneActions.readOnly")}</p>
+      ) : savedCopy ? (
+        <p className="py-2 text-sm text-muted-foreground">{t("space.readOnly.savedCopy")}</p>
       ) : mode === "actions" ? (
         <div className="flex flex-col gap-1">
           {/* Close kills a real terminal, and on a crew the sheet says which machine's — but that
@@ -472,8 +482,8 @@ export function PaneActionsSheet({
               onClick={() => void showInTerminal()}
             />
           )}
-          {/* A second agent on a new branch of this pane's repo (ADR 0089). Above Close, so the
-              destructive row stays last; close-then-act, so the new-space sheet arrives alone. */}
+          {/* A second agent in a worktree of this pane's repo (ADR 0089). Above Close, so the
+              destructive row stays last; close-then-act, so the sheet is gone before the page opens. */}
           {showBranchOff && (
             <ActionRow
               icon={<GitBranchPlus className="size-4 shrink-0 text-muted-foreground" />}

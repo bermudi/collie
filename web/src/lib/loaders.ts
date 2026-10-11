@@ -26,7 +26,7 @@ import {
 import { parseAnsi } from "@/lib/ansi";
 import { splitLines } from "@/lib/blocks";
 import { type CacheHold, holdCacheReadings } from "@/lib/cache-hold";
-import { isLostLatched } from "@/lib/connection-health";
+import { isLostLatched, type ReadFailureKind, wakeStrikeHolds } from "@/lib/connection-health";
 import { markSavedCopy } from "@/lib/liveness";
 import { ambientSpaces, findPane } from "@/lib/hosts";
 import {
@@ -145,6 +145,13 @@ export interface HomeData {
   error: boolean;
   /** True when the failed refresh was rejected with HTTP 401 or 403. */
   authError: boolean;
+  /**
+   * What THIS run's own herd read said when it failed (lib/api.ts `readFailureKind`). Absent on a
+   * live render, and on a stale one that made no read of its own: the latched navigation fast path,
+   * or a cold open that drew the saved copy while its read was still in flight. The poll cadence
+   * reads it (hooks/use-polling.ts): only a read that got no answer at all is retried early.
+   */
+  failure?: ReadFailureKind;
   /**
    * When this herd was actually fetched — set ONLY on a stale render, and only when the write-through
    * cache can date it (lib/last-seen.ts). It is what lets the UI say "last seen 14:32" instead of
@@ -449,7 +456,7 @@ export async function rootLoader({ request }: { request?: Request } = {}): Promi
     if (isAbortError(e)) throw e; // superseded revalidation — let React Router drop it
     rememberAuthError(scope, isAuthError(e));
     // Keep the last good herd on screen, flagged so the ConnectionBanner can say "reconnecting…".
-    return staleHome(scope, viewAll);
+    return { ...(await staleHome(scope, viewAll)), failure: readFailureKind(e) };
   }
 }
 
@@ -731,8 +738,10 @@ export async function paneLoader({
     if (isAbortError(e)) throw e; // superseded revalidation — let React Router drop it
     rememberAuthError(scope, isAuthError(e));
     // Genuine network / server failure: show stale text flagged as degraded. A read that got no
-    // answer at all is the saved copy at once (see drawnFromSave).
-    return stalePane(paneId, scope, lines, readFailureKind(e) === "network");
+    // answer at all is the saved copy at once (see drawnFromSave), unless the wake's one strike
+    // covers it: the herd read of the same poll did not latch either, and the retry decides.
+    const outage = readFailureKind(e) === "network" && !wakeStrikeHolds();
+    return stalePane(paneId, scope, lines, outage);
   }
 }
 

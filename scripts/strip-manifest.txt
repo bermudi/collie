@@ -44,7 +44,8 @@ docs/deployment.md                        # upstream deployment guide; Pup has D
 docs/install.md
 docs/upgrading.md
 docs/voice-and-push.md                    # STT voice notes
-docs/images/                              # crew/update-screen art
+docs/images/                              # deployment/update art for docs Pup does not carry
+scripts/docs-screens.sh                   # screenshot generator for those stripped docs
 
 # ── CI and release machinery ─────────────────────────────────────────────────
 .github/workflows/release.yml             # releases are hand-cut on Pup (ADR 0020)
@@ -61,6 +62,8 @@ scripts/upstream-bun.sh
 scripts/upstream-bun.test.sh
 scripts/check-crew-wire.sh                # crew wire lint
 scripts/crew-mux-probe.ts                 # crew mux probe
+scripts/crew-mux-probe.test.ts            # test of the stripped crew mux probe (ADR 9004)
+scripts/pre-commit.test.sh                # upstream's multi-guard hook suite; Pup's hook is version-only
 scripts/check-payload-links.sh            # release-payload lint
 scripts/check-payload-links.test.sh
 scripts/check-tag.sh                      # release tag lint
@@ -85,8 +88,6 @@ web/src/components/server-switcher.test.tsx
 web/src/components/session-chip.tsx       # crew session chrome
 web/src/components/session-chip.test.tsx
 web/src/lib/crew-level.ts
-web/src/lib/host-health.ts
-web/src/lib/host-health.test.ts
 web/src/routes/crew.tsx
 web/src/routes/crew.test.tsx
 web/src/routes/updates.tsx                # the staged-update screen
@@ -120,6 +121,7 @@ web/src/components/recording-strip.tsx
 web/src/components/hands-free-control.tsx
 web/src/lib/stt.ts
 web/src/hooks/use-stt-recorder.ts
+web/src/test/media-recorder.ts            # jsdom MediaRecorder fake for the stripped STT hook
 web/src/lib/solo-baseline.test.ts         # crew solo-baseline mirror of the bridge test
 web/src/lib/mirror-images.ts              # the mirror does not guess images (ADR 9003)
 web/src/lib/mirror-images.test.ts

@@ -110,8 +110,8 @@ test("the needs-you switch shows only the panes that need you, and survives a re
   await needsYou(page).click();
   await expect(page.getByRole("heading", { name: "webapp" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "collie" })).toHaveCount(0);
-  // The strip still offers every workspace: a filter removes rows, it never places.
-  await expect(page.getByRole("navigation", { name: en["space.strip.title"] }).getByRole("button", { name: /collie/u })).toBeVisible();
+  // The select still offers every workspace: a filter removes rows, it never places.
+  await expect(page.getByRole("combobox", { name: en["home.workspaceFilter.aria"] }).getByRole("option", { name: /^collie/u })).toBeAttached();
   // The mark stays on the Dashboard tab with the switch on.
   await expect(tab(page, DASHBOARD)).toContainText("1");
 

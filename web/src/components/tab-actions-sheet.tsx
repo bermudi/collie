@@ -24,6 +24,8 @@ interface TabActionsSheetProps {
   scope?: Scope;
   /** This device isn't authorised to write — show a read-only note instead of the actions. */
   readOnly?: boolean;
+  /** A saved copy is on screen (see PaneActionsSheet.savedCopy): the writes are replaced by a note. */
+  savedCopy?: boolean;
   /** Fired after a successful rename so the parent can revalidate (the label lands on the next poll). */
   onRenamed: () => void;
   /** Fired after a successful close, with the closed tab id — the parent falls back to "All"/Home if
@@ -47,6 +49,7 @@ export function TabActionsSheet({
   tab,
   scope,
   readOnly = false,
+  savedCopy = false,
   onRenamed,
   onClosed,
 }: TabActionsSheetProps) {
@@ -82,7 +85,7 @@ export function TabActionsSheet({
   const trimmed = label.trim();
 
   async function save() {
-    if (!tab || saving || !trimmed) return;
+    if (!tab || saving || !trimmed || savedCopy) return;
     setSaving(true);
     try {
       const res = await api.renameTab(tab.tabId, trimmed, scope);
@@ -107,7 +110,7 @@ export function TabActionsSheet({
   // the strip is the outcome, and the echo is the acceptance. `tab` is copied to a local first,
   // because narrowing does not survive into the async closure.
   async function requestClose() {
-    if (!tab || closeEcho.pending) return;
+    if (!tab || closeEcho.pending || savedCopy) return;
     const target = tab;
     if (!confirm(target.tabId)) return;
     await closeEcho.run(target.tabId, async () => {
@@ -147,6 +150,8 @@ export function TabActionsSheet({
     >
       {readOnly ? (
         <p className="py-2 text-sm text-muted-foreground">{t("space.tab.readOnly")}</p>
+      ) : savedCopy ? (
+        <p className="py-2 text-sm text-muted-foreground">{t("space.readOnly.savedCopy")}</p>
       ) : mode === "actions" ? (
         <div className="flex flex-col gap-1">
           {/* Per-row capability gating, one dimension up from the pane sheet and for exactly the

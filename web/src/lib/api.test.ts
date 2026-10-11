@@ -2,28 +2,34 @@ import { http, HttpResponse } from "msw";
 
 import { server } from "@/test/setup";
 import { fixtureCrewSnapshot, fixtureSnapshot } from "@/test/handlers";
-import { __resetConnectionHealth, isLostLatched, lastHealthyAt } from "./connection-health";
+import { __resetConnectionHealth, isLostLatched, lastHealthyAt, markWake } from "./connection-health";
 import { isConnecting } from "./connection";
 import { DEAD_DEBOUNCE_MS, isLive, resetLiveness } from "./liveness";
 import { resetBasePathForTests } from "./base-path";
 import { burstPaneId, resetPollIntent, sendCount } from "./poll-intent";
 import {
   checkForUpdates,
+  checkRun,
+  clearRecentRuns,
   createTab,
   fetchChat,
   fetchConfig,
+  fetchFileImage,
   fetchHistory,
   fetchPane,
   fetchSnapshot,
+  filesImagePath,
   getNotifyPrefs,
   POLL_TIMEOUT_MS,
   readFailureKind,
   imageSrc,
   refreshNow,
+  removeRecentRun,
   sendKeys,
   sendReply,
   textBeforeLastSend,
   uploadFile,
+  startRun,
   withTimeout,
   XHR_HEADER,
   XHR_HEADER_VALUE,
@@ -429,6 +435,26 @@ describe("api client — failed reads and the outage latch", () => {
     const controller = new AbortController();
     controller.abort();
     await fetchSnapshot(undefined, controller.signal).catch(() => {});
+    expect(isLostLatched()).toBe(false);
+  });
+
+  // 2026-10-08: the herd read stamps its own start, so the store can tell the wake's first read from
+  // an ordinary one (lib/connection-health.ts `noteReadStart`).
+  it("right after a wake, the first herd read with no answer is one strike, the second latches", async () => {
+    server.use(http.get("/api/snapshot", () => HttpResponse.error()));
+    markWake();
+    await expect(fetchSnapshot()).rejects.toBeInstanceOf(TypeError);
+    expect(isLostLatched()).toBe(false);
+    await expect(fetchSnapshot()).rejects.toBeInstanceOf(TypeError);
+    expect(isLostLatched()).toBe(true);
+  });
+
+  it("a herd read started while the page was hidden is one strike when it fails after the return", async () => {
+    server.use(http.get("/api/snapshot", () => HttpResponse.error()));
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    const read = fetchSnapshot();
+    visibility.mockReturnValue("visible");
+    await expect(read).rejects.toBeInstanceOf(TypeError);
     expect(isLostLatched()).toBe(false);
   });
 
@@ -868,8 +894,20 @@ describe("fetchChat", () => {
       }),
     );
     await expect(fetchChat("chat-etag")).resolves.toMatchObject({ outcome: "body" });
-    await expect(fetchChat("chat-etag")).resolves.toEqual({ outcome: "unchanged" });
+    await expect(fetchChat("chat-etag", { after: { gen: 7, rev: 3 } })).resolves.toEqual({
+      outcome: "unchanged",
+    });
     expect(asks).toBe(2);
+  });
+
+  it("never validates a read that holds nothing, so a remounted view gets the body and not a 304", async () => {
+    // The tag outlives the view. A first read was answered with this body, nothing moved, the view
+    // left for the Files screen and came back with an empty window: the same read with no cursor
+    // would hash to the same tag and be answered 304 into a window with nothing in it.
+    const { seen } = captureChat("chat-remount", 'W/"c3"');
+    await fetchChat("chat-remount");
+    await fetchChat("chat-remount");
+    expect(seen[1]?.get("if-none-match")).toBeNull();
   });
 
   it("does not validate a `?before=` page — a one-shot tap has no repeat fetch to save", async () => {
@@ -927,5 +965,91 @@ describe("fetchPane drives the pane's liveness", () => {
     await expect(fetchPane("w1:p1", undefined, undefined, controller.signal)).rejects.toThrow();
     await new Promise((resolve) => setTimeout(resolve, DEAD_DEBOUNCE_MS + 50));
     expect(isLive("w1:p1")).toBe(true);
+  });
+});
+
+describe("the Files image read (ADR 0090)", () => {
+  it("addresses files/image beside the Files read, in both forms, with the scope", () => {
+    expect(filesImagePath({ kind: "pane", paneId: "w1:p1" }, "img/a b.png")).toBe("/api/pane/w1%3Ap1/files/image?path=img%2Fa+b.png");
+    expect(filesImagePath({ kind: "space", spaceId: "w2" }, "logo.png", { host: "laptop", session: "s1" })).toBe(
+      "/api/workspace/w2/files/image?path=logo.png&host=laptop&session=s1",
+    );
+  });
+
+  it("answers the bytes, and turns 413, 415 and any other failure into an outcome", async () => {
+    const got = await fetchFileImage({ kind: "pane", paneId: "w1:p1" }, "logo.png");
+    if (got.outcome !== "image") throw new Error(got.outcome);
+    expect(got.blob.type).toBe("image/png");
+    // The version the bridge sent with the bytes is the size and mtime, joined as the text read's are.
+    expect(got.version).toMatch(/^\d+:\d+$/);
+    server.use(http.get(/\/files\/image$/, () => new HttpResponse(new Uint8Array(3), { headers: { "content-type": "image/png" } })));
+    const bare = await fetchFileImage({ kind: "pane", paneId: "w1:p1" }, "logo.png");
+    // Not `expect.any(Blob)`: the fetch polyfill's Blob and jsdom's are different classes on some
+    // Node versions (CI's), so the class check fails there while the answer is right.
+    if (bare.outcome !== "image") throw new Error(bare.outcome);
+    expect(bare.blob.type).toBe("image/png");
+    expect(bare.blob.size).toBe(3);
+    expect(Object.keys(bare).toSorted()).toEqual(["blob", "outcome"]);
+    server.resetHandlers();
+    for (const [status, outcome] of [
+      [413, "too-large"],
+      [415, "not-image"],
+      [404, "failed"],
+      [500, "failed"],
+    ] as const) {
+      server.use(http.get(/\/files\/image$/, () => new HttpResponse("no", { status })));
+      expect(await fetchFileImage({ kind: "space", spaceId: "w1" }, "a.png")).toEqual({ outcome });
+    }
+    server.use(http.get(/\/files\/image$/, () => HttpResponse.error()));
+    expect(await fetchFileImage({ kind: "pane", paneId: "w1:p1" }, "a.png")).toEqual({ outcome: "failed" });
+  });
+
+  it("an abort rethrows, so a screen that moved on hears nothing", async () => {
+    const abort = new AbortController();
+    abort.abort();
+    await expect(fetchFileImage({ kind: "pane", paneId: "w1:p1" }, "logo.png", undefined, abort.signal)).rejects.toBeTruthy();
+  });
+});
+
+describe("one-off runs and their history (ADR 0095)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function capture() {
+    const calls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      calls.push({ url: String(input), method: init?.method, body: init?.body == null ? undefined : JSON.parse(String(init.body)) });
+      return new Response(JSON.stringify({ ok: true, removed: 1 }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    return calls;
+  }
+
+  it("startRun sends `run`, the folder only when named, and the request id, to that machine", async () => {
+    const calls = capture();
+    await startRun("make test", { cwd: "~/src/app", requestId: "id-1" }, { host: "badger" });
+    await startRun("htop", { requestId: "id-2" });
+    expect(calls).toEqual([
+      { url: "/api/launch?host=badger", method: "POST", body: { run: "make test", requestId: "id-1", cwd: "~/src/app" } },
+      { url: "/api/launch", method: "POST", body: { run: "htop", requestId: "id-2" } },
+    ]);
+  });
+
+  it("checkRun posts the line to that machine's check and returns its answer, a read that sends nothing else", async () => {
+    const calls = capture();
+    await checkRun("claude --yolo", { host: "badger" });
+    await checkRun("htop");
+    expect(calls).toEqual([
+      { url: "/api/launch/check?host=badger", method: "POST", body: { run: "claude --yolo" } },
+      { url: "/api/launch/check", method: "POST", body: { run: "htop" } },
+    ]);
+  });
+
+  it("remove names the exact line; clear sends an empty body; both reach the member on host=", async () => {
+    const calls = capture();
+    await expect(removeRecentRun("make test", { host: "badger" })).resolves.toEqual({ ok: true, removed: 1 });
+    await clearRecentRuns({ host: "badger" });
+    expect(calls).toEqual([
+      { url: "/api/launch/recent/remove?host=badger", method: "POST", body: { line: "make test" } },
+      { url: "/api/launch/recent/clear?host=badger", method: "POST", body: {} },
+    ]);
   });
 });

@@ -23,16 +23,8 @@ import { SnoozeControl } from "@/components/snooze-control";
 import { NotifyPrefsControl } from "@/components/notify-prefs-control";
 import type { AgentStatus } from "@/lib/types";
 
-import {
-  Card,
-  Group,
-  PhoneFrame,
-  RootRouter,
-  Section,
-  Segmented,
-  Stage,
-  type SectionDef,
-} from "../harness";
+import { RootRouter } from "../harness";
+import { Card, CardControls, Group, PhoneFrame, Section, Segmented, Stage, type SectionDef } from "../layout";
 import { homeSolo, updateRelease } from "../fixtures";
 import { Replay, SlowStage } from "./motion-harness";
 import { AppWalkthroughCard } from "./app-walkthrough-card";
@@ -96,14 +88,14 @@ function CollapsePrimitiveCard() {
         band's floor while the full surface is closed.`}
       span={2}
     >
-      <div className="mb-2">
+      <CardControls>
         <Segmented
           name="open"
           value={open ? "on" : "off"}
           options={ON_OFF}
           onChange={(next) => setOpen(next === "on")}
         />
-      </div>
+      </CardControls>
       <SlowStage>
         <Stage>
           <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
@@ -177,9 +169,9 @@ function OneOfSwapCard() {
         resizing it. Watch the dashed border: it never moves."
       span={1}
     >
-      <div className="mb-2">
+      <CardControls>
         <Segmented name="one-of option" value={active} options={ONE_OF_TABS} onChange={setActive} />
-      </div>
+      </CardControls>
       <SlowStage>
         <Stage>
           <div className="p-4">
@@ -223,14 +215,14 @@ function BusyBarCard() {
         switched mid-demo."
       span={1}
     >
-      <div className="mb-2">
+      <CardControls>
         <Segmented
           name="busy"
           value={on ? "on" : "off"}
           options={ON_OFF}
           onChange={(next) => setOn(next === "on")}
         />
-      </div>
+      </CardControls>
       <Stage height={64}>
         <BusyBar />
       </Stage>
@@ -329,7 +321,7 @@ function BottomSheetMotionCard() {
     <Card
       state="bottom-sheet-motion"
       label="BottomSheet, entrance, exit and drag-to-dismiss"
-      reach="any sheet in the app: pane actions, the new-space sheet, a device's paperwork. Pull down
+      reach="any sheet in the app: pane actions, the New page, a device's paperwork. Pull down
         from the handle to dismiss by drag; tap the backdrop or Escape for the ordinary dismiss."
       note="Mounted inside a PhoneFrame, whose `transform` is the containing block for the sheet's
         `position: fixed` root (harness.tsx's own PhoneFrame doc, the same composition the Settings

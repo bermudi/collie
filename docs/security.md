@@ -1,12 +1,16 @@
 # Security — read before you run it
 
 **Collie provides remote shell access to your machine by design.** A single Collie API call sends
-arbitrary keystrokes directly to a live terminal pane. Anyone with network access to the URL can
-read every pane (source code, secrets, environment variables, agent output) and execute commands as
-your user.
+arbitrary keystrokes directly to a live terminal pane. Any device you paired can read every pane
+(source code, secrets, environment variables, agent output) and execute commands as your user.
+Since 1.18.0 every API request needs a paired device's token, reads included, so the door is
+pairing itself: anyone who can reach the URL and holds a valid pairing code gets the same access.
+Before 1.18.0, anyone who could reach the URL could read every pane.
 
 There is no sandbox and no command allow-list, as filtering commands would defeat the purpose of
-the tool. Treat the URL as a root login.
+the tool. Treat every paired device as a root login, and a pairing code as a password. Revoke a
+lost device at once with `collie devices revoke <label>`. Pairing lowers the risk but does not
+remove it, so keep the URL on a private network such as a tailnet, never on the public internet.
 
 ## Pair a device — the write credential
 
@@ -69,6 +73,11 @@ At each start the bridge writes a new random secret to `local-secret` in its sta
 `collie doctor` and `collie crew update` send it to read their own bridge on the same machine.
 The file is owner-only, so only your account can read it, and a clean stop deletes it. The
 bridge takes it for reads only, never for a write or the Files view, and never from another machine.
+It accepts the secret from loopback only, and never on a request that carries a proxy's header such
+as `X-Forwarded-For`. A crew member that binds `COLLIE_HOST` to its tailnet address has nothing on
+loopback, so there the bridge also accepts it from this machine's own addresses. A plain TCP relay
+on the same machine, such as `socat` or `ssh -L`, can still pass the secret on. The file is what
+keeps the secret yours, so keep the state folder owner-only.
 
 ### Give a device an expiry
 
@@ -86,7 +95,10 @@ token with `device expired` instead of `device not paired`. The phone then
 [clears what the pairing left](#what-unpair-clears-on-the-phone) and shows **Pair again** in
 Settings, so run `collie pair` for a new code. `collie devices list` and the Settings screen show
 each device's expiry. An expired device stays in the list until you revoke it or give it a new
-expiry with `set-expiry`. A crew deputy's standby door refuses an expired token too.
+expiry with `set-expiry`. To pair it again, you can use the same name: the new pairing replaces
+the expired entry and revokes its old token, and the audit log records the revoke. A name that a
+device still uses, with a token that has not expired, is refused. A crew deputy's standby door
+refuses an expired token too.
 
 On a host running multiple instances, prefix commands with `COLLIE_INSTANCE=<name>` and open that
 specific instance URL on the phone
@@ -98,7 +110,7 @@ When a pairing ends, the phone deletes what Collie stored under it. This happens
 phone from Settings, and when the bridge refuses its token with `device not paired` or `device expired`.
 
 The phone deletes the token, every unsent draft, the saved pane text and herd, the push subscription,
-and Collie's caches except the app shell. Your settings stay: theme, language, pins and other
+the "No prompts" confirms, and Collie's caches except the app shell. Your settings stay: theme, language, pins and other
 preferences hold no session text. Settings asks you to confirm before it revokes any device.
 
 The phone's own wipe is the only one. The bridge sends no `Clear-Site-Data` header, because that
@@ -133,6 +145,12 @@ raw terminal screen. "Keep chat on this phone" set to Off keeps none and deletes
 When a pane asks for a password, the phone drops that pane's entries. Nothing in the store can send a key or a reply. The deletions at unpair are the ones in
 [What unpair clears on the phone](#what-unpair-clears-on-the-phone).
 
+The phone's app switcher can also show a pane. When you leave Collie, the phone keeps a picture of
+the screen for its list of recent apps, and that picture can show pane text. A web app cannot stop
+this: Android took its picture before the page heard that it went to the background (tested on a
+Pixel, 2026-10-08), and iOS gives no promise either. If that matters to you, lock the phone or close
+Collie before you hand it to someone.
+
 ## Risk model
 
 Key security boundaries and risks:
@@ -161,6 +179,25 @@ Key security boundaries and risks:
   `~/.codex`, `~/.config/gh` or `~/.ssh` shows what is there. So does the `.env` of a second Collie
   whose config folder sits under the workspace. A hard link inside the folder to a file outside it is
   not caught either.
+- **A paired device can add launchers.** With the default `[phone] adds = true`, a phone may add a
+  row built from a recipe: an agent plus option chips whose flags the bridge picks from its own
+  table. A line typed by hand needs `free_text = true`, which is off by default. A recipe can still
+  skip permission prompts. Such a row carries a "No prompts" badge, and each device confirms it once.
+  Revoking a device removes the rows it added. Set `adds = false` to turn off every phone-added row
+  ([Your own launchers](configure.md#launchers-added-from-a-phone),
+  [ADR 0094](../.adr/0094-launchers-added-from-a-phone.md)).
+- **A paired device can run a one-off command.** With the default `[phone] run = true`, a phone may
+  type a line it wrote into a fresh shell on a machine. This adds no power, because a paired phone can
+  already open a shell and type into it. The line follows the free-line character rule, and the bridge
+  refuses it with no paired device. Each command that started is kept, up to 12, in
+  `commands-recent.json` in the state folder (mode 0600). A line that seems to carry a secret (an
+  assignment such as `TOKEN=…`, a URL with a password, or a word such as `token` or `password`) runs
+  but is not kept. The check is a guess, so a secret can still slip into the list; the audit log
+  records only a line's first word and its length. Unpairing or revoking a device leaves the
+  list as it is, because running a line again needs a paired device. Set `run = false` to remove the
+  shortcut
+  ([One-off commands](configure.md#one-off-commands-and-their-history),
+  [ADR 0095](../.adr/0095-one-off-commands-and-their-history.md)).
 - **A single instance exposes all sessions.** By default, one Collie process fronts every
   multiplexer session discovered under Herdr's configuration root, including sandbox sessions
   ([Multi-session](configure.md#multi-session)).
@@ -238,6 +275,24 @@ It matches high-confidence shapes only:
 Some ordinary text is masked too, for example a line of prose or YAML that reads `token: something`.
 What you type and send is never masked, and the audit trail keeps its own rules
 (`COLLIE_AUDIT_CONTENT`).
+
+The switch lives on the bridge only, as `COLLIE_REDACT`. Settings → System shows it read-only, as
+"Secret masking". The phone has no switch on purpose: a switch on the phone would let any paired
+phone, or a stolen one, turn the mask off. To read a masked value, read it on the machine. The first
+time a pane shows masked text, a short line on the phone says so, once per device. If you paste
+masked text into a reply, a caution under the box says the pane gets the dots, not the secret.
+
+In a crew, each member masks its own text, and the lead masks it again before your phone gets it.
+The lead masks a member's mirror, Chat, History, diffs, file text and pane titles with the same mask
+it uses for its own, so a member that still runs 1.17.x cannot send a key to your phone in clear.
+Masked text stays as it is when it is masked again. Text reaches the phone unmasked only when
+`COLLIE_REDACT=off` is set on both the lead and the member. One edge: a member on 1.17.x masks
+nothing itself, so when a secret sits in the lines a reply is checked against, the phone may refuse
+that reply with "The screen changed before that could be sent". The reply then waits until the
+member runs 1.18.0.
+
+If the lead cannot read a member's answer to mask it, it does not pass the answer on. The phone then
+shows that read as failed, as it does for a member it cannot reach.
 
 A push notification also names a pane only by the name you gave it: the pane's label, Claude's
 `/rename` name, or a one-pane tab's name. It never uses the title a program in the pane set, because

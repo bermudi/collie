@@ -60,7 +60,6 @@ public access, Collie isn't built for it. Read the
 - [Troubleshooting](#troubleshooting)
 - [Architecture](#architecture)
 - [Developing this plugin](#developing-this-plugin)
-||||||| 3d562ae5
 - **React Router + Vite** with TypeScript, Tailwind, shadcn, and a Bun bridge
 - **Status dashboard** led by what needs your input; every other pane sits under its own workspace, tab on the row
 - **Push notifications** when an agent blocks on user input

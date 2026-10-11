@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { manifestLineToRegExp, manifestMatchers, uncovered } from "./check-strip.ts";
+import { manifestLineToRegExp, manifestMatchers, stripLeaks, uncovered } from "./check-strip.ts";
 
 describe("manifestLineToRegExp", () => {
   test("an exact path matches itself and nothing else", () => {
@@ -57,5 +57,26 @@ describe("uncovered — the casualty finder", () => {
 
   test("a near-miss prefix is a casualty, not a pass", () => {
     expect(uncovered(["cli2/program.ts"], matchers)).toEqual(["cli2/program.ts"]);
+  });
+});
+
+describe("stripLeaks — the presence gate", () => {
+  const matchers = manifestMatchers("cli/\nweb/src/lib/stt.ts\ndocs/images/\n.adr/0029-*.md\n");
+
+  test("every manifest line is a leak pattern, not only the hard-coded subsystem roots", () => {
+    expect(stripLeaks(["web/src/lib/stt.ts", "docs/images/updates/band.png"], matchers)).toEqual([
+      "web/src/lib/stt.ts",
+      "docs/images/updates/band.png",
+    ]);
+  });
+
+  test("the hard-coded pattern still catches the subsystem roots and loose beacon files", () => {
+    expect(
+      stripLeaks(["cli/main.ts", "bridge/crew/router.ts", "docs/beacon-notes.md"], matchers),
+    ).toEqual(["cli/main.ts", "bridge/crew/router.ts", "docs/beacon-notes.md"]);
+  });
+
+  test("kept files with similar names stay tracked", () => {
+    expect(stripLeaks(["web/src/lib/storage.ts", "docs/images2/band.png"], matchers)).toEqual([]);
   });
 });

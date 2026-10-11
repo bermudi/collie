@@ -69,11 +69,28 @@ const en = readFileSync(join(dir, "en.ts"), "utf8");
 const enKeys = keysOf(en);
 let failed = false;
 
+/**
+ * Locales whose Intl.PluralRules emits categories English does not need may carry `.few`/`.many`
+ * variants beside an `.one`/`.other` pair en has — i18n.test.ts's EXTRA_PLURAL_LOCALES pins the
+ * same set, and the same base-key rule.
+ */
+const EXTRA_PLURAL_LOCALES = new Set(["ru"]);
+const EXTRA_PLURAL_CATEGORIES = ["few", "many"];
+
+function isExtraPlural(locale: string, key: string): boolean {
+  if (!EXTRA_PLURAL_LOCALES.has(locale)) return false;
+  return EXTRA_PLURAL_CATEGORIES.some((category) => {
+    if (!key.endsWith(`.${category}`)) return false;
+    return enKeys.includes(`${key.slice(0, -category.length - 1)}.one`);
+  });
+}
+
 for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts") && f !== "en.ts").toSorted()) {
   const path = join(dir, file);
   let src = readFileSync(path, "utf8");
   const keys = keysOf(src);
-  const extra = keys.filter((k) => !enKeys.includes(k));
+  const locale = file.replace(/\.ts$/, "");
+  const extra = keys.filter((k) => !enKeys.includes(k) && !isExtraPlural(locale, k));
   const missing = enKeys.filter((k) => !keys.includes(k));
 
   if (extra.length === 0 && missing.length === 0) {

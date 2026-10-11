@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 import { useFileLinks, type FileLinkTarget } from "@/components/file-links";
+import { CopyableBlock } from "@/components/ui/copyable-block";
 import { codeSpanPath, findFilePaths } from "@/lib/file-paths";
 import { headingAnchors, parseMarkdown, spansText, type MdBlock, type MdSpan } from "@/lib/markdown";
 import { splitHighlight } from "@/lib/transcript-search";
@@ -33,6 +34,22 @@ export type LinkResolver = (href: string) => LinkTarget;
 // The resolver, threaded the way the find query is. With none (the transcript) a `rel` link is its
 // label as plain text: a dead anchor would be worse than none, and raw Markdown worse still.
 const LinkContext = createContext<LinkResolver | null>(null);
+
+/**
+ * What the screen draws for one `![alt](src)` (ADR 0090), or null to draw the alt text, as an image
+ * has always read. Only a screen that passes one gets image spans at all: the parse is asked for
+ * them only then, so the transcript's images stay their alt text.
+ */
+export type ImageResolver = (src: string, alt: string) => ReactNode | null;
+
+const ImageContext = createContext<ImageResolver | null>(null);
+
+/** One image span: the screen's drawing of it, or its alt text when the screen draws none. */
+function ImageSpan({ src, alt }: { src: string; alt: string }) {
+  const resolve = useContext(ImageContext);
+  const drawn = resolve?.(src, alt) ?? null;
+  return drawn ?? <TextRun text={alt} />;
+}
 
 /** Literal text with find hits marked. Still text nodes — `<mark>` is structure, never parsed markup. */
 function Hit({ text }: { text: string }) {
@@ -247,6 +264,8 @@ function Span({ span }: { span: MdSpan }) {
       return <CodeSpan text={span.text} />;
     case "link":
       return <LinkSpan span={span} />;
+    case "image":
+      return <ImageSpan src={span.src} alt={span.alt} />;
     default:
       return <TextRun text={span.text} />;
   }
@@ -316,9 +335,11 @@ function Block({ block, anchor, variant }: { block: MdBlock; anchor: string | nu
     }
     case "code":
       return (
-        <pre className="overflow-x-auto rounded-md border border-status-info/20 bg-status-info/5 px-2 py-1.5 font-mono text-[11px] leading-snug [font-variant-ligatures:none]">
-          <Hit text={block.text} />
-        </pre>
+        <CopyableBlock text={block.text}>
+          <pre className="overflow-x-auto rounded-md border border-status-info/20 bg-status-info/5 px-2 py-1.5 font-mono text-[11px] leading-snug [font-variant-ligatures:none]">
+            <Hit text={block.text} />
+          </pre>
+        </CopyableBlock>
       );
     case "list": {
       const Tag = block.ordered ? "ol" : "ul";
@@ -347,36 +368,41 @@ function Block({ block, anchor, variant }: { block: MdBlock; anchor: string | nu
       // Columns can't be made to fit a phone, so the table keeps its real widths and pans inside its
       // own scroller — the same thing a mobile browser does with a table on any normal page.
       return (
-        <div className="overflow-x-auto">
-          <table className="w-max border-collapse text-xs">
-            <thead>
-              <tr>
-                {block.header.map((cell, i) => (
-                  <th
-                    key={i}
-                    className={`border px-2 py-1 font-semibold ${ALIGN_CLASS.get(block.align[i] ?? "left") ?? "text-left"}`}
-                  >
-                    <Spans spans={cell} />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {block.rows.map((row, r) => (
-                <tr key={r}>
-                  {row.map((cell, c) => (
-                    <td
-                      key={c}
-                      className={`border px-2 py-1 align-top ${ALIGN_CLASS.get(block.align[c] ?? "left") ?? "text-left"}`}
+        // `w-fit max-w-full` makes the wrapper the table's own width (the scroller's content is `w-max`)
+        // up to the column, so a narrow table's icon sits at the table's corner and a wide one's at the
+        // scroller's visible corner.
+        <CopyableBlock text={block.source} className="w-fit max-w-full">
+          <div className="overflow-x-auto">
+            <table className="w-max border-collapse text-xs">
+              <thead>
+                <tr>
+                  {block.header.map((cell, i) => (
+                    <th
+                      key={i}
+                      className={`border px-2 py-1 font-semibold ${ALIGN_CLASS.get(block.align[i] ?? "left") ?? "text-left"}`}
                     >
                       <Spans spans={cell} />
-                    </td>
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {block.rows.map((row, r) => (
+                  <tr key={r}>
+                    {row.map((cell, c) => (
+                      <td
+                        key={c}
+                        className={`border px-2 py-1 align-top ${ALIGN_CLASS.get(block.align[c] ?? "left") ?? "text-left"}`}
+                      >
+                        <Spans spans={cell} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CopyableBlock>
       );
     case "rule":
       return <hr className="border-border" />;
@@ -402,6 +428,7 @@ export function MarkdownText({
   className,
   query = "",
   resolveLink,
+  resolveImage,
   headingIds = false,
   variant = "chat",
 }: {
@@ -411,21 +438,26 @@ export function MarkdownText({
   query?: string;
   /** Where a relative or fragment link leads. Without it such a link reads as its label. */
   resolveLink?: LinkResolver;
+  /** How an image is drawn. Without it every image reads as its alt text, and none is parsed as one. */
+  resolveImage?: ImageResolver;
   /** Give each heading an `id` (its anchor). Off by default: an id on every transcript heading is a collision. */
   headingIds?: boolean;
   /** `document` sizes headings as a page. Chat, the default, renders exactly as it always did. */
   variant?: MarkdownVariant;
 }) {
-  const blocks = useMemo(() => parseMarkdown(text), [text]);
+  const withImages = resolveImage !== undefined;
+  const blocks = useMemo(() => parseMarkdown(text, { images: withImages }), [text, withImages]);
   const anchors = useMemo(() => (headingIds ? headingAnchors(blocks) : null), [blocks, headingIds]);
   return (
     <QueryContext.Provider value={query}>
       <LinkContext.Provider value={resolveLink ?? null}>
-        <div className={`font-content space-y-2 text-sm break-words ${className ?? ""}`}>
-          {blocks.map((block, i) => (
-            <Block key={i} block={block} anchor={anchors?.[i] ?? null} variant={variant} />
-          ))}
-        </div>
+        <ImageContext.Provider value={resolveImage ?? null}>
+          <div className={`font-content space-y-2 text-sm break-words ${className ?? ""}`}>
+            {blocks.map((block, i) => (
+              <Block key={i} block={block} anchor={anchors?.[i] ?? null} variant={variant} />
+            ))}
+          </div>
+        </ImageContext.Provider>
       </LinkContext.Provider>
     </QueryContext.Provider>
   );

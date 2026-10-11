@@ -57,7 +57,7 @@ COUNT=$(git rev-list --count HEAD..upstream/main)
 if [ "$COUNT" -eq 0 ]; then echo "✓ already at upstream/main ($(git rev-parse --short upstream/main))"; exit 0; fi
 
 echo "── arriving: $COUNT commit(s) past $(git rev-parse --short "$BASE")"
-git log --oneline "$BASE"..upstream/main | head -30
+git log --max-count=30 --oneline "$BASE"..upstream/main
 [ "$COUNT" -gt 30 ] && echo "  … and $((COUNT - 30)) more"
 echo "── diffstat (top):"
 git diff --stat "$BASE" upstream/main | tail -3

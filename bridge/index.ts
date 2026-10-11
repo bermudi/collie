@@ -31,6 +31,7 @@ import {
 import type { AgentView } from "./types.ts";
 import { HOST } from "./host.ts";
 import { EventPoker } from "./event-poker.ts";
+import { GitHeads } from "./git-head.ts";
 import { HERDR_DIAL_MODE_OPTION } from "./mux/herdr/adapter.ts";
 import { DEFAULT_TIMEOUT_MS } from "./mux/herdr/client.ts";
 import { deriveConfigRoot } from "./mux/herdr/sessions.ts";
@@ -48,7 +49,12 @@ import { NotificationCoordinator, makeNotifySink, type NotifyClock } from "./not
 import { pushTitle } from "./push-titles.ts";
 import { NotifyPrefsStore } from "./notify-prefs.ts";
 import { FolderStore } from "./folders.ts";
+import { WorktreeBaseStore } from "./worktree-bases.ts";
 import { WorktreeReceiptStore } from "./worktree-receipts.ts";
+import { LaunchReceiptStore } from "./launch-receipts.ts";
+import { AddedLauncherStore, addedFileIo } from "./launchers-added.ts";
+import { RecentRunStore, recentRunFileIo } from "./recent-runs.ts";
+import { WorktreeChoiceStore } from "./worktree-choices.ts";
 import { filePairingIo, PairingStore } from "./pairing.ts";
 import {
   LOCAL_SECRET_FILENAME,
@@ -199,6 +205,10 @@ const paneCache =
     ? null
     : new CacheTracker(journals, { overrides: () => cacheRulesReader() }, () => Date.now());
 
+// Which branch each pane's folder is on (bridge/git-head.ts). One for the whole bridge: every
+// session's poll feeds it its folders, and the server reads it from memory at serialise time.
+const gitHeads = new GitHeads();
+
 // Which panes the operator asked to be warned about before their prompt cache goes cold, and the
 // deadlines already warned (bridge/cache/watch.ts). Loaded here beside the other two preference stores;
 // the file does not exist until an operator toggles something or a warning actually goes out.
@@ -216,6 +226,30 @@ await folders.load();
 // nothing: the file appears on the first create that carries an id.
 const worktreeReceipts = new WorktreeReceiptStore(cfg.stateDir);
 await worktreeReceipts.load();
+
+// Which ref each new worktree was cut from (ADR 0089, amended, bridge/worktree-bases.ts). Nothing
+// reads it yet. Loading writes nothing: the file appears on the first create that named a start.
+const worktreeBases = new WorktreeBaseStore(cfg.stateDir);
+await worktreeBases.load();
+
+// One receipt per launch the phone tagged with a request id, so a retried Start never opens a second
+// pane (ADR 0091, bridge/launch-receipts.ts). Loading writes nothing.
+const launchReceipts = new LaunchReceiptStore(cfg.stateDir);
+await launchReceipts.load();
+
+// The New sheet's last branch choices per repo on this machine (M48, bridge/worktree-choices.ts).
+// Loading writes nothing: the file appears on the first branch create that works.
+const worktreeChoices = new WorktreeChoiceStore(cfg.stateDir);
+await worktreeChoices.load();
+
+// The launcher rows phones added on this machine (ADR 0094, bridge/launchers-added.ts). Read by mtime
+// on each use, because `collie devices revoke` edits it from another process. Nothing is written until
+// the first add.
+const addedLaunchers = new AddedLauncherStore(addedFileIo(cfg.stateDir));
+
+// The one-off lines a phone ran on this machine, newest first (ADR 0095, bridge/recent-runs.ts).
+// Nothing is written until the first run that works.
+const recentRuns = new RecentRunStore(recentRunFileIo(cfg.stateDir));
 
 // The warden that judges them. A DEPS LITERAL WITH NO LOGIC IN IT, for the reason
 // `bridge/update.ts`'s monitor is built the same way: there is no `bridge/index.test.ts`, so every gate
@@ -339,6 +373,11 @@ const makeSession: SessionFactory = (name, socketPath, isPrimary) => {
   // which the engine's agent-derived removal event never reports.
   trackActivity(engine, activity, name);
 
+  // The branch of every pane's folder rides the same poll, fired and not awaited, for the cache
+  // probe's reason below: a poll never waits on a disk read. The reader keeps its own clocks, so a
+  // poll every 1.5 s is not a read every 1.5 s, and it never throws.
+  engine.onUpdate((s) => void gitHeads.refresh([...s.agents, ...s.shellPanes].map((p) => p.cwd)));
+
   // The prompt-cache probe rides the same poll, and for the reason the tracker's header gives:
   // `localSnapshot` is synchronous, so the disk read cannot happen at serialise time. It is fired and
   // not awaited — `onUpdate` is synchronous and a poll must never wait on a probe — and the tracker
@@ -429,15 +468,32 @@ const sweepTimer = setInterval(() => void sweepNow(""), SWEEP_INTERVAL_MS);
 sweepTimer.unref();
 
 // ── Machines: this machine's load (ADR 0084, solo shape) ─────────────────────
-// Every collie samples itself. The sampler reads `/proc` (Linux) or `node:os` and nothing else, and
-// never spawns a process. Upstream's watch also carries a crew's members and their samples; Pup is a
-// solo bridge by construction (ADR 9004), so the roster is this machine alone and there is no peer
-// arm to switch off.
+// Every collie samples itself. The sampler reads `/proc` (Linux) or `node:os` and nothing else,
+// except on macOS, where one async, killed-after-1-s `vm_stat` run per sample gives the memory
+// Activity Monitor shows, served one tick late (machine-stats.ts, VmStatWatch). Upstream's watch
+// also carries a crew's members and their samples; Pup is a solo bridge by construction
+// (ADR 9004), so the roster is this machine alone and there is no peer arm to switch off.
 const machineSampler = new MachineSampler({
   host: HOST,
   readText: (path) => {
     try {
       return readFileSync(path, "utf8");
+    } catch {
+      return null;
+    }
+  },
+  // Only macOS runs a command (`vm_stat`). Async, never awaited by the tick, killed after 1 s; any
+  // failure resolves null.
+  run: async (command, args) => {
+    try {
+      const proc = Bun.spawn([command, ...args], { stdin: "ignore", stdout: "pipe", stderr: "ignore", env: { LC_ALL: "C" } });
+      const timer = setTimeout(() => proc.kill("SIGKILL"), 1000);
+      try {
+        const [text, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+        return code === 0 ? text : null;
+      } finally {
+        clearTimeout(timer);
+      }
     } catch {
       return null;
     }
@@ -504,9 +560,15 @@ const server = startServer({
   // Built above so the cache tracker probes through the same adapters this serves history from.
   journals: journals ?? undefined,
   cache: paneCache ?? undefined,
+  gitHeads,
   cacheWatch,
   folders,
   worktreeReceipts,
+  worktreeBases,
+  launchReceipts,
+  worktreeChoices,
+  addedLaunchers,
+  recentRuns,
   // This machine's load and its alert rules (ADR 0084).
   machines: machineWatch,
   pairing,

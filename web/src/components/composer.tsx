@@ -2,14 +2,15 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { createPortal } from "react-dom";
 import type { ChangeEvent, ClipboardEvent, CSSProperties, ReactNode } from "react";
 import { useRevalidator } from "react-router";
-import { Check, FileText, Image, Keyboard, Loader2, Paperclip, Send, Settings2, Slash, Terminal, X, Zap } from "lucide-react";
+import { Check, FileText, Image, Keyboard, Loader2, Paperclip, Pencil, Send, Settings2, Slash, Terminal, X, Zap } from "lucide-react";
 
 import { applyDraftFontSize, fontStack, inputFocusZoomsPage } from "@/hooks/use-display-prefs";
-import type { DisplayPrefs } from "@/hooks/use-display-prefs";
+import type { DisplayPrefs, Hand } from "@/hooks/use-display-prefs";
 import { usePendingConfirm } from "@/hooks/use-pending-confirm";
 import { useDirectTyping } from "@/hooks/use-direct-typing";
 import { useLocale } from "@/hooks/use-locale";
 import { t as translate, tn as translatePlural } from "@/lib/i18n";
+import { holdsMask } from "@/lib/masked-text";
 import { setStatus } from "@/lib/status";
 import { buzz } from "@/lib/haptics";
 import { stampSend } from "@/lib/poll-intent";
@@ -18,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ChatInput } from "@/components/ui/chat/chat-input";
 import { NavTray } from "@/components/nav-tray";
+import { KeyBoardEditor } from "@/components/key-board-editor";
 import { CommandPalette } from "@/components/command-palette";
 import { QuickActionsContent } from "@/components/quick-actions";
 import { ActionsRow } from "@/components/actions-row";
@@ -45,6 +47,7 @@ import {
   uploadLimits,
 } from "@/lib/attachments";
 import { ctrlPresetsFor } from "@/lib/operator-keys";
+import { useKeyBoard } from "@/lib/key-board-store";
 import { isDestructiveInput } from "@/lib/destructive";
 import { fitsDraftStore, loadDraftEntry, saveDraft } from "@/lib/drafts";
 import { wipeDevice } from "@/lib/wipe";
@@ -166,6 +169,15 @@ interface ComposerProps {
    * the bridge comes back, because the words may answer a screen that has moved on.
    */
   stale?: boolean;
+
+  /**
+   * Which thumb the pane is laid out for (the Settings "Hand" choice). `"right"` (default) is the
+   * shipped layout, unchanged. `"left"` mirrors the two ends a thumb has to reach: the belt turns
+   * round, with its pinned block at the left end above Send and the pills running right to left
+   * from Keys ({@link Hand} in actions-row.tsx), and in the reply box Send and Attach move to the
+   * left of the field, Send on the outer edge, Attach beside the field.
+   */
+  hand?: Hand;
 }
 
 // The composer cluster at the bottom of the pane view — everything a phone keyboard can't do on its
@@ -206,10 +218,13 @@ const KEY_REVALIDATE_MS = 300;
 // viewport with a tall tray. One wrapper so Keys and Quick can't drift apart.
 function ComposerDock({
   title,
+  onEdit,
   onClose,
   children,
 }: {
   title: string;
+  /** Draws a pencil beside the label, centred on it. Only the Keys dock has one (ADR 0092). */
+  onEdit?: () => void;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -218,6 +233,19 @@ function ComposerDock({
       <div className="flex items-center justify-between px-3 pt-2">
         <div className="flex min-w-0 items-center gap-2">
           <SectionLabel>{title}</SectionLabel>
+          {onEdit !== undefined && (
+            // 28px drawn, 44px reached: the `::before` reaches 8px past each edge into the header's own
+            // padding and the dock's gap, the same trade the Close X beside it makes (DESIGN.md §6).
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative -ml-1 size-7 text-muted-foreground before:absolute before:-inset-2 before:content-['']"
+              onClick={onEdit}
+              aria-label={translate("composer.dock.editKeys")}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+          )}
         </div>
         <Button
           variant="ghost"
@@ -290,7 +318,7 @@ interface ClearedDraft {
 }
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { paneId, scope, agent, isShell, gone, readOnly, composing, dialogPresent, dialogUnread, text, terminalDraft, rawTerminalDraft, prefs, display, onSent, pullHandle, draftNoticeSlot, changesPill, stale },
+  { paneId, scope, agent, isShell, gone, readOnly, composing, dialogPresent, dialogUnread, text, terminalDraft, rawTerminalDraft, prefs, display, onSent, pullHandle, draftNoticeSlot, changesPill, stale, hand = "right" },
   ref,
 ) {
   const revalidator = useRevalidator();
@@ -584,6 +612,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       endUndoWindow();
     },
     focusInput: focusInputEnd,
+    // Identity for the agent-change disarm: the mode belongs to the session
+    // that armed it. "shell" when the pane has no agent (agent exits, pane
+    // falls back to shell) — a change there disarms with a notice.
+    agentKey: agent ?? "shell",
   });
 
   // ── THE ORBIT TURNS WHILE THE OPERATOR'S WORK IS IN FLIGHT (lib/busy.ts) ───────────────────────
@@ -675,13 +707,15 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   // this is the ONLY gate that waits for the 1.5s stability, so a blip or an in-flight send never
   // flashes it. Deliberately one-directional: once latched, rapid host typing (which keeps blanking
   // the stabilised value) can't turn it back off — the raw-tracking + unlatch effects own the hide
-  // side. Skipped when the pane is gone.
+  // side. Skipped when the pane is gone, and while a send is in flight: the staged line then
+  // carries our own text (attachments go out as host paths), and even a foreign draft waits until
+  // the send completes rather than fighting it for the mirror.
   useEffect(() => {
-    if (gone) return;
+    if (gone || sending) return;
     if (effectiveStable !== null && normalizeDraft(effectiveStable) !== handledKey) {
       setPreviewLatched(true);
     }
-  }, [effectiveStable, handledKey, gone]);
+  }, [effectiveStable, handledKey, gone, sending]);
 
   // Unlatch when the host clears the "❯" line — the draft was submitted or wiped on the host, or our
   // own send echoed back and got suppressed to null. The preview unmounts on the next render. Also
@@ -705,7 +739,11 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   // or sent, not a fresh one to re-show. Not gated on `locked`: read-only devices get the preview +
   // Take over (a local text copy); only the actual Send stays gated.
   const showPreview =
-    !gone && previewLatched && effectiveRaw !== null && normalizeDraft(effectiveRaw) !== handledKey;
+    !gone &&
+    !sending &&
+    previewLatched &&
+    effectiveRaw !== null &&
+    normalizeDraft(effectiveRaw) !== handledKey;
 
   // The floating notice (ADR 0061). The wrapper passes touches through (`pointer-events-none`) and
   // the notice takes them back, so the mirror under the empty part of the slot still scrolls.
@@ -809,6 +847,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   }
   // The Keys tray's preset row, resolved the same way from the same one-shot read of /api/config.
   const keyPresets = ctrlPresetsFor(agent, useOperatorKeys());
+  // The key board (ADR 0092): the pad the Keys dock draws. A hook, so an edit made in the
+  // editor sheet shows in the dock at once.
+  const keyBoard = useKeyBoard();
+  const [keysEditorOpen, setKeysEditorOpen] = useState(false);
   // Empty on every adapter that refuses nothing, and empty for Herdr's six as far as this tray is
   // concerned — it offers none of the paging/edit keys Herdr rejects, so nothing greys out there.
   const unsupportedKeys = useMuxUnsupportedKeys();
@@ -1378,7 +1420,11 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             one-tap reply grids; Display mounts the labelled mirror prefs. Agent stays a covering
             BottomSheet below (it's a palette, not a pad). */}
         {drawer === "keys" && (
-          <ComposerDock title={translate("composer.controls.keys")} onClose={closeDrawer}>
+          <ComposerDock
+            title={translate("composer.controls.keys")}
+            onEdit={() => setKeysEditorOpen(true)}
+            onClose={closeDrawer}
+          >
             <NavTray
               // The chords THIS multiplexer refuses (M10/06). A key is not a capability: the Keys
               // door is `sendKeys` (the lock above), and this is the list of holes behind it, so a
@@ -1386,11 +1432,13 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               unsupportedKeys={unsupportedKeys}
               onSend={pressKeys}
               presets={keyPresets}
+              board={keyBoard}
               onQueueChange={setQueuedKeys}
               disabled={locked || offline}
             />
           </ComposerDock>
         )}
+        <KeyBoardEditor open={keysEditorOpen} onClose={() => setKeysEditorOpen(false)} unsupportedKeys={unsupportedKeys} />
         {drawer === "quick" && (
           <ComposerDock title={translate("composer.controls.quick")} onClose={closeDrawer}>
             <QuickActionsContent
@@ -1546,6 +1594,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           // (agent-chat.tsx); this row draws the pill, wires the drag, and costs no height.
           handle={pullHandle}
           changes={changesPill}
+          hand={hand}
           // The X on the pinned block while the box holds a draft, then Undo in its place until
           // the next act (M40 spec 04). See `clearSlot` for when it shows.
           clear={clearSlot()}
@@ -1617,6 +1666,17 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             {translate("composer.draft.tooLong")}
           </p>
         </Collapse>
+        {/* A draft that holds the bridge's mask. The operator copied a masked line off the mirror and
+            pasted it here, and the pane would receive the dots, not the secret. A CONDITION for as
+            long as the text stays, like the line above, so it is derived at render and clears when
+            the dots are deleted or the draft is sent. A caution and never a block: a `••••` can be
+            meant (a password placeholder in a README), and reply-action.ts accepts it as a mask slot
+            on purpose when it reads the pane back. */}
+        <Collapse open={!direct.active && holdsMask(input)}>
+          <p className="px-1 pb-1 text-xs leading-snug text-muted-foreground">
+            {translate("composer.draft.holdsMask")}
+          </p>
+        </Collapse>
         {/* ── ONE BOX, ONE ROW: THE FIELD, ATTACH, THE PRIMARY ACTION ──────────────────────
             The field, the attach control and Send used to be three shapes on one line: a
             bordered field with a button tucked into its bottom-right corner, and a round primary
@@ -1663,8 +1723,13 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             out of the widest part of the composer. It answers the same question from the belt
             above, which is equally at the write surface and costs the draft nothing. */}
         <div
+          data-slot="composer-box"
           className={cn(
             "relative flex items-end gap-1 rounded-xl border border-input bg-background p-1 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring",
+            // `hand="left"`: the whole row runs mirrored, so Send stands on the box's left edge, then
+            // Attach, then the field. The DOM order is untouched, so the tab and reading order are
+            // too. With chips, `flex-wrap` still stacks the chip strip ABOVE the row.
+            hand === "left" && "flex-row-reverse",
             // Chips take a line of their own ABOVE the row (ADR 0060). `flex-wrap` plus a
             // full-basis strip does that without re-parenting the field, so the textarea is never
             // remounted (and never loses its caret) when the first chip arrives. With no chips the
@@ -1766,6 +1831,9 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               // the field's right side takes no padding of its own, and the box's `gap-1` to attach
               // is what keeps the text off it.
               "min-w-0 flex-1 min-h-9 pl-2 py-1.5",
+              // Mirrored, the field's right side stands against the box's border, so it takes the
+              // inset the left used to take from Attach.
+              hand === "left" && "pr-2",
               // The draft is terminal-bound text, so the field wears the TERMINAL face — the same
               // family the mirror above it renders in, not the app's chrome face. `font-mono` is
               // the mirror's own default; the style below follows the operator's mirror-family
@@ -1842,6 +1910,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             open={picking}
             onClose={() => setPicking(false)}
             label={translate("composer.attach.title")}
+            // Attach stands near the box's LEFT edge under `hand="left"`; the panel follows it.
+            className={hand === "left" ? "right-auto left-0" : undefined}
           >
             <ActionRow
               icon={<Image aria-hidden="true" className="size-4 shrink-0" />}

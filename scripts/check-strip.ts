@@ -2,7 +2,7 @@
 //
 // Two failures it catches, both of which bit before it existed:
 //   1. THE STRIP LEAKED: a file matching the strip patterns (cli/, bridge/crew/, bridge/stt/,
-//      beacons) is tracked on Pup — usually a silent rename/delete mis-resolution.
+//      beacons) or a manifest line is tracked on Pup — usually a silent rename/delete mis-resolution.
 //   2. A CASUALTY: a file upstream has that Pup does not, with no line for it in
 //      scripts/strip-manifest.txt. Git resolves upstream renames onto Pup's deletes with no
 //      conflict at all (1.13.x did it to routes/updates.tsx), so the merge report never names
@@ -40,6 +40,11 @@ export function uncovered(absences: readonly string[], matchers: readonly RegExp
   return absences.filter((path) => !matchers.some((re) => re.test(path)));
 }
 
+/** The tracked files the manifest says Pup must not carry — the leaks. Pure, so it can be tested. */
+export function stripLeaks(tracked: readonly string[], matchers: readonly RegExp[]): string[] {
+  return tracked.filter((path) => STRIP_PRESENT.test(path) || matchers.some((re) => re.test(path)));
+}
+
 async function lines(cmd: string[]): Promise<string[]> {
   const proc = await Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
   const out = await new Response(proc.stdout).text();
@@ -54,15 +59,6 @@ const upstreamRef = process.argv.includes("--upstream")
 
 const tracked = await lines(["git", "ls-files"]);
 
-// ── Side A: the strip must not be tracked ───────────────────────────────────────────────
-const leaked = tracked.filter((p) => STRIP_PRESENT.test(p));
-if (leaked.length > 0) {
-  console.error(`✗ strip leaked — these tracked files match the strip patterns:`);
-  for (const p of leaked) console.error(`  ${p}`);
-  process.exit(1);
-}
-
-// ── Side B: every absence must be a decision ────────────────────────────────────────────
 // `fileURLToPath`, not `.pathname`: a file URL's pathname is `/C:/x` on Windows, which is the
 // exact platform-blind spelling bridge/host-guard.test.ts exists to refuse.
 const manifestPath = fileURLToPath(new URL("./strip-manifest.txt", import.meta.url));
@@ -74,6 +70,15 @@ try {
   process.exit(1);
 }
 
+// ── Side A: the strip must not be tracked ───────────────────────────────────────────────
+const leaked = stripLeaks(tracked, matchers);
+if (leaked.length > 0) {
+  console.error(`✗ strip leaked — these tracked files match the strip patterns:`);
+  for (const p of leaked) console.error(`  ${p}`);
+  process.exit(1);
+}
+
+// ── Side B: every absence must be a decision ────────────────────────────────────────────
 try {
   const upstreamFiles = await lines(["git", "ls-tree", "-r", "--name-only", upstreamRef]);
   const trackedSet = new Set(tracked);
