@@ -145,6 +145,7 @@ the pointer, it was a supersede.
 | [9002](./9002-a-journal-image-reference-is-never-a-remote-url.md) | A journal image reference is this bridge's blob path or inline bytes, never a remote URL | Accepted (Pup) |
 | [9003](./9003-the-mirror-does-not-guess-images.md) | The mirror does not reconstruct terminal images; blank image rows collapse | Accepted (Pup) |
 | [9004](./9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md) | Pup tracks upstream wholesale and strips the pack, not the viewer | Accepted (Pup) |
+| [9005](./9005-the-herd-list-nests-a-worktree-under-its-repo.md) | The herd list nests a worktree under the workspace showing its repo — an upstream-bound divergence, recorded | Accepted (Pup) |
 
 Numbers are claimed across **both** lines: upstream's 0011–0016 were accepted on their `v1` while
 their `main` was still at 0010. On Pup, rows marked **(Pup)** are the fork's own decisions and live
