@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { groupPanesByWorkspace, workspaceGroupKey } from "./pane-groups";
-import type { AgentView } from "./types";
+import type { AgentView, WorkspaceView } from "./types";
 
 function pane(paneId: string, over: Partial<AgentView> = {}): AgentView {
   return {
@@ -15,6 +15,19 @@ function pane(paneId: string, over: Partial<AgentView> = {}): AgentView {
     status: "idle",
     cwd: "/home/k/proj",
     focused: false,
+    ...over,
+  };
+}
+
+function ws(workspaceId: string, over: Partial<WorkspaceView> = {}): WorkspaceView {
+  return {
+    workspaceId,
+    number: 1,
+    label: workspaceId,
+    focused: false,
+    activeTabId: `${workspaceId}:t1`,
+    tabCount: 1,
+    paneCount: 1,
     ...over,
   };
 }
@@ -125,6 +138,105 @@ describe("groupPanesByWorkspace — shells", () => {
   it("takes no shells at all without complaint", () => {
     expect(groupPanesByWorkspace([pane("a")])).toHaveLength(1);
     expect(groupPanesByWorkspace([], [])).toEqual([]);
+  });
+});
+
+describe("groupPanesByWorkspace — worktrees nest under the group showing their repo", () => {
+  // little-goblin's own shape: the repo's checkout is workspace 1, its two linked worktrees are
+  // workspaces 9 and 10 — flat order put them last, nesting puts them under their repo.
+  const REPO = "/home/k/little-goblin";
+  const records = [
+    ws("w1", { repoRoot: REPO, isWorktree: false }),
+    ws("w9", { repoRoot: REPO, isWorktree: true }),
+    ws("w10", { repoRoot: REPO, isWorktree: true }),
+    ws("w2"),
+  ];
+  const herd = [
+    pane("repo", { workspaceId: "w1", workspaceLabel: "little-goblin", workspaceNumber: 1 }),
+    pane("other", { workspaceId: "w2", workspaceLabel: "pi-delegate", workspaceNumber: 2, tabId: "w2:t1" }),
+    pane("tree-a", { workspaceId: "w9", workspaceLabel: "worktree-a", workspaceNumber: 9, tabId: "w9:t1" }),
+    pane("tree-b", { workspaceId: "w10", workspaceLabel: "worktree-b", workspaceNumber: 10, tabId: "w10:t1" }),
+  ];
+
+  it("runs a worktree right under the group showing its repo, whatever its number", () => {
+    const groups = groupPanesByWorkspace(herd, [], { workspaces: records });
+    expect(labels(groups)).toEqual(["little-goblin", "worktree-a", "worktree-b", "pi-delegate"]);
+    expect(groups[1]!.parentKey).toBe(groups[0]!.key);
+    expect(groups[2]!.parentKey).toBe(groups[0]!.key);
+    expect(groups[0]!.parentKey).toBeUndefined();
+    expect(groups[3]!.parentKey).toBeUndefined();
+  });
+
+  it("pulls the whole cluster up to a worktree numbered ahead of its repo", () => {
+    const groups = groupPanesByWorkspace(
+      [
+        pane("tree", { workspaceId: "w1", workspaceLabel: "tree", workspaceNumber: 1 }),
+        pane("other", { workspaceId: "w3", workspaceLabel: "other", workspaceNumber: 3, tabId: "w3:t1" }),
+        pane("repo", { workspaceId: "w5", workspaceLabel: "repo", workspaceNumber: 5, tabId: "w5:t1" }),
+      ],
+      [],
+      { workspaces: [ws("w5", { repoRoot: REPO, isWorktree: false }), ws("w1", { repoRoot: REPO, isWorktree: true })] },
+    );
+    expect(labels(groups)).toEqual(["repo", "tree", "other"]);
+    expect(groups[1]!.parentKey).toBe(groups[0]!.key);
+  });
+
+  it("leaves a worktree flat when its repo's checkout has no group on screen", () => {
+    // The record exists — the repo IS a worktree of little-goblin — but no pane of the checkout's
+    // workspace is in the list, so there is nothing to nest under.
+    const groups = groupPanesByWorkspace(
+      [pane("tree", { workspaceId: "w9", workspaceLabel: "worktree-a", workspaceNumber: 9, tabId: "w9:t1" })],
+      [],
+      { workspaces: records },
+    );
+    expect(groups[0]!.parentKey).toBeUndefined();
+  });
+
+  it("leaves every group flat when no workspaces are handed in", () => {
+    expect(groupPanesByWorkspace(herd).every((g) => g.parentKey === undefined)).toBe(true);
+  });
+
+  it("links only the ambient session: a tagged other-session group never takes the record", () => {
+    const groups = groupPanesByWorkspace(
+      [
+        pane("repo", { workspaceId: "w1", workspaceLabel: "repo", workspaceNumber: 1 }),
+        pane("tree", { workspaceId: "w9", workspaceLabel: "tree", workspaceNumber: 9, tabId: "w9:t1", session: "other" }),
+      ],
+      [],
+      { workspaces: records, ambientSession: "default" },
+    );
+    expect(groups[1]!.parentKey).toBeUndefined();
+    // …while the ambient session's own tagged group links exactly as an untagged one does.
+    const ambient = groupPanesByWorkspace(
+      [
+        pane("repo", { workspaceId: "w1", workspaceLabel: "repo", workspaceNumber: 1 }),
+        pane("tree", { workspaceId: "w9", workspaceLabel: "tree", workspaceNumber: 9, tabId: "w9:t1", session: "default" }),
+      ],
+      [],
+      { workspaces: records, ambientSession: "default" },
+    );
+    expect(ambient[1]!.parentKey).toBe(ambient[0]!.key);
+  });
+
+  it("links only the ambient machine: a peer's identically-numbered group never takes the record", () => {
+    const groups = groupPanesByWorkspace(
+      [
+        pane("repo", { workspaceId: "w1", workspaceLabel: "repo", workspaceNumber: 1 }),
+        pane("tree", { workspaceId: "w9", workspaceLabel: "tree", workspaceNumber: 9, tabId: "w9:t1", host: "peer" }),
+      ],
+      [],
+      { workspaces: records, ambientHost: "lead" },
+    );
+    expect(groups[1]!.parentKey).toBeUndefined();
+    const ambient = groupPanesByWorkspace(
+      [
+        pane("repo", { workspaceId: "w1", workspaceLabel: "repo", workspaceNumber: 1, host: "lead" }),
+        pane("tree", { workspaceId: "w9", workspaceLabel: "tree", workspaceNumber: 9, tabId: "w9:t1", host: "lead" }),
+      ],
+      [],
+      { workspaces: records.map((w) => Object.assign({}, w, { host: "lead" })), ambientHost: "lead" },
+    );
+    expect(ambient[1]!.parentKey).toBe(ambient[0]!.key);
   });
 });
 

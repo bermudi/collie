@@ -16,7 +16,7 @@ import { workspacePrefKey } from "./agent-list";
 import { paneRowKey } from "@/lib/hosts";
 import { currentPins, setPinned } from "@/lib/pins";
 import { setMachineHidden, useHiddenMachines } from "@/lib/hidden-machines";
-import type { AgentStatus, AgentView, MuxConfig, ServerSummary } from "@/lib/types";
+import type { AgentStatus, AgentView, MuxConfig, ServerSummary, WorkspaceView } from "@/lib/types";
 
 function agent(
   paneId: string,
@@ -596,6 +596,74 @@ describe("AgentList — the workspace select", () => {
     // A status change marks the row (a tint, a dot) — it never reorders it. Pane id is the only
     // tiebreak `order: "fixed"` uses (lib/pane-groups.ts).
     expect(order()).toEqual(["first", "second"]);
+  });
+});
+
+// WORKTREES (the herd half of lib/spaces.ts's nesting): a worktree's section renders INSIDE the
+// section showing its repo — the herdr sidebar's tree, on the dashboard's axis.
+describe("AgentList — worktrees nest inside the workspace showing their repo", () => {
+  const REPO = "/home/k/little-goblin";
+  const ws = (workspaceId: string, over: Partial<WorkspaceView> = {}): WorkspaceView => ({
+    workspaceId,
+    number: 1,
+    label: workspaceId,
+    focused: false,
+    activeTabId: `${workspaceId}:t1`,
+    tabCount: 1,
+    paneCount: 1,
+    ...over,
+  });
+  const records = [
+    ws("w1", { repoRoot: REPO, isWorktree: false }),
+    ws("w9", { repoRoot: REPO, isWorktree: true }),
+    ws("w10", { repoRoot: REPO, isWorktree: true }),
+  ];
+  const herd = [
+    agent("repo-a", "working", { workspaceId: "w1", workspaceLabel: "little-goblin", workspaceNumber: 1, tabId: "w1:t1" }),
+    agent("other", "idle", { workspaceId: "w2", workspaceLabel: "pi-delegate", workspaceNumber: 2, tabId: "w2:t1" }),
+    agent("tree-a", "idle", { workspaceId: "w9", workspaceLabel: "worktree-a", workspaceNumber: 9, tabId: "w9:t1" }),
+    agent("tree-b", "idle", { workspaceId: "w10", workspaceLabel: "worktree-b", workspaceNumber: 10, tabId: "w10:t1" }),
+  ];
+
+  /** A section's parent section, if it nests inside one — null stands "top-level". */
+  const parentSectionOf = (label: string) => groupSection(label).parentElement!.closest("section");
+
+  it("renders a worktree's section inside the section showing its repo, ahead of later workspaces", () => {
+    render(<AgentList agents={herd} workspaces={records} onOpen={vi.fn()} />);
+    expect(headings()).toEqual(["little-goblin", "worktree-a", "worktree-b", "pi-delegate"]);
+    const parent = groupSection("little-goblin");
+    // Both worktree sections live INSIDE the repo's own section — nested, not merely adjacent.
+    expect(parent.contains(groupSection("worktree-a"))).toBe(true);
+    expect(parent.contains(groupSection("worktree-b"))).toBe(true);
+    // The unrelated workspace stays a sibling, outside the cluster.
+    expect(parent.contains(groupSection("pi-delegate"))).toBe(false);
+    // A nested section is still a whole workspace: its own heading and its own row.
+    expect(within(groupSection("worktree-a")).getAllByRole("button")).toHaveLength(1);
+  });
+
+  it("keeps every section flat when no workspaces are handed in", () => {
+    render(<AgentList agents={herd} onOpen={vi.fn()} />);
+    expect(headings()).toEqual(["little-goblin", "pi-delegate", "worktree-a", "worktree-b"]);
+    expect(parentSectionOf("worktree-a")).toBeNull();
+  });
+
+  it("isolating the repo keeps its worktrees — the navigator's own rule", () => {
+    render(<AgentList agents={herd} workspaces={records} isolated={prefKeyOf(herd[0]!)} onOpen={vi.fn()} />);
+    expect(headings()).toEqual(["little-goblin", "worktree-a", "worktree-b"]);
+    expect(parentSectionOf("worktree-a")).not.toBeNull();
+  });
+
+  it("isolating a worktree shows just that worktree, flat", () => {
+    render(<AgentList agents={herd} workspaces={records} isolated={prefKeyOf(herd[2]!)} onOpen={vi.fn()} />);
+    expect(headings()).toEqual(["worktree-a"]);
+    expect(parentSectionOf("worktree-a")).toBeNull();
+  });
+
+  it("stands a worktree flat when the repo's workspace is hidden off the list", () => {
+    render(<AgentList agents={herd} workspaces={records} hidden={[prefKeyOf(herd[0]!)]} onOpen={vi.fn()} />);
+    // The children keep the cluster's place rather than sinking to the end, but nothing indents.
+    expect(headings()).toEqual(["worktree-a", "worktree-b", "pi-delegate"]);
+    expect(parentSectionOf("worktree-a")).toBeNull();
   });
 });
 
