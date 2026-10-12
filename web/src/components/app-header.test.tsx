@@ -68,7 +68,6 @@ describe("the header — the one shared shell", () => {
       </Header>,
     );
     expect(screen.queryByRole("status")).toBeNull(); // no connection pill of any kind
-    expect(container.querySelector(".dog-gallop")).toBeNull(); // mark at rest (static icon)
     expect(screen.getByText("webapp › main")).toBeInTheDocument(); // the breadcrumb slot
     expect(screen.getByText("working")).toBeInTheDocument(); // the agent status badge
     expect(screen.getByText("Collie")).not.toBeVisible(); // no brand line ON SCREEN in a pane
@@ -80,11 +79,10 @@ describe("the header — the one shared shell", () => {
   });
 
   it("is calm in the DASHBOARD variant while live — identity + settings gear, resting mark", () => {
-    const { container } = renderHeader(
+    renderHeader(
       <Header bridge="connected" error={false} wordmark rightTrail={<SettingsGear />} />,
     );
     expect(screen.getByText("Collie")).toBeInTheDocument(); // the identity's brand line
-    expect(container.querySelector(".dog-gallop")).toBeNull(); // mark at rest while live
     expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
   });
 

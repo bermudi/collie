@@ -24,7 +24,7 @@ export const es: Dictionary = {
   "settings.section.appearance.title": "Apariencia",
   "settings.section.appearance.blurb": "Tema, idioma, fuentes",
   "settings.section.device.title": "Dispositivo",
-  "settings.section.device.blurb": "Vibración, voz, modo zen",
+  "settings.section.device.blurb": "Vibración, modo zen",
   "settings.section.alerts.title": "Avisos",
   "settings.section.alerts.blurb": "Notificaciones, horas de silencio",
   "settings.section.system.title": "Sistema",
@@ -70,10 +70,10 @@ export const es: Dictionary = {
   "settings.zen.auto.hint": "Gira el teléfono de lado para abrir el modo zen automáticamente; gíralo de vuelta para cerrarlo.",
 
   // --- settings.handsFree ---
-  "settings.handsFree.title": "Dictado directo",
+  "settings.handsFree.title": "Voz con manos libres",
   "settings.handsFree.description":
-    "Envía la transcripción directamente al terminal sin pasar por el cuadro de entrada. Desactivado por defecto.",
-  "settings.handsFree.ariaLabel": "Dictado directo: enviar transcripción de inmediato",
+    "Envía la transcripción de inmediato en lugar de ponerla en el cuadro de mensaje. Desactivado por defecto: normalmente lees lo que se oyó antes de que llegue al terminal.",
+  "settings.handsFree.ariaLabel": "Voz con manos libres: enviar la transcripción de inmediato",
 
   // --- settings.push ---
   "settings.push.title": "Notificaciones push",
@@ -271,11 +271,6 @@ export const es: Dictionary = {
   "composer.mic.unavailable": "Entrada de voz no disponible",
   "composer.mic.stopAria": "Detener grabación",
   "composer.mic.recordAria": "Grabar mensaje de voz",
-  "composer.mic.transcribing": "Transcribiendo...",
-  "composer.mic.recording": "Grabando {elapsed}",
-  "composer.mic.handsFreeHint": "Se enviará al detener la grabación",
-  "composer.mic.manualHint": "Se insertará en el campo de texto",
-  "composer.mic.stop": "Detener",
   "composer.mic.discardAria": "Descartar grabación",
   "composer.attach.aria": "Adjuntar archivo",
   "composer.attach.title": "Adjuntar",
@@ -1228,11 +1223,11 @@ export const es: Dictionary = {
   "apiError.upload.no_file": "No se especificó ningún archivo.",
   "apiError.upload.bad_type": "Formato de archivo no admitido por Collie: {type}",
   "apiError.upload.write_failed": "No se pudo guardar el archivo en el host: {reason}",
-  "apiError.stt.unconfigured": "El servicio de dictado por voz no está configurado en este collie.",
-  "apiError.stt.too_large": "La grabación excede la duración permitida. Use un audio más corto.",
+  "apiError.stt.unconfigured": "El servicio de voz a texto no está configurado en este collie.",
+  "apiError.stt.too_large": "La grabación excede la duración permitida. Usa un audio más corto.",
   "apiError.stt.bad_format": "El navegador generó un formato de audio incompatible con Collie.",
   "apiError.stt.busy":
-    "Hay dos transcripciones en proceso. Reintente en un momento.",
+    "Hay dos transcripciones en proceso. Inténtalo de nuevo en un momento.",
   "apiError.stt.unreadable": "No se pudo procesar el archivo de audio.",
   "apiError.stt.empty": "La grabación no contiene datos.",
   "apiError.stt.provider_failed": "Fallo en el servicio de transcripción: {reason}",
@@ -1251,10 +1246,8 @@ export const es: Dictionary = {
   "apiError.host.unknown": "No existe el collie {host} en este equipo.",
   "apiError.crew.not_lead": "Este collie no lidera ningún equipo. No hay datos para mostrar.",
   // --- worktrees (ADR 0032) ---
-  "apiError.worktree.list_failed": "Error al listar los worktrees: {reason}",
   "apiError.worktree.create_failed": "Error al crear el worktree: {reason}",
   "apiError.worktree.created_not_opened": "La rama fue creada, pero falló la apertura del espacio: {reason}",
-  "apiError.worktree.open_failed": "Error al abrir el worktree: {reason}",
   "apiError.worktree.busy": "Hay otra operación de worktree en ejecución. Reintente en un momento.",
   "apiError.worktree.ambiguous_branch": "El nombre de rama es ambiguo: {reason}",
   "apiError.worktree.branch_required": "Indique un nombre de rama.",
@@ -1526,4 +1519,8 @@ export const es: Dictionary = {
   "pushTitle.machine.cpu": "La CPU sigue alta en {machine}",
   "pushTitle.machine.mem": "La memoria sigue alta en {machine}",
   "pushTitle.machine.disk": "El disco sigue lleno en {machine}",
+
+  // --- settings.speech and stt.model (Whistle, ADR 0096) ---
+  // The Host speech provider card and the Codex consent (ADR 0097). The four consent paragraphs are
+  // `collie stt setup`'s words, byte for byte: bridge/stt/codex-setup.test.ts fails when they differ.
 };

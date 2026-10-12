@@ -121,6 +121,8 @@ describe("names", () => {
     }
     expect(isStateSecretName("pack-trust.json")).toBe(true);
     expect(isStateSecretName("paired-devices.json.4242.7.tmp")).toBe(true);
+    // `stt.json` holds a key, and its temporary is named by pid and sequence (bridge/stt/config.ts).
+    expect(isStateSecretName("stt.json.4242.7.tmp")).toBe(true);
     for (const name of ["activity.json", "crew-trust.json.bak", "my-stt.json", ".env", "config.toml"]) {
       expect(isStateSecretName(name)).toBe(false);
     }
@@ -146,7 +148,7 @@ describe("names", () => {
   });
 
   test("only Collie's own suffixes follow a Collie name: a rotation and its temporary files", () => {
-    for (const name of ["audit.log.1", "crew-trust.json.tmp", "collie-processes.4242.tmp", "paired-devices.json.4242.7.tmp", ".env.collie-tmp", ".env.push-keys.tmp"]) {
+    for (const name of ["audit.log.1", "crew-trust.json.tmp", "collie-processes.4242.tmp", "paired-devices.json.4242.7.tmp", "stt.json.4242.7.tmp", ".env.collie-tmp", ".env.push-keys.tmp"]) {
       expect(isCollieName(name)).toBe(true);
     }
     for (const name of [".env.production", ".env.local", "audit.log.x", "config.toml.bak", "stt.json.old", "paired-devices.json.1.2.3.tmp"]) {

@@ -24,7 +24,7 @@ export const ja: Dictionary = {
   "settings.section.appearance.title": "外観",
   "settings.section.appearance.blurb": "テーマ、言語、フォント",
   "settings.section.device.title": "デバイス",
-  "settings.section.device.blurb": "触覚、音声、ゼンモード",
+  "settings.section.device.blurb": "触覚、ゼンモード",
   "settings.section.alerts.title": "通知",
   "settings.section.alerts.blurb": "通知、サイレント時間",
   "settings.section.system.title": "システム",
@@ -268,11 +268,6 @@ export const ja: Dictionary = {
   "composer.mic.unavailable": "音声入力は利用できません",
   "composer.mic.stopAria": "録音停止",
   "composer.mic.recordAria": "音声メッセージを録音",
-  "composer.mic.transcribing": "文字起こし中…",
-  "composer.mic.recording": "録音中 {elapsed}",
-  "composer.mic.handsFreeHint": "録音停止時に送信されます",
-  "composer.mic.manualHint": "メッセージ入力欄に挿入されます",
-  "composer.mic.stop": "停止",
   "composer.mic.discardAria": "録音を破棄",
   "composer.attach.aria": "ファイルを添付",
   "composer.attach.title": "添付",
@@ -1222,10 +1217,10 @@ export const ja: Dictionary = {
   "apiError.upload.no_file": "ファイルが指定されていません。",
   "apiError.upload.bad_type": "未対応のファイル形式です: {type}",
   "apiError.upload.write_failed": "ホストに保存できませんでした: {reason}",
-  "apiError.stt.unconfigured": "この collie では音声入力が設定されていません。",
+  "apiError.stt.unconfigured": "この collie では音声文字起こしが設定されていません。",
   "apiError.stt.too_large": "録音時間が上限を超えています。短く録音してください。",
   "apiError.stt.bad_format":
-    "ブラウザの録音形式に対応していません。",
+    "このブラウザの録音形式は Collie が送信できない形式です。",
   "apiError.stt.busy":
     "現在 2 件の文字起こしを処理中です。時間をおいて再試行してください。",
   "apiError.stt.unreadable": "録音データを読み取れませんでした。",
@@ -1244,10 +1239,8 @@ export const ja: Dictionary = {
   "apiError.host.unknown": "このクルーに collie {host} は存在しません。",
   "apiError.crew.not_lead": "この collie はクルーを統括していないため、表示可能なクルーがありません。",
   // --- worktrees (ADR 0032) ---
-  "apiError.worktree.list_failed": "worktree の一覧取得に失敗しました: {reason}",
   "apiError.worktree.create_failed": "worktree の作成に失敗しました: {reason}",
   "apiError.worktree.created_not_opened": "ブランチは作成されましたが、起動に失敗しました: {reason}",
-  "apiError.worktree.open_failed": "worktree を開けませんでした: {reason}",
   "apiError.worktree.busy": "別の worktree 処理が実行中です。時間をおいて再試行してください。",
   "apiError.worktree.ambiguous_branch": "ブランチ名が複数の候補に一致します: {reason}",
   "apiError.worktree.branch_required": "ブランチ名を指定してください。",
@@ -1519,4 +1512,8 @@ export const ja: Dictionary = {
   "pushTitle.machine.cpu": "{machine} の CPU が高い状態です",
   "pushTitle.machine.mem": "{machine} のメモリが高い状態です",
   "pushTitle.machine.disk": "{machine} のディスクがいっぱいのままです",
+
+  // --- settings.speech and stt.model (Whistle, ADR 0096) ---
+  // The Host speech provider card and the Codex consent (ADR 0097). The four consent paragraphs are
+  // `collie stt setup`'s words, byte for byte: bridge/stt/codex-setup.test.ts fails when they differ.
 };

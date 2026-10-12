@@ -43,7 +43,7 @@ export const en = {
   "settings.section.appearance.title": "Appearance",
   "settings.section.appearance.blurb": "Theme, language, fonts",
   "settings.section.device.title": "Device",
-  "settings.section.device.blurb": "Haptics, voice, zen mode",
+  "settings.section.device.blurb": "Haptics, zen mode",
   "settings.section.alerts.title": "Alerts",
   "settings.section.alerts.blurb": "Notifications, quiet hours",
   "settings.section.system.title": "System",
@@ -93,7 +93,7 @@ export const en = {
   // --- settings.handsFree ---
   "settings.handsFree.title": "Hands-free voice",
   "settings.handsFree.description":
-    "Send the transcript immediately instead of putting it in the message box. Off by default — you normally read what was heard before it reaches the terminal.",
+    "Send the transcript immediately instead of putting it in the message box. Off by default: you normally read what was heard before it reaches the terminal.",
   "settings.handsFree.ariaLabel": "Hands-free voice: send transcript immediately",
 
   // --- settings.push ---
@@ -298,11 +298,6 @@ export const en = {
   "composer.mic.unavailable": "Voice input is unavailable",
   "composer.mic.stopAria": "Stop recording",
   "composer.mic.recordAria": "Record a voice message",
-  "composer.mic.transcribing": "Transcribing…",
-  "composer.mic.recording": "Recording {elapsed}",
-  "composer.mic.handsFreeHint": "will send when you stop",
-  "composer.mic.manualHint": "lands in the message box",
-  "composer.mic.stop": "Stop",
   "composer.mic.discardAria": "Discard recording",
   "composer.attach.aria": "Attach file",
   "composer.attach.title": "Attach",
@@ -1310,7 +1305,7 @@ export const en = {
   "apiError.upload.bad_type": "Collie can't send that kind of file: {type}",
   "apiError.upload.write_failed": "The file couldn't be saved on the host: {reason}",
   "apiError.stt.unconfigured": "Speech-to-text isn't set up on this collie.",
-  "apiError.stt.too_large": "That recording is too long — record a shorter one.",
+  "apiError.stt.too_large": "That recording is too long. Record a shorter one.",
   "apiError.stt.bad_format": "This browser recorded a format Collie can't send on.",
   "apiError.stt.busy": "Two recordings are already being transcribed — try again in a moment.",
   "apiError.stt.unreadable": "That recording couldn't be read.",
@@ -1330,10 +1325,8 @@ export const en = {
   "apiError.crew.not_lead": "This collie doesn't lead a crew, so there is no crew to show.",
   // The key mirrors the wire code `crew.not_lead` (`bridge/error-codes.ts`). Both say crew from 1.8.0.
   // --- worktrees (ADR 0032) ---
-  "apiError.worktree.list_failed": "The worktrees couldn't be listed: {reason}",
   "apiError.worktree.create_failed": "The worktree couldn't be created: {reason}",
   "apiError.worktree.created_not_opened": "The branch was created, but nothing could be opened on it: {reason}",
-  "apiError.worktree.open_failed": "The worktree couldn't be opened: {reason}",
   "apiError.worktree.busy": "Another worktree operation is still running — try again in a moment.",
   "apiError.worktree.ambiguous_branch": "That branch name matches more than one thing: {reason}",
   "apiError.worktree.branch_required": "Type a branch name first.",
@@ -1686,6 +1679,16 @@ export const en = {
   "pushTitle.machine.cpu": "CPU stays high on {machine}",
   "pushTitle.machine.mem": "Memory stays high on {machine}",
   "pushTitle.machine.disk": "Disk stays full on {machine}",
+
+  // --- settings.speech and stt.model (Whistle, ADR 0096) ---
+  // The host's option and the ChatGPT (Codex) consent (ADR 0097). The four consent paragraphs are
+  // `collie stt setup`'s words, byte for byte: bridge/stt/codex-setup.test.ts fails when they differ.
+  // Settings → Voice: the hub, Host speech and Whistle model (ADR 0096, ADR 0097). "Audio" is the one
+  // label for where audio goes, everywhere; each destination has one fixed sentence.
+  // The Status row. `{detail}` is one of the sentences below, so the state word comes first in every
+  // language and the sentence after it says what the state rests on.
+  // `{reason}` is the host's own words, in English: they come from the host.
+  // The info sheet: the same five facts for every option, in this order.
 } as const;
 
 /** Every key that exists, as a union of string literals. The completeness contract. */

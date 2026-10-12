@@ -25,7 +25,7 @@ export const ko: Dictionary = {
   "settings.section.appearance.title": "화면",
   "settings.section.appearance.blurb": "테마, 언어, 글꼴",
   "settings.section.device.title": "기기",
-  "settings.section.device.blurb": "햅틱, 음성, 젠 모드",
+  "settings.section.device.blurb": "햅틱, 젠 모드",
   "settings.section.alerts.title": "알림",
   "settings.section.alerts.blurb": "알림, 방해 금지 시간",
   "settings.section.system.title": "시스템",
@@ -71,10 +71,10 @@ export const ko: Dictionary = {
   "settings.zen.auto.hint": "휴대폰을 옆으로 돌리면 젠 모드가 자동으로 열리고, 다시 돌리면 닫힙니다.",
 
   // --- settings.handsFree ---
-  "settings.handsFree.title": "음성 직접 전송",
+  "settings.handsFree.title": "핸즈프리 음성",
   "settings.handsFree.description":
-    "음성 인식 텍스트를 입력창에 넣지 않고 터미널로 즉시 전송합니다. 오인식을 방지하기 위해 기본값은 꺼짐입니다.",
-  "settings.handsFree.ariaLabel": "음성 직접 전송: 인식된 텍스트 즉시 전송",
+    "음성 인식 텍스트를 입력창에 넣지 않고 터미널로 즉시 전송합니다. 기본값은 꺼짐입니다. 보통은 인식된 내용을 확인한 뒤 터미널로 보냅니다.",
+  "settings.handsFree.ariaLabel": "핸즈프리 음성: 인식된 텍스트 즉시 전송",
 
   // --- settings.push ---
   "settings.push.title": "푸시 알림",
@@ -267,13 +267,8 @@ export const ko: Dictionary = {
   "composer.placeholder.reply": "응답 입력…",
   "composer.mic.unavailable": "음성 입력을 사용할 수 없습니다",
   "composer.mic.stopAria": "녹음 중지",
-  "composer.mic.recordAria": "음성 녹음",
-  "composer.mic.transcribing": "텍스트 변환 중…",
-  "composer.mic.recording": "녹음 중 {elapsed}",
-  "composer.mic.handsFreeHint": "중지 시 자동 전송",
-  "composer.mic.manualHint": "입력창에 텍스트로 삽입",
-  "composer.mic.stop": "중지",
-  "composer.mic.discardAria": "녹음 취소",
+  "composer.mic.recordAria": "음성 메시지 녹음",
+  "composer.mic.discardAria": "녹음 삭제",
   "composer.attach.aria": "파일 첨부",
   "composer.attach.title": "첨부",
   "composer.attach.photos": "사진",
@@ -1217,13 +1212,13 @@ export const ko: Dictionary = {
   "apiError.upload.no_file": "전송된 파일이 없습니다.",
   "apiError.upload.bad_type": "Collie에서 지원하지 않는 파일 형식입니다: {type}",
   "apiError.upload.write_failed": "호스트에 파일을 저장하지 못했습니다: {reason}",
-  "apiError.stt.unconfigured": "해당 collie에 음성 인식(STT)이 구성되지 않았습니다.",
+  "apiError.stt.unconfigured": "이 collie에는 음성 인식이 설정되어 있지 않습니다.",
   "apiError.stt.too_large": "녹음 길이가 초과되었습니다. 더 짧게 녹음하십시오.",
   "apiError.stt.bad_format": "브라우저에서 Collie가 처리할 수 없는 형식으로 녹음되었습니다.",
-  "apiError.stt.busy": "이미 두 개의 음성을 변환 중입니다. 잠시 후 다시 시도하십시오.",
+  "apiError.stt.busy": "이미 녹음 두 개를 텍스트로 변환하는 중입니다. 잠시 후 다시 시도하십시오.",
   "apiError.stt.unreadable": "녹음 데이터를 읽을 수 없습니다.",
   "apiError.stt.empty": "녹음 데이터가 비어 있습니다.",
-  "apiError.stt.provider_failed": "음성 변환에 실패했습니다: {reason}",
+  "apiError.stt.provider_failed": "텍스트 변환에 실패했습니다: {reason}",
   "apiError.pairing.bad_request": "코드 또는 이름을 사용할 수 없습니다. 이름은 1~48자여야 합니다.",
   "apiError.pairing.no_pending": "호스트에 대기 중인 페어링 코드가 없습니다.",
   "apiError.pairing.expired": "만료된 페어링 코드입니다.",
@@ -1237,10 +1232,8 @@ export const ko: Dictionary = {
   "apiError.host.unknown": "해당 크루에 {host} collie가 없습니다.",
   "apiError.crew.not_lead": "해당 collie가 크루를 lead하지 않으므로 표시할 크루가 없습니다.",
   // --- worktrees (ADR 0032) ---
-  "apiError.worktree.list_failed": "worktree 목록을 가져오지 못했습니다: {reason}",
   "apiError.worktree.create_failed": "worktree를 생성하지 못했습니다: {reason}",
   "apiError.worktree.created_not_opened": "브랜치는 생성되었으나 대상 항목을 열지 못했습니다: {reason}",
-  "apiError.worktree.open_failed": "worktree를 열지 못했습니다: {reason}",
   "apiError.worktree.busy": "다른 worktree 작업이 진행 중입니다. 잠시 후 다시 시도하십시오.",
   "apiError.worktree.ambiguous_branch": "브랜치 이름이 여러 대상과 일치합니다: {reason}",
   "apiError.worktree.branch_required": "브랜치 이름을 먼저 입력하십시오.",
@@ -1512,4 +1505,8 @@ export const ko: Dictionary = {
   "pushTitle.machine.cpu": "{machine}의 CPU가 계속 높음",
   "pushTitle.machine.mem": "{machine}의 메모리가 계속 높음",
   "pushTitle.machine.disk": "{machine}의 디스크가 계속 가득 참",
+
+  // --- settings.speech and stt.model (Whistle, ADR 0096) ---
+  // The Host speech provider card and the Codex consent (ADR 0097). The four consent paragraphs are
+  // `collie stt setup`'s words, byte for byte: bridge/stt/codex-setup.test.ts fails when they differ.
 };

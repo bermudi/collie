@@ -18,7 +18,7 @@ export const fr: Dictionary = {
   "settings.section.appearance.title": "Apparence",
   "settings.section.appearance.blurb": "Thème, langue, polices",
   "settings.section.device.title": "Appareil",
-  "settings.section.device.blurb": "Retour haptique, voix, mode zen",
+  "settings.section.device.blurb": "Retour haptique, mode zen",
   "settings.section.alerts.title": "Alertes",
   "settings.section.alerts.blurb": "Notifications, heures de silence",
   "settings.section.system.title": "Système",
@@ -216,11 +216,6 @@ export const fr: Dictionary = {
   "composer.mic.unavailable": "Saisie vocale indisponible",
   "composer.mic.stopAria": "Arrêter l'enregistrement",
   "composer.mic.recordAria": "Enregistrer un message vocal",
-  "composer.mic.transcribing": "Transcription…",
-  "composer.mic.recording": "Enregistrement {elapsed}",
-  "composer.mic.handsFreeHint": "envoi automatique à l'arrêt",
-  "composer.mic.manualHint": "inséré dans le champ de saisie",
-  "composer.mic.stop": "Arrêter",
   "composer.mic.discardAria": "Supprimer l'enregistrement",
   "composer.attach.aria": "Joindre un fichier",
   "composer.attach.title": "Joindre",
@@ -1086,10 +1081,8 @@ export const fr: Dictionary = {
   "apiError.session.unknown": "Il n'y a pas de session nommée {session} sur ce collie.",
   "apiError.host.unknown": "Il n'y a pas de collie nommé {host} dans cette crew.",
   "apiError.crew.not_lead": "Ce collie ne dirige pas de crew, il n'y a donc aucune crew à afficher.",
-  "apiError.worktree.list_failed": "Impossible de lister les worktrees : {reason}",
   "apiError.worktree.create_failed": "Impossible de créer le worktree : {reason}",
   "apiError.worktree.created_not_opened": "La branche a été créée, mais rien n'a pu y être ouvert : {reason}",
-  "apiError.worktree.open_failed": "Impossible d'ouvrir le worktree : {reason}",
   "apiError.worktree.busy": "Une autre opération de worktree est en cours, réessayez dans un instant.",
   "apiError.worktree.ambiguous_branch": "Ce nom de branche correspond à plusieurs éléments : {reason}",
   "apiError.worktree.branch_required": "Entrez d'abord un nom de branche.",
@@ -1331,4 +1324,8 @@ export const fr: Dictionary = {
   "pushTitle.machine.cpu": "Utilisation processeur élevée sur {machine}",
   "pushTitle.machine.mem": "Mémoire toujours élevée sur {machine}",
   "pushTitle.machine.disk": "Disque toujours plein sur {machine}",
+
+  // --- settings.speech and stt.model (Whistle, ADR 0096) ---
+  // The Host speech provider card and the Codex consent (ADR 0097). The four consent paragraphs are
+  // `collie stt setup`'s words, byte for byte: bridge/stt/codex-setup.test.ts fails when they differ.
 };

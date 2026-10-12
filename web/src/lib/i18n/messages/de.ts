@@ -25,7 +25,7 @@ export const de: Dictionary = {
   "settings.section.appearance.title": "Darstellung",
   "settings.section.appearance.blurb": "Design, Sprache, Schriften",
   "settings.section.device.title": "Gerät",
-  "settings.section.device.blurb": "Haptik, Sprache, Zen-Modus",
+  "settings.section.device.blurb": "Haptik, Zen-Modus",
   "settings.section.alerts.title": "Hinweise",
   "settings.section.alerts.blurb": "Mitteilungen, Ruhezeiten",
   "settings.section.system.title": "System",
@@ -71,10 +71,10 @@ export const de: Dictionary = {
   "settings.zen.auto.hint": "Beim seitlichen Drehen öffnet sich der Zen-Modus automatisch; beim Zurückdrehen schließt er sich wieder.",
 
   // --- settings.handsFree ---
-  "settings.handsFree.title": "Freisprechen",
+  "settings.handsFree.title": "Freihändige Spracheingabe",
   "settings.handsFree.description":
     "Transkript sofort senden, statt es im Eingabefeld abzulegen. Standardmäßig deaktiviert, um Eingaben vor dem Senden an das Terminal prüfen zu können.",
-  "settings.handsFree.ariaLabel": "Freisprechen: Transkript sofort senden",
+  "settings.handsFree.ariaLabel": "Freihändige Spracheingabe: Transkript sofort senden",
 
   // --- settings.push ---
   "settings.push.title": "Push-Benachrichtigungen",
@@ -273,11 +273,6 @@ export const de: Dictionary = {
   "composer.mic.unavailable": "Spracheingabe nicht verfügbar",
   "composer.mic.stopAria": "Aufnahme beenden",
   "composer.mic.recordAria": "Sprachnachricht aufnehmen",
-  "composer.mic.transcribing": "Transkription läuft…",
-  "composer.mic.recording": "Aufnahme: {elapsed}",
-  "composer.mic.handsFreeHint": "Wird beim Beenden gesendet",
-  "composer.mic.manualHint": "Wird in das Eingabefeld eingefügt",
-  "composer.mic.stop": "Stopp",
   "composer.mic.discardAria": "Aufnahme verwerfen",
   "composer.attach.aria": "Datei anhängen",
   "composer.attach.title": "Anhängen",
@@ -1231,7 +1226,7 @@ export const de: Dictionary = {
   "apiError.upload.bad_type": "Collie unterstützt diesen Dateityp nicht: {type}",
   "apiError.upload.write_failed":
     "Datei konnte nicht auf dem Host gespeichert werden: {reason}",
-  "apiError.stt.unconfigured": "Spracherkennung ist auf dieser collie-Instanz nicht eingerichtet.",
+  "apiError.stt.unconfigured": "Spracherkennung ist auf dieser Collie-Instanz nicht eingerichtet.",
   "apiError.stt.too_large": "Aufnahme ist zu lang. Bitte eine kürzere Aufnahme wählen.",
   "apiError.stt.bad_format":
     "Audioformat des Browsers wird von Collie nicht unterstützt.",
@@ -1254,10 +1249,8 @@ export const de: Dictionary = {
   "apiError.host.unknown": "Kein collie namens {host} in dieser Crew vorhanden.",
   "apiError.crew.not_lead": "Dieser collie führt keine Crew. Es gibt keine Crew anzuzeigen.",
   // --- worktrees (ADR 0032) ---
-  "apiError.worktree.list_failed": "Worktrees konnten nicht aufgelistet werden: {reason}",
   "apiError.worktree.create_failed": "Worktree konnte nicht erstellt werden: {reason}",
   "apiError.worktree.created_not_opened": "Branch wurde erstellt, konnte jedoch nicht geöffnet werden: {reason}",
-  "apiError.worktree.open_failed": "Worktree konnte nicht geöffnet werden: {reason}",
   "apiError.worktree.busy": "Ein anderer Worktree-Vorgang läuft noch. Bitte kurz warten.",
   "apiError.worktree.ambiguous_branch": "Branch-Name ist mehrdeutig: {reason}",
   "apiError.worktree.branch_required": "Bitte zuerst einen Branch-Namen angeben.",
@@ -1529,4 +1522,8 @@ export const de: Dictionary = {
   "pushTitle.machine.cpu": "CPU bleibt hoch auf {machine}",
   "pushTitle.machine.mem": "Speicher bleibt hoch auf {machine}",
   "pushTitle.machine.disk": "Festplatte bleibt voll auf {machine}",
+
+  // --- settings.speech and stt.model (Whistle, ADR 0096) ---
+  // The Host speech provider card and the Codex consent (ADR 0097). The four consent paragraphs are
+  // `collie stt setup`'s words, byte for byte: bridge/stt/codex-setup.test.ts fails when they differ.
 };

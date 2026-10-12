@@ -90,6 +90,8 @@ describe("SettingsRoute — the index", () => {
       .filter((text) => /Appearance|Device|Alerts|System/.test(text));
     expect(rows).toHaveLength(4);
     expect(rows[0]).toContain("Appearance");
+    expect(rows[1]).toContain("Device");
+    expect(rows[2]).toContain("Alerts");
     expect(rows[3]).toContain("System");
   });
 

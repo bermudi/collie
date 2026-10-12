@@ -25,7 +25,7 @@ export const zh: Dictionary = {
   "settings.section.appearance.title": "外观",
   "settings.section.appearance.blurb": "主题、语言、字体",
   "settings.section.device.title": "设备",
-  "settings.section.device.blurb": "触感、语音、禅模式",
+  "settings.section.device.blurb": "触感、禅模式",
   "settings.section.alerts.title": "提醒",
   "settings.section.alerts.blurb": "通知、免打扰时段",
   "settings.section.system.title": "系统",
@@ -260,11 +260,6 @@ export const zh: Dictionary = {
   "composer.mic.unavailable": "语音输入不可用",
   "composer.mic.stopAria": "停止录音",
   "composer.mic.recordAria": "录制语音消息",
-  "composer.mic.transcribing": "正在转写…",
-  "composer.mic.recording": "正在录音 {elapsed}",
-  "composer.mic.handsFreeHint": "停止后自动发送",
-  "composer.mic.manualHint": "内容将填入输入框",
-  "composer.mic.stop": "停止",
   "composer.mic.discardAria": "放弃录音",
   "composer.attach.aria": "附加文件",
   "composer.attach.title": "添加附件",
@@ -1205,7 +1200,7 @@ export const zh: Dictionary = {
   "apiError.upload.bad_type": "Collie 不支持该文件格式：{type}",
   "apiError.upload.write_failed": "无法在主机上保存文件：{reason}",
   "apiError.stt.unconfigured": "当前 collie 实例未配置语音转文字服务。",
-  "apiError.stt.too_large": "录音时长超出限制，请提供较短的音频。",
+  "apiError.stt.too_large": "录音时长超出限制，请录制较短的音频。",
   "apiError.stt.bad_format": "当前浏览器录制的音频格式不被 Collie 支持。",
   "apiError.stt.busy": "已有两个录音正在转写，请稍后重试。",
   "apiError.stt.unreadable": "无法读取录音数据。",
@@ -1224,10 +1219,8 @@ export const zh: Dictionary = {
   "apiError.host.unknown": "当前机组中不存在名为 {host} 的 collie 实例。",
   "apiError.crew.not_lead": "当前 collie 不是机组 lead，无可展示的机组。",
   // --- worktrees (ADR 0032) ---
-  "apiError.worktree.list_failed": "获取 worktree 列表失败：{reason}",
   "apiError.worktree.create_failed": "创建 worktree 失败：{reason}",
   "apiError.worktree.created_not_opened": "分支创建成功，但无法在其上打开工作区：{reason}",
-  "apiError.worktree.open_failed": "打开 worktree 失败：{reason}",
   "apiError.worktree.busy": "另一个 worktree 操作正在执行，请稍后重试。",
   "apiError.worktree.ambiguous_branch": "分支名称存在多处匹配：{reason}",
   "apiError.worktree.branch_required": "请指定分支名称。",
@@ -1499,4 +1492,8 @@ export const zh: Dictionary = {
   "pushTitle.machine.cpu": "{machine} 的 CPU 持续偏高",
   "pushTitle.machine.mem": "{machine} 的内存持续偏高",
   "pushTitle.machine.disk": "{machine} 的磁盘持续占满",
+
+  // --- settings.speech and stt.model (Whistle, ADR 0096) ---
+  // The Host speech provider card and the Codex consent (ADR 0097). The four consent paragraphs are
+  // `collie stt setup`'s words, byte for byte: bridge/stt/codex-setup.test.ts fails when they differ.
 };

@@ -61,6 +61,9 @@ let currentMux: MuxConfig | null = null;
 let currentUpload: UploadCapability | null = null;
 let inflight: Promise<void> | null = null;
 let loaded = false;
+// True once any read has succeeded, and unlike `loaded` it stays true through `refreshOperatorConfig`,
+// so a page that must tell "not asked yet" from "asked, and nothing was offered" does not flicker.
+let everLoaded = false;
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -93,6 +96,7 @@ export function loadOperatorCommands(): Promise<void> {
       currentMux = cfg.mux ?? null;
       currentUpload = cfg.upload ?? null;
       loaded = true;
+      everLoaded = true;
       emit();
     } catch {
       // Additive feature — see the header. Leave the list empty and allow a later retry.
@@ -286,5 +290,12 @@ export function __resetOperatorCommands(): void {
   currentUpload = null;
   inflight = null;
   loaded = false;
+  everLoaded = false;
   listeners.clear();
 }
+
+/** Whether a read of the config has ever succeeded in this page session. */
+export function operatorConfigRead(): boolean {
+  return everLoaded;
+}
+

@@ -8,6 +8,7 @@ import { askInApp, openNotificationTarget, type OpenOutcome, type OpenTargetClie
 import { readPushTitles } from "./lib/push-title-store";
 import { FONT_URLS, navigationNetworkOnlyUnder } from "./lib/sw-routes";
 
+
 // Where this worker is mounted (ADR 0052): the directory it was fetched from, which is the mount
 // the app registered it under (lib/pwa.ts) — `/` at the origin root, `/collie/` behind a proxy that
 // gives Collie a path. One build serves any mount, so nothing here is a build-time constant: every

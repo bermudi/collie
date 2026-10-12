@@ -1,5 +1,6 @@
 import { basePath, mounted } from "./base-path";
 import { BUILD, isStaleBuild } from "./build";
+import { setChunkReloader } from "./chunk-reload";
 import { UPDATE_MODE_HOLD, isReloadHeld, isReloadHeldBy, subscribeReloadHeld } from "./reload-guard";
 import { getServerBuild, subscribeServerBuild } from "./server-build";
 
@@ -212,6 +213,10 @@ function reloadOnce(lane: ReloadLane) {
   window.location.reload();
 }
 
+// A lazy chunk the new build no longer has reloads the page through the automatic lane, so it shares
+// that lane's latch and the `navigating` flag (lib/chunk-reload.ts holds the held-draft and loop checks).
+setChunkReloader(() => reloadOnce("auto"));
+
 // Last-resort reload that BYPASSES a wedged service worker: unregister every registration first, so
 // the ensuing navigation fetches straight from the bridge instead of being answered from the stale
 // precache (a plain reload stays controlled by the active worker and would re-serve the SAME old
@@ -232,7 +237,7 @@ async function forceReload(lane: ReloadLane): Promise<void> {
   // Deleting the caches needs no job and cannot be queued behind one. With its precache gone,
   // workbox's precache handler falls through to the network (`fallbackToNetwork`), so the navigation
   // below reaches the bridge whether the unregister ever lands or not. Every cache, not the precache
-  // by name: the name is workbox's to change, and the only other one is the font cache
+  // by name: the name is workbox's to change, and the other is the font cache
   // (`src/sw.ts` FONT_CACHE), which re-fills on first use.
   try {
     const keys = await caches.keys();

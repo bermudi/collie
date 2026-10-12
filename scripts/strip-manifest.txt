@@ -129,6 +129,29 @@ web/src/lib/mirror-images.test.ts
 web/src/hooks/use-mirror-images.ts
 web/src/hooks/use-mirror-images.test.ts
 
+# ── The 1.20 voice rebuild (upstream ADRs 0096/0097): Whistle engine, the in-page ──
+# ── speech worker, the Voice settings page — all inside ADR 9004's STT strip ──
+web/src/stt/                              # the in-page speech worker, its protocol and pins
+web/public/stt/                           # the vendored Needle wasm + model it runs
+web/src/lib/stt-*                         # stt-cache/-consent/-engine/-model/-pcm and their tests
+web/src/lib/stt.test.ts                   # tests the already-stripped stt.ts
+web/src/lib/voice*                        # voice.ts, voice.test.ts, voice-levels (+test)
+web/src/lib/audio-meter.ts                # the takeover's level meter
+web/src/lib/speech-endpoint.ts            # endpoint detection for the takeover
+web/src/lib/speech-endpoint.test.ts
+web/src/lib/update-run-store-retry.test.ts # retry test for the stripped update-run-store
+web/src/components/speech-control.tsx     # the Voice settings cards
+web/src/components/speech-control.test.tsx
+web/src/components/voice-*                # voice-empty, voice-parts, voice-takeover (+test)
+web/src/components/composer-stt-phone.test.tsx
+web/src/hooks/use-phone-engine.ts         # the phone-side engine hook
+web/src/hooks/use-stored-model.ts         # the model-copy store
+web/src/hooks/use-voice-levels.ts
+web/src/hooks/use-stt-recorder.test.ts    # tests the already-stripped recorder hook
+web/src/hooks/use-stt-recorder-phone.test.ts
+web/src/playground/sections/voice-takeover.tsx
+web/src/routes/settings-voice.test.tsx
+
 # ── e2e for the stripped surfaces ────────────────────────────────────────────
 web/e2e/fixtures/mirror.ts
 web/e2e/m24-crew.spec.ts
@@ -141,6 +164,8 @@ web/e2e/live/redirect.spec.ts
 web/e2e/live/updates.spec.ts
 web/e2e/update-screen.spec.ts
 web/e2e/update-band-overflow.spec.ts
+web/e2e/stt-*.spec.ts                     # the phone speech worker and its CSP spec
+web/e2e/voice-takeover.spec.ts
 
 # ── Upstream ADR rows reserved-but-empty on Pup (crew/STT/pack/CLI decisions) ──
 # Pup's own ADRs live in the 9000 series; these numbers stay reserved (see .adr/README.md).
@@ -167,3 +192,5 @@ web/e2e/update-band-overflow.spec.ts
 .adr/0050-*.md
 .adr/0062-*.md
 .adr/0064-*.md
+.adr/0096-*.md                            # speech-on-the-phone (ADR 0096) — the STT strip
+.adr/0097-*.md                            # codex speech from Settings (ADR 0097) — the STT strip

@@ -16,3 +16,7 @@
 # NOT package.json: upstream's real script changes there must arrive, conflict and all.
 herdr-plugin.toml merge=ours
 README.md merge=ours
+
+# The vendored speech engine is pinned by hash (ADR 0096). A Windows checkout with autocrlf would
+# rewrite the glue's line endings and the served bytes would no longer be the hashed bytes.
+web/public/stt/** -text

@@ -17,7 +17,7 @@ import { BandMain } from "@/components/ui/strip-host";
 
 // ── THE SETTINGS INDEX ──────────────────────────────────────────────────────────────────────────
 //
-// Four rows, each opening a section (routes/settings-sections.tsx, which explains the split), then
+// Five rows, each opening a section (routes/settings-sections.tsx, which explains the split), then
 // Machines (a page, not a section) and, while Experiments holds anything, Experiments.
 //
 // This page used to BE the settings: seventeen cards in one column, over a thousand pixels of

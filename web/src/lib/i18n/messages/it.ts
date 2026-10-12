@@ -18,7 +18,7 @@ export const it: Dictionary = {
   "settings.section.appearance.title": "Aspetto",
   "settings.section.appearance.blurb": "Tema, lingua, caratteri",
   "settings.section.device.title": "Dispositivo",
-  "settings.section.device.blurb": "Feedback aptico, voce, modalità zen",
+  "settings.section.device.blurb": "Feedback aptico, modalità zen",
   "settings.section.alerts.title": "Avvisi",
   "settings.section.alerts.blurb": "Notifiche, ore di silenzio",
   "settings.section.system.title": "Sistema",
@@ -216,11 +216,6 @@ export const it: Dictionary = {
   "composer.mic.unavailable": "Input vocale non disponibile",
   "composer.mic.stopAria": "Interrompi registrazione",
   "composer.mic.recordAria": "Registra un messaggio vocale",
-  "composer.mic.transcribing": "Trascrizione in corso…",
-  "composer.mic.recording": "Registrazione {elapsed}",
-  "composer.mic.handsFreeHint": "invierà quando ti fermi",
-  "composer.mic.manualHint": "arriva nella casella del messaggio",
-  "composer.mic.stop": "Interrompi",
   "composer.mic.discardAria": "Scarta registrazione",
   "composer.attach.aria": "Allega file",
   "composer.attach.title": "Allega",
@@ -1067,7 +1062,7 @@ export const it: Dictionary = {
   "apiError.upload.no_file": "Nessun file inviato.",
   "apiError.upload.bad_type": "Collie non può inviare questo tipo di file: {type}",
   "apiError.upload.write_failed": "Impossibile salvare il file sull'host: {reason}",
-  "apiError.stt.unconfigured": "La sintesi vocale non è configurata su questo collie.",
+  "apiError.stt.unconfigured": "La trascrizione vocale non è configurata su questo collie.",
   "apiError.stt.too_large": "La registrazione è troppo lunga, registrane una più breve.",
   "apiError.stt.bad_format": "Questo browser ha registrato un formato che Collie non può inoltrare.",
   "apiError.stt.busy": "Due registrazioni sono già in trascrizione, riprova tra poco.",
@@ -1086,10 +1081,8 @@ export const it: Dictionary = {
   "apiError.session.unknown": "Nessuna sessione chiamata {session} su questo collie.",
   "apiError.host.unknown": "Nessun collie chiamato {host} in questa crew.",
   "apiError.crew.not_lead": "Questo collie non guida una crew, non c'è nessuna crew da mostrare.",
-  "apiError.worktree.list_failed": "Impossibile elencare i worktree: {reason}",
   "apiError.worktree.create_failed": "Impossibile creare il worktree: {reason}",
   "apiError.worktree.created_not_opened": "Il branch è stato creato, ma non è stato possibile aprirvi nulla: {reason}",
-  "apiError.worktree.open_failed": "Impossibile aprire il worktree: {reason}",
   "apiError.worktree.busy": "Un'altra operazione sui worktree è ancora in corso, riprova tra poco.",
   "apiError.worktree.ambiguous_branch": "Quel nome di ramo corrisponde a più elementi: {reason}",
   "apiError.worktree.branch_required": "Inserisci prima il nome di un ramo.",
@@ -1331,4 +1324,8 @@ export const it: Dictionary = {
   "pushTitle.machine.cpu": "CPU ancora elevata su {machine}",
   "pushTitle.machine.mem": "Memoria sempre alta su {machine}",
   "pushTitle.machine.disk": "Disco sempre pieno su {machine}",
+
+  // --- settings.speech and stt.model (Whistle, ADR 0096) ---
+  // The Host speech provider card and the Codex consent (ADR 0097). The four consent paragraphs are
+  // `collie stt setup`'s words, byte for byte: bridge/stt/codex-setup.test.ts fails when they differ.
 };

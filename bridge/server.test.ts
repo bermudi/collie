@@ -47,6 +47,7 @@ import {
   replyPane,
   resolvePaneCwd,
   requestBodyCap,
+  pairedLabel,
   requestDevice,
   resetStaticGzipCache,
   resolveStaticPath,
@@ -1549,6 +1550,33 @@ describe("requestDevice — attribution across both gates", () => {
   });
 });
 
+describe("pairedLabel — the name Settings credits a change to", () => {
+  const gate = {
+    enforced: () => true,
+    resolve: (token: string | null) => (token === "tok-phone" ? { label: "Pixel 8" } : null),
+    local: (token: string | null) => token === "tok-local",
+  };
+
+  test("the pairing label of the token, and nothing else", () => {
+    expect(pairedLabel(req({ host: "h", authorization: "Bearer tok-phone" }), gate)).toBe("Pixel 8");
+    // A header name is for the gate, not for a screen.
+    expect(pairedLabel(req({ host: "h", "x-device-id": "desk" }), gate)).toBeNull();
+    expect(pairedLabel(req({ host: "h", authorization: "Bearer tok-unknown" }), gate)).toBeNull();
+    expect(pairedLabel(req({ host: "h", authorization: "Bearer tok-local" }), gate)).toBeNull();
+    expect(pairedLabel(req({ host: "h", authorization: "Bearer tok-phone" }))).toBeNull();
+  });
+
+  test("a registry that cannot be read names nobody", () => {
+    const broken = {
+      enforced: () => true,
+      resolve: (): { label: string } | null => {
+        throw new Error("unreadable");
+      },
+    };
+    expect(pairedLabel(req({ host: "h", authorization: "Bearer tok-phone" }), broken)).toBeNull();
+  });
+});
+
 // ── Open routes (M46 specs 03 and 06, ADR 0086) ─────────────────────────────────────────────
 // Reads need the pairing token, and pairing is always on. The open-route list is short and named:
 // `/api/health` and `/api/pair`. The crew surface (`/crew/v1/*`) and the standby door have their own
@@ -2040,6 +2068,7 @@ describe("serveStatic — a text file ships gzipped", () => {
   });
 });
 
+
 describe("stripMount — a proxy that forwards the mount instead of stripping it", () => {
   test("takes the mount off a path that carries it, and only then", () => {
     expect(stripMount("/collie/api/health", "/collie/")).toBe("/api/health");
@@ -2204,6 +2233,7 @@ describe("bridgeConfigBody — the masking switch is reported, and omitted when 
     ]);
   });
 });
+
 
 // The mux block (M10/06) — how the phone learns what the multiplexer underneath can do, without
 // ever learning to branch on which one it is. Same reason as above: the handler is inside Bun.serve,
