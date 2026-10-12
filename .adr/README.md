@@ -178,6 +178,11 @@ the pointer, it was a supersede.
 | [0101](./0101-a-control-on-a-screenless-pane-names-the-turn-it-saw.md) | A control on a screenless pane names the turn it saw: send and abort carry a turn id or ask id and a request id, and a stale one gets 409 | Accepted |
 | [0102](./0102-starters-are-launcher-rows.md) | Starters are launcher rows: a program's starters ride `GET /api/launchers` and `POST /api/launch` with the ADR 0091 receipt | Accepted |
 | [0103](./0103-the-wire-has-two-transports-a-private-socket-or-tls-with-a-token.md) | The wire has two transports: a private socket, or TLS with a token: `COLLIE_DURABLE_URL` and `COLLIE_DURABLE_TOKEN` as a pair, exclusive with the socket; `https://` only, loopback `http://` with a port for `wrangler dev`; a token of at least 32 bytes on every request, never printed; 401 or 403 is `token-refused`; 2 s and 10 s polls and 5000 ms budgets because each poll is billed; the program checks the token first, in constant time; version stays 1 (amends 0099 in scope) | Accepted |
+||||||| parent of 7cebbb65 (docs(adr): 9005 — the herd-list worktree nest is an upstream-bound divergence)
+| [9001](./9001-opencode-sessions-are-pane-scoped.md) | Opencode sessions are pane-scoped, not server-scoped | Accepted (Pup) |
+| [9002](./9002-a-journal-image-reference-is-never-a-remote-url.md) | A journal image reference is this bridge's blob path or inline bytes, never a remote URL | Accepted (Pup) |
+| [9003](./9003-the-mirror-does-not-guess-images.md) | The mirror does not reconstruct terminal images; blank image rows collapse | Accepted (Pup) |
+| [9004](./9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md) | Pup tracks upstream wholesale and strips the pack, not the viewer | Accepted (Pup) |
 
 Numbers are claimed across **both** branches: 0011–0016 were accepted here on `v1` while `main` was
 still at 0010, so a new ADR continues from the highest number in use anywhere, not the highest one on
