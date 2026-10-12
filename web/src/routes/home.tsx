@@ -29,7 +29,7 @@ import { useLaunchers } from "@/lib/launchers";
 import { useMuxCapability } from "@/lib/mux-capability";
 import { setStatus } from "@/lib/status";
 import { isolateSpaces } from "@/lib/spaces";
-import { ambientHost, ambientPanes, isMultiHost, paneRowKey, paneScope, sessionsOnHost } from "@/lib/hosts";
+import { ambientHost, ambientPanes, isMultiHost, paneRowKey, paneScope, primarySession, sessionsOnHost } from "@/lib/hosts";
 import { setMachineHidden, useHiddenMachines } from "@/lib/hidden-machines";
 import type { ChangesLookup } from "@/lib/api";
 import type { DashView } from "@/lib/dash-view";
@@ -264,6 +264,12 @@ export function HomeRoute() {
               stale={data.stale === true}
               tabs={data.tabs}
               servers={data.servers}
+              // The ambient machine's workspace records, so a worktree's section nests under the
+              // section showing its repo (agent-list.tsx). `ambientSpaces` already narrowed them to
+              // the addressed host; the ambient session's name is the second half of the match, so a
+              // widened list's other-session group can never link to a record that isn't its own.
+              workspaces={data.workspaces}
+              ambientSession={data.scope.session ?? primarySession(sessionsHere)}
               // Each workspace heading's "+" (M40/03): the list resolves each heading's own machine and
               // session from these, the way a row's tap does, and sends the create there.
               newTab={{

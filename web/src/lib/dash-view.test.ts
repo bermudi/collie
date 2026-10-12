@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   coerceDashView,
   isLegacyDashView,
+  nestWorkspaceGroups,
   pinnedRows,
   shownGroups,
   stripEntries,
@@ -11,7 +12,7 @@ import {
 } from "./dash-view";
 import { groupPanesByWorkspace } from "./pane-groups";
 import { currentPins, pinMatcher, setPinned } from "./pins";
-import type { AgentView } from "./types";
+import type { AgentView, WorkspaceView } from "./types";
 
 // Issue 270's filter, as the "Focus" tab draws it (ADR 0066, renamed by ADR 0068): it removes rows
 // and moves nothing.
@@ -173,6 +174,64 @@ describe("coerceDashView", () => {
       true,
       false,
       false,
+    ]);
+  });
+});
+
+// Worktree nesting (lib/pane-groups.ts does the linking; this is the render shape): a child nests
+// only while its parent is on the same screen.
+describe("nestWorkspaceGroups", () => {
+  const REPO = "/home/you/little-goblin";
+  const ws = (workspaceId: string, over: Partial<WorkspaceView> = {}): WorkspaceView => ({
+    workspaceId,
+    number: 1,
+    label: workspaceId,
+    focused: false,
+    activeTabId: `${workspaceId}:t1`,
+    tabCount: 1,
+    paneCount: 1,
+    ...over,
+  });
+  const records = [
+    ws("w1", { repoRoot: REPO, isWorktree: false }),
+    ws("w9", { repoRoot: REPO, isWorktree: true }),
+    ws("w10", { repoRoot: REPO, isWorktree: true }),
+  ];
+  const herd = [
+    pane("p1", 1, "working"),
+    pane("p1", 9, "working", { workspaceLabel: "tree-a" }),
+    pane("p1", 10, "working", { workspaceLabel: "tree-b" }),
+    pane("p1", 2, "working"),
+  ];
+  const grouped = groupPanesByWorkspace(herd, [], { workspaces: records });
+  const names = (nodes: ReturnType<typeof nestWorkspaceGroups>) =>
+    nodes.map((n) => [n.shown.group.label, n.children.map((c) => c.group.label)] as const);
+
+  it("nests each worktree under the group showing its repo, in the list's own order", () => {
+    expect(names(nestWorkspaceGroups(shownGroups(grouped, false)))).toEqual([
+      ["ws1", ["tree-a", "tree-b"]],
+      ["ws2", []],
+    ]);
+  });
+
+  it("lets a worktree stand flat when its parent left the list", () => {
+    // The parent's whole group is pinned away: the children are still drawn, just not nested.
+    const isPinned = pinMatcher([{ row: "\u0000\u0000w1:p1", space: "ws1", at: 1 }]);
+    const drawn = shownGroups(grouped, false, isPinned);
+    expect(names(nestWorkspaceGroups(drawn))).toEqual([
+      ["tree-a", []],
+      ["tree-b", []],
+      ["ws2", []],
+    ]);
+  });
+
+  it("keeps the rest of the list flat when no group claims a parent", () => {
+    const flat = groupPanesByWorkspace(herd, [], {});
+    expect(names(nestWorkspaceGroups(shownGroups(flat, false)))).toEqual([
+      ["ws1", []],
+      ["ws2", []],
+      ["tree-a", []],
+      ["tree-b", []],
     ]);
   });
 });

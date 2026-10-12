@@ -8,9 +8,9 @@ import { ListGroup } from "@/components/ui/list-group";
 import { groupPanesByWorkspace, type WorkspaceGroup } from "@/lib/pane-groups";
 import { StatusCounts, StatusSummaryLine } from "@/components/status-counts";
 import { ATTENTION, bucketOf, triage, worstTriage } from "@/lib/triage";
-import { groupHost, pinnedRows, shownGroups, stripEntries } from "@/lib/dash-view";
-import type { AgentView, BridgeStatus, ServerSummary, SessionSummary, TabView } from "@/lib/types";
-import { paneRowKey, paneScope } from "@/lib/hosts";
+import { groupHost, nestWorkspaceGroups, pinnedRows, shownGroups, stripEntries, type ShownGroup } from "@/lib/dash-view";
+import type { AgentView, BridgeStatus, ServerSummary, SessionSummary, TabView, WorkspaceView } from "@/lib/types";
+import { ambientHost, paneRowKey, paneScope } from "@/lib/hosts";
 import { machinesHiddenFrom } from "@/lib/hidden-machines";
 import { pinMatcher, type Pin } from "@/lib/pins";
 import { inRankOrder, type PaneOrder } from "@/lib/pane-order";
@@ -77,6 +77,18 @@ interface AgentListProps {
   tabs?: readonly TabView[];
   /** The snapshot's machine list, for the order machines run in: the lead first (lib/pane-groups.ts). */
   servers?: readonly ServerSummary[] | undefined;
+  /**
+   * The ambient machine's workspace records (the loader's `ambientSpaces`), so a worktree's group
+   * nests under the group showing its repo (lib/pane-groups.ts). Omit and every workspace section
+   * stands alone, as the list always drew.
+   */
+  workspaces?: readonly WorkspaceView[];
+  /**
+   * The ambient session's registry name (`?s=`, or the primary's). Workspace records describe the
+   * ambient session only, so on a widened list another session's identically-numbered group must
+   * never link to one. Untagged groups are ambient by the standing rule (lib/hosts.ts).
+   */
+  ambientSession?: string;
   /**
    * The workspace heading's "+" (M40/03, issue 290): a new tab in that workspace, on the heading's
    * own machine and session. Omit and no heading carries one; every strong heading still reserves
@@ -260,6 +272,8 @@ export function AgentList({
   stale = false,
   tabs,
   servers,
+  workspaces,
+  ambientSession,
   newTab,
   isolated = null,
   hidden = NO_KEYS,
@@ -380,7 +394,17 @@ export function AgentList({
   // the one summary line. Push and the badge carry the alarm; this screen answers "where".
   const all = triage(agents);
   const attention = all.filter((s) => ATTENTION.has(s.key) && s.agents.length > 0);
-  const groups = groupPanesByWorkspace(agents, shellPanes, { order: "fixed", tabs, servers });
+  // The ambient machine's member id, resolved: the worktree match compares it against a pane's own
+  // tag, and an absent `?h=` means the lead's, never undefined (lib/hosts.ts `ambientHost`).
+  const ambientHostKey = ambientHost(servers, addressedHost);
+  const groups = groupPanesByWorkspace(agents, shellPanes, {
+    order: "fixed",
+    tabs,
+    servers,
+    workspaces,
+    ambientHost: ambientHostKey,
+    ambientSession,
+  });
   if (groups.length === 0) return null;
   // A stale key (a workspace since closed) filters nothing: an isolation nobody can see is dropped.
   const isolatedGroup = isolated === null ? undefined : groups.find((g) => workspacePrefKey(g) === isolated);
@@ -391,8 +415,11 @@ export function AgentList({
   // (ADR 0070). The addressed machine is never in this set, so the filter cannot empty the list, and
   // on a solo list the set is empty and the clause never matches (lib/hidden-machines.ts).
   const machineHidden = machinesHiddenFrom(hiddenMachines, servers, addressedHost);
+  // Isolate keeps the SAME shape the Spaces navigator gives it (lib/spaces.ts `isolateSpaces`):
+  // isolating the repo's own checkout shows its worktree spaces with it — they are the same
+  // project's spaces — while isolating a worktree shows just that worktree.
   const shown = isolatedGroup
-    ? [isolatedGroup]
+    ? [isolatedGroup, ...groups.filter((g) => g.parentKey === isolatedGroup.key)]
     : groups.filter((g) => !hiddenSet.has(workspacePrefKey(g)) && !machineHidden.has(groupHost(g)));
   const strip = stripEntries(groups, machineHidden, isolatedGroup?.key);
   const allClear = attention.length === 0;
@@ -500,6 +527,26 @@ export function AgentList({
       tint
       stale={stale}
     />
+  );
+
+  // One workspace section's body — its heading (name, urgent dot, counts, "+") and its rows —
+  // shared by a top-level group and by a worktree child nested inside it (the render below).
+  const groupBody = ({ group: g, rows }: ShownGroup): ReactNode => (
+    <>
+      <SectionHeader
+        label={g.label}
+        tone="strong"
+        dot={urgentDot(g)}
+        className="min-h-7"
+        trailing={
+          <>
+            <StatusCounts panes={g.panes} className="shrink-0 text-[11px] text-muted-foreground" />
+            {headingNewTab(g)}
+          </>
+        }
+      />
+      <ListGroup>{rows.map((a) => row(a))}</ListGroup>
+    </>
   );
 
   const summary = (
@@ -643,21 +690,24 @@ export function AgentList({
         </section>
       )}
 
-      {!renderBody && !ranked && drawn.map(({ group: g, rows }) => (
-        <section key={g.key} id={groupDomId(g.key)} className="flex scroll-mt-4 flex-col gap-2">
-          <SectionHeader
-            label={g.label}
-            tone="strong"
-            dot={urgentDot(g)}
-            className="min-h-7"
-            trailing={
-              <>
-                <StatusCounts panes={g.panes} className="shrink-0 text-[11px] text-muted-foreground" />
-                {headingNewTab(g)}
-              </>
-            }
-          />
-          <ListGroup>{rows.map((a) => row(a))}</ListGroup>
+      {/* A worktree's section nests INSIDE the section showing its repo (nestWorkspaceGroups,
+          lib/dash-view.ts): one rail ties the branch to the trunk the way the navigator's lone
+          indent does, and each child keeps its own heading and "+" — it is still a whole workspace,
+          only placed. The rail takes the hairline token, not --rule: it subdivides one region,
+          which is --border's stated job (ListGroup's doctrine). A group whose parent left the list
+          stands flat at its own place — indented under nothing would read as a bug. */}
+      {!renderBody && !ranked && nestWorkspaceGroups(drawn).map((node) => (
+        <section key={node.shown.group.key} id={groupDomId(node.shown.group.key)} className="flex scroll-mt-4 flex-col gap-2">
+          {groupBody(node.shown)}
+          {node.children.length > 0 && (
+            <div className="ml-1.5 flex flex-col gap-3 border-l-2 border-border pl-3">
+              {node.children.map((child) => (
+                <section key={child.group.key} id={groupDomId(child.group.key)} className="flex scroll-mt-4 flex-col gap-2">
+                  {groupBody(child)}
+                </section>
+              ))}
+            </div>
+          )}
         </section>
       ))}
     </div>

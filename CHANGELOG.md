@@ -8,6 +8,19 @@ All notable changes to Collie are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **A worktree's dashboard section nests under the workspace showing its repo** — the herdr
+  sidebar's tree, on the herd's own axis. The Spaces navigator already drew it
+  (`lib/spaces.ts` `nestWorktrees`); the main list kept every workspace flat because
+  `groupPanesByWorkspace` never saw the records. Handed the ambient machine's workspaces and the
+  ambient session's name, a linked worktree's group now carries the key of the group showing its
+  repo's checkout, and the cluster takes the position of its earliest member — the navigator's own
+  rule. Each nested section is still a whole workspace (own heading, counts, "+"), set on a left
+  rail inside the parent's. The link is recomputed per call from what is on screen: a parent lost
+  to isolate, hide, needs-you or pins leaves its worktrees flat, isolating the repo keeps them,
+  and a group tagged with another machine or session can never link — a missed nest degrades to
+  flat, never to a wrong one.
+
 ### Packaging
 - **CI runs only what this fork ships.** The crew drill job — whose `test:crew` script the strip
   removed at the re-branch — leaves ci.yml, and the Windows workflow, whose one job runs the
