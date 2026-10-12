@@ -8,6 +8,8 @@ All notable changes to Collie are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.52.0] - 2026-10-12
+
 ### Added
 - **A worktree's dashboard section nests under the workspace showing its repo** — the herdr
   sidebar's tree, on the herd's own axis. The Spaces navigator already drew it
