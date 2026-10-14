@@ -769,3 +769,10 @@ level ITSELF to the release its lead is running, fetching that public tag from G
 HTTPS on its own decision, which adds no code, route or verb to the link). How the operator
 reached a member is remembered locally in `crew-ops.json`, which is never a wire field and never merged into the trust
 store.
+
+## Devin red lines (Pup)
+
+The devin store (`~/.local/share/devin/cli/sessions.db`, ~9 GB of real transcripts) is probed schema-only:
+`json_tree`/`json_type` with KEYS and TYPES, `json_extract` on enum fields at most; NEVER
+`json_each(<col>, '$.…').value`; message content never enters agent context or the repo; adapter
+fixtures stay synthetic.
