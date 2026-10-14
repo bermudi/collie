@@ -342,6 +342,25 @@ const renderImageCluster = (
     />
   );
 
+// Runs of blank lines collapse to one labelled row — see the old blank-run machinery. A run of cells
+// carrying a bg fill is a band of colour and is never treated as blank.
+const BLANK_RUN_MIN = 4;
+
+function isBlankLine(line: StyledLine): boolean {
+  let text = "";
+  for (const seg of line.segments) {
+    if (seg.bg) return false;
+    text += seg.text;
+  }
+  return text.trim() === "";
+}
+
+function blankRunEnd(lines: readonly StyledLine[], from: number): number {
+  let end = from;
+  while (end < lines.length && isBlankLine(lines[end]!)) end++;
+  return end - 1;
+}
+
 export const AnsiOutput = memo(function AnsiOutput({
   text,
   logicalText,
@@ -620,6 +639,21 @@ export const AnsiOutput = memo(function AnsiOutput({
         }
         nodes.push(renderImageCluster(url, `image:${bi}:${cluster.start}`, onImageError));
         li = cluster.end + 1;
+        continue;
+      }
+      const blankEnd = blankRunEnd(block.lines, li);
+      if (blankEnd - li + 1 >= BLANK_RUN_MIN) {
+        for (let k = li; k <= blankEnd; k++) {
+          if (k > 0) offset += 1;
+          offset += lineText(block.lines[k]!).length;
+        }
+        nodes.push(
+          <Fragment key={`blank:${bi}:${li}`}>
+            {li > 0 ? "\n" : null}
+            <span className="text-muted-foreground/60">{t("mirror.blankLines", { n: blankEnd - li + 1 })}</span>
+          </Fragment>,
+        );
+        li = blankEnd + 1;
         continue;
       }
       const run: TableRun | undefined = runs[ri];

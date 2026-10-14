@@ -1165,6 +1165,7 @@ export const de: Dictionary = {
   // --- mirror (terminal graphics in the pane mirror) ---
   "mirror.imageAlt": "Terminal-Grafik",
   "mirror.imageBadge": "[Bild]",
+  "mirror.blankLines": "[{n} blank lines]",
   "mirror.imageMatchedByOrder": "nach Reihenfolge zugeordnet, zum Prüfen den Verlauf öffnen",
   "mirror.turnImageCaption": "das neueste Bild des Agenten aus seinem Protokoll",
 

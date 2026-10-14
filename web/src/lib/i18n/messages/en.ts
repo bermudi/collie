@@ -1236,6 +1236,7 @@ export const en = {
   // --- mirror (terminal graphics in the pane mirror) ---
   "mirror.imageAlt": "Terminal graphics",
   "mirror.imageBadge": "[Image]",
+  "mirror.blankLines": "[{n} blank lines]",
   "mirror.imageMatchedByOrder": "matched by order, open History to check",
   "mirror.turnImageCaption": "the agent's newest picture, from its log",
 

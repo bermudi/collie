@@ -1145,6 +1145,7 @@ export const zh: Dictionary = {
   // --- mirror (terminal graphics in the pane mirror) ---
   "mirror.imageAlt": "终端图像",
   "mirror.imageBadge": "[图片]",
+  "mirror.blankLines": "[{n} blank lines]",
   "mirror.imageMatchedByOrder": "按顺序匹配，打开历史记录核对",
   "mirror.turnImageCaption": "代理日志中的最新图片",
 

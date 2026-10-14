@@ -1164,6 +1164,7 @@ export const es: Dictionary = {
   // --- mirror (terminal graphics in the pane mirror) ---
   "mirror.imageAlt": "Gráfico de terminal",
   "mirror.imageBadge": "[Imagen]",
+  "mirror.blankLines": "[{n} blank lines]",
   "mirror.imageMatchedByOrder": "emparejada por orden, abre el Historial para comprobarlo",
   "mirror.turnImageCaption": "la imagen más reciente del agente, de su registro",
 

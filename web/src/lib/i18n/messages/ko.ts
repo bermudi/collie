@@ -1155,6 +1155,7 @@ export const ko: Dictionary = {
   // --- mirror (terminal graphics in the pane mirror) ---
   "mirror.imageAlt": "터미널 그래픽",
   "mirror.imageBadge": "[이미지]",
+  "mirror.blankLines": "[{n} blank lines]",
   "mirror.imageMatchedByOrder": "순서로 맞춤, 확인은 기록에서",
   "mirror.turnImageCaption": "에이전트의 로그에서 가져온 최신 사진",
 

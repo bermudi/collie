@@ -1039,6 +1039,7 @@ export const tr: Dictionary = {
   "transcript.attachmentAlt": "Ek",
   "mirror.imageAlt": "Terminal grafikleri",
   "mirror.imageBadge": "[Görsel]",
+  "mirror.blankLines": "[{n} blank lines]",
   "mirror.imageMatchedByOrder": "sıraya göre eşleşti, kontrol etmek için Geçmiş'i açın",
   "mirror.turnImageCaption": "ajanın en yeni resmi, günlüğünden",
   "time.justNow": "az önce",

@@ -1141,6 +1141,7 @@ export const zhTW: Dictionary = {
   // --- mirror (terminal graphics in the pane mirror) ---
   "mirror.imageAlt": "終端機圖形",
   "mirror.imageBadge": "[圖片]",
+  "mirror.blankLines": "[{n} blank lines]",
   "mirror.imageMatchedByOrder": "依順序比對，開啟歷史記錄確認",
   "mirror.turnImageCaption": "代理程式日誌中的最新圖片",
 

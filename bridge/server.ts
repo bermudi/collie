@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
 import { isIP } from "node:net";
 import { homedir, networkInterfaces } from "node:os";
 import { dirname, extname, isAbsolute, join, normalize, sep } from "node:path";
@@ -4567,6 +4567,26 @@ async function closeTab(
   return json({ ok: true } satisfies ActionResponse, ae);
 }
 
+// Resolve a client-supplied directory for a new pane/space. `~` and `~/…` expand against the
+// bridge's home: the phone keyboard has no shell to do it, and nothing downstream does either —
+// the multiplexer takes the string verbatim and the shell silently swaps a non-directory cwd for
+// $HOME (observed: a `~/build` space opened in /home/daniel with no error anywhere). Everything
+// else must be an absolute path to an existing directory, so a typo fails loudly here instead of
+// opening home as if the field had been ignored.
+export async function resolvePaneCwd(raw: string | undefined): Promise<string> {
+  const trimmed = raw?.trim() ?? "";
+  if (!trimmed) return homedir();
+  const expanded =
+    trimmed === "~" ? homedir() : trimmed.startsWith("~/") ? join(homedir(), trimmed.slice(2)) : trimmed;
+  if (!isAbsolute(expanded)) {
+    throw new Error(`directory must be absolute or start with ~ (got "${trimmed}")`);
+  }
+  const st = await stat(expanded).catch(() => null);
+  if (!st) throw new Error(`no such directory: ${expanded}`);
+  if (!st.isDirectory()) throw new Error(`not a directory: ${expanded}`);
+  return expanded;
+}
+
 // Create a new tab in a workspace, opening a fresh shell pane (you then launch your own agent in
 // it). Structural — no more privilege than typing into an existing pane (you can already spawn a
 // shell that way). `cwd` omitted => inherits the workspace dir. session.* stays unexposed.
@@ -4592,10 +4612,22 @@ async function createTab(
   // and throw a TypeError out of the handler.
   const workspaceId = typeof fields.workspaceId === "string" ? fields.workspaceId.trim() : undefined;
   const tabLabel = typeof fields.label === "string" ? fields.label : undefined;
-  const cwd = typeof fields.cwd === "string" ? fields.cwd : undefined;
   const ae = req.headers.get("accept-encoding");
   if (!workspaceId) {
     return json({ ok: false, ...apiError("tab.workspace_required") } satisfies CreateResponse, ae);
+  }
+  // Empty/absent cwd means "inherit the space dir" — only resolve an explicit one.
+  const rawCwd = typeof fields.cwd === "string" ? fields.cwd : undefined;
+  let cwd: string | undefined;
+  if (rawCwd !== undefined && rawCwd.trim() !== "") {
+    try {
+      cwd = await resolvePaneCwd(rawCwd);
+    } catch (err) {
+      return json(
+        { ok: false, ...apiError("tab.create_failed", { reason: /* SAFETY: err is a thrown Error; runtime wraps non-Error throws only at boundaries */ (err as Error).message }) } satisfies CreateResponse,
+        ae,
+      );
+    }
   }
   const outcome = await herdr.createTab({ spaceId: workspaceId, label: tabLabel, cwd });
   if (!outcome.ok) {
@@ -4660,10 +4692,18 @@ export async function createWorkspace(
   }
   const fields = asJsonRecord(body) ?? {};
   // Checked, not declared — see createTab.
-  const typed = typeof fields.cwd === "string" ? fields.cwd.trim() : "";
-  const cwd = typed || homedir();
   const label = typeof fields.label === "string" ? fields.label : undefined;
   const ae = req.headers.get("accept-encoding");
+  let cwd: string;
+  const typed = typeof fields.cwd === "string" ? fields.cwd : undefined;
+  try {
+    cwd = await resolvePaneCwd(typed);
+  } catch (err) {
+    return json(
+      { ok: false, ...apiError("workspace.create_failed", { reason: /* SAFETY: err is a thrown Error; runtime wraps non-Error throws only at boundaries */ (err as Error).message }) } satisfies CreateResponse,
+      ae,
+    );
+  }
   const outcome = await herdr.createSpace({ cwd, label });
   if (!outcome.ok) {
     return json(
@@ -4680,7 +4720,7 @@ export async function createWorkspace(
     detail: { label, cwd },
   });
   // Never throws: a list that could not be saved costs a Recent entry, never the space just made.
-  if (typed !== "" && folders !== undefined) await folders.recordRecent(created.cwd);
+  if (typed !== undefined && typed.trim() !== "" && folders !== undefined) await folders.recordRecent(created.cwd);
   await settleTopology(herdr, engine);
   return json({
     ok: true,

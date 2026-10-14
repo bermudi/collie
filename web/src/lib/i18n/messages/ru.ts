@@ -1093,6 +1093,7 @@ export const ru: Dictionary = {
   "transcript.attachmentAlt": "Вложение",
   "mirror.imageAlt": "Терминальная графика",
   "mirror.imageBadge": "[Изображение]",
+  "mirror.blankLines": "[{n} blank lines]",
   "mirror.imageMatchedByOrder": "совпало по порядку, откройте Историю для проверки",
   "mirror.turnImageCaption": "новейшее изображение агента из его журнала",
   "time.justNow": "только что",

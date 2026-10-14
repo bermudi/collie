@@ -297,11 +297,10 @@ function labelledRuleRow(text: string): TextRange[] | null {
     if (/\s/.test(text[labelStart]!) || /\s/.test(text[labelEnd - 1]!)) return null;
   }
 
-  const width = (run: TextRange) => run.end - run.start;
-  if (width(runs[0]!) > MAX_LEADING_RULE_RUN) return null;
+  if ((runs[0]!.end - runs[0]!.start) > MAX_LEADING_RULE_RUN) return null;
   let long = false;
   for (let i = 1; i < runs.length; i++) {
-    if (width(runs[i]!) >= MIN_LONG_RULE_RUN) long = true;
+    if ((runs[i]!.end - runs[i]!.start) >= MIN_LONG_RULE_RUN) long = true;
     else if (i < runs.length - 1) return null; // a run between two labels must be a long one
   }
   if (!long) return null; // no run long enough to wrap — nothing for clipping to buy

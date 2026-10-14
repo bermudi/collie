@@ -1039,6 +1039,7 @@ export const it: Dictionary = {
   "transcript.attachmentAlt": "Allegato",
   "mirror.imageAlt": "Grafica del terminale",
   "mirror.imageBadge": "[Immagine]",
+  "mirror.blankLines": "[{n} blank lines]",
   "mirror.imageMatchedByOrder": "abbinato per ordine, apri Cronologia per verificare",
   "mirror.turnImageCaption": "l'immagine più recente dell'agent, dal suo log",
   "time.justNow": "proprio ora",

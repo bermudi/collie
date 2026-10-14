@@ -1156,6 +1156,7 @@ export const ja: Dictionary = {
   // --- mirror (terminal graphics in the pane mirror) ---
   "mirror.imageAlt": "ターミナルグラフィックス",
   "mirror.imageBadge": "[画像]",
+  "mirror.blankLines": "[{n} blank lines]",
   "mirror.imageMatchedByOrder": "順序で対応付け。確認は履歴から",
   "mirror.turnImageCaption": "エージェントのログから取得した最新の画像",
 
