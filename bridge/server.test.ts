@@ -3749,9 +3749,9 @@ describe("POST /api/workspace — a create that worked records the folder the mu
 
   test("records the REPORTED folder, not the typed text", async () => {
     const mux = new FakeSpaceMux("/home/op/proj");
-    const { res, lists, written } = await create(JSON.stringify({ cwd: "~/proj" }), mux);
+    const { res, lists, written } = await create(JSON.stringify({ cwd: "~" }), mux);
     expect(res.status).toBe(200);
-    expect(mux.created?.cwd).toBe("~/proj");
+    expect(mux.created?.cwd).toBe(homedir());
     expect(lists.recent).toEqual(["/home/op/proj"]);
     expect(written).toBe(true);
   });
@@ -3783,7 +3783,7 @@ describe("POST /api/workspace — a create that worked records the folder the mu
 
   test("with no store (a bridge built by hand), the create is exactly today's", async () => {
     const mux = new FakeSpaceMux("/home/op/proj");
-    const res = await createWorkspace(asSpaceMux(mux), engine, body(JSON.stringify({ cwd: "~/proj" })), new AuditLog(() => {}), null, "default");
+    const res = await createWorkspace(asSpaceMux(mux), engine, body(JSON.stringify({ cwd: "~" })), new AuditLog(() => {}), null, "default");
     expect(await res.json()).toMatchObject({ ok: true, pane: { cwd: "/home/op/proj" } });
   });
 });

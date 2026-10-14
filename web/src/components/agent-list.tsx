@@ -536,7 +536,7 @@ export function AgentList({
       <SectionHeader
         label={g.label}
         tone="strong"
-        dot={urgentDot(g)}
+        mark={urgentMark(g)}
         className="min-h-7"
         trailing={
           <>

@@ -359,7 +359,7 @@ describe("the history section", () => {
     const none = await run({ files: {} });
     expect(none.get("journal-roots")?.status).toBe("warn");
     // NINE, not eight: eight agents, and pi has two roots (the omp home and pi's own).
-    expect(none.get("journal-roots")?.detail).toContain("none of the 9 journal roots is there");
+    expect(none.get("journal-roots")?.detail).toContain("none of the 11 journal roots is there");
 
     // `list` answers `[]` for a directory this user cannot read AND for an empty one; the finding
     // says both, because the seam cannot tell them apart and a doctor may not guess.

@@ -60,6 +60,7 @@ export const HARNESS_LAUNCHES: readonly HarnessLaunch[] = [
 export const NOT_STARTED = {
   antigravity: "the desktop app; its terminal agent is agy",
   openclaw: "its TUI is a client of the operator's gateway; Collie reads its history only",
+  devin: "Collie tracks Devin's history only; no launch recipe yet",
 } as const satisfies Readonly<Record<string, string>>;
 
 /** The launch for `id`, or `undefined` for a name Collie does not start. Exact match only. */

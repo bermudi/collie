@@ -401,9 +401,6 @@ describe("devin: a reducer reads a torn stream the way the parser reads a whole 
   });
 });
 
-  });
-});
-
 describe("the line feeder", () => {
   test("holds a fragment until the row is complete", () => {
     const feeder = createLineFeeder();
