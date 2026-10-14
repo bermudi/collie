@@ -23,6 +23,13 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-10-14
+
+### Added
+- **Upstream plus Devin and the worktree nest (re-branch).** Pup now tracks upstream wholesale and
+  adds only the Devin journal adapter and the dashboard worktree nest, plus the check-only update
+  monitor.
+
 ## [1.21.0] - 2026-10-13
 
 ### Added
