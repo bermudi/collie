@@ -40,13 +40,13 @@ describe("SettingsRoute — the shared header shell", () => {
     expect(document.querySelectorAll("header")).toHaveLength(1);
   });
 
-  it("leads with a 44px back button where every other route puts the Collie mark", async () => {
+  it("leads with a 44px back button where every other route puts the Pup mark", async () => {
     renderSettings();
     const back = await screen.findByRole("button", { name: "Back" });
     expect(back.className).toContain("size-11");
     expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
     // The mark is NOT here — this route leads with the way out, not with the way home.
-    expect(screen.queryByRole("button", { name: /^Collie/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Pup/ })).toBeNull();
   });
 });
 
@@ -72,7 +72,7 @@ describe("SettingsRoute — the update surfaces", () => {
     // on this page — it is the first word of the System row's blurb — so the assertion is about
     // the update ROW's own title, not about the string.
     expect(screen.queryByText("Updates", { selector: ".font-medium" })).toBeNull();
-    expect(screen.queryByText("Update Collie")).toBeNull();
+    expect(screen.queryByText("Update Pup")).toBeNull();
     expect(screen.queryByRole("button", { name: "Check for updates" })).toBeNull();
   });
 });

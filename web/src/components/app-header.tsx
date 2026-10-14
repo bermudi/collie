@@ -357,7 +357,7 @@ export function AppHeaderHost({ bridge, error, lastSeenAt, children }: AppHeader
                   className="shrink-0 whitespace-nowrap"
                 >
                   <SectionLabel className="flex h-0 items-end leading-none">
-                    Collie
+                    Pup
                   </SectionLabel>
                   {/* The line the freed width is FOR — "on <mux>", the sentence the brand line
                       above starts. `min-h-6` RESERVES it whether or not a name has arrived:

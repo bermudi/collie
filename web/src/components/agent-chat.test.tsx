@@ -1619,7 +1619,7 @@ describe("AgentChat — a pane on a host the lead can't reach", () => {
   it("gives an incompatible member its own reason, verbatim", () => {
     renderCrewChat("attic");
     const notice = screen.getByRole("status");
-    expect(notice).toHaveTextContent(/attic is running an incompatible Collie/i);
+    expect(notice).toHaveTextContent(/attic is running an incompatible Pup/i);
     expect(notice).toHaveTextContent(/crew protocol 2 \(this collie speaks 1\)/);
     // Never seen at all → there is no last-good screen under the banner, and it says so rather than
     // implying the empty mirror is the machine's real state.
@@ -2034,7 +2034,7 @@ describe("AgentChat — zen mode", () => {
     expect(screen.queryByRole("button", { name: "Find in output" })).not.toBeInTheDocument();
   });
 
-  it("takes every Collie surface off the screen and leaves the pane's own output", async () => {
+  it("takes every Pup surface off the screen and leaves the pane's own output", async () => {
     setZenEnabled(true);
     const user = userEvent.setup();
     const { container } = renderChat({ tabs: fixtureTabs, text: STATUS_TEXT });

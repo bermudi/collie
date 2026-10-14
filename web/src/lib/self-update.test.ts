@@ -133,7 +133,7 @@ describe("update path — fires regardless of service-worker presence (checkForU
 // module reloads on. That reload is right, and only once the run is over. Mid-run it lands the
 // operator on a page that cannot reach the bridge, which is why the coordination is explicit rather
 // than left to timing.
-describe("self-update hold — a Collie update run defers the bundle reload", () => {
+describe("self-update hold — a Pup update run defers the bundle reload", () => {
   it("does not reload while the run is in flight, and does the moment it is done", () => {
     const reload = vi.fn();
     __setReloadImpl(reload);

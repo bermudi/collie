@@ -23,6 +23,11 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Changed
+- **The app presents as Pup on every surface that names it.** The header identity, lock screen,
+  launcher and manifest names (both channels), document title, boot splash, push fallback and the
+  localised strings read Pup; the generated collie mark and its favicons keep the collie name.
+
 ## [0.53.0] - 2026-10-14
 
 ### Added
