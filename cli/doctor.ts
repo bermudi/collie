@@ -820,12 +820,6 @@ function herdrSocket(deps: DoctorDeps): Finding {
   return ok("herdr-socket", deps.ctx.socket);
 }
 
-/** A bind that only loopback can reach. Not loopback itself — `127.0.0.1` is the right answer solo. */
-function isLoopbackBind(host: string): boolean {
-  const h = host.trim().toLowerCase();
-  return h === "localhost" || h === "::1" || h === "[::1]" || h.startsWith("127.");
-}
-
 /**
  * Whether this peer dials its lead on loopback. The stored address goes through `crewUrl`, the same
  * builder the dial uses, so an address the dial would refuse never counts.
@@ -849,7 +843,7 @@ function leadIsOnLoopback(address: string | null): boolean {
 function bindCheck(deps: DoctorDeps, mode: string, leadOnLoopback: boolean): Finding {
   const host = resolvedBind(deps);
   const shown = bindIsWildcard(host) ? "0.0.0.0/:: (COLLIE_HOST empty)" : host;
-  if (mode === "peer" && isLoopbackBind(host)) {
+  if (mode === "peer" && isLoopbackBindHost(host)) {
     if (leadOnLoopback) {
       return ok("bind", `${shown} (mode peer: this peer listens on loopback, and it reaches its lead on loopback too, so the lead sits on this host or at the end of a tunnel)`);
     }

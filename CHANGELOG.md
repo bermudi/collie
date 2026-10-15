@@ -23,6 +23,9 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Fixed
+- **`collie doctor` judges a peer's bind by the bridge's own loopback table.** The bind check kept a local list — `localhost`, `::1`, a `127.` prefix — beside the shared `isLoopbackBindHost`, so a peer bound to expanded IPv6 `0:0:0:0:0:0:0:1` passed a check the bridge itself counts as loopback, while a `127.`-prefixed hostname counted as loopback when the bridge would refuse it. One predicate now decides both.
+
 ## [0.55.0] - 2026-10-15
 
 ### Added

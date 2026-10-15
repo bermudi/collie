@@ -686,6 +686,24 @@ describe("collie doctor — the local checks", () => {
     expect(code).toBe(EXIT.FAIL);
   });
 
+  // The check asks the bridge's own loopback table (`isLoopbackBindHost`, bridge/config.ts) — the
+  // same predicate the boot refusal decides by — so EVERY spelling that table accepts is the trap
+  // here, expanded `::1` and the deep 127/8 included. A local list once missed those spellings and
+  // passed a peer the bridge had bound to loopback.
+  test("bind: a PEER on any spelling of loopback is the trap, not just 127.0.0.1", async () => {
+    for (const host of ["0:0:0:0:0:0:0:1", "[0:0:0:0:0:0:0:1]", "127.1.2.3"]) {
+      const peer = peerStore();
+      const { byCheck } = await findings(
+        harness(peer, [hello({ memberId: "desk" })], {
+          env: { COLLIE_HOST: host },
+          files: without({ ...healthyFiles(), ...markerFile(peer) }, HANDLER),
+        }),
+      );
+      expect(byCheck.get("bind")?.status, host).toBe("error");
+      expect(byCheck.get("bind")?.detail, host).toContain("PEER");
+    }
+  });
+
   // ADR 0013's tunnel row: a peer that dials its lead on loopback is behind an operator-owned tunnel
   // (or shares the lead's host), so the lead's dial lands on loopback too and the default bind is right.
   test("bind: loopback on a PEER whose lead is dialled on loopback is a tunnel, not the trap", async () => {
