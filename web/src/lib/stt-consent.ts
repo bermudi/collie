@@ -12,7 +12,7 @@ import type { MessageKey } from "@/lib/i18n";
 // id, so a phone that showed an older text cannot consent to a newer one.
 
 /** The version of the consent text this app shows. Equal to `CODEX_CONSENT_ID` in bridge/stt/codex-setup.ts. */
-export const CODEX_CONSENT_ID = "codex-consent-80d08bef89cd";
+export const CODEX_CONSENT_ID = "codex-consent-35a682cf3f8b";
 
 /** The endpoint the consent names. Equal to `CODEX_TRANSCRIBE_URL` in bridge/stt/codex.ts. */
 export const CODEX_TRANSCRIBE_URL = "https://chatgpt.com/backend-api/transcribe";

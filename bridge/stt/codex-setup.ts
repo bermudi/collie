@@ -32,7 +32,7 @@ import type { CodexSttSettings, SttSettingsDocument, SttWireIdentity } from "./c
 export const CODEX_CONSENT_PARAGRAPHS: readonly (readonly string[])[] = [
   [
     "Recordings would be sent to {url}.",
-    "That endpoint is PRIVATE and UNSUPPORTED. It is undocumented, nobody owes Collie",
+    "That endpoint is PRIVATE and UNSUPPORTED. It is undocumented, nobody owes ColliePup",
     "compatibility with it, and it may stop working at any time without notice.",
   ],
   [
@@ -41,7 +41,7 @@ export const CODEX_CONSENT_PARAGRAPHS: readonly (readonly string[])[] = [
     "any suspension or ban that comes of using a private endpoint this way.",
   ],
   [
-    "Collie asks the endpoint under its OWN name first. If that is refused, the fallback",
+    "ColliePup asks the endpoint under its OWN name first. If that is refused, the fallback",
     "wears the Codex CLI's headers. That is impersonation, and accepting here is what",
     "permits it. Whichever identity is accepted gets written into the config, in a word",
     "you can read back with `collie stt status`.",

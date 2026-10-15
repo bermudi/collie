@@ -32,6 +32,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
   localised strings read ColliePup; the generated collie mark and its favicons keep the collie name.
 
 ### Fixed
+- **The rename reaches the last two surfaces that still said Collie.** The push fallback headline and the Codex consent's terminal text read ColliePup now, and the web catalogue mirrors the consent again; the consent id moved with the words, so phones re-ask before the newer text.
 - **An answer's note is part of what its request id pins.** A second POST under a used requestId carrying a different note was joined to the in-flight request or replayed from the receipt, silently dropping the new note; the digest covers the note now, and receipts written before notes existed still replay as themselves.
 - **A durable pane whose events cannot be read says so.** `syncEvents` swallowed every failure into "no new rows" — a persistent events-only failure left the pane transcript stale while the census stayed green; it now warns, at most once every five minutes.
 - **An unreadable OpenClaw journal says so instead of showing no history.** Query errors inside the journal reader now propagate the way devin's always have; only an unopenable file or an unknown schema still reads as "this agent holds no session".

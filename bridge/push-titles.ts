@@ -42,7 +42,7 @@ export const PUSH_TITLES = {
 
   // ── Everything else the bridge pushes ──────────────────────────────────────────────
   /** A newer release is available (`index.ts`). The title never moves, not even when urgent (ADR 0046). */
-  "update.available": "Collie update available",
+  "update.available": "ColliePup update available",
   /** A watched pane's prompt cache is about to expire (`cache/warn.ts`). */
   "cache.cold_soon": "Cache goes cold in about {minutes} min",
   /** A machine's CPU stayed above its alert line for the rule's minutes (`machine-alerts.ts`). */
