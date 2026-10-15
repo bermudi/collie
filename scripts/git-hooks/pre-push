@@ -1,84 +1,28 @@
 #!/usr/bin/env bash
-# Pre-push guard: typecheck both sides, run the test suites (backend Bun + web Vitest), then say so
-# out loud if the push carries a release that has no tag. Install with: scripts/install-hooks.sh
-# (sets core.hooksPath).
-# Override once: SKIP_TYPECHECK=1 git push (skip typecheck) · SKIP_TESTS=1 git push (skip tests) ·
-# SKIP_TAG_CHECK=1 git push (skip the release-tag warning).
+# Pre-push guard: the release-tag warning, and nothing else. Install with: scripts/install-hooks.sh
+# (sets core.hooksPath to scripts/git-hooks, so this file runs straight from the checkout and edits
+# are live at once).
+#
+# The batteries used to run here — typecheck both sides, the bridge suite, the ctl suite and the web
+# suite: about five minutes on every push, and the web lane flaked under a loaded machine (three
+# times on 2026-10-15 alone, on code that was green). The identical battery runs in ci.yml's `check`
+# job on a clean runner, which now triggers on every branch push. That is the gate. Nothing local
+# stands between a push and the remote any more.
+# Override once: SKIP_TAG_CHECK=1 git push (skip the release-tag warning).
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 
 # git feeds a pre-push hook the refs being pushed on stdin, one `<local ref> <local sha> <remote ref>
-# <remote sha>` line per ref. Read it NOW, before any suite runs: a suite that reads stdin would eat
-# it, and the ranges are what the tag check works from.
+# <remote sha>` line per ref. Read it NOW: check-tag.sh shells out to git, and git commands that read
+# stdin would eat the ranges this loop works from.
 pushed_refs="$(cat)"
 
-# Everything below this line runs test suites, and git has exported GIT_DIR (and, depending on the
-# hook, GIT_INDEX_FILE and friends) into this process. Those override repository discovery for every
-# git command a suite runs — `-C` included — which is how the ctl suite once re-initialised the
-# developer's own checkout instead of its sandbox. That suite now defends itself; this drops the
-# variables once, for every suite the hook runs, so the next one to shell out to git inherits a clean
-# environment rather than a trap. ROOT is resolved above, while they still apply.
+# git has exported GIT_DIR (and, depending on the hook, GIT_INDEX_FILE and friends) into this process.
+# Those override repository discovery for every git command a suite runs — `-C` included — which is
+# how the ctl suite once re-initialised the developer's own checkout instead of its sandbox. check-tag.sh
+# shells out to git too, so the variables are dropped once here, before anything inherits them.
 unset "${!GIT_@}" 2>/dev/null || true
-
-# ── Typecheck (the Vite build does NOT typecheck; catch it before it ships) ──
-if [ "${SKIP_TYPECHECK:-}" = "1" ]; then
-  echo "pre-push: SKIP_TYPECHECK=1 — skipping typecheck" >&2
-else
-  echo "pre-push: typechecking backend (bun run typecheck)…" >&2
-  if ! (cd "$ROOT" && bun run typecheck); then
-    cat >&2 <<'EOF'
-✗ pre-push: backend typecheck failed — push aborted.
-  Fix the type errors, or override once with: SKIP_TYPECHECK=1 git push
-EOF
-    exit 1
-  fi
-  echo "pre-push: typechecking web (bun run typecheck)…" >&2
-  if ! (cd "$ROOT/web" && bun run typecheck); then
-    cat >&2 <<'EOF'
-✗ pre-push: web typecheck failed — push aborted.
-  Fix the type errors, or override once with: SKIP_TYPECHECK=1 git push
-EOF
-    exit 1
-  fi
-fi
-
-# ── Tests ───────────────────────────────────────────────────────────────────
-if [ "${SKIP_TESTS:-}" = "1" ]; then
-  echo "pre-push: SKIP_TESTS=1 — skipping test suite" >&2
-else
-  # `./bridge` and NOT `./integration`: the two-instance crew drill lives there on purpose and CI
-  # gives it a job of its own. It boots twenty child processes over real pinned TLS and measured
-  # 58.3s of a 67.0s backend run on 2026-09-30, which is a minute every developer paid on every push
-  # for a lane that cannot be made fast. Run it by hand with `bun run test:crew` when you touch the
-  # crew transport. Do not put it back here.
-  echo "pre-push: running backend test suite (bun test ./bridge)…" >&2
-  if ! (cd "$ROOT" && bun test ./bridge); then
-    cat >&2 <<'EOF'
-✗ pre-push: backend tests failed — push aborted.
-  Fix the failing tests, or override once with: SKIP_TESTS=1 git push
-EOF
-    exit 1
-  fi
-
-  echo "pre-push: running control-script lifecycle suite (collie-ctl.test.sh)…" >&2
-  if ! (cd "$ROOT" && bash scripts/collie-ctl.test.sh); then
-    cat >&2 <<'EOF'
-✗ pre-push: collie-ctl lifecycle tests failed — push aborted.
-  Fix the failing tests, or override once with: SKIP_TESTS=1 git push
-EOF
-    exit 1
-  fi
-
-  echo "pre-push: running web test suite (vitest)…" >&2
-  if ! (cd "$ROOT/web" && bun run test); then
-    cat >&2 <<'EOF'
-✗ pre-push: web tests failed — push aborted.
-  Fix the failing tests, or override once with: SKIP_TESTS=1 git push
-EOF
-    exit 1
-  fi
-fi
 
 # ── Release tag (WARNS, never blocks) ───────────────────────────────────────
 # Betas 33 to 41 were cut in the version files and the CHANGELOG and never tagged, so nine releases
