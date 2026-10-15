@@ -1839,6 +1839,7 @@ export const ru: Dictionary = {
   "pushTitle.machine.cpu": "Высокая нагрузка на ЦП на {machine}",
   "pushTitle.machine.mem": "Память почти заполнена на {machine}",
   "pushTitle.machine.disk": "Диск почти заполнен на {machine}",
+  "pushTitle.frontdoor.gone": "Вход ColliePup исчез",
   "pushTitle.ask.permission": "Permission needed in {pane}",
   "pushTitle.ask.flood": "A program on {host} is raising many asks",
 

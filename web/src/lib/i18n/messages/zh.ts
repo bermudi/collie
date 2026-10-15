@@ -1905,6 +1905,7 @@ export const zh: Dictionary = {
   "pushTitle.machine.cpu": "{machine} 的 CPU 持续偏高",
   "pushTitle.machine.mem": "{machine} 的内存持续偏高",
   "pushTitle.machine.disk": "{machine} 的磁盘持续占满",
+  "pushTitle.frontdoor.gone": "ColliePup 的入口消失了",
   "pushTitle.ask.permission": "Permission needed in {pane}",
   "pushTitle.ask.flood": "A program on {host} is raising many asks",
 

@@ -1918,6 +1918,7 @@ export const ko: Dictionary = {
   "pushTitle.machine.cpu": "{machine}의 CPU가 계속 높음",
   "pushTitle.machine.mem": "{machine}의 메모리가 계속 높음",
   "pushTitle.machine.disk": "{machine}의 디스크가 계속 가득 참",
+  "pushTitle.frontdoor.gone": "ColliePup의 출입문이 사라졌습니다",
   "pushTitle.ask.permission": "Permission needed in {pane}",
   "pushTitle.ask.flood": "A program on {host} is raising many asks",
 

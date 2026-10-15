@@ -1939,6 +1939,7 @@ export const de: Dictionary = {
   "pushTitle.machine.cpu": "CPU bleibt hoch auf {machine}",
   "pushTitle.machine.mem": "Speicher bleibt hoch auf {machine}",
   "pushTitle.machine.disk": "Festplatte bleibt voll auf {machine}",
+  "pushTitle.frontdoor.gone": "ColliePups Eingang ist verschwunden",
   "pushTitle.ask.permission": "Permission needed in {pane}",
   "pushTitle.ask.flood": "A program on {host} is raising many asks",
 

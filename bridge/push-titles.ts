@@ -51,6 +51,8 @@ export const PUSH_TITLES = {
   "machine.mem": "Memory stays high on {machine}",
   /** The same for the fullest disk. */
   "machine.disk": "Disk stays full on {machine}",
+  /** The tailnet door this machine published is gone from `tailscale serve` (`front-door-watch.ts`). */
+  "frontdoor.gone": "ColliePup's front door is gone",
 
   // ── Asks that travel as data (`notifications.ts`, `durable/ask-push.ts`, ADR 0100) ──────────────
   /**

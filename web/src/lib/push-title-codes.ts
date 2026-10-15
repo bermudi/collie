@@ -20,6 +20,7 @@ export const PUSH_TITLE_CODES = [
   "machine.cpu",
   "machine.mem",
   "machine.disk",
+  "frontdoor.gone",
   "ask.permission",
   "ask.flood",
 ] as const;

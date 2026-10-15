@@ -114,6 +114,7 @@ describe("pushTitle — the English comes from the catalogue", () => {
       "machine.cpu": "CPU stays high on {machine}",
       "machine.mem": "Memory stays high on {machine}",
       "machine.disk": "Disk stays full on {machine}",
+      "frontdoor.gone": "ColliePup's front door is gone",
       "ask.permission": "Permission needed in {pane}",
       "ask.flood": "A program on {host} is raising many asks",
     });
@@ -133,6 +134,7 @@ describe("pushTitle — the English comes from the catalogue", () => {
       "machine.cpu": ["machine"],
       "machine.mem": ["machine"],
       "machine.disk": ["machine"],
+      "frontdoor.gone": [],
       "ask.permission": ["pane"],
       "ask.flood": ["host"],
     } satisfies Record<PushTitleCode, string[]>;

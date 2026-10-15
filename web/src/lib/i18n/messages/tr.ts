@@ -1739,6 +1739,7 @@ export const tr: Dictionary = {
   "pushTitle.machine.cpu": "{machine} üzerinde CPU yüksek kalıyor",
   "pushTitle.machine.mem": "{machine} üzerinde bellek yüksek kalıyor",
   "pushTitle.machine.disk": "{machine} üzerinde disk dolu kalıyor",
+  "pushTitle.frontdoor.gone": "ColliePup'un giriş kapısı kayboldu",
   "pushTitle.ask.permission": "Permission needed in {pane}",
   "pushTitle.ask.flood": "A program on {host} is raising many asks",
 

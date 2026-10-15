@@ -1899,6 +1899,7 @@ export const zhTW: Dictionary = {
   "pushTitle.machine.cpu": "{machine} 的 CPU 持續偏高",
   "pushTitle.machine.mem": "{machine} 的記憶體持續偏高",
   "pushTitle.machine.disk": "{machine} 的磁碟持續滿載",
+  "pushTitle.frontdoor.gone": "ColliePup 的入口消失了",
   "pushTitle.ask.permission": "Permission needed in {pane}",
   "pushTitle.ask.flood": "A program on {host} is raising many asks",
 

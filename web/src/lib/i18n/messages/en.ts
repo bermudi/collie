@@ -2095,6 +2095,7 @@ export const en = {
   "pushTitle.machine.cpu": "CPU stays high on {machine}",
   "pushTitle.machine.mem": "Memory stays high on {machine}",
   "pushTitle.machine.disk": "Disk stays full on {machine}",
+  "pushTitle.frontdoor.gone": "ColliePup's front door is gone",
   "pushTitle.ask.permission": "Permission needed in {pane}",
   "pushTitle.ask.flood": "A program on {host} is raising many asks",
 

@@ -49,6 +49,7 @@ import {
   releaseManagedFrontDoor,
   shouldReleaseFrontDoor,
 } from "./front-door.ts";
+import { FRONT_DOOR_WATCH_INTERVAL_MS, FrontDoorWatch } from "./front-door-watch.ts";
 import { DURABLE_LOG_DIR_OPTION, DURABLE_MUX } from "./mux/durable/adapter.ts";
 import { HERDR_DIAL_MODE_OPTION } from "./mux/herdr/adapter.ts";
 import { DEFAULT_TIMEOUT_MS } from "./mux/herdr/client.ts";
@@ -1330,6 +1331,25 @@ void sweepNow(" at startup");
 const sweepTimer = setInterval(() => void sweepNow(""), SWEEP_INTERVAL_MS);
 sweepTimer.unref();
 
+// The front-door watchdog: the ownership record vs. the live serve config, once a minute. A loss
+// logs loudly and pushes the phone; the watch never publishes and never removes anything
+// (`bridge/front-door-watch.ts` holds the posture and the argument). No tick at boot: the first
+// observation sets the baseline, and a boot that starts next to a stolen door says so within a
+// minute, on the first tick, without blocking startup on a `tailscale` call.
+const frontDoorWatch = new FrontDoorWatch({
+  handlerFile: managedHandlerPath(resolveConfigDir(), instanceSuffixOf(collieInstance)),
+  exec: realFrontDoorExec(process.env, homedir()),
+  files: realFrontDoorFiles,
+  enabled: () => !cfg.skipServe && crew.mode !== "peer" && deposed === null,
+  push: (message) => push.send(message),
+  log: {
+    out: (line) => console.log(`[front-door] ${line}`),
+    warn: (line) => console.warn(`[front-door] ${line}`),
+  },
+});
+const frontDoorTimer = setInterval(() => void frontDoorWatch.tick(), FRONT_DOOR_WATCH_INTERVAL_MS);
+frontDoorTimer.unref();
+
 // ── The lead runtime ─────────────────────────────────────────────────────────
 // Built only in `lead` mode — which `deriveMode` defines as "≥1 enrolled peer and no lead of my
 // own". So the condition under which `servers` goes on the wire is exactly "a crew with peers
@@ -2222,6 +2242,7 @@ const shutdown = async () => {
   // The day of minutes is saved every five minutes from the tick; the last few go to disk here.
   await machineWatch?.flush();
   clearInterval(sweepTimer);
+  frontDoorWatch.stop();
   clearTimeout(updateFirstCheck);
   clearInterval(updateTimer);
   process.exit(0);

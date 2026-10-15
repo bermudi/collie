@@ -1739,6 +1739,7 @@ export const fr: Dictionary = {
   "pushTitle.machine.cpu": "Utilisation processeur élevée sur {machine}",
   "pushTitle.machine.mem": "Mémoire toujours élevée sur {machine}",
   "pushTitle.machine.disk": "Disque toujours plein sur {machine}",
+  "pushTitle.frontdoor.gone": "La porte d'entrée de ColliePup a disparu",
   "pushTitle.ask.permission": "Permission needed in {pane}",
   "pushTitle.ask.flood": "A program on {host} is raising many asks",
 

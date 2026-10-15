@@ -1925,6 +1925,7 @@ export const ja: Dictionary = {
   "pushTitle.machine.cpu": "{machine} の CPU が高い状態です",
   "pushTitle.machine.mem": "{machine} のメモリが高い状態です",
   "pushTitle.machine.disk": "{machine} のディスクがいっぱいのままです",
+  "pushTitle.frontdoor.gone": "ColliePup の入り口が消えました",
   "pushTitle.ask.permission": "Permission needed in {pane}",
   "pushTitle.ask.flood": "A program on {host} is raising many asks",
 
