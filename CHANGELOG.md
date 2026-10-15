@@ -23,6 +23,8 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+## [0.55.0] - 2026-10-15
+
 ### Added
 - **The bridge notices when its tailnet front door disappears.** A watchdog re-reads `tailscale serve status` every minute and compares it against the ownership record; a lost or replaced door logs loudly and pushes the phone with the fix (`collie serve`). It only watches — it never publishes and never removes anything. Seen live: another app's "Tailscale HTTPS" feature rewrote the serve config three times in one day, leaving the bridge green and the phone dark.
 
