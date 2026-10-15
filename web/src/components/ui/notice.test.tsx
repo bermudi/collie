@@ -218,7 +218,7 @@ describe("Notice — the one notice surface", () => {
         onDismiss={onDismiss}
         dismissLabel="Dismiss"
       >
-        Collie 1.6.0 available.
+        ColliePup 1.6.0 available.
       </Notice>,
     );
     expect(screen.getAllByRole("button")).toHaveLength(2);
@@ -228,7 +228,7 @@ describe("Notice — the one notice surface", () => {
     await user.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(onActivate).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Collie 1.6.0 available." }));
+    await user.click(screen.getByRole("button", { name: "ColliePup 1.6.0 available." }));
     expect(onActivate).toHaveBeenCalledTimes(1);
   });
 

@@ -239,7 +239,7 @@ describe("CollieHome — the lost badge", () => {
   it("is decorative: hidden from assistive tech, the button's label names the state", () => {
     const { container, getByRole } = render(<CollieHome trouble lost online={false} />);
     expect(badge(container)?.getAttribute("aria-hidden")).toBe("true");
-    expect(getByRole("button", { name: "Collie home — not connected" })).toBeInTheDocument();
+    expect(getByRole("button", { name: "ColliePup home — not connected" })).toBeInTheDocument();
   });
 
   // What remains of the strip's "Showing what was saved at <time>" once it is dismissed: the badge
@@ -249,13 +249,13 @@ describe("CollieHome — the lost badge", () => {
     const at = new Date(2026, 9, 7, 12, 21).getTime();
     const { getByRole } = render(<CollieHome trouble lost lastSeenAt={at} />);
     expect(
-      getByRole("button", { name: `Collie home, not connected. Showing what was saved at ${savedAtLabel(at)}.` }),
+      getByRole("button", { name: `ColliePup home, not connected. Showing what was saved at ${savedAtLabel(at)}.` }),
     ).toBeInTheDocument();
   });
 
   it("keeps the reconnecting name while merely troubled, stamp or not", () => {
     const { getByRole } = render(<CollieHome trouble lastSeenAt={1_000} />);
-    expect(getByRole("button", { name: "Collie home — reconnecting" })).toBeInTheDocument();
+    expect(getByRole("button", { name: "ColliePup home — reconnecting" })).toBeInTheDocument();
   });
 
   it("sits on the page colour with the ring cut, in the danger token", () => {

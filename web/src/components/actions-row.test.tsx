@@ -21,7 +21,7 @@ function general(over: Partial<GeneralAction> = {}): GeneralAction {
 const names = () => screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"));
 
 describe("ActionsRow", () => {
-  it("puts Collie's own actions first and the harness's own after them", () => {
+  it("puts ColliePup's own actions first and the harness's own after them", () => {
     render(
       <ActionsRow
         general={[general(), general({ id: "type", icon: Terminal, label: "Type into terminal" })]}

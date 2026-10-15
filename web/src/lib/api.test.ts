@@ -487,7 +487,7 @@ describe("api client — the transcription deadline scales with the clip", () =>
     expect(large).toBeGreaterThan(small);
   });
 
-  it("an 8 MiB clip — the largest Collie will record — is allowed a little under six minutes", () => {
+  it("an 8 MiB clip — the largest ColliePup will record — is allowed a little under six minutes", () => {
     const budget = sttTimeoutFor(8 * 1024 * 1024);
     expect(budget).toBeGreaterThan(5 * 60_000);
     expect(budget).toBeLessThan(6 * 60_000);

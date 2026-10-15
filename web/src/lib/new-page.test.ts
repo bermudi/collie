@@ -123,7 +123,7 @@ describe("offerFor", () => {
     expect(offer.agentsNote).toBeNull();
   });
 
-  it("an older Collie: no agents, a note that says why, no worktrees, the shell by the old route", () => {
+  it("an older ColliePup: no agents, a note that says why, no worktrees, the shell by the old route", () => {
     const offer = offerFor({ ...base, harnesses: null });
     expect(offer.agents).toEqual([]);
     expect(offer.shellById).toBe(false);
@@ -131,7 +131,7 @@ describe("offerFor", () => {
     expect(offer.branchBlocked).toEqual({ kind: "olderCollie" });
   });
 
-  it("an answer not in yet is not an older Collie", () => {
+  it("an answer not in yet is not an older ColliePup", () => {
     const offer = offerFor({ ...base, harnesses: null, loaded: false });
     expect(offer.agentsNote).toBeNull();
     expect(offer.branchBlocked).toBeNull();
@@ -401,7 +401,7 @@ describe("unavailableText", () => {
     expect(unavailableText({ kind: "notFound" })).toBe("not installed");
     expect(unavailableText({ kind: "needsHerdr" })).toBe("needs Herdr");
     expect(unavailableText({ kind: "onlyOnLead", lead: "bluefin" })).toBe("only on bluefin");
-    expect(unavailableText({ kind: "olderCollie" })).toMatch(/older Collie/);
+    expect(unavailableText({ kind: "olderCollie" })).toMatch(/older ColliePup/);
     expect(unavailableText({ kind: "addsOff" })).toBe("turned off on this machine");
     expect(unavailableText({ kind: "freeTextOff" })).toBe("typed lines are turned off on this machine");
     expect(unavailableText({ kind: "commandRow" })).toBe("a command cannot start in a new worktree");

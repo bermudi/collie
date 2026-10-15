@@ -70,7 +70,7 @@ describe("service-worker navigation passthrough", () => {
     expect(isNetworkOnlyNavigation("/cdn-cgi/access/callback?code=abc")).toBe(true);
   });
 
-  it("does not leak a Collie route that merely carries a query string", () => {
+  it("does not leak a ColliePup route that merely carries a query string", () => {
     expect(isNetworkOnlyNavigation("/authors?x=1")).toBe(false);
     expect(isNetworkOnlyNavigation("/?s=collie-demo")).toBe(false);
     expect(isNetworkOnlyNavigation("/pane/w1:p1?s=demo")).toBe(false);
@@ -112,7 +112,7 @@ describe("service-worker navigation passthrough", () => {
     expect(isNetworkOnlyNavigation(`/${"pack"}/v1/snapshot`)).toBe(false);
   });
 
-  it("still owns every Collie route, so deep links keep resolving offline", () => {
+  it("still owns every ColliePup route, so deep links keep resolving offline", () => {
     for (const path of [
       "/",
       "/settings",

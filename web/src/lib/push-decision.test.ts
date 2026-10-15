@@ -10,7 +10,7 @@ describe("decidePush", () => {
     expect(decidePush({ type: "clear", tag: "collie:herd" }, true)).toEqual(expected);
   });
 
-  test("suppresses a show when a Collie tab is visible", () => {
+  test("suppresses a show when a ColliePup tab is visible", () => {
     expect(decidePush({ title: "claude needs you", tag: "collie:herd" }, true)).toEqual({
       kind: "suppress",
     });
@@ -18,7 +18,7 @@ describe("decidePush", () => {
 
   // A machine's sustained load is the one push no visible tab stands in for: the in-app status speaks
   // for panes, not machines. It shows whether or not a Collie tab is open, and carries the machine.
-  test("a machine alert is shown even while a Collie tab is visible", () => {
+  test("a machine alert is shown even while a ColliePup tab is visible", () => {
     const payload = {
       type: "machine" as const,
       title: "laptop: CPU high",
@@ -69,7 +69,7 @@ describe("decidePush", () => {
   test("falls back to a per-pane tag, default title, empty body, and renotify off", () => {
     expect(decidePush({ data: { paneId: "test" } }, false)).toEqual({
       kind: "show",
-      title: "Collie",
+      title: "ColliePup",
       body: "",
       tag: "collie:test",
       paneId: "test",
@@ -89,7 +89,7 @@ describe("decidePush", () => {
     expect(
       decidePush(
         {
-          title: "Collie 0.12.0 available",
+          title: "ColliePup 0.12.0 available",
           body: "collie-ctl.sh update",
           data: { target: "settings" },
         },
@@ -97,7 +97,7 @@ describe("decidePush", () => {
       ),
     ).toMatchObject({
       kind: "show",
-      title: "Collie 0.12.0 available",
+      title: "ColliePup 0.12.0 available",
       target: "settings",
       paneId: undefined,
     });
