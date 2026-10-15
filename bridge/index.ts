@@ -49,7 +49,7 @@ import {
   releaseManagedFrontDoor,
   shouldReleaseFrontDoor,
 } from "./front-door.ts";
-import { FRONT_DOOR_WATCH_INTERVAL_MS, FrontDoorWatch } from "./front-door-watch.ts";
+import { FrontDoorWatch } from "./front-door-watch.ts";
 import { DURABLE_LOG_DIR_OPTION, DURABLE_MUX } from "./mux/durable/adapter.ts";
 import { HERDR_DIAL_MODE_OPTION } from "./mux/herdr/adapter.ts";
 import { DEFAULT_TIMEOUT_MS } from "./mux/herdr/client.ts";
@@ -1333,9 +1333,10 @@ sweepTimer.unref();
 
 // The front-door watchdog: the ownership record vs. the live serve config, once a minute. A loss
 // logs loudly and pushes the phone; the watch never publishes and never removes anything
-// (`bridge/front-door-watch.ts` holds the posture and the argument). No tick at boot: the first
-// observation sets the baseline, and a boot that starts next to a stolen door says so within a
-// minute, on the first tick, without blocking startup on a `tailscale` call.
+// (`bridge/front-door-watch.ts` holds the posture and the argument). The class owns its interval —
+// start() arms it unref'd, stop() disarms — so shutdown's stop() is the real teardown. No tick at
+// boot: the first observation sets the baseline, and a boot that starts next to a stolen door says
+// so within a minute, on the first tick, without blocking startup on a `tailscale` call.
 const frontDoorWatch = new FrontDoorWatch({
   handlerFile: managedHandlerPath(resolveConfigDir(), instanceSuffixOf(collieInstance)),
   exec: realFrontDoorExec(process.env, homedir()),
@@ -1347,8 +1348,7 @@ const frontDoorWatch = new FrontDoorWatch({
     warn: (line) => console.warn(`[front-door] ${line}`),
   },
 });
-const frontDoorTimer = setInterval(() => void frontDoorWatch.tick(), FRONT_DOOR_WATCH_INTERVAL_MS);
-frontDoorTimer.unref();
+frontDoorWatch.start();
 
 // ── The lead runtime ─────────────────────────────────────────────────────────
 // Built only in `lead` mode — which `deriveMode` defines as "≥1 enrolled peer and no lead of my

@@ -308,6 +308,29 @@ describe("OpenclawTranscriptSource", () => {
     expect(read?.kind === "tool" && read.result?.text.startsWith("Lab file body.")).toBe(true);
   });
 
+  test("a corrupt agent database surfaces as an error, never as no history", async () => {
+    // The failure the devin reader once shipped: a query that cannot be answered must not read as
+    // "this agent holds no session". SQLite opens lazily, so garbage bytes open fine and the first
+    // query is what throws — exactly the drift shape withAgentDb must propagate.
+    const bad = join(stateDir, "agents", "main", "agent", "corrupt.sqlite");
+    await writeFile(bad, "this is not a sqlite database, it is forty bytes of noise padding\n");
+    const source = new OpenclawTranscriptSource([stateDir]);
+    const key = `${bad}#d21f9015-1ea1-4ee5-b344-ba173f57ed2f`;
+    expect(await source.stat(key).then(() => "ok", (err: Error) => err.message)).toMatch(/not a database/i);
+    expect(await source.load(key).then(() => "ok", (err: Error) => err.message)).toMatch(/not a database/i);
+  });
+
+  test("resolve keeps walking past a root whose agent database cannot be read", async () => {
+    // The one caller that guards its loop: a corrupt ROOT must not take the whole resolve down,
+    // because a later root may hold the session. The corrupt root is answered by the good one —
+    // without the guard this resolve rejects instead.
+    const badRoot = join(stateDir, "bad-profile");
+    await mkdir(join(badRoot, "agents", "main", "agent"), { recursive: true });
+    await writeFile(join(badRoot, "agents", "main", "agent", "openclaw-agent.sqlite"), "noise bytes so sqlite must refuse the schema read\n");
+    const source = new OpenclawTranscriptSource([badRoot, stateDir]);
+    expect(await source.resolve(REF)).toBe(`${dbPath}#d21f9015-1ea1-4ee5-b344-ba173f57ed2f`);
+  });
+
   test("a live read opens with the branch tail, then carries only what is new", async () => {
     const source = new OpenclawTranscriptSource([stateDir]);
     const key = (await source.resolve(REF))!;

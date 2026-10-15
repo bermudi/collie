@@ -302,6 +302,43 @@ describe("answer: replay", () => {
     await Promise.all([first, same]);
     expect(adapter.calls).toHaveLength(1);
   });
+
+  test("a reused id with a different note is refused, and the new note never reaches the program", async () => {
+    const adapter = new ScriptedAdapter([muxOk({ kind: "taken", replayed: false })]);
+    const r = rig(adapter);
+    const first = await r.call("conv-04", body({ note: "old reason" }));
+    expect(first.body).toMatchObject({ ok: true, outcome: "taken" });
+    const second = await r.call("conv-04", body({ note: "new reason" }));
+    expect(second.status).toBe(409);
+    expect(second.body).toMatchObject({ ok: false, outcome: "refused", reason: "request-id-reused" });
+    expect(adapter.calls).toHaveLength(1);
+    expect(adapter.calls[0]?.[1].note).toBe("old reason");
+  });
+
+  test("the same id with the same note replays as itself", async () => {
+    const adapter = new ScriptedAdapter([muxOk({ kind: "taken", replayed: false })]);
+    const r = rig(adapter);
+    await r.call("conv-05", body({ note: "same" }));
+    const again = await r.call("conv-05", body({ note: "same" }));
+    expect(again.status).toBe(200);
+    expect(again.body).toMatchObject({ ok: true, outcome: "taken", replayed: true });
+    expect(adapter.calls).toHaveLength(1);
+  });
+
+  test("a note appearing under a used id is a different payload, and so is one disappearing", async () => {
+    const adapter = new ScriptedAdapter([
+      muxOk({ kind: "taken", replayed: false }),
+      muxOk({ kind: "taken", replayed: false }),
+    ]);
+    const r = rig(adapter);
+    await r.call("conv-06");
+    const grew = await r.call("conv-06", body({ note: "now" }));
+    expect(grew.body).toMatchObject({ outcome: "refused", reason: "request-id-reused" });
+    await r.call("conv-07", body({ requestId: OTHER_ID, note: "gone" }));
+    const shrank = await r.call("conv-07", body({ requestId: OTHER_ID }));
+    expect(shrank.body).toMatchObject({ outcome: "refused", reason: "request-id-reused" });
+    expect(adapter.calls).toHaveLength(2);
+  });
 });
 
 describe("answer: after an unknown outcome", () => {

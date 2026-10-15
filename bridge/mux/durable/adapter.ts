@@ -262,6 +262,9 @@ function durableCapabilities(idlePollMs: number): MuxCapabilityDeclaration {
   });
 }
 
+/** One line per interval when the events route keeps failing — the census cannot see this one. */
+const EVENTS_WARN_INTERVAL_MS = 300_000;
+
 export class DurableMux implements MuxAdapter {
   readonly mux = DURABLE_MUX;
   readonly logo = DURABLE_LOGO_SVG;
@@ -287,6 +290,8 @@ export class DurableMux implements MuxAdapter {
   private readonly watchDials: boolean;
   /** The delay the watch armed with its last census: how old a good read `poll()` may serve over HTTPS. */
   private watchCadenceMs: number;
+  /** The last `clock.now()` an events-sync failure was logged at; seeded so the FIRST failure logs. */
+  private eventsWarnAt = -EVENTS_WARN_INTERVAL_MS;
 
   /**
    * `log` is where a pane's events go. Without one the adapter reads the layout only, which is what a
@@ -410,9 +415,23 @@ export class DurableMux implements MuxAdapter {
    * log gained rows, and never rejects: a program that cannot be asked ends the pass, and the next
    * snapshot read says why. The watch calls it after a census and does not wait for it.
    */
+  /**
+   * Read the events of every pane whose `rev` moved, into the pane log. Resolves with the panes whose
+   * log gained rows, and never rejects: a program that cannot be asked ends the pass, and the next
+   * snapshot read says why. A failure of the events route ALONE says nothing to the census — the
+   * program answers snapshots fine — so it is logged here, rate-limited, before it reads as no new
+   * rows. The watch calls it after a census and does not wait for it.
+   */
   syncEvents(): Promise<readonly string[]> {
     if (this.events === null) return Promise.resolve([]);
-    return this.events.sync().catch(() => []);
+    return this.events.sync().catch((err: Error) => {
+      const at = this.clock.now();
+      if (at - this.eventsWarnAt >= EVENTS_WARN_INTERVAL_MS) {
+        this.eventsWarnAt = at;
+        console.warn(`[durable] events sync failed — the pane transcript may be going stale: ${err.message}`);
+      }
+      return [];
+    });
   }
 
   /**

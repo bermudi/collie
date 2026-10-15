@@ -75,7 +75,7 @@ export interface AnswerReceipt {
   askId: string;
   revision: number;
   optionId: string;
-  /** {@link answerDigest} of the four fields above, so another payload under the same id is refused. */
+  /** {@link answerDigest} of the fields the digest pins, so another payload under the same id is refused. */
   digest: string;
   state: AnswerState;
   /** For `refused`: the line the refusal carried, and its word. */
@@ -83,9 +83,20 @@ export interface AnswerReceipt {
   reason?: "unsupported" | "refused";
 }
 
-/** What one answer asks for, as a digest: the pane, the ask, the revision the phone saw, the option. */
-export function answerDigest(paneId: string, request: Pick<AnswerRequest, "askId" | "revision" | "optionId">): string {
-  return payloadDigest(["answer", paneId, request.askId, request.revision, request.optionId]);
+/** What one answer asks for, as a digest: the pane, the ask, the revision the phone saw, the option, and the note when one rode along. */
+export function answerDigest(paneId: string, request: Pick<AnswerRequest, "askId" | "revision" | "optionId" | "note">): string {
+  // The note is part of the payload the id pins (WIRE.md section 6): a second POST under a used id
+  // carrying a different note is a different answer, and must be refused — never joined to the
+  // in-flight request, never replayed from the receipt. Absent stays ABSENT in the field list, not
+  // an empty string, so receipts written before notes existed still replay as themselves.
+  return payloadDigest([
+    "answer",
+    paneId,
+    request.askId,
+    request.revision,
+    request.optionId,
+    ...(request.note === undefined ? [] : [request.note]),
+  ]);
 }
 
 /** A week, the newest thousand, and a pending receipt kept for at least a day (ADR 0100). */

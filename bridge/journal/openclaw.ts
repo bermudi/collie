@@ -147,15 +147,21 @@ function splitKey(key: string): { dbPath: string; sessionId: string } | null {
 }
 
 /**
- * Run `fn` against a read-only open of `dbPath`, or answer null: the file will not open, the query
- * failed, or the schema is not one this reader knows. The schema is checked on EVERY open, not once,
- * because OpenClaw migrates the file in place when it updates under a running bridge.
+ * Run `fn` against a read-only open of `dbPath`, or answer null when the file will not open or the
+ * schema is not one this reader knows. The schema is checked on EVERY open, not once, because
+ * OpenClaw migrates the file in place when it updates under a running bridge.
+ *
+ * `fn`'s own errors — and the schema read's — PROPAGATE, matching `devin.ts`: a query failure is
+ * schema drift or corruption, and swallowing it here is how a real store once read as "no history".
+ * Callers that walk many candidates guard their own loop (resolve does, per root).
  */
 function withAgentDb<T>(open: OpenDatabase, dbPath: string, fn: (db: Database) => T): T | null {
   let db: Database;
   try {
     db = open(dbPath);
   } catch {
+    // An unopenable database is an ordinary negative: the root walk treats a root without its db
+    // the same as a root without the session. Deliberately silent, same stance as devin.ts.
     return null;
   }
   try {
@@ -164,8 +170,6 @@ function withAgentDb<T>(open: OpenDatabase, dbPath: string, fn: (db: Database) =
       .get();
     if (meta === null || !OPENCLAW_SCHEMA_VERSIONS.includes(meta.schema_version)) return null;
     return fn(db);
-  } catch {
-    return null;
   } finally {
     db.close();
   }
@@ -255,16 +259,23 @@ export class OpenclawTranscriptSource implements TranscriptSource {
     for (const root of this.roots) {
       const path = await containedRealpath(join(root, "agents", lookup.agentId, "agent", AGENT_DB), root);
       if (path === null) continue;
-      const sessionId = withAgentDb(this.open, path, (db) => {
-        const query = db.query<{ current_session_id: string }, [string]>(
-          "select current_session_id from session_nodes where session_key = ?",
-        );
-        for (const candidate of lookup.candidates) {
-          const hit = query.get(candidate);
-          if (hit !== null) return hit.current_session_id;
-        }
-        return null;
-      });
+      let sessionId: string | null;
+      try {
+        sessionId = withAgentDb(this.open, path, (db) => {
+          const query = db.query<{ current_session_id: string }, [string]>(
+            "select current_session_id from session_nodes where session_key = ?",
+          );
+          for (const candidate of lookup.candidates) {
+            const hit = query.get(candidate);
+            if (hit !== null) return hit.current_session_id;
+          }
+          return null;
+        });
+      } catch {
+        // An unreadable agent database disqualifies this ROOT, not the request — keep walking
+        // (devin.ts's resolve guards its probe the same way, for the same reason).
+        continue;
+      }
       if (sessionId !== null && SESSION_ID_RE.test(sessionId)) return openclawKey(path, sessionId);
     }
     return null;
