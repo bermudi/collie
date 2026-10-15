@@ -1362,7 +1362,7 @@ export const it: Dictionary = {
   "updateRibbon.urgent": "Urgente.",
   "updateRibbon.linkChangeShort": "Modifica il link della crew.",
   "updateRibbon.available": "ColliePup {version} disponibile.",
-  "updateRibbon.availablePackaged": "ColliePup {version} disponibile tramite {manager}.",
+  "updateRibbon.availablePackaged": "ColliePup {version} disponibile via {manager}.",
   "updateRibbon.availablePackagedUnnamed": "ColliePup {version} disponibile.",
   "updateRibbon.view": "Visualizza",
   "updateRibbon.dismiss": "Ignora questa versione",
