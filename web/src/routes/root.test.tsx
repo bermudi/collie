@@ -48,7 +48,7 @@ describe("BootSplash — escalates a stuck cold start", () => {
     act(() => vi.advanceTimersByTime(CONNECTION_LOST_MS));
     expect(screen.queryByText("Connecting to the herd…")).not.toBeInTheDocument();
     expect(screen.getByText("Not connected")).toBeInTheDocument();
-    expect(screen.getByText(/Can.t reach Pup/)).toBeInTheDocument();
+    expect(screen.getByText(/Can.t reach Collie/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
     // Same mark throughout — it is never swapped for a second drawing, it only stops blooming: the
     // rest state is that mark still, muted. No bloom, because we have stopped trying, and a
@@ -215,7 +215,7 @@ describe("RootLayout — the safe-area inset is reserved exactly once", () => {
 
   it("gives it to the header while a strip is showing, and to nothing in the band", async () => {
     const { container } = renderLayout(offered);
-    await waitFor(() => expect(screen.getByText(/Pup 1.5.0 available/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Collie 1.5.0 available/)).toBeInTheDocument());
 
     expect(reservations(container)).toHaveLength(1);
     expect(container.querySelector("header")?.className).toMatch(/safe-area-inset-top/);
@@ -263,7 +263,7 @@ describe("RootLayout — the header comes first, the band under it, the route la
       { initialEntries: ["/"] },
     );
     const { container } = render(<RouterProvider router={router} />);
-    const strip = await screen.findByText(/Pup 1.5.0 available/);
+    const strip = await screen.findByText(/Collie 1.5.0 available/);
     const header = container.querySelector("header");
     const route = screen.getByText("dashboard");
     expect(header).not.toBeNull();
@@ -325,7 +325,7 @@ describe("RootLayout: the band floats over the route and moves nothing", () => {
 
   it("paints the strip inside an absolutely positioned band hung right under the header", async () => {
     const { container } = renderLayout(offered);
-    const strip = await screen.findByText(/Pup 1.5.0 available/);
+    const strip = await screen.findByText(/Collie 1.5.0 available/);
     const header = container.querySelector("header");
     const anchor = container.querySelector('[data-slot="strip-anchor"]');
     expect(anchor).toHaveClass("relative", "z-30", "h-0");
@@ -352,7 +352,7 @@ describe("RootLayout: the band floats over the route and moves nothing", () => {
     bare.unmount();
 
     const shown = renderLayout(offered);
-    await screen.findByText(/Pup 1.5.0 available/);
+    await screen.findByText(/Collie 1.5.0 available/);
     const shownBox = routeBox(shown.container);
     expect(shownBox?.className).toBe(bareClass);
     expect(shownBox?.getAttribute("style")).toBe(bareStyle);

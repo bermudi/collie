@@ -117,7 +117,7 @@ describe("pins", () => {
     expect(rows).not.toContain(paneRowKey(herd[MAX_PINS - 1]!));
   });
 
-  it("drops the pin when the pane is closed from Pup, and writes nothing when there was none", () => {
+  it("drops the pin when the pane is closed from Collie, and writes nothing when there was none", () => {
     const a = pane("w1:p1", "collie");
     const b = pane("w2:p1", "docs");
     setPinned(a, true, [a, b], 1);

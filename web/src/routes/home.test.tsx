@@ -377,7 +377,7 @@ describe("the dashboard's footer (ADR 0066, ADR 0085)", () => {
     expect(screen.getByRole("heading", { name: "collie" })).toBeInTheDocument();
   });
 
-  it("a solo Pup has two tabs, Dashboard and Files, and no Crew", async () => {
+  it("a solo Collie has two tabs, Dashboard and Files, and no Crew", async () => {
     renderHome(solo());
     await settled();
     expect(tabNames()).toHaveLength(2);

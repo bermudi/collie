@@ -230,7 +230,7 @@ describe("pasteCarriesSend — an image path Claude lifted out of the paste", ()
   });
 });
 
-describe("liftableImagePaths — only the paths Claude lifts, in the shape Pup sends", () => {
+describe("liftableImagePaths — only the paths Claude lifts, in the shape Collie sends", () => {
   const p = "/s/uploads/w1_p1-mf3x9q-0a1b2c3d.png";
 
   it("counts a path on its own line and a path ending the text, once each", () => {

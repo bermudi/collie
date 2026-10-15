@@ -181,7 +181,7 @@ describe("send", () => {
     const { onReload } = draw();
     const user = await type("hello");
     await user.click(sendButton());
-    await waitFor(() => expect(screen.getByTestId("said")).toHaveTextContent(/older Pup/));
+    await waitFor(() => expect(screen.getByTestId("said")).toHaveTextContent(/older Collie/));
     expect(field()).toHaveValue("hello");
     expect(onReload).not.toHaveBeenCalled();
   });

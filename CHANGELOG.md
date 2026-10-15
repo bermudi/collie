@@ -23,6 +23,11 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Changed
+- **Undoes 0.54.0's rename: the app says Collie again.** Every surface that briefly read Pup —
+  header identity, lock screen, launcher and manifest names, title, boot splash, push title and
+  the localised strings — is back to Collie, tagline included.
+
 ## [0.54.0] - 2026-10-14
 
 ### Changed

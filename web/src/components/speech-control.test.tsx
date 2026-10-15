@@ -308,11 +308,11 @@ describe("the hub", () => {
     expect(screen.getByText("Ready. Version ca52876.")).toBeInTheDocument();
   });
 
-  it("paused: the phone's copy is gone, the choice stays, Pup does not switch, and Restore is in the card", async () => {
+  it("paused: the phone's copy is gone, the choice stays, Collie does not switch, and Restore is in the card", async () => {
     const p = props({ ...WHISTLE_HUB, engine: "phone", local: null });
     render(<SpeechCards {...p} />);
     expect(inUse()).toMatchObject({ title: "Whistle by Cactus Compute", where: "On this phone", status: "Paused. This phone's copy of Whistle is gone.", setUp: "" });
-    expect(statusExtra()).toMatch(/Pup does not switch to your host by itself\. Restore the copy/);
+    expect(statusExtra()).toMatch(/Collie does not switch to your host by itself\. Restore the copy/);
     expect(changeRow()).toHaveAttribute("aria-expanded", "true");
     expect(within(phoneGroup()).getByRole("radio", { name: /^On this phone/ })).toHaveAttribute("aria-checked", "true");
     // The phone's card offers the copy as it would unchosen: its rows do not follow the choice.
@@ -326,7 +326,7 @@ describe("the hub", () => {
 
   it("paused with no copy on the host to restore from: says so, with no button", () => {
     render(<SpeechCards {...props({ engine: "phone", local: null, host: HOST_CODEX, hostStt: { provider: "codex", available: true } })} />);
-    expect(screen.getByText("Pup does not switch to your host by itself. Choose On your host below.")).toBeInTheDocument();
+    expect(screen.getByText("Collie does not switch to your host by itself. Choose On your host below.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Restore/ })).toBeNull();
   });
 
@@ -346,7 +346,7 @@ describe("the hub", () => {
   const STATUS_CASES: { name: string; host: SttHostStatus; expected: Partial<ReturnType<typeof inUse>> }[] = [
     { name: "your own command, found", host: { provider: "local-cli", available: true, configuredBy: "file", switchable: LOCKED("terminal") }, expected: { title: "Your own command", where: "Your own command on your host", setUp: "In a terminal on your host", status: "Ready. Your host found the command and can run it." } },
     { name: "your own command, not found", host: { provider: "local-cli", available: false, reason: "the local transcription command was not found", configuredBy: "file", switchable: LOCKED("terminal") }, expected: { title: "Your own command", where: "Your own command on your host", setUp: "In a terminal on your host", status: "Not ready. Your host cannot find or run the command." } },
-    { name: "a speech service", host: HOST_SERVICE, expected: { title: "A speech service", setUp: "In a terminal on your host", status: "Set up. Your host has the service's address. Pup tries the service only when you speak." } },
+    { name: "a speech service", host: HOST_SERVICE, expected: { title: "A speech service", setUp: "In a terminal on your host", status: "Set up. Your host has the service's address. Collie tries the service only when you speak." } },
     { name: "ChatGPT, signed in", host: HOST_CODEX, expected: { title: "ChatGPT subscription (OpenAI)", where: "Through Codex on your host", setUp: "In a terminal on your host", status: "Ready. Codex on your host is signed in with ChatGPT." } },
     { name: "a provider this build does not know", host: { ...HOST_SERVICE, provider: "future-stt", available: false, reason: "it is resting" }, expected: { title: "future-stt", setUp: "In a terminal on your host", status: "Not ready. Your host says: it is resting" } },
     { name: "Whistle named by the environment", host: { ...HOST_WHISTLE, configuredBy: "env", switchable: LOCKED("env") }, expected: { title: "Whistle by Cactus Compute", setUp: "By your host's environment", status: "Ready. Whistle ca52876 is on your host." } },
@@ -418,7 +418,7 @@ describe("the hub", () => {
   it("the old Whistle wrapper: one plain line, and a button that opens Host speech", async () => {
     const p = props({ whistle: READY, host: HOST_WRAPPER, hostName: "bluefin" });
     render(<SpeechCards {...p} />);
-    expect(statusExtra()).toContain("This is the old Whistle wrapper. Pup now runs Whistle itself, without ffmpeg.");
+    expect(statusExtra()).toContain("This is the old Whistle wrapper. Collie now runs Whistle itself, without ffmpeg.");
     await userEvent.click(within(statusCard()).getByRole("button", { name: "Switch to built-in Whistle" }));
     expect(p.onOpenPage).toHaveBeenCalledWith("host");
   });
@@ -682,7 +682,7 @@ describe("Host speech", () => {
     expect(follows(stays, screen.getByText("Your own command"))).toBe(true);
     expect(follows(screen.getByText("Your own command"), leaves)).toBe(true);
     expect(follows(leaves, screen.getByText("A speech service"))).toBe(true);
-    expect(screen.getByText("Pup cannot check where this command sends audio.")).toBeInTheDocument();
+    expect(screen.getByText("Collie cannot check where this command sends audio.")).toBeInTheDocument();
     expect(screen.getByText("Your host takes no audio.")).toBeInTheDocument();
   });
 
@@ -862,10 +862,10 @@ describe("Host speech", () => {
 
   it("ChatGPT in use: the identity, honest or the codex-cli fallback, in words", () => {
     render(<SpeechCards {...host({ host: HOST_CODEX })} />);
-    expect(screen.getByText("Pup names itself to the endpoint.", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("Collie names itself to the endpoint.", { exact: false })).toBeInTheDocument();
     cleanup();
     render(<SpeechCards {...host({ host: { ...HOST_CODEX, identity: "codex-cli" } })} />);
-    expect(screen.getByText(/Pup wears the Codex CLI's headers/)).toBeInTheDocument();
+    expect(screen.getByText(/Collie wears the Codex CLI's headers/)).toBeInTheDocument();
   });
 
   it("an option in use that does not work shows the host's own words when the page has none of its own", () => {
@@ -1281,7 +1281,7 @@ describe("SpeechControl", () => {
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "I accept" }));
     await waitFor(() => expect(bodies).toEqual([{ provider: "codex", consent: CODEX_CONSENT_ID }]));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(await screen.findByText("Pup names itself to the endpoint.", { exact: false })).toBeInTheDocument();
+    expect(await screen.findByText("Collie names itself to the endpoint.", { exact: false })).toBeInTheDocument();
   });
 
   it("ChatGPT refused: the reason is written in the open sheet", async () => {
@@ -1297,7 +1297,7 @@ describe("SpeechControl", () => {
     await userEvent.click(within(group).getByRole("radio", { name: /^ChatGPT subscription/ }));
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "I accept" }));
     const sheet = screen.getByRole("dialog");
-    expect(await within(sheet).findByText("The Codex endpoint did not accept Pup: both identities were refused")).toBeInTheDocument();
+    expect(await within(sheet).findByText("The Codex endpoint did not accept Collie: both identities were refused")).toBeInTheDocument();
   });
 
   it("Check again reads the host once more, so a command run in its terminal shows up", async () => {

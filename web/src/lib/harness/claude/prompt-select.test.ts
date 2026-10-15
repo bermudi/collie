@@ -195,7 +195,7 @@ describe("detectPromptSelect — the plan-approval feedback row is an INPUT, in 
     expect(model!.feedback).toBeUndefined();
   });
 
-  it("AskUserQuestion's free-text row is modelled as a field Pup never types into", () => {
+  it("AskUserQuestion's free-text row is modelled as a field Collie never types into", () => {
     // "Type something." is never a button. Measured on Claude Code 2.1.283: with the pointer on it a
     // digit is typed into the field, so it is modelled with the `free-text` purpose, which locks the
     // other buttons while focused and never offers the plan flow's editor or keystroke plan.
