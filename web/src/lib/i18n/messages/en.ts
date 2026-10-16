@@ -226,6 +226,10 @@ export const en = {
   "settings.updateBanner.restartNeeded": "ColliePup was replaced on disk. Restart it.",
   "settings.updateBanner.releaseAvailable": "ColliePup {version} available",
   "settings.updateBanner.majorAvailable": "ColliePup {version} — a new major",
+  // THE UPSTREAM MERGE SIGNAL (Pup, ADR 9007). Names BOTH versions and says merge, never update:
+  // the remedy is a `git merge upstream/main` on the operator's machine. No command to copy — the
+  // release page (linked) carries the notes, and the merge happens where the checkout lives.
+  "settings.updateBanner.upstreamAvailable": "Upstream {version} available (merged {merged}). Merge upstream/main on this machine.",
   "settings.updateBanner.copyAria": "Copy command: {command}",
 
   // --- settings.typeface (the APP's own face — a per-device preference since ADR 0033) ---
@@ -1543,6 +1547,10 @@ export const en = {
   // takes it.
   "settings.updateCard.urgentSince": "Urgent since {version}",
   "settings.updateCard.linkChange": "Changes the crew link. Update the lead first, members follow.",
+  // THE UPSTREAM MERGE NOTICE (Pup, ADR 9007). Names BOTH versions and says merge, never update: the
+  // remedy is a `git merge upstream/main` on the operator's machine. No button — the card never
+  // starts a merge, it only names it.
+  "settings.updateCard.upstream": "Upstream {version} is available (merged {merged}). Merge upstream/main on this machine.",
   "settings.updateCard.confirmAction": "Yes, update",
   "settings.updateCard.majorConfirmTitle": "Cross the major to {version}?",
   "settings.updateCard.majorConfirmBody": "{version} is a new major, so it is consented to on its own and never folded into a routine update. Read its release notes first. Your terminal session stays alive. The phone view drops for up to 30 seconds.",
@@ -1645,6 +1653,10 @@ export const en = {
   "updateRibbon.urgent": "Urgent.",
   "updateRibbon.linkChangeShort": "Changes the crew link.",
   "updateRibbon.available": "ColliePup {version} available.",
+  // THE UPSTREAM BAND'S CUT (Pup, ADR 9007). Names BOTH versions in one truncating row, held to the
+  // forty-character budget like every other band string. The tap lands on the Updates card, which
+  // carries the merge remedy whole — the band states what moved, not how to take it.
+  "updateRibbon.upstream": "Upstream {version} (merged {merged})",
   // A packaged host cannot take the tap — its updates come from its package manager (ADR 0035) — so
   // the band STATES the fact and names the manager. It does not instruct: the phone cannot run
   // pacman, and a line that told the operator to would be telling them to go somewhere else.

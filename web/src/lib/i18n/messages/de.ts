@@ -206,6 +206,7 @@ export const de: Dictionary = {
   "settings.updateBanner.restartNeeded": "ColliePup wurde auf der Festplatte ersetzt. Neu starten.",
   "settings.updateBanner.releaseAvailable": "ColliePup {version} verfügbar",
   "settings.updateBanner.majorAvailable": "ColliePup {version} (Major-Release)",
+  "settings.updateBanner.upstreamAvailable": "Upstream {version} verfügbar (gemergt {merged}). Merge upstream/main auf diesem Rechner.",
   "settings.updateBanner.copyAria": "Befehl kopieren: {command}",
 
   // --- settings.typeface ---
@@ -1448,6 +1449,7 @@ export const de: Dictionary = {
   "settings.updateCard.urgent": "Dringend",
   "settings.updateCard.urgentSince": "Dringend seit {version}",
   "settings.updateCard.linkChange": "Ändert die Crew-Verbindung. Zuerst den Lead aktualisieren, die Mitglieder folgen.",
+  "settings.updateCard.upstream": "Upstream {version} ist verfügbar (gemergt {merged}). Merge upstream/main auf diesem Rechner.",
   "settings.updateCard.confirmAction": "Ja, aktualisieren",
   "settings.updateCard.majorConfirmTitle": "Major-Wechsel auf {version} durchführen?",
   "settings.updateCard.majorConfirmBody": "{version} ist eine neue Major-Version, muss einzeln bestätigt werden und ist nie Teil eines Routine-Updates. Bitte zuerst die Release Notes lesen. Die Terminal-Sitzung bleibt aktiv. Die mobile Ansicht trennt sich für bis zu 30 Sekunden.",
@@ -1534,6 +1536,7 @@ export const de: Dictionary = {
   "updateRibbon.urgent": "Dringend.",
   "updateRibbon.linkChangeShort": "Ändert die Crew-Verbindung.",
   "updateRibbon.available": "ColliePup {version} verfügbar.",
+  "updateRibbon.upstream": "Upstream {version} (gemergt {merged})",
   "updateRibbon.availablePackaged": "ColliePup {version} über {manager} verfügbar.",
   "updateRibbon.availablePackagedUnnamed": "ColliePup {version} verfügbar.",
   "updateRibbon.view": "Ansehen",

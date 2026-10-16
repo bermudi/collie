@@ -15,7 +15,10 @@ import {
   GITHUB_TOKEN_ENVS,
   githubReleaseUrl,
   githubTagsUrl,
+  isUpstreamFire,
+  parseUpstreamMerged,
   readAllTags,
+  shouldNotifyUpstream,
   TAG_PAGE_SIZE,
   TAG_PAGES_MAX,
   isGithubApiUrl,
@@ -37,6 +40,8 @@ import {
   shouldNotify,
   stampOf,
   updateDigestBody,
+  upstreamMergeBody,
+  upstreamMergeSignal,
   releaseFetchers,
   updateMirror,
   updatesNewerThan,
@@ -375,6 +380,139 @@ describe("shouldNotify", () => {
   });
 });
 
+describe("parseUpstreamMerged", () => {
+  it("reads one dotted strict semver, whitespace tolerated", () => {
+    expect(parseUpstreamMerged("1.21.3")).toBe("1.21.3");
+    expect(parseUpstreamMerged("  1.21.3\n")).toBe("1.21.3");
+  });
+
+  it("rejects everything else — missing, garbage, prerelease, leading v", () => {
+    expect(parseUpstreamMerged(null)).toBeNull();
+    expect(parseUpstreamMerged(undefined)).toBeNull();
+    expect(parseUpstreamMerged("")).toBeNull();
+    expect(parseUpstreamMerged("   \n")).toBeNull();
+    expect(parseUpstreamMerged("garbage")).toBeNull();
+    expect(parseUpstreamMerged("v1.21.3")).toBeNull();
+    expect(parseUpstreamMerged("1.21.3-beta.1")).toBeNull();
+    expect(parseUpstreamMerged("1.21")).toBeNull();
+    expect(parseUpstreamMerged("1.21.3.4")).toBeNull();
+  });
+});
+
+describe("upstreamMergeSignal", () => {
+  it("merged 1.21.3 → 1.21.4 no-fire (patch is churn, not signal)", () => {
+    expect(upstreamMergeSignal("1.21.3", ["v1.21.3", "v1.21.4"])).toEqual({
+      fire: false,
+      latest: "1.21.4",
+    });
+  });
+
+  it("merged 1.21.3 → 1.22.0 fire (minor)", () => {
+    expect(upstreamMergeSignal("1.21.3", ["v1.21.3", "v1.21.4", "v1.22.0"])).toEqual({
+      fire: true,
+      latest: "1.22.0",
+    });
+  });
+
+  it("merged 1.21.3 → 2.0.0 fire (major)", () => {
+    expect(upstreamMergeSignal("1.21.3", ["v1.21.3", "v2.0.0"])).toEqual({
+      fire: true,
+      latest: "2.0.0",
+    });
+  });
+
+  it("record equal to newest no-fire", () => {
+    expect(upstreamMergeSignal("1.21.3", ["v1.21.3"])).toEqual({ fire: false, latest: "1.21.3" });
+    expect(upstreamMergeSignal("1.22.0", ["v1.21.3", "v1.22.0"])).toEqual({
+      fire: false,
+      latest: "1.22.0",
+    });
+  });
+
+  it("lower upstream never fires", () => {
+    expect(upstreamMergeSignal("1.22.0", ["v1.21.3", "v1.22.0"])).toEqual({
+      fire: false,
+      latest: "1.22.0",
+    });
+    expect(upstreamMergeSignal("2.0.0", ["v1.99.9", "v2.0.0"])).toEqual({
+      fire: false,
+      latest: "2.0.0",
+    });
+  });
+
+  it("prerelease tags are invisible", () => {
+    expect(upstreamMergeSignal("1.21.3", ["v1.21.3", "v1.22.0-beta.1"])).toEqual({
+      fire: false,
+      latest: "1.21.3",
+    });
+    expect(upstreamMergeSignal("1.21.3", ["v1.22.0-rc.1"])).toEqual({ fire: false, latest: null });
+  });
+
+  it("missing/garbage record never fires", () => {
+    expect(upstreamMergeSignal(null, ["v1.22.0"])).toEqual({ fire: false, latest: null });
+  });
+
+  it("no strict tags never fires", () => {
+    expect(upstreamMergeSignal("1.21.3", [])).toEqual({ fire: false, latest: null });
+    expect(upstreamMergeSignal("1.21.3", ["nightly", "main"])).toEqual({ fire: false, latest: null });
+  });
+});
+
+describe("isUpstreamFire / shouldNotifyUpstream", () => {
+  it("patch-only never fires, minor/major does", () => {
+    expect(isUpstreamFire("1.21.3", "1.21.4")).toBe(false);
+    expect(isUpstreamFire("1.21.3", "1.21.3")).toBe(false);
+    expect(isUpstreamFire("1.21.3", "1.20.9")).toBe(false);
+    expect(isUpstreamFire("1.21.3", "1.22.0")).toBe(true);
+    expect(isUpstreamFire("1.21.3", "2.0.0")).toBe(true);
+  });
+
+  it("after firing for 1.22.0, a 1.22.1 does not re-fire; 1.23.0 or 2.0.0 does", () => {
+    const base = {
+      recorded: "1.21.3",
+      lastPushedAt: null,
+      now: AT_10AM,
+    };
+    expect(
+      shouldNotifyUpstream({ ...base, latest: "1.22.0", lastUpstreamNotified: null }),
+    ).toEqual({ send: true, latest: "1.22.0" });
+    expect(
+      shouldNotifyUpstream({ ...base, latest: "1.22.1", lastUpstreamNotified: "1.22.0" }),
+    ).toEqual({ send: false });
+    expect(
+      shouldNotifyUpstream({ ...base, latest: "1.23.0", lastUpstreamNotified: "1.22.0" }),
+    ).toEqual({ send: true, latest: "1.23.0" });
+    expect(
+      shouldNotifyUpstream({ ...base, latest: "2.0.0", lastUpstreamNotified: "1.22.0" }),
+    ).toEqual({ send: true, latest: "2.0.0" });
+  });
+
+  it("respects the digest window and the 09:00 floor, like the own-channel digest", () => {
+    const base = { recorded: "1.21.3", latest: "1.22.0", lastUpstreamNotified: null };
+    expect(
+      shouldNotifyUpstream({ ...base, lastPushedAt: hoursAgo(AT_10AM, 3), now: AT_10AM }),
+    ).toEqual({ send: false });
+    expect(
+      shouldNotifyUpstream({ ...base, lastPushedAt: hoursAgo(AT_10AM, 30), now: AT_10AM }),
+    ).toEqual({ send: true, latest: "1.22.0" });
+    expect(
+      shouldNotifyUpstream({
+        ...base,
+        lastPushedAt: null,
+        now: new Date(2026, 0, 15, 3, 0, 0),
+      }),
+    ).toEqual({ send: false });
+  });
+
+  it("the push body names both versions and says merge, never update", () => {
+    const body = upstreamMergeBody("1.22.0", "1.21.3");
+    expect(body).toContain("1.22.0");
+    expect(body).toContain("1.21.3");
+    expect(body.toLowerCase()).toContain("merge");
+    expect(body.toLowerCase()).not.toContain("tap");
+  });
+});
+
 describe("stampOf", () => {
   it("is order-independent and changes on any mtime/size change", () => {
     const a = [
@@ -395,20 +533,29 @@ describe("stampOf", () => {
 function fakeStore(
   initial: string | null = null,
   pushedAt: string | null = null,
-): UpdateStore & { saved: string[]; pushes: string[]; closed: string[]; writes: number } {
+): UpdateStore & {
+  saved: string[];
+  pushes: string[];
+  closed: string[];
+  writes: number;
+  upstreamSaved: string[];
+} {
   let last = initial;
   let stamp = pushedAt;
   let dismissed: string | null = null;
   let dismissedCrew: string | null = null;
   let dismissedCrewAt: number | null = null;
+  let upstream: string | null = null;
   const saved: string[] = [];
   const pushes: string[] = [];
   const closed: string[] = [];
+  const upstreamSaved: string[] = [];
   const counter = { writes: 0 };
   return {
     saved,
     pushes,
     closed,
+    upstreamSaved,
     get writes() {
       return counter.writes;
     },
@@ -419,6 +566,14 @@ function fakeStore(
       last = v;
       stamp = at;
       saved.push(v);
+      pushes.push(at);
+    },
+    upstreamLastNotified: () => upstream,
+    setUpstreamNotified: async (v, at) => {
+      counter.writes += 1;
+      upstream = v;
+      stamp = at;
+      upstreamSaved.push(v);
       pushes.push(at);
     },
     dismissedVersion: () => dismissed,
@@ -565,6 +720,8 @@ function makeMonitor(over: Partial<UpdateMonitorDeps> = {}) {
     linkChange: { from: number; to: number } | null;
     urgent: { version: string; reason: string } | null;
   }[] = [];
+  /** Every upstream-merge push, as (latest, merged) — the body names both (ADR 9007). */
+  const upstreamPushes: { latest: string; merged: string }[] = [];
   const store = fakeStore();
   // 10:00 on a fixed LOCAL day: past the digest's earliest hour, so these tests exercise the monitor
   // rather than the clock. `tick` moves it forward within the same morning unless a test says otherwise.
@@ -596,9 +753,12 @@ function makeMonitor(over: Partial<UpdateMonitorDeps> = {}) {
       notified.push(...versions);
       pushes.push({ versions, linkChange, urgent });
     },
+    notifyUpstream: (latest, merged) => {
+      upstreamPushes.push({ latest, merged });
+    },
     ...over,
   });
-  return { monitor, notified, pushes, store, tick: (ms: number) => (clock += ms) };
+  return { monitor, notified, pushes, upstreamPushes, store, tick: (ms: number) => (clock += ms) };
 }
 
 describe("UpdateMonitor", () => {
@@ -715,6 +875,8 @@ describe("UpdateMonitor", () => {
       dismissedCrewVersion: store.dismissedCrewVersion,
       dismissedCrewAt: store.dismissedCrewAt,
       setDismissed: store.setDismissed,
+      upstreamLastNotified: store.upstreamLastNotified,
+      setUpstreamNotified: store.setUpstreamNotified,
       setLastNotified: async (v, at) => {
         order.push(`persist:${v}`);
         await store.setLastNotified(v, at);
@@ -837,6 +999,163 @@ describe("UpdateMonitor", () => {
     expect(monitor.status().bridgeStale).toBe(false);
     tick(6_000); // ...past it, the recompute sees the divergence.
     expect(monitor.status().bridgeStale).toBe(true);
+  });
+});
+
+describe("UpdateMonitor upstream signal", () => {
+  const upstream = (merged: string | null, ...names: string[]) => ({
+    upstreamRepo: "AltanS/collie",
+    upstreamMerged: () => merged,
+    fetchUpstreamTags: async () => apiTags(...names),
+  });
+
+  it("merged 1.21.3 with upstream 1.21.4: no banner, no push — patch is churn", async () => {
+    const { monitor, upstreamPushes } = makeMonitor({
+      current: "0.55.0",
+      fetchTags: async () => apiTags("v0.55.0"),
+      ...upstream("1.21.3", "v1.21.3", "v1.21.4"),
+    });
+    await monitor.checkRelease();
+    expect(monitor.status().upstreamAvailable).toBeUndefined();
+    expect(monitor.status().upstreamLatest).toBeUndefined();
+    expect(upstreamPushes).toEqual([]);
+  });
+
+  it("merged 1.21.3 with upstream 1.22.0: banner names both, push fires once", async () => {
+    const { monitor, upstreamPushes, store } = makeMonitor({
+      current: "0.55.0",
+      fetchTags: async () => apiTags("v0.55.0"),
+      ...upstream("1.21.3", "v1.21.3", "v1.21.4", "v1.22.0"),
+    });
+    await monitor.checkRelease();
+    expect(monitor.status()).toMatchObject({
+      upstreamAvailable: true,
+      upstreamLatest: "1.22.0",
+      upstreamMerged: "1.21.3",
+      upstreamUrl: "https://github.com/AltanS/collie/releases/tag/v1.22.0",
+    });
+    expect(upstreamPushes).toEqual([{ latest: "1.22.0", merged: "1.21.3" }]);
+    expect(store.upstreamLastNotified()).toBe("1.22.0");
+    // Own-channel untouched: no Pup release, no own push.
+    expect(monitor.status().releaseAvailable).toBe(false);
+  });
+
+  it("merged 1.21.3 with upstream 2.0.0: fires (major)", async () => {
+    const { monitor, upstreamPushes } = makeMonitor({
+      current: "0.55.0",
+      fetchTags: async () => apiTags("v0.55.0"),
+      ...upstream("1.21.3", "v1.21.3", "v2.0.0"),
+    });
+    await monitor.checkRelease();
+    expect(monitor.status()).toMatchObject({ upstreamAvailable: true, upstreamLatest: "2.0.0" });
+    expect(upstreamPushes).toEqual([{ latest: "2.0.0", merged: "1.21.3" }]);
+  });
+
+  it("record equal to newest: no-fire", async () => {
+    const { monitor, upstreamPushes } = makeMonitor({
+      current: "0.55.0",
+      fetchTags: async () => apiTags("v0.55.0"),
+      ...upstream("1.21.3", "v1.21.3"),
+    });
+    await monitor.checkRelease();
+    expect(monitor.status().upstreamAvailable).toBeUndefined();
+    expect(upstreamPushes).toEqual([]);
+  });
+
+  it("prerelease tags invisible: 1.22.0-beta alone never fires", async () => {
+    const { monitor, upstreamPushes } = makeMonitor({
+      current: "0.55.0",
+      fetchTags: async () => apiTags("v0.55.0"),
+      ...upstream("1.21.3", "v1.21.3", "v1.22.0-beta.1"),
+    });
+    await monitor.checkRelease();
+    expect(monitor.status().upstreamAvailable).toBeUndefined();
+    expect(upstreamPushes).toEqual([]);
+  });
+
+  it("missing/garbage record: no-fire, loud log, rest of banner unaffected", async () => {
+    const warnings: string[] = [];
+    const orig = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(String(args[0]));
+    };
+    try {
+      for (const bad of [null, "garbage", "v1.21.3"]) {
+        const { monitor, upstreamPushes } = makeMonitor({
+          current: "0.55.0",
+          fetchTags: async () => apiTags("v0.56.0"),
+          upstreamRepo: "AltanS/collie",
+          // Simulate the file reader: raw text parsed, garbage reads as null.
+          upstreamMerged: () => parseUpstreamMerged(bad),
+          fetchUpstreamTags: async () => apiTags("v1.22.0"),
+        });
+        await monitor.checkRelease();
+        expect(monitor.status().upstreamAvailable).toBeUndefined();
+        expect(upstreamPushes).toEqual([]);
+        // The own-channel signal still works beside it.
+        expect(monitor.status().releaseAvailable).toBe(true);
+      }
+      expect(warnings.some((w) => w.includes("upstream-merged"))).toBe(true);
+    } finally {
+      console.warn = orig;
+    }
+  });
+
+  it("after firing for 1.22.0, a 1.22.1 does not re-fire; 1.23.0 does", async () => {
+    let tags = ["v1.21.3", "v1.22.0"];
+    const { monitor, upstreamPushes, store, tick } = makeMonitor({
+      current: "0.55.0",
+      fetchTags: async () => apiTags("v0.55.0"),
+      upstreamRepo: "AltanS/collie",
+      upstreamMerged: () => "1.21.3",
+      fetchUpstreamTags: async () => apiTags(...tags),
+    });
+    await monitor.checkRelease();
+    expect(upstreamPushes).toEqual([{ latest: "1.22.0", merged: "1.21.3" }]);
+
+    // A patch inside the announced minor: banner stays (still beyond the record) but no second push.
+    tags = ["v1.21.3", "v1.22.0", "v1.22.1"];
+    tick(25 * 3600_000);
+    await monitor.checkRelease();
+    expect(monitor.status()).toMatchObject({ upstreamAvailable: true, upstreamLatest: "1.22.1" });
+    expect(upstreamPushes).toHaveLength(1);
+    expect(store.upstreamLastNotified()).toBe("1.22.0");
+
+    // A new minor: fires again.
+    tags = ["v1.21.3", "v1.22.1", "v1.23.0"];
+    tick(25 * 3600_000);
+    await monitor.checkRelease();
+    expect(upstreamPushes).toHaveLength(2);
+    expect(upstreamPushes[1]).toEqual({ latest: "1.23.0", merged: "1.21.3" });
+  });
+
+  it("an upstream fetch error keeps prior state and never fails the own-channel check", async () => {
+    const { monitor, upstreamPushes } = makeMonitor({
+      current: "0.55.0",
+      fetchTags: async () => apiTags("v0.56.0"),
+      upstreamRepo: "AltanS/collie",
+      upstreamMerged: () => "1.21.3",
+      fetchUpstreamTags: async () => {
+        throw new Error("network down");
+      },
+    });
+    await monitor.checkRelease();
+    expect(monitor.status().releaseAvailable).toBe(true);
+    expect(monitor.status().upstreamAvailable).toBeUndefined();
+    expect(upstreamPushes).toEqual([]);
+  });
+
+  it("the off switch suppresses the upstream push but not the banner", async () => {
+    const { monitor, upstreamPushes, store } = makeMonitor({
+      current: "0.55.0",
+      fetchTags: async () => apiTags("v0.55.0"),
+      updatesEnabled: () => false,
+      ...upstream("1.21.3", "v1.22.0"),
+    });
+    await monitor.checkRelease();
+    expect(monitor.status().upstreamAvailable).toBe(true);
+    expect(upstreamPushes).toEqual([]);
+    expect(store.upstreamLastNotified()).toBeNull();
   });
 });
 

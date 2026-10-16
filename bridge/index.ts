@@ -187,10 +187,15 @@ import {
   bridgeStampSync,
   githubReleaseUrl,
   mirrorValue,
+  parseUpstreamMerged,
   releaseFetchers,
   UpdateMonitor,
   UpdateStateStore,
   updateDigestBody,
+  upstreamMergeBody,
+  UPSTREAM_MERGED_FILENAME,
+  UPSTREAM_REPO_DEFAULT,
+  UPSTREAM_REPO_ENV,
 } from "./update.ts";
 import { SWEEP_INTERVAL_MS, sweepUploads } from "./uploads.ts";
 import { crewTurnStart, readUpdateRun, updateLockHeld } from "./update-run.ts";
@@ -799,9 +804,27 @@ await updateStore.load();
 // install can never be "updated" into upstream's binaries; overridable for another fork (or a
 // synthetic test target) via COLLIE_UPDATE_REPO.
 const updateRepo = process.env.COLLIE_UPDATE_REPO?.trim() || "bermudi/collie";
+// The upstream repo Pup tracks (ADR 9007). A second tag fetch runs alongside the own-channel one,
+// gated by the `upstream-merged` record below; the own-channel check keeps running unchanged.
+const upstreamRepo = process.env[UPSTREAM_REPO_ENV]?.trim() || UPSTREAM_REPO_DEFAULT;
 // The release reads, with the rehearsal mirror (a loopback-only test seam) decided in one place.
 const releaseReads = releaseFetchers(updateRepo, process.env);
 if (releaseReads.warning !== null) console.warn(`[update] ${releaseReads.warning}`);
+// The upstream reads ride the same mirror seam: a rehearsal must not touch a real release on either
+// channel. No second warning — the line above already says the seam is set.
+const upstreamReads = releaseFetchers(upstreamRepo, process.env);
+// The last upstream release merged, from the tracked `upstream-merged` file at the repo root (ADR
+// 9007). Read per check, never cached: a merge rewrites it and re-arms the signal. Missing or
+// garbage reads as null — the monitor logs loudly and never fires, with the rest of the banner
+// unaffected. A tracked file, not git-derived: field installs are detached checkouts without the
+// `upstream` remote and possibly without history.
+function readUpstreamMerged(): string | null {
+  try {
+    return parseUpstreamMerged(readFileSync(join(rootDir, UPSTREAM_MERGED_FILENAME), "utf8"));
+  } catch {
+    return null;
+  }
+}
 // How this Collie is installed — the ONE shared classifier (`cli/install-kind.ts`), probed once at
 // startup because the answer cannot change under a running process (an update restarts the service).
 // The banner spells its commands from this: Herdr actions for a Herdr-managed checkout, the `collie`
@@ -920,6 +943,20 @@ const updateMonitor = new UpdateMonitor({
       // kind of thing it always was, and what makes it urgent is the first sentence of the body.
       ...pushTitle("update.available"),
       body: updateDigestBody(currentVersion, versions, linkChange, urgent),
+      target: "settings",
+    }),
+  // The upstream merge signal (ADR 9007): a second tag fetch alongside the own-channel one, gated by
+  // the tracked record above. Same digest channel, no new one — the body names BOTH versions and the
+  // remedy is a merge on the operator's machine, never tap-to-update.
+  upstreamRepo,
+  upstreamMerged: readUpstreamMerged,
+  fetchUpstreamTags: upstreamReads.fetchTags,
+  notifyUpstream: (latest, merged) =>
+    void push.send({
+      type: "update",
+      tag: "collie:update",
+      ...pushTitle("update.available"),
+      body: upstreamMergeBody(latest, merged),
       target: "settings",
     }),
 });

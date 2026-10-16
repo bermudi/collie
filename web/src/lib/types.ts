@@ -725,6 +725,16 @@ export interface UpdateInfo {
    * (ADR 0046). Absent on an older bridge too, which reads the same way: no label, no sentence.
    */
   urgent?: UpdateUrgent;
+  /**
+   * Upstream holds a minor/major beyond the merged record (Pup, ADR 9007). Absent on an older
+   * bridge, which reads as no upstream signal. Present together or not at all when the signal fires:
+   * the new upstream version, the merged one, and its release page. The remedy is a merge on the
+   * operator's machine — never tap-to-update.
+   */
+  upstreamAvailable?: boolean;
+  upstreamLatest?: string;
+  upstreamMerged?: string;
+  upstreamUrl?: string | null;
   /** The running bridge PROCESS is behind the on-disk code — a `systemctl restart` picks it up. */
   bridgeStale: boolean;
   /**

@@ -201,6 +201,7 @@ export const ja: Dictionary = {
   "settings.updateBanner.restartNeeded": "ディスク上の ColliePup が置き換えられました。再起動してください。",
   "settings.updateBanner.releaseAvailable": "ColliePup {version} が利用可能です",
   "settings.updateBanner.majorAvailable": "ColliePup {version} (メジャーアップデート)",
+  "settings.updateBanner.upstreamAvailable": "Upstream {version} が利用可能（統合済 {merged}）。このマシンで upstream/main をマージ。",
   "settings.updateBanner.copyAria": "コマンドをコピー: {command}",
 
   // --- settings.typeface ---
@@ -1434,6 +1435,7 @@ export const ja: Dictionary = {
   "settings.updateCard.urgent": "緊急",
   "settings.updateCard.urgentSince": "{version} から緊急",
   "settings.updateCard.linkChange": "クルーの接続方式が変わります。先にleadを更新すると、メンバーが続きます。",
+  "settings.updateCard.upstream": "Upstream {version} が利用可能です（統合済 {merged}）。このマシンで upstream/main をマージしてください。",
   "settings.updateCard.confirmAction": "更新する",
   "settings.updateCard.majorConfirmTitle": "{version} にメジャー更新しますか？",
   "settings.updateCard.majorConfirmBody": "{version} は新しいメジャーバージョンのため、通常の更新には含まれず、個別の同意が必要です。先にリリースノートを確認してください。端末セッションは維持されます。スマホ画面は最大 30 秒間切断されます。",
@@ -1520,6 +1522,7 @@ export const ja: Dictionary = {
   "updateRibbon.urgent": "緊急。",
   "updateRibbon.linkChangeShort": "クルーの接続方式が変わります。",
   "updateRibbon.available": "ColliePup {version} が利用可能です。",
+  "updateRibbon.upstream": "Upstream {version}（統合済 {merged}）",
   "updateRibbon.availablePackaged": "ColliePup {version}（{manager}）が利用可能。",
   "updateRibbon.availablePackagedUnnamed": "ColliePup {version} が利用可能。",
   "updateRibbon.view": "表示",

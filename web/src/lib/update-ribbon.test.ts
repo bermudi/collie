@@ -83,6 +83,35 @@ describe("update ribbon states", () => {
     expect(read({ update: info({ latest: null }) })).toEqual({ kind: "silent" });
   });
 
+  it("(u) names both upstream versions when a merge is waiting", () => {
+    expect(
+      read({
+        update: info({
+          releaseAvailable: false,
+          latest: null,
+          upstreamAvailable: true,
+          upstreamLatest: "1.22.0",
+          upstreamMerged: "1.21.3",
+        }),
+      }),
+    ).toEqual({ kind: "upstream", version: "1.22.0", merged: "1.21.3" });
+    expect(
+      ribbonText(
+        { kind: "upstream", version: "1.22.0", merged: "1.21.3" },
+        null,
+        null,
+      ),
+    ).toBe("Upstream 1.22.0 (merged 1.21.3)");
+  });
+
+  it("(u) sits below the own-channel offer, so an update this machine can take wins", () => {
+    expect(read()).toEqual({ kind: "available", version: "1.5.0" });
+  });
+
+  it("(u) carries no close — only a merge re-arms it", () => {
+    expect(dismissTarget({ kind: "upstream", version: "1.22.0", merged: "1.21.3" })).toBeNull();
+  });
+
   it("an unreachable peer is a failed leg, not a moving one (M16/04)", () => {
     // The lead gave up on that machine after three missed sweeps, so the band names it rather than
     // counting it among the machines still going.

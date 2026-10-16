@@ -23,6 +23,9 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Added
+- **The phone says when upstream is worth merging.** Pup records the last upstream release merged in `upstream-merged` and raises the update banner plus a daily push when upstream publishes a new minor or major beyond it; patches never fire, and the remedy names both versions as a merge on your machine.
+
 ## [0.55.0] - 2026-10-15
 
 ### Added

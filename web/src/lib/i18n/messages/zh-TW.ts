@@ -192,6 +192,7 @@ export const zhTW: Dictionary = {
   "settings.updateBanner.restartNeeded": "磁碟上的 ColliePup 已被取代，請重新啟動。",
   "settings.updateBanner.releaseAvailable": "ColliePup {version} 已發布",
   "settings.updateBanner.majorAvailable": "ColliePup {version} 發布（主要版本升級）",
+  "settings.updateBanner.upstreamAvailable": "上游 {version} 可用（已合併 {merged}）。請在本機合併 upstream/main。",
   "settings.updateBanner.copyAria": "複製指令：{command}",
 
   // --- settings.typeface ---
@@ -1410,6 +1411,7 @@ export const zhTW: Dictionary = {
   "settings.updateCard.urgent": "緊急",
   "settings.updateCard.urgentSince": "自 {version} 起緊急",
   "settings.updateCard.linkChange": "此版本會變更機組連線方式。請先更新 Lead 節點，成員隨後跟進。",
+  "settings.updateCard.upstream": "上游 {version} 可用（已合併 {merged}）。請在本機合併 upstream/main。",
   "settings.updateCard.confirmAction": "確認更新",
   "settings.updateCard.majorConfirmTitle": "升級至主要版本 {version}？",
   "settings.updateCard.majorConfirmBody": "{version} 是新的主要版本，必須另外確認，不會合併到日常更新中。請先閱讀版本說明。終端機工作階段會保持連線，行動裝置端檢視最多會中斷 30 秒。",
@@ -1494,6 +1496,7 @@ export const zhTW: Dictionary = {
   "updateRibbon.urgent": "緊急。",
   "updateRibbon.linkChangeShort": "機組連線方式會變更。",
   "updateRibbon.available": "已推出 ColliePup {version}。",
+  "updateRibbon.upstream": "上游 {version}（已合併 {merged}）",
   "updateRibbon.availablePackaged": "ColliePup {version} 可透過 {manager} 取得。",
   "updateRibbon.availablePackagedUnnamed": "ColliePup {version} 可用。",
   "updateRibbon.view": "查看",

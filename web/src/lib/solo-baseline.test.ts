@@ -177,6 +177,12 @@ const UPDATE_INFO_KEYS = {
   // The newest urgent release in the delta (ADR 0046). Optional, and absent on every ordinary
   // release, so a solo payload is byte-identical to what it was.
   urgent: true,
+  // The upstream merge signal (Pup, ADR 9007). Optional, and absent unless a merge is waiting, so a
+  // solo payload without one is byte-identical to what it was.
+  upstreamAvailable: true,
+  upstreamLatest: true,
+  upstreamMerged: true,
+  upstreamUrl: true,
 } satisfies Record<keyof UpdateInfo, true>;
 
 describe("solo zero-tax — the client's mirror types carry no crew dimension", () => {
@@ -281,6 +287,11 @@ describe("solo zero-tax — the client's mirror types carry no crew dimension", 
       "restartNeeded",
       "run",
       "settledAt",
+      // The upstream merge signal (Pup, ADR 9007) — optional, absent unless a merge is waiting.
+      "upstreamAvailable",
+      "upstreamLatest",
+      "upstreamMerged",
+      "upstreamUrl",
       // The newest urgent release in the delta (ADR 0046) — optional, and absent unless a release
       // asked for the daily cadence.
       "urgent",

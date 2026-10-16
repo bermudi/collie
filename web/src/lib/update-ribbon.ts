@@ -110,7 +110,14 @@ export type RibbonView =
       target: string | null;
     }
   | { kind: "available"; version: string }
-  | { kind: "available-packaged"; version: string; manager: string | null };
+  | { kind: "available-packaged"; version: string; manager: string | null }
+  | {
+      kind: "upstream";
+      /** The new upstream version to merge. */
+      version: string;
+      /** The upstream release the last merge absorbed. */
+      merged: string;
+    };
 
 /** Everything the reading needs. Two are client facts; the rest are the poll. */
 export interface RibbonInput {
@@ -380,6 +387,10 @@ export function dismissTarget(view: RibbonView): Dismissal | null {
     // replaces it. An operator who has read it may put it down.
     case "peer-failed":
       return view.target === null ? null : { scope: "crew", version: view.target };
+    // AN UPSTREAM MERGE IS NOT CLOSABLE. The remedy is a merge on the operator's machine, not a tap,
+    // and putting it down would hide a standing fact no digest snooze covers. Only a merge re-arms it.
+    case "upstream":
+      return null;
     default:
       return null;
   }
@@ -487,6 +498,18 @@ export function ribbonView(input: RibbonInput): RibbonView {
     return { kind: "available", version: latest };
   }
 
+  // (u) — an upstream merge is waiting (Pup, ADR 9007). Below the own-channel offer, so an update
+  // this machine can take always wins the row; above silence, so a merge worth hearing about is heard.
+  // No dismiss: the remedy is a merge on the operator's machine, and only a merge re-arms it. The tap
+  // navigates to Updates, where the card names the merge whole.
+  if (
+    input.update?.upstreamAvailable === true &&
+    input.update?.upstreamLatest !== undefined &&
+    input.update?.upstreamMerged !== undefined
+  ) {
+    return { kind: "upstream", version: input.update.upstreamLatest, merged: input.update.upstreamMerged };
+  }
+
   return { kind: "silent" };
 }
 
@@ -569,6 +592,8 @@ function ribbonLine(view: RibbonView): string {
         return `${t("updateRibbon.availablePackagedUnnamed", { version: view.version })} ${t("updateRibbon.seeUpdates")}`;
       }
       return t("updateRibbon.availablePackaged", { version: view.version, manager: view.manager });
+    case "upstream":
+      return t("updateRibbon.upstream", { version: view.version, merged: view.merged });
   }
 }
 

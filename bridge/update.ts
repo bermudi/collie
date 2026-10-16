@@ -276,6 +276,114 @@ export function updatesNewerThan(tags: string[], current: string): string[] {
   return [...seen].toSorted(compareSemver);
 }
 
+// ── The upstream-merge signal (Pup, ADR 9007) ───────────────────────────────
+// Pup (`bermudi/collie`) tracks upstream (`AltanS/collie`) by wholesale `git merge upstream/main`,
+// but nothing told the operator when upstream had moved far enough to be worth merging. A tracked
+// file `upstream-merged` at the repo root holds the upstream release the last merge absorbed
+// (`1.21.3` today), and this signal fires when upstream publishes a MINOR or MAJOR beyond it.
+// Patch releases never fire: they are merge churn, not signal. Pup's own version is not part of
+// the comparison; the axis is upstream's newest release vs the last upstream release merged.
+//
+// Prereleases are invisible by construction: only STRICT `vX.Y.Z` tags are read, via the same
+// `SEMVER_TAG` the own-channel check uses. A missing or unparseable record never fires (fail-safe);
+// the monitor logs loudly and the rest of the banner is unaffected.
+
+/** The file at the repo root holding the last upstream release merged, dotted `X.Y.Z`. */
+export const UPSTREAM_MERGED_FILENAME = "upstream-merged";
+/** The env seam naming the upstream repo, mirroring `COLLIE_UPDATE_REPO` for the own channel. */
+export const UPSTREAM_REPO_ENV = "COLLIE_UPSTREAM_REPO";
+/** The upstream repo Pup tracks, unless the env seam names another (a fork or a test target). */
+export const UPSTREAM_REPO_DEFAULT = "AltanS/collie";
+
+/** Parse the `upstream-merged` record: one dotted strict `X.Y.Z`, whitespace tolerated. Null for
+ *  missing, empty, or anything that is not three dot-separated numbers — a prerelease tail, a
+ *  leading `v`, or prose. The monitor treats null as "no signal", loudly. */
+export function parseUpstreamMerged(text: string | null | undefined): string | null {
+  if (text === null || text === undefined) return null;
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(text.trim());
+  if (!m) return null;
+  return `${Number(m[1])}.${Number(m[2])}.${Number(m[3])}`;
+}
+
+/** Whether `candidate` moves the (major, minor) beyond `recorded`. Patch-only, equal, or lower
+ *  never fires — only a new minor or major is a merge worth hearing about. */
+export function isUpstreamFire(recorded: string, candidate: string): boolean {
+  const a = versionParts(recorded);
+  const b = versionParts(candidate);
+  if (b.triple[0] !== a.triple[0]) return b.triple[0] > a.triple[0];
+  return b.triple[1] > a.triple[1];
+}
+
+/** The gate's answer: fire with the version to name, or no-fire (with the newest seen, if any). */
+export type UpstreamSignal =
+  | { fire: true; latest: string }
+  | { fire: false; latest: string | null };
+
+/**
+ * Given the recorded merge and upstream's strict tags, answer fire/no-fire and the version to name.
+ * Pure, no timer or network: `recorded` is already parsed (null = missing/garbage, never fires),
+ * `tags` are the raw ref names (`vX.Y.Z`), prereleases invisible via `SEMVER_TAG`.
+ *
+ * The author's example, pinned in tests: merged 1.21.3 → 1.21.4 no-fire; → 1.22.0 fire; → 2.0.0 fire.
+ */
+export function upstreamMergeSignal(
+  recorded: string | null,
+  tags: readonly string[],
+): UpstreamSignal {
+  if (recorded === null) return { fire: false, latest: null };
+  const latest = latestReleaseTag([...tags]);
+  if (latest === null) return { fire: false, latest: null };
+  if (!isUpstreamFire(recorded, latest)) return { fire: false, latest };
+  return { fire: true, latest };
+}
+
+/**
+ * Whether an UPSTREAM push should fire, and what it names. Pure, time-aware like {@link shouldNotify}:
+ * `now` is an argument so the rule is testable without a timer.
+ *
+ * Rides the existing digest etiquette — one push per day, never before 09:00 host-local — in the same
+ * push channel; no new channel, no weekly patch window (patches never fire here at all). After firing
+ * for 1.22.0, a 1.22.1 does not re-fire: the dedupe is on (major, minor), not the exact version.
+ * Fold-not-drop: a closed window suppresses but never forgets; the banner stays up regardless.
+ */
+export function shouldNotifyUpstream(a: {
+  recorded: string;
+  latest: string | null;
+  lastUpstreamNotified: string | null;
+  lastPushedAt: string | null;
+  now: Date;
+}): { send: false } | { send: true; latest: string } {
+  if (!a.latest) return { send: false };
+  if (!isUpstreamFire(a.recorded, a.latest)) return { send: false };
+  if (a.lastUpstreamNotified !== null) {
+    const announced = versionParts(a.lastUpstreamNotified);
+    const candidate = versionParts(a.latest);
+    // Same (major, minor) already announced → no re-fire, even for a newer patch in it.
+    if (
+      candidate.triple[0] === announced.triple[0] &&
+      candidate.triple[1] === announced.triple[1]
+    ) {
+      // A NEWER minor/major above the announced one still fires; equal or lower does not.
+      // `isUpstreamFire` against the announced version answers exactly that.
+      if (!isUpstreamFire(a.lastUpstreamNotified, a.latest)) return { send: false };
+    } else if (!isUpstreamFire(a.lastUpstreamNotified, a.latest)) {
+      return { send: false };
+    }
+  }
+  const pushedAt = a.lastPushedAt === null ? Number.NaN : Date.parse(a.lastPushedAt);
+  if (!Number.isNaN(pushedAt) && a.now.getTime() - pushedAt < DIGEST_WINDOW_MS) {
+    return { send: false };
+  }
+  if (a.now.getHours() < DIGEST_EARLIEST_HOUR) return { send: false };
+  return { send: true, latest: a.latest };
+}
+
+/** The push body for an upstream merge signal: names BOTH versions and says merge, never update.
+ *  English-only by design — the push has no locale to read, like {@link LINK_CHANGE_SENTENCE}. */
+export function upstreamMergeBody(latest: string, merged: string): string {
+  return `Upstream ${latest} is available (merged ${merged}). Merge upstream/main on this machine.`;
+}
+
 /** Whether two dotted versions differ ONLY in their patch component — `1.3.0` vs `1.3.1`, but not
  *  `1.3.0` vs `1.4.0` and not `1.0.0-beta.44` vs `1.0.0-beta.45` (same patch, different train stop). */
 function isPatchOnlyDelta(current: string, candidate: string): boolean {
@@ -921,6 +1029,7 @@ export class UpdateStateStore {
   private dismissed: string | null = null;
   private dismissedCrew: string | null = null;
   private dismissedCrewStamp: number | null = null;
+  private upstreamNotified: string | null = null;
   private readonly file: string;
 
   constructor(private readonly cfg: Config) {
@@ -938,6 +1047,7 @@ export class UpdateStateStore {
       const closed = rec === null ? undefined : rec.dismissedVersion;
       const closedCrew = rec === null ? undefined : rec.dismissedCrewVersion;
       const closedCrewAt = rec === null ? undefined : rec.dismissedCrewAt;
+      const upstream = rec === null ? undefined : rec.upstreamLastNotified;
       this.lastVersion = typeof last === "string" ? last : null;
       // A record written before M17/08 carries neither dismissal. Both read as "nothing dismissed",
       // which is the band's own default — an operator who closed the band on an older build simply
@@ -951,6 +1061,9 @@ export class UpdateStateStore {
       // A LEGACY record carries no timestamp. It reads as "no push yet" — the window opens at once
       // rather than crashing the monitor or pinning it shut for a day.
       this.pushedAt = typeof pushed === "string" ? pushed : null;
+      // A record written before the upstream signal (ADR 9007) carries no upstream notification.
+      // It reads as "never announced", so the first minor/major beyond the record fires at once.
+      this.upstreamNotified = typeof upstream === "string" ? upstream : null;
     } catch {
       /* none saved yet */
     }
@@ -963,6 +1076,11 @@ export class UpdateStateStore {
   /** When the last update push went out, ISO-8601, or null when none ever did. */
   lastPushedAt(): string | null {
     return this.pushedAt;
+  }
+
+  /** The upstream version last announced (ADR 9007), or null when none ever was. */
+  upstreamLastNotified(): string | null {
+    return this.upstreamNotified;
   }
 
   /** The release whose OFFER the operator closed, or null when none was. */
@@ -984,6 +1102,15 @@ export class UpdateStateStore {
 
   async setLastNotified(version: string, pushedAt: string): Promise<void> {
     this.lastVersion = version;
+    this.pushedAt = pushedAt;
+    await this.write();
+  }
+
+  /** Remember the upstream version just announced (ADR 9007), sharing the digest window's stamp.
+   *  The window is one push a day across BOTH signals — same push channel, no new one — so this sets
+   *  the shared `lastPushedAt` beside the upstream record, in one atomic write. */
+  async setUpstreamNotified(version: string, pushedAt: string): Promise<void> {
+    this.upstreamNotified = version;
     this.pushedAt = pushedAt;
     await this.write();
   }
@@ -1028,6 +1155,7 @@ export class UpdateStateStore {
       dismissedVersion: this.dismissed,
       dismissedCrewVersion: this.dismissedCrew,
       dismissedCrewAt: this.dismissedCrewStamp,
+      upstreamLastNotified: this.upstreamNotified,
     };
     const tmp = `${this.file}.tmp`;
     await writeFile(tmp, JSON.stringify(body, null, 2), { mode: 0o600 });
@@ -1076,6 +1204,10 @@ export interface UpdateStore {
   /** ISO-8601 stamp of the last push, or null — the digest window is measured from it. */
   lastPushedAt(): string | null;
   setLastNotified(version: string, pushedAt: string): Promise<void>;
+  /** The upstream version last announced (ADR 9007), or null — the (major, minor) dedupe reads it. */
+  upstreamLastNotified(): string | null;
+  /** Remember the upstream version just announced, sharing the digest window's stamp. */
+  setUpstreamNotified(version: string, pushedAt: string): Promise<void>;
   /** The release whose OFFER was closed, or null. Reported on the snapshot, so the decision holds
    *  on every screen rather than in the browser that made it. */
   dismissedVersion(): string | null;
@@ -1106,6 +1238,18 @@ export interface UpdateMonitorDeps {
    *  one JSON parser, shared with `collie update`'s binary path; this consumer maps to names at its
    *  own edge and its pure resolver chain is untouched. */
   fetchTags: () => Promise<readonly ApiTag[]>;
+  /** The upstream repo Pup tracks (`AltanS/collie` unless `COLLIE_UPSTREAM_REPO` names another).
+   *  Additive: the own-channel check above keeps running unchanged; this adds a signal. */
+  upstreamRepo?: string;
+  /** The last upstream release merged, dotted `X.Y.Z`, or null when the record is missing or
+   *  unparseable. Read per check (never cached): the file changes only on a merge, and noticing it
+   *  re-arms the signal. A null reads as "no signal", loudly — never a fire. */
+  upstreamMerged?: () => string | null;
+  /** Fetch upstream's tags, alongside {@link fetchTags}. Throws on failure — fail-soft like it. */
+  fetchUpstreamTags?: () => Promise<readonly ApiTag[]>;
+  /** Fire the upstream-merge push: the new upstream version and the merged one, both named, with the
+   *  remedy as a merge on the operator's machine. Same push channel as {@link notify}, no new one. */
+  notifyUpstream?: (latest: string, merged: string) => void;
   /** Recompute the on-disk bridge source stamp for the staleness check. */
   bridgeStamp: () => string;
   /** How this Collie is installed, probed once at startup — it cannot change under a running process
@@ -1209,6 +1353,12 @@ export class UpdateMonitor {
   // THE NEWEST URGENT RELEASE IN THE DELTA, or null (ADR 0046). Cached beside `linkChange` and for
   // the same reason: it is a fact about the releases the last check found.
   private urgent: UpdateUrgentReading | null = null;
+  // THE UPSTREAM SIGNAL (ADR 9007): the newest upstream release beyond the merged record, and the
+  // record itself. Cached like `latest` — the banner stays up until a merge re-arms it, regardless
+  // of the digest window. Absent (null) when no check has run, the record is missing/garbage, or
+  // upstream holds no minor/major beyond it.
+  private upstreamLatest: string | null = null;
+  private upstreamMerged: string | null = null;
   // One reading per version, for this process's lifetime. A published release's sidecar never
   // changes, so a second read of the same version would spend a request to learn what we know. Only
   // an ANSWER is kept: a failed or absent read stays out, so tomorrow's check asks again rather than
@@ -1247,6 +1397,11 @@ export class UpdateMonitor {
    * version. Fail-soft — a fetch error keeps the previous `latest`/`checkedAt`. The push is gated on
    * the `updates` pref and de-duped against `lastNotified`; the version is persisted BEFORE the send
    * so a crash mid-send leaves an under-delivered nag rather than a duplicate.
+   *
+   * The upstream check (ADR 9007) rides alongside, never disturbing the own-channel answer: a second
+   * tag fetch from the upstream repo, gated by the `upstream-merged` record, feeding the same banner
+   * and the same digest channel. A missing/garbage record or a failed upstream fetch keeps the prior
+   * upstream state and never fails the own-channel check.
    */
   private async runCheck(): Promise<void> {
     let tags: string[];
@@ -1287,6 +1442,10 @@ export class UpdateMonitor {
     // timeout rather than ten. It cannot fail the check: every read answers null or a reading.
     this.urgent = await this.urgencyOf(this.newerVersions);
 
+    // THE UPSTREAM SIGNAL, alongside — never instead. The record is read per check (never cached):
+    // a merge rewrites it and re-arms the signal without a restart.
+    await this.checkUpstream();
+
     const { current, store } = this.deps;
     // The snapshot above is already updated — suppressing a push must never suppress state.
     if (!this.deps.updatesEnabled()) return;
@@ -1299,9 +1458,78 @@ export class UpdateMonitor {
       now: new Date(this.deps.now()),
       urgent: this.urgent ?? undefined,
     });
+    if (verdict.send) {
+      await store.setLastNotified(verdict.versions[verdict.versions.length - 1] ?? current, this.nowIso());
+      this.deps.notify(verdict.versions, this.linkChange, this.urgent);
+    }
+
+    // THE UPSTREAM PUSH, in the same channel, after the own-channel one — so both firing shares one
+    // daily window (the second folds to tomorrow, never dropped). The banner above already shows it;
+    // this only decides the buzz.
+    await this.maybeNotifyUpstream();
+  }
+
+  /**
+   * One upstream check: read the merged record, fetch upstream's tags, recompute the signal.
+   * Fail-safe throughout: a missing/garbage record logs loudly and clears the signal; a fetch error
+   * keeps the prior signal; the rest of the banner is unaffected either way.
+   */
+  private async checkUpstream(): Promise<void> {
+    const { upstreamMerged, fetchUpstreamTags } = this.deps;
+    if (upstreamMerged === undefined || fetchUpstreamTags === undefined) return;
+    let recorded: string | null;
+    try {
+      recorded = upstreamMerged();
+    } catch {
+      recorded = null;
+    }
+    if (recorded === null) {
+      console.warn(
+        `[update] ${UPSTREAM_MERGED_FILENAME} missing or unparseable — upstream merge signal off until it holds a dotted X.Y.Z`,
+      );
+      this.upstreamLatest = null;
+      this.upstreamMerged = null;
+      return;
+    }
+    let names: string[];
+    try {
+      names = (await fetchUpstreamTags()).map((t) => t.name);
+    } catch {
+      return; // keep prior upstream state, retry next tick
+    }
+    const signal = upstreamMergeSignal(recorded, names);
+    if (!signal.fire) {
+      this.upstreamLatest = null;
+      this.upstreamMerged = null;
+      return;
+    }
+    this.upstreamLatest = signal.latest;
+    this.upstreamMerged = recorded;
+  }
+
+  /** Fire the upstream push when the digest etiquette allows it. The version is persisted BEFORE the
+   *  send, like the own-channel one, so a crash mid-send under-delivers rather than duplicates. */
+  private async maybeNotifyUpstream(): Promise<void> {
+    const { upstreamMerged, notifyUpstream, store } = this.deps;
+    if (
+      upstreamMerged === undefined ||
+      notifyUpstream === undefined ||
+      this.upstreamLatest === null ||
+      this.upstreamMerged === null
+    ) {
+      return;
+    }
+    if (!this.deps.updatesEnabled()) return;
+    const verdict = shouldNotifyUpstream({
+      recorded: this.upstreamMerged,
+      latest: this.upstreamLatest,
+      lastUpstreamNotified: store.upstreamLastNotified(),
+      lastPushedAt: store.lastPushedAt(),
+      now: new Date(this.deps.now()),
+    });
     if (!verdict.send) return;
-    await store.setLastNotified(verdict.versions[verdict.versions.length - 1] ?? current, this.nowIso());
-    this.deps.notify(verdict.versions, this.linkChange, this.urgent);
+    await store.setUpstreamNotified(verdict.latest, this.nowIso());
+    notifyUpstream(verdict.latest, this.upstreamMerged);
   }
 
   /**
@@ -1468,6 +1696,16 @@ export class UpdateMonitor {
     // The urgent marker (ADR 0046), on the same rule: absent when no release in the delta asked for
     // the daily cadence, which is every ordinary release and every check that has not run yet.
     if (this.urgent !== null) status.urgent = this.urgent;
+    // The upstream merge signal (ADR 9007), on the same absent-when-nothing-to-say rule: present only
+    // while upstream holds a minor/major beyond the merged record. A solo instance with no record, a
+    // failed read, and an up-to-date merge all send no such keys — so the golden bodies stay put.
+    if (this.upstreamLatest !== null && this.upstreamMerged !== null) {
+      const upstreamRepo = this.deps.upstreamRepo ?? UPSTREAM_REPO_DEFAULT;
+      status.upstreamAvailable = true;
+      status.upstreamLatest = this.upstreamLatest;
+      status.upstreamMerged = this.upstreamMerged;
+      status.upstreamUrl = githubReleaseUrl(upstreamRepo, this.upstreamLatest);
+    }
     if (this.deps.packageCommand !== null) status.packageCommand = this.deps.packageCommand;
     if (status.restartNeeded) status.restartCommand = restartCommandFor(this.deps.installKind, this.deps.instance);
     return status;

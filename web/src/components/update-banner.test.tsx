@@ -67,6 +67,49 @@ describe("updateNotice", () => {
     expect(updateNotice(someUpdate({ releaseAvailable: true, latest: null }))).toBeNull();
   });
 
+  it("names both upstream versions and says merge, below the own-channel release and above a major", () => {
+    const url = "https://github.com/AltanS/collie/releases/tag/v1.22.0";
+    expect(
+      updateNotice(
+        someUpdate({
+          upstreamAvailable: true,
+          upstreamLatest: "1.22.0",
+          upstreamMerged: "1.21.3",
+          upstreamUrl: url,
+        }),
+      ),
+    ).toEqual({
+      line: "Upstream 1.22.0 available (merged 1.21.3). Merge upstream/main on this machine.",
+      href: url,
+    });
+    // Own-channel wins the line when both are pending.
+    expect(
+      updateNotice(
+        someUpdate({
+          releaseAvailable: true,
+          latest: "0.10.3",
+          upstreamAvailable: true,
+          upstreamLatest: "1.22.0",
+          upstreamMerged: "1.21.3",
+          upstreamUrl: url,
+        }),
+      )?.line,
+    ).toBe("ColliePup 0.10.3 available");
+    // Upstream wins over a major.
+    expect(
+      updateNotice(
+        someUpdate({
+          majorAvailable: "1.0.0",
+          majorUrl: url,
+          upstreamAvailable: true,
+          upstreamLatest: "1.22.0",
+          upstreamMerged: "1.21.3",
+          upstreamUrl: url,
+        }),
+      )?.line,
+    ).toContain("Upstream 1.22.0");
+  });
+
   // The command spelling follows the install kind (M14/01 §5.3): Herdr's plugin actions reach only a
   // Herdr-managed (detached) checkout. A binary install, a linked dev clone and an unknown layout are
   // told the `collie` verbs; an ABSENT kind is an older, git-era bridge and keeps the Herdr spelling.

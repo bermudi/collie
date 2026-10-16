@@ -964,6 +964,22 @@ export interface UpdateStatus {
    * release in the delta carried the marker, the sidecars could not be read, or no check has run.
    */
   urgent?: UpdateUrgent;
+  /**
+   * Upstream holds a minor/major beyond the merged record (Pup, ADR 9007) — merge on the operator's
+   * machine, never tap-to-update.
+   *
+   * OPTIONAL and ABSENT when there is nothing to say, the rule `linkChange` and `urgent` follow:
+   * no check has run, the `upstream-merged` record is missing/garbage, or upstream holds no new
+   * minor/major. Present together or not at all: `upstreamAvailable` true with the new upstream
+   * version, the merged one, and its release page. A solo golden body carries none of them.
+   */
+  upstreamAvailable?: boolean;
+  /** The new upstream version to merge, dotted `X.Y.Z` — present exactly when `upstreamAvailable`. */
+  upstreamLatest?: string;
+  /** The upstream release the last merge absorbed — present exactly when `upstreamAvailable`. */
+  upstreamMerged?: string;
+  /** GitHub release page for `upstreamLatest`, or null — present exactly when `upstreamAvailable`. */
+  upstreamUrl?: string | null;
 }
 
 /** GET /api/pane/:id — recent terminal output for one agent (ANSI/SGR, rendered colored). */

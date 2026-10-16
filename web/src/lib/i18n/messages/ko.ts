@@ -201,6 +201,7 @@ export const ko: Dictionary = {
   "settings.updateBanner.restartNeeded": "디스크의 ColliePup가 교체되었습니다. 다시 시작하세요.",
   "settings.updateBanner.releaseAvailable": "ColliePup {version} 업데이트 가능",
   "settings.updateBanner.majorAvailable": "ColliePup {version} 메이저 업데이트 출시",
+  "settings.updateBanner.upstreamAvailable": "Upstream {version} 사용 가능 (병합됨 {merged}). 이 머신에서 upstream/main 병합.",
   "settings.updateBanner.copyAria": "명령어 복사: {command}",
 
   // --- settings.typeface ---
@@ -1427,6 +1428,7 @@ export const ko: Dictionary = {
   "settings.updateCard.urgent": "긴급",
   "settings.updateCard.urgentSince": "{version}부터 긴급",
   "settings.updateCard.linkChange": "크루 연결 방식이 바뀝니다. lead를 먼저 업데이트하면 멤버가 따라갑니다.",
+  "settings.updateCard.upstream": "Upstream {version}을(를) 사용할 수 있음 (병합됨 {merged}). 이 머신에서 upstream/main을 병합하세요.",
   "settings.updateCard.confirmAction": "업데이트 시작",
   "settings.updateCard.majorConfirmTitle": "{version} 메이저 버전으로 업데이트하시겠습니까?",
   "settings.updateCard.majorConfirmBody": "{version} 버전은 새 메이저 릴리스이며 정기 업데이트에 포함되지 않고 별도 승인이 필요합니다. 먼저 릴리스 노트를 확인하십시오. 터미널 세션은 유지되며, 모바일 화면 연결은 최대 30초 동안 끊깁니다.",
@@ -1513,6 +1515,7 @@ export const ko: Dictionary = {
   "updateRibbon.urgent": "긴급.",
   "updateRibbon.linkChangeShort": "크루 연결 방식이 바뀝니다.",
   "updateRibbon.available": "ColliePup {version} 사용 가능.",
+  "updateRibbon.upstream": "Upstream {version} (병합 {merged})",
   "updateRibbon.availablePackaged": "ColliePup {version} ({manager}) 이용 가능.",
   "updateRibbon.availablePackagedUnnamed": "ColliePup {version} 이용 가능.",
   "updateRibbon.view": "보기",

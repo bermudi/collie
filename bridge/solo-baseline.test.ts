@@ -379,6 +379,13 @@ const UPDATE_STATUS_KEYS = {
   // The newest urgent release in the delta (ADR 0046). Optional, and absent on every ordinary
   // release — an urgent one is rare by construction, so the golden bodies below carry no such key.
   urgent: true,
+  // The upstream merge signal (Pup, ADR 9007). Optional, and ABSENT on a solo instance without a
+  // merge waiting — the golden bodies below carry no such keys, which is the claim. Present together
+  // or not at all when upstream holds a minor/major beyond the merged record.
+  upstreamAvailable: true,
+  upstreamLatest: true,
+  upstreamMerged: true,
+  upstreamUrl: true,
 } satisfies Record<keyof UpdateStatus, true>;
 
 const WORKSPACE_KEYS = {
@@ -511,6 +518,11 @@ describe("solo zero-tax — wire shapes carry no crew dimension", () => {
       // The detached updater's run record (M15/04) — optional, so an install that has never run one
       // sends no such key at all.
       "run",
+      // The upstream merge signal (Pup, ADR 9007) — optional, and absent unless a merge is waiting.
+      "upstreamAvailable",
+      "upstreamLatest",
+      "upstreamMerged",
+      "upstreamUrl",
       // The newest urgent release in the delta (ADR 0046) — optional, and absent unless a release
       // asked for the daily cadence.
       "urgent",
