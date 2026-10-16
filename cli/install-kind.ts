@@ -357,7 +357,7 @@ const GITHUB_REPO_NAME = /^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_.-]+$/;
 
 /** `owner/repo` is the only string GitHub's `/releases` (or `/tags`) can answer. Anything else — a
  *  rehearsal remote's local path, a non-GitHub host — is fixture truth and is asked nothing, the
- *  same rule a `COLLIE_UPDATE_MIRROR` follows (bridge/released-tags.ts). */
+ *  same rule the rehearsal-mirror seam follows (bridge/released-tags.ts). */
 export function isGithubRepoName(repo: string): boolean {
   return GITHUB_REPO_NAME.test(repo);
 }
