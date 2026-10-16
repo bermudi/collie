@@ -23,7 +23,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
-## [0.56.3] - 2026-10-16
+## [0.56.4] - 2026-10-16
 
 ### Added
 - **A pre-push guard refuses tags outside Pup's 0.x line.** A merge makes upstream's annotated tags reachable, and `git push --follow-tags` used to flush all of them onto `bermudi/collie`; the hook now blocks the push and names the offending tags. `PUSH_FOREIGN_TAGS=1` overrides once. ([3509156](https://github.com/bermudi/collie/commit/3509156ca4047fe03466c4652b5bc4a4ae41b315))
