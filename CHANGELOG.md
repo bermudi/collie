@@ -23,6 +23,9 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Changed
+- **The Windows lane is removed.** The `windows.yml` workflow, the release's `payload-windows` job and zip-asset gate, the Windows build and test scripts, `install.ps1`, the Windows docs page and the `win-rehearse` recipe step are deleted: releases carry Linux and macOS assets only, `collie update` on a Windows host answers "no artifact for your platform", and upstream's dormant win32 code paths stay so wholesale merges stay clean ([ADR 9008](./.adr/9008-pup-drops-windows.md)).
+
 ## [0.56.4] - 2026-10-16
 
 ### Added

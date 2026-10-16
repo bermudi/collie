@@ -65,8 +65,7 @@ jobs:
   # The durable example (M50 spec 10). Its own job: the example is a program with its own lockfile,
   # and Pi Durable never enters the root install. In `check`, bridge/mux/durable/example.test.ts
   # skips for want of that install; here it runs, so the wire, the adapter and the example are proven
-  # to agree. Linux only, and never in windows.yml: the example's descendant check needs /proc and
-  # SO_PEERCRED, and a Windows socket has no owner for the adapter to check.
+  # to agree. Linux only: the example's descendant check needs /proc and SO_PEERCRED.
   durable-example:
     name: durable example
     runs-on: ubuntu-latest

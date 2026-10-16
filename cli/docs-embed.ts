@@ -30,7 +30,6 @@ import security from "../docs/security.md" with { type: "text" };
 import troubleshooting from "../docs/troubleshooting.md" with { type: "text" };
 import upgrading from "../docs/upgrading.md" with { type: "text" };
 import voiceAndPush from "../docs/voice-and-push.md" with { type: "text" };
-import windows from "../docs/windows.md" with { type: "text" };
 
 // The agent-facing brief, which is not one of the pages: it is hand-written, it carries two
 // placeholder tokens `cli/docs.ts` fills at print time, and `collie skill` prints it alone.
@@ -61,11 +60,6 @@ export const DOC_PAGES: readonly DocPage[] = [
     name: "install",
     purpose: "Requirements, the two routes in, first run, and opening it on your phone",
     text: install,
-  },
-  {
-    name: "windows",
-    purpose: "Windows 11 with Herdr: what is supported, the unsigned binary, updating, and the limits",
-    text: windows,
   },
   {
     name: "claude-code-on-your-phone",

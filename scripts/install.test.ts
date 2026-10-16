@@ -152,7 +152,7 @@ const sha256 = (path: string): string =>
  *  digest agrees with both. */
 function stageRelease(
   dir: string,
-  opts: { version: string; platform?: string; corrupt?: boolean; schemaVersion?: number; windows?: boolean },
+  opts: { version: string; platform?: string; corrupt?: boolean; schemaVersion?: number },
 ): void {
   const platform = opts.platform ?? PLATFORM;
   const root = `collie-${opts.version}-${platform}`;
@@ -189,20 +189,16 @@ function stageRelease(
         tag: `v${opts.version}`,
         version: opts.version,
         artifacts: [
-          // The Windows entry a release carries from M43 spec 06 on, listed FIRST so a reader that
-          // took the first entry, or any unknown one, would be caught here.
-          ...(opts.windows === true
-            ? [
-                {
-                  name: `collie-${opts.version}-windows-x64.zip`,
-                  platform: "windows-x64",
-                  sha256: "f".repeat(64),
-                  size: 1,
-                  payloadRoot: `collie-${opts.version}-windows-x64`,
-                  signed: false,
-                },
-              ]
-            : []),
+          // An unknown platform listed FIRST, so a reader that took the first entry, or any
+          // unknown one, would be caught here.
+          {
+            name: `collie-${opts.version}-freebsd-x64.tar.gz`,
+            platform: "freebsd-x64",
+            sha256: "f".repeat(64),
+            size: 1,
+            payloadRoot: `collie-${opts.version}-freebsd-x64`,
+            signed: false,
+          },
           { name, platform, sha256: digest, size: 1, payloadRoot: root },
         ],
       },
@@ -237,9 +233,7 @@ function run(opts: Options = {}): Run {
     linkSystemTools(bin, opts.without ?? []);
     if (!(opts.without ?? []).includes("curl")) fakeBin(bin, "curl", FAKE_CURL);
     (opts.release ?? ((d: string) => {
-      // The default release lists a `windows-x64` entry FIRST, as every release does from M43 spec 06
-      // on, so every case below also proves that install.sh ignores it.
-      stageRelease(d, { version: VERSION, windows: true });
+      stageRelease(d, { version: VERSION });
       stageRelease(d, { version: BETA_VERSION });
       writeFileSync(
         join(d, "tags.json"),
@@ -327,9 +321,8 @@ function runKeeping(opts: Options, inspect: (r: Omit<Run, "installed" | "headers
   }
 }
 
-// install.sh is a POSIX shell installer driven through /bin/sh, symlinks and a fake `curl`. A Windows
-// host has no /bin/sh, so these cases stay skipped there. Windows installs with install.ps1, which has
-// its own tests in install-ps1.test.ts, run on Windows against a local release mirror.
+// install.sh is a POSIX shell installer driven through /bin/sh, symlinks and a fake `curl`. A
+// win32 host has no /bin/sh, so these cases stay skipped there.
 describe.skipIf(process.platform === "win32")("scripts/install.sh", () => {
   test("is valid POSIX sh", () => {
     const proc = Bun.spawnSync(["/bin/sh", "-n", SCRIPT]);
@@ -360,9 +353,9 @@ describe.skipIf(process.platform === "win32")("scripts/install.sh", () => {
     expect(r.code).toBe(0);
     expect(r.out).toContain(`Collie v${VERSION}`);
     expect(r.out).not.toContain("beta");
-    // The manifest's `windows-x64` entry is never fetched: this platform's tarball is.
+    // The manifest's unknown-platform entry is never fetched: this platform's tarball is.
     expect(r.curl).toContain(`collie-${VERSION}-${PLATFORM}.tar.gz`);
-    expect(r.curl).not.toContain("windows");
+    expect(r.curl).not.toContain("freebsd");
   });
 
   test("--beta is the opt-in, and it takes the newest prerelease by semver, not by string", () => {

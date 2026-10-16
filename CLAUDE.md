@@ -106,22 +106,11 @@ release. 1.14.2 was cut this way on 2026-09-28.
    the flake), so a lock that moved in a feature commit describes a build nothing records. This is
    the only commit allowed to touch it, and `scripts/check-flake-lock.sh` refuses the others.
    Leaving it alone is the ordinary case; a release does not owe the lock a bump.
-6. **Run `scripts/check-version.sh`** — it must print `✓`.
-7. **Run `make win-rehearse LOCAL=collie` from the workspace root before the tag.** Windows is a
-   supported host ([ADR 0075](./.adr/0075-windows-is-a-supported-host.md)), and this rehearsal
-   installs, updates and rolls back a Windows build on the test VM, which no CI job can do. It
-   resets the VM's disk and takes 13 to 16 minutes, and it ships the commits of `LOCAL`, so commit
-   the release first. Read its table: a failed step holds the tag, and so does an unavailable VM.
-   The `windows.yml` run on the release commit must be green as well. Then tag and push (next
-   paragraph).
+6. **Run `scripts/check-version.sh`** — it must print `✓`. Then tag and push (next paragraph).
 
-   A missing Windows zip stops the release from the first of two moments: once an earlier stable
-   release (not a draft, not a prerelease) has carried one, or on 2026-11-15
-   (`WINDOWS_ASSET_MANDATORY_FROM` in `scripts/windows-asset.ts`). It also stops the release
-   whenever the releases API does not answer. For a Linux hotfix while the Windows job is broken, set the
-   repository variable `COLLIE_WINDOWS_ASSET_OVERRIDE` to `optional` (Settings > Secrets and
-   variables > Actions > Variables) before the tag, and delete it right after the release: the run
-   warns loudly while it is set. To move the date instead, change that one constant in a commit.
+   On the Pup there is no Windows lane: the `windows.yml` workflow, the `payload-windows` job and
+   the asset gate upstream carried are removed here ([ADR 9008](./.adr/9008-pup-drops-windows.md)),
+   so a release is only ever held by `gate` reading `ci.yml`.
 
 **A PR from a fork is the exception: leave all four files alone.** Bump nothing, add no CHANGELOG
 line — send the functional commits only. The version is the maintainer's to pick, because it depends

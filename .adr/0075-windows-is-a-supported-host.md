@@ -1,6 +1,7 @@
 # 0075: Windows is a supported host
 
-- **Status:** Accepted. The public label stays experimental until all of these hold together: a
+- **Status:** Accepted upstream; superseded on the Pup fork by [9008](./9008-pup-drops-windows.md).
+  The public label stays experimental until all of these hold together: a
   release carries the Windows zip, `install.ps1` is on colliepwa.dev, one install and one update have
   run against a real release, the Windows check is a required check in branch protection,
   `release.yml`'s gate reads the Windows workflow, and the tolerance for a missing Windows zip is off.

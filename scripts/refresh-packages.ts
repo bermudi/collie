@@ -75,12 +75,11 @@ const NIX_PLATFORMS = [
 ] as const;
 
 /**
- * Platforms the release ships that these packages deliberately do not carry. The AUR and Nix
- * packages are Linux and macOS packages; `windows-x64` is a zip that `install.ps1` takes (M43), and
- * `macos-x64` is a tarball for `install.sh` alone: the AUR package is Linux only and the nixpkgs pin
- * has no x86_64-darwin (#385). A
- * platform here is known, so its entry never stops this job, and it is not required, so a release
- * that has no Windows asset (a warning in release.yml for one cycle) passes too.
+ * Platforms a release may list that these packages deliberately do not carry. The AUR and Nix
+ * packages are Linux and macOS packages; `macos-x64` is a tarball for `install.sh` alone: the AUR
+ * package is Linux only and the nixpkgs pin has no x86_64-darwin (#385). `windows-x64` stays on the
+ * list so a manifest cut before Windows was dropped can still be read. A platform here is known, so
+ * its entry never stops this job, and it is not required, so a release without it passes too.
  */
 const NOT_PACKAGED: ReadonlySet<string> = new Set(["windows-x64", "macos-x64"]);
 

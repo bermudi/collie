@@ -118,7 +118,7 @@ it); `collie stt off` removes `stt.json` and the button is gone again, no restar
 [Whistle](https://huggingface.co/Cactus-Compute/whistle) is a small speech model by Cactus Compute.
 The file is 16.9 MB and the licence is Apache-2.0. It knows English, German, French, Spanish,
 Italian, Dutch and Polish, and finds the language itself. It needs no account, no key and no extra
-program. Collie carries the engine that runs it, so it works on Linux, macOS, Windows and NixOS.
+program. Collie carries the engine that runs it, so it works on Linux, macOS and NixOS.
 
 Whistle can run in two places. You choose per phone.
 
@@ -379,10 +379,6 @@ What the command must do:
 - Print at most 256 KiB to stdout. Collie kills it as soon as it prints more.
 - Leave nothing running. When the command exits, Collie kills any process it started that is still
   there. A helper that must stay up has to start its own session, for example with `setsid`.
-
-On Windows, Collie ends the command's whole process tree at the same moments, and after a clean exit
-it ends any process the command started that is still running. One case is left: a process
-started by a helper that has already exited can outlive the command.
 
 At most two dictations run the command at the same time. A third gets the same "busy" answer the
 phone already knows, and Collie starts nothing for it.
