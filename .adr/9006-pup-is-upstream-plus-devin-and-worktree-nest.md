@@ -22,6 +22,9 @@ retired: upstream's journal is pane-scoped by design, so phantom-agent enumerati
 
 ## Consequences
 
-Future merges are plain `git merge upstream/main`, then tests and build. The only deliberate
-divergences beyond the two features are the 0.x version line (ADR 0020) and the check-only update
-monitor watching `bermudi/collie` tags.
+Future merges are plain `git merge upstream/main`, then `bun scripts/record-upstream-merge.ts`
+(which writes the upstream version just merged into the tracked `upstream-merged` file, committed
+with the merge), then tests and build. The only deliberate
+divergences beyond the two features are the 0.x version line (ADR 0020), the check-only update
+monitor watching `bermudi/collie` tags, and the upstream merge signal watching `AltanS/collie` tags
+against that record ([9007](./9007-pup-watches-upstream-minor-and-major.md)).

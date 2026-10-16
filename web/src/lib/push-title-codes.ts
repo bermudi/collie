@@ -16,6 +16,7 @@ export const PUSH_TITLE_CODES = [
   "herd.done",
   "herd.mixed",
   "update.available",
+  "update.upstream",
   "cache.cold_soon",
   "machine.cpu",
   "machine.mem",

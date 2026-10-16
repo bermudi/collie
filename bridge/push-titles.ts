@@ -43,6 +43,8 @@ export const PUSH_TITLES = {
   // ── Everything else the bridge pushes ──────────────────────────────────────────────
   /** A newer release is available (`index.ts`). The title never moves, not even when urgent (ADR 0046). */
   "update.available": "ColliePup update available",
+  /** An upstream merge is waiting (ADR 9007). Same push channel as above, honest headline. */
+  "update.upstream": "Upstream merge available",
   /** A watched pane's prompt cache is about to expire (`cache/warn.ts`). */
   "cache.cold_soon": "Cache goes cold in about {minutes} min",
   /** A machine's CPU stayed above its alert line for the rule's minutes (`machine-alerts.ts`). */

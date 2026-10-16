@@ -29,6 +29,11 @@ export interface UpdateNotice {
  * stale running PROCESS outranks an available release — restarting is the cheaper, more urgent fix,
  * and a release upgrade restarts the service anyway. `null` = nothing to say (an older bridge omits
  * `update`, or you're current). Kept pure and exported so the precedence is unit-tested directly.
+ *
+ * The upstream merge signal (Pup, ADR 9007) sits below the own-channel release and above a major:
+ * an update this machine can take always wins the line; a merge worth hearing about is heard before
+ * a major that needs its own consent. It carries no command — the remedy is a merge where the
+ * checkout lives, never tap-to-update — only a link to the upstream release page.
  */
 export function updateNotice(update: UpdateInfo | undefined): UpdateNotice | null {
   if (!update) return null;
@@ -65,6 +70,21 @@ export function updateNotice(update: UpdateInfo | undefined): UpdateNotice | nul
     return {
       line: t("settings.updateBanner.releaseAvailable", { version: update.latest }),
       href: update.latestUrl ?? undefined,
+    };
+  }
+  // AN UPSTREAM MERGE IS WAITING. Names BOTH versions and says merge, never update. No command: the
+  // merge runs where the checkout lives, and the linked release page carries the notes.
+  if (
+    update.upstreamAvailable === true &&
+    update.upstreamLatest !== undefined &&
+    update.upstreamMerged !== undefined
+  ) {
+    return {
+      line: t("settings.updateBanner.upstreamAvailable", {
+        version: update.upstreamLatest,
+        merged: update.upstreamMerged,
+      }),
+      href: update.upstreamUrl ?? undefined,
     };
   }
   // A MAJOR is out. It ranks below a routine release because it is the one thing the plain update

@@ -23,8 +23,12 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Added
+- **The phone says when upstream is worth merging.** Pup records the last upstream release merged in `upstream-merged` and raises the update banner plus a daily push when upstream publishes a new minor or major beyond it; patches never fire, and the remedy names both versions as a merge on your machine.
+
 ### Fixed
 - **`collie doctor` judges a peer's bind by the bridge's own loopback table.** The bind check kept a local list — `localhost`, `::1`, a `127.` prefix — beside the shared `isLoopbackBindHost`, so a peer bound to expanded IPv6 `0:0:0:0:0:0:0:1` passed a check the bridge itself counts as loopback, while a `127.`-prefixed hostname counted as loopback when the bridge would refuse it. One predicate now decides both.
+- **The upstream merge signal ships in payloads with an honest headline.** `upstream-merged` rides the Linux/macOS and Windows payloads so binary installs can fire it, the push title reads Upstream merge available on the shared channel, and the Turkish copy says birleştirilmiş.
 
 ## [0.55.0] - 2026-10-15
 

@@ -184,6 +184,7 @@ the pointer, it was a supersede.
 | [9004](./9004-pup-tracks-upstream-wholesale-and-strips-the-pack-not-the-viewer.md) | Pup tracks upstream wholesale and strips the pack, not the viewer | Superseded by 9006 (Pup) |
 | [9005](./9005-the-herd-list-nests-a-worktree-under-its-repo.md) | The herd list nests a worktree under the workspace showing its repo | Accepted (Pup) |
 | [9006](./9006-pup-is-upstream-plus-devin-and-worktree-nest.md) | Pup is upstream plus Devin and the worktree nest | Accepted (Pup) |
+| [9007](./9007-pup-watches-upstream-minor-and-major.md) | Pup watches upstream's minor and major, and says merge | Accepted (Pup) |
 
 Numbers are claimed across **both** branches: 0011–0016 were accepted here on `v1` while `main` was
 still at 0010, so a new ADR continues from the highest number in use anywhere, not the highest one on

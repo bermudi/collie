@@ -111,8 +111,9 @@ Need-Exit0 "compiling bin\collie.exe"
 
 # The same files the Linux payload carries, in the same layout. `herdr-plugin.toml` is the bridge's
 # root marker and the canonical version; `package.json` is where the bridge reads its version.
+# `upstream-merged` is the Pup merge record (ADR 9007) the monitor reads per check.
 Copy-Item -Recurse -LiteralPath (Join-Path $repo "web\dist") -Destination (Join-Path $stage "web\dist")
-foreach ($f in "herdr-plugin.toml", "package.json", ".env.example", "CHANGELOG.md", "LICENSE", "README.md") {
+foreach ($f in "herdr-plugin.toml", "package.json", ".env.example", "CHANGELOG.md", "LICENSE", "README.md", "upstream-merged") {
   Copy-Item -LiteralPath (Join-Path $repo $f) -Destination (Join-Path $stage $f)
 }
 Copy-Item -Recurse -LiteralPath (Join-Path $repo "docs") -Destination (Join-Path $stage "docs")

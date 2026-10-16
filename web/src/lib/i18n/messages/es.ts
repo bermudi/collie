@@ -204,6 +204,7 @@ export const es: Dictionary = {
   "settings.updateBanner.restartNeeded": "ColliePup fue reemplazado en el disco. Reinícialo.",
   "settings.updateBanner.releaseAvailable": "ColliePup {version} disponible",
   "settings.updateBanner.majorAvailable": "ColliePup {version}, nueva versión mayor",
+  "settings.updateBanner.upstreamAvailable": "Upstream {version} disponible (fusionado {merged}). Fusiona upstream/main en esta máquina.",
   "settings.updateBanner.copyAria": "Copiar comando: {command}",
 
   // --- settings.typeface ---
@@ -1444,6 +1445,7 @@ export const es: Dictionary = {
   "settings.updateCard.urgent": "Urgente",
   "settings.updateCard.urgentSince": "Urgente desde {version}",
   "settings.updateCard.linkChange": "Cambia el enlace del equipo. Actualiza primero el lead, los miembros siguen después.",
+  "settings.updateCard.upstream": "Upstream {version} está disponible (fusionado {merged}). Fusiona upstream/main en esta máquina.",
   "settings.updateCard.confirmAction": "Sí, actualizar",
   "settings.updateCard.majorConfirmTitle": "¿Pasar a la versión mayor {version}?",
   "settings.updateCard.majorConfirmBody": "{version} es una versión mayor, por lo que se confirma por separado y nunca se incluye en actualizaciones rutinarias. Lea primero las notas de la versión. La sesión de terminal se mantiene activa. La vista móvil se interrumpe hasta 30 segundos.",
@@ -1530,6 +1532,7 @@ export const es: Dictionary = {
   "updateRibbon.urgent": "Urgente.",
   "updateRibbon.linkChangeShort": "Cambia el enlace del equipo.",
   "updateRibbon.available": "ColliePup {version} disponible.",
+  "updateRibbon.upstream": "Upstream {version} (fusionado {merged})",
   "updateRibbon.availablePackaged": "ColliePup {version} disponible vía {manager}.",
   "updateRibbon.availablePackagedUnnamed": "ColliePup {version} disponible.",
   "updateRibbon.view": "Ver",
@@ -1931,6 +1934,7 @@ export const es: Dictionary = {
   "pushTitle.herd.done": "{count} agentes han completado su trabajo",
   "pushTitle.herd.mixed": "{count} agentes necesitan atención",
   "pushTitle.update.available": "Actualización de ColliePup disponible",
+  "pushTitle.update.upstream": "Upstream merge available",
   "pushTitle.cache.cold_soon": "La caché se enfría en unos {minutes} min",
   "pushTitle.machine.cpu": "La CPU sigue alta en {machine}",
   "pushTitle.machine.mem": "La memoria sigue alta en {machine}",

@@ -705,6 +705,14 @@ export const CONFIG_SETTINGS: readonly ConfigSetting[] = [
     doc: "The owner/repo releases are taken from. Set it only when you run a fork on purpose.",
   },
   {
+    key: "upstream_repo",
+    env: "COLLIE_UPSTREAM_REPO",
+    section: "update",
+    kind: "string",
+    default: "AltanS/collie",
+    doc: "The upstream owner/repo Pup merges from (ADR 9007). The merge signal watches its tags against the upstream-merged record.",
+  },
+  {
     key: "github_token",
     env: "COLLIE_GITHUB_TOKEN",
     section: "update",

@@ -148,6 +148,12 @@ export function UpdateCard() {
   const releaseAvailable = snapshot?.releaseAvailable ?? check?.releaseAvailable ?? false;
   const majorAvailable = snapshot?.majorAvailable ?? check?.majorAvailable ?? null;
   const newerVersions = snapshot?.newerVersions ?? check?.newerVersions ?? [];
+  // THE UPSTREAM MERGE SIGNAL (Pup, ADR 9007), read like every other field: snapshot first, check
+  // second, never re-derived. Present together or not at all when the signal fires.
+  const upstreamAvailable = snapshot?.upstreamAvailable ?? check?.upstreamAvailable ?? false;
+  const upstreamLatest = snapshot?.upstreamLatest ?? check?.upstreamLatest ?? null;
+  const upstreamMerged = snapshot?.upstreamMerged ?? check?.upstreamMerged ?? null;
+  const upstreamUrl = snapshot?.upstreamUrl ?? check?.upstreamUrl ?? null;
   // The one sentence about the crew wire (M27/06), or null. Off the SNAPSHOT first and the card's
   // own check second, the way every other field on this card is read — never re-derived here.
   const linkChange = linkChangeNote(snapshot?.linkChange ?? check?.linkChange ?? null);
@@ -325,8 +331,15 @@ export function UpdateCard() {
   // `behind === 0` is part of it now: a lead whose own version is newest but whose peer is a
   // release back has something to do, and "Up to date. Nothing to do." three inches above a
   // "Retry crew update" button would be the card contradicting itself.
+  // An upstream merge waiting is something to do as well (ADR 9007): "Up to date" beside a merge
+  // notice would be the card contradicting itself the same way.
   const upToDate =
-    !releaseAvailable && majorAvailable === null && latest !== null && run === undefined && behind === 0;
+    !releaseAvailable &&
+    majorAvailable === null &&
+    !upstreamAvailable &&
+    latest !== null &&
+    run === undefined &&
+    behind === 0;
   const updateAvailable = releaseAvailable || majorAvailable !== null;
 
   return (
@@ -378,6 +391,25 @@ export function UpdateCard() {
           {newerVersions.length > 1 && (
             <p className="mt-1 text-xs text-muted-foreground">
               {t("settings.updateCard.includes", { versions: newerVersions.join(", ") })}
+            </p>
+          )}
+          {/* THE UPSTREAM MERGE NOTICE (Pup, ADR 9007). Names BOTH versions and says merge, never
+              update — no button, because the card never starts a merge. It shows even when the
+              own-channel is up to date, which is why `upToDate` above excludes it. */}
+          {upstreamAvailable && upstreamLatest !== null && upstreamMerged !== null && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {upstreamUrl !== null ? (
+                <a
+                  href={upstreamUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2"
+                >
+                  {t("settings.updateCard.upstream", { version: upstreamLatest, merged: upstreamMerged })}
+                </a>
+              ) : (
+                t("settings.updateCard.upstream", { version: upstreamLatest, merged: upstreamMerged })
+              )}
             </p>
           )}
         </div>

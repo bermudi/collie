@@ -60,6 +60,9 @@ const BAND_PREFIXES = ["updateRibbon.", "updateScreen.badge."] as const;
 /** One representative value per slot. See the header for why `reason` is empty. */
 const SAMPLE = {
   version: "1.5.0",
+  // The merged record the upstream band names beside the new version (ADR 9007): today's real state,
+  // a minor longer than the version above, so the budget is measured against the generous case.
+  merged: "1.21.3",
   // The longest manager name the band can print today: pacman, nix and brew are the three
   // `cli/package-command.ts` resolves.
   manager: "pacman",
