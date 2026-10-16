@@ -23,10 +23,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
-### Fixed
-- **A non-GitHub update repo is asked nothing.** The tag-is-not-release check read `/releases` for whatever `COLLIE_UPDATE_REPO` held — a rehearsal remote's local path 404s at `api.github.com`, so a managed checkout's `collie update` and the `upstream` preflight died before a ref moved. A repo that is not `owner/repo`-shaped now skips the filter: like a rehearsal mirror, it is its own truth.
-
-## [0.56.2] - 2026-10-16
+## [0.56.3] - 2026-10-16
 
 ### Added
 - **A pre-push guard refuses tags outside Pup's 0.x line.** A merge makes upstream's annotated tags reachable, and `git push --follow-tags` used to flush all of them onto `bermudi/collie`; the hook now blocks the push and names the offending tags. `PUSH_FOREIGN_TAGS=1` overrides once. ([3509156](https://github.com/bermudi/collie/commit/3509156ca4047fe03466c4652b5bc4a4ae41b315))
@@ -35,6 +32,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
 ### Fixed
 - **The update channel counts releases, not tags.** A `--follow-tags` push after the 1.21.x merge put 130 of upstream's `v1.x` tags on the fork, and the raw-tag read announced upstream 1.21.2 as a new major over a running 0.56.1 — `collie update --major` would have detached onto upstream's own commit. The banner, `collie update` (checkout, staged, and binary paths), and `collie update --check` now intersect the tag list with the repo's GitHub releases, so a tag with no release behind it announces nothing and cannot be selected; a releases list that cannot be read fails the check before anything moves. Rehearsal mirrors stay unfiltered — the mirror is the fixture's truth. ([3509156](https://github.com/bermudi/collie/commit/3509156ca4047fe03466c4652b5bc4a4ae41b315))
 - **A missing website-dispatch token no longer fails the release run.** The `notify-website` step skips with a notice when `COLLIE_GITHUB_REPO_TOKEN` is unset — on the fork neither the token nor the target repo exists, so every release painted red after the release itself had already shipped. ([fecf7eb](https://github.com/bermudi/collie/commit/fecf7eb9721501fcd3754f36f09ebe43d1e6e349))
+- **A non-GitHub update repo is asked nothing.** The tag-is-not-release check read `/releases` for whatever `COLLIE_UPDATE_REPO` held — a rehearsal remote's local path 404s at `api.github.com`, so a managed checkout's `collie update` and the `upstream` preflight died before a ref moved. A repo that is not `owner/repo`-shaped now skips the filter: like a rehearsal mirror, it is its own truth. ([518ef5c](https://github.com/bermudi/collie/commit/518ef5c7d603c177ba36f6f073409edd4df1f3b6))
 
 ## [0.56.1] - 2026-10-15
 
