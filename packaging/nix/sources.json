@@ -1,17 +1,17 @@
 {
-  "version": "1.21.3",
+  "version": "0.56.4",
   "platforms": {
     "linux-x64": {
-      "url": "https://github.com/AltanS/collie/releases/download/v1.21.3/collie-1.21.3-linux-x64.tar.gz",
-      "sha256": "2192d08a7ac07dfadea226a56ceb38b3e23bd117e5cb954bc4f566dd37516789"
+      "url": "https://github.com/bermudi/collie/releases/download/v0.56.4/collie-0.56.4-linux-x64.tar.gz",
+      "sha256": "a91804ae2c3523b293022dbc993dc30ad35d44997b7b675db0c67f7070d5a71e"
     },
     "linux-arm64": {
-      "url": "https://github.com/AltanS/collie/releases/download/v1.21.3/collie-1.21.3-linux-arm64.tar.gz",
-      "sha256": "d8ec73fe23ea54104751e95d17e46246a862c28c469eb0fc3e6e3493e9a6bb40"
+      "url": "https://github.com/bermudi/collie/releases/download/v0.56.4/collie-0.56.4-linux-arm64.tar.gz",
+      "sha256": "2b91e434b58ab6bb9a7998104467122b670848ff3f1f6fdb10451bc51a7b917d"
     },
     "darwin-arm64": {
-      "url": "https://github.com/AltanS/collie/releases/download/v1.21.3/collie-1.21.3-macos-arm64.tar.gz",
-      "sha256": "6396b93d3d3774b4b28e0f9cca107ca5a64df82182b3823da71ef47746acbd75"
+      "url": "https://github.com/bermudi/collie/releases/download/v0.56.4/collie-0.56.4-macos-arm64.tar.gz",
+      "sha256": "76acaec83831fd9deb4916ce435893aff74aaf4f891b07752ee5d0cabed5ca94"
     }
   }
 }
