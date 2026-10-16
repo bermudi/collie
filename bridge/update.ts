@@ -355,20 +355,10 @@ export function shouldNotifyUpstream(a: {
 }): { send: false } | { send: true; latest: string } {
   if (!a.latest) return { send: false };
   if (!isUpstreamFire(a.recorded, a.latest)) return { send: false };
-  if (a.lastUpstreamNotified !== null) {
-    const announced = versionParts(a.lastUpstreamNotified);
-    const candidate = versionParts(a.latest);
-    // Same (major, minor) already announced → no re-fire, even for a newer patch in it.
-    if (
-      candidate.triple[0] === announced.triple[0] &&
-      candidate.triple[1] === announced.triple[1]
-    ) {
-      // A NEWER minor/major above the announced one still fires; equal or lower does not.
-      // `isUpstreamFire` against the announced version answers exactly that.
-      if (!isUpstreamFire(a.lastUpstreamNotified, a.latest)) return { send: false };
-    } else if (!isUpstreamFire(a.lastUpstreamNotified, a.latest)) {
-      return { send: false };
-    }
+  // Dedupe on (major, minor) via the announced version: after firing for 1.22.0, a 1.22.1 does not
+  // re-fire (`isUpstreamFire` is false inside the same minor), while 1.23.0 or 2.0.0 still does.
+  if (a.lastUpstreamNotified !== null && !isUpstreamFire(a.lastUpstreamNotified, a.latest)) {
+    return { send: false };
   }
   const pushedAt = a.lastPushedAt === null ? Number.NaN : Date.parse(a.lastPushedAt);
   if (!Number.isNaN(pushedAt) && a.now.getTime() - pushedAt < DIGEST_WINDOW_MS) {

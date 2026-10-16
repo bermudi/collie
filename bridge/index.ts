@@ -946,8 +946,9 @@ const updateMonitor = new UpdateMonitor({
       target: "settings",
     }),
   // The upstream merge signal (ADR 9007): a second tag fetch alongside the own-channel one, gated by
-  // the tracked record above. Same digest channel, no new one — the body names BOTH versions and the
-  // remedy is a merge on the operator's machine, never tap-to-update.
+  // the tracked record above. Same digest channel and tag, no new one — but its own title code, so a
+  // lock screen names a merge, not an update. The body names BOTH versions and the remedy is a merge
+  // on the operator's machine, never tap-to-update.
   upstreamRepo,
   upstreamMerged: readUpstreamMerged,
   fetchUpstreamTags: upstreamReads.fetchTags,
@@ -955,7 +956,7 @@ const updateMonitor = new UpdateMonitor({
     void push.send({
       type: "update",
       tag: "collie:update",
-      ...pushTitle("update.available"),
+      ...pushTitle("update.upstream"),
       body: upstreamMergeBody(latest, merged),
       target: "settings",
     }),

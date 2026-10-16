@@ -1924,6 +1924,7 @@ export const ja: Dictionary = {
   "pushTitle.herd.done": "{count}件のエージェントが完了しました",
   "pushTitle.herd.mixed": "{count}件のエージェントに確認が必要です",
   "pushTitle.update.available": "ColliePup のアップデートがあります",
+  "pushTitle.update.upstream": "Upstream merge available",
   "pushTitle.cache.cold_soon": "約{minutes}分後にキャッシュがコールドになります",
   "pushTitle.machine.cpu": "{machine} の CPU が高い状態です",
   "pushTitle.machine.mem": "{machine} のメモリが高い状態です",

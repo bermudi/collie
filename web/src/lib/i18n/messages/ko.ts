@@ -1917,6 +1917,7 @@ export const ko: Dictionary = {
   "pushTitle.herd.done": "에이전트 {count}개 작업 완료",
   "pushTitle.herd.mixed": "에이전트 {count}개 확인 필요",
   "pushTitle.update.available": "ColliePup 업데이트 가능",
+  "pushTitle.update.upstream": "Upstream merge available",
   "pushTitle.cache.cold_soon": "약 {minutes}분 후 캐시 콜드",
   "pushTitle.machine.cpu": "{machine}의 CPU가 계속 높음",
   "pushTitle.machine.mem": "{machine}의 메모리가 계속 높음",

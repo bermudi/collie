@@ -1738,6 +1738,7 @@ export const fr: Dictionary = {
   "pushTitle.herd.done": "{count} agents ont terminé",
   "pushTitle.herd.mixed": "{count} agents requièrent votre attention",
   "pushTitle.update.available": "Mise à jour de ColliePup disponible",
+  "pushTitle.update.upstream": "Upstream merge available",
   "pushTitle.cache.cold_soon": "Le cache expire dans environ {minutes} min",
   "pushTitle.machine.cpu": "Utilisation processeur élevée sur {machine}",
   "pushTitle.machine.mem": "Mémoire toujours élevée sur {machine}",

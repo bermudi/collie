@@ -1904,6 +1904,7 @@ export const zh: Dictionary = {
   "pushTitle.herd.done": "{count} 个 Agent 已完成",
   "pushTitle.herd.mixed": "{count} 个 Agent 需要关注",
   "pushTitle.update.available": "ColliePup 有可用更新",
+  "pushTitle.update.upstream": "Upstream merge available",
   "pushTitle.cache.cold_soon": "缓存约 {minutes} 分钟后变冷",
   "pushTitle.machine.cpu": "{machine} 的 CPU 持续偏高",
   "pushTitle.machine.mem": "{machine} 的内存持续偏高",

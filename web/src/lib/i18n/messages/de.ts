@@ -1938,6 +1938,7 @@ export const de: Dictionary = {
   "pushTitle.herd.done": "{count} Agenten haben die Arbeit abgeschlossen",
   "pushTitle.herd.mixed": "{count} Agenten brauchen Aufmerksamkeit",
   "pushTitle.update.available": "ColliePup-Update verfügbar",
+  "pushTitle.update.upstream": "Upstream merge available",
   "pushTitle.cache.cold_soon": "Cache wird in etwa {minutes} Min. kalt",
   "pushTitle.machine.cpu": "CPU bleibt hoch auf {machine}",
   "pushTitle.machine.mem": "Speicher bleibt hoch auf {machine}",

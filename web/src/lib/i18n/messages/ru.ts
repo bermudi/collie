@@ -1838,6 +1838,7 @@ export const ru: Dictionary = {
   "pushTitle.herd.done": "{count} агентов завершили работу",
   "pushTitle.herd.mixed": "{count} агентам требуется внимание",
   "pushTitle.update.available": "Доступно обновление ColliePup",
+  "pushTitle.update.upstream": "Upstream merge available",
   "pushTitle.cache.cold_soon": "Кэш сбросится примерно через {minutes} мин",
   "pushTitle.machine.cpu": "Высокая нагрузка на ЦП на {machine}",
   "pushTitle.machine.mem": "Память почти заполнена на {machine}",

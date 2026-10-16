@@ -2103,6 +2103,7 @@ export const en = {
   "pushTitle.herd.done": "{count} agents done",
   "pushTitle.herd.mixed": "{count} agents need attention",
   "pushTitle.update.available": "ColliePup update available",
+  "pushTitle.update.upstream": "Upstream merge available",
   "pushTitle.cache.cold_soon": "Cache goes cold in about {minutes} min",
   "pushTitle.machine.cpu": "CPU stays high on {machine}",
   "pushTitle.machine.mem": "Memory stays high on {machine}",

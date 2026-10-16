@@ -21,7 +21,7 @@ export interface Dismissal {
 
 // ── THE UPDATE BAND, AS A PURE READING ──────────────────────────────────────────────────────────
 //
-// One top-of-app row carries the whole update subject, and WHICH of its five states is on screen is
+// One top-of-app row carries the whole update subject, and WHICH of its six states is on screen is
 // decided here rather than inside the component. Everything below is a pure function of the polled
 // snapshot plus two client facts (this tab just posted a confirm; the bundle on screen is stale), so
 // the precedence is pinned by unit tests instead of by pulling a DOM apart.
@@ -37,6 +37,7 @@ export interface Dismissal {
 //   (i) bundle-installing  THIS document's worker is fetching a new bundle
 //   (c) bundle             this bundle is behind the bridge and the page may reload onto it
 //   (a) available          a newer release exists upstream
+//   (u) upstream           an upstream merge is waiting (Pup, ADR 9007)
 //
 // The two download states stay here because they are about the PWA and not about a run: with no run
 // to be about, the sheet shows nothing and this row is the whole story (2026-09-12). The sheet shows
@@ -373,8 +374,10 @@ export function managerOf(command: string | undefined): string | null {
  * finished run, a failed peer and a peer still moving all do, and "a dismissed run is a run the
  * operator can no longer see the end of" — so they carry no close. An offer and the two QUIET crew
  * states describe a standing fact, and a standing fact the operator has read is one they may put
- * down. Keyed by the version, so a newer one raises the band again — and by the SCOPE, so putting
- * down a notice about another machine leaves this host's own offer alone.
+ * down — with ONE exception: an upstream merge (ADR 9007) is a standing fact whose remedy is a
+ * merge on the operator's machine, and putting it down would hide it with no snooze to bring it
+ * back. Only a merge re-arms it. Keyed by the version, so a newer one raises the band again — and
+ * by the SCOPE, so putting down a notice about another machine leaves this host's own offer alone.
  */
 export function dismissTarget(view: RibbonView): Dismissal | null {
   switch (view.kind) {

@@ -1898,6 +1898,7 @@ export const zhTW: Dictionary = {
   "pushTitle.herd.done": "{count} 個 Agent 已完成",
   "pushTitle.herd.mixed": "{count} 個 Agent 需要關注",
   "pushTitle.update.available": "ColliePup 有可用更新",
+  "pushTitle.update.upstream": "Upstream merge available",
   "pushTitle.cache.cold_soon": "快取約 {minutes} 分鐘後變冷",
   "pushTitle.machine.cpu": "{machine} 的 CPU 持續偏高",
   "pushTitle.machine.mem": "{machine} 的記憶體持續偏高",

@@ -1934,6 +1934,7 @@ export const es: Dictionary = {
   "pushTitle.herd.done": "{count} agentes han completado su trabajo",
   "pushTitle.herd.mixed": "{count} agentes necesitan atención",
   "pushTitle.update.available": "Actualización de ColliePup disponible",
+  "pushTitle.update.upstream": "Upstream merge available",
   "pushTitle.cache.cold_soon": "La caché se enfría en unos {minutes} min",
   "pushTitle.machine.cpu": "La CPU sigue alta en {machine}",
   "pushTitle.machine.mem": "La memoria sigue alta en {machine}",
