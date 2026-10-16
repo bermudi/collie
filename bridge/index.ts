@@ -3,7 +3,7 @@ import { mkdir, readFile as readFileAsync, realpath as realpathAsync, stat as st
 import { cpus, freemem, homedir, hostname, loadavg, totalmem } from "node:os";
 import { join } from "node:path";
 
-import { classifyInstall, probeInstall } from "../cli/install-kind.ts";
+import { classifyInstall, probeInstall, updateRepoOf } from "../cli/install-kind.ts";
 import { realLinkFs } from "../cli/link.ts";
 import { packageCommand } from "../cli/package-command.ts";
 import { realExec, realFiles } from "../cli/sys.ts";
@@ -788,22 +788,21 @@ const cacheWarden = new CacheWarden({
 // ── Update-availability monitor ───────────────────────────────────────────────
 // The running plugin version, captured NOW at module load — never re-read from disk later, or a
 // post-pull package.json would mask the very update we detect (same class of bug as the buildId gap).
-// The bridge-source stamp is snapshotted here too, so a rebuilt-but-not-restarted process reads stale.
+// `crewVersion`, not the manifest: it is the boot-time build-stamp capture — on a checkout install
+// the manifest IS the file a release commit moves without a rebuild, so it cannot answer "what is
+// running". One read, one truth: the same capture the wire already puts out.
 const bridgeDir = join(rootDir, "bridge");
-// SAFETY: this is the plugin's OWN package.json, shipped in the same checkout as this file, and
-// `scripts/check-version.sh` gates every build on its `version` being present and agreeing with the
-// manifest — so the field is guaranteed by the release process, not hoped for.
-const currentVersion = (
-  JSON.parse(readFileSync(join(rootDir, "package.json"), "utf8")) as { version: string }
-).version;
+const currentVersion = crewVersion;
 
 const updateStore = new UpdateStateStore(cfg);
 await updateStore.load();
 
-// The repo the release check + release links point at. The fork defaults to its own channel so an
-// install can never be "updated" into upstream's binaries; overridable for another fork (or a
-// synthetic test target) via COLLIE_UPDATE_REPO.
-const updateRepo = process.env.COLLIE_UPDATE_REPO?.trim() || "bermudi/collie";
+// The repo the release check + release links point at. Read through the ONE resolver
+// (`updateRepoOf`), the same one `collie update`, `collie doctor` and the preflight consult —
+// a second default here is what splits the banner's channel from the updater's. COLLIE_UPDATE_REPO
+// (env, .env or `update_repo` in config.toml — `applyConfigLayer` has already run) moves them all
+// together; unset, everything agrees on the default channel.
+const updateRepo = updateRepoOf({ COLLIE_UPDATE_REPO: process.env.COLLIE_UPDATE_REPO });
 // The upstream repo Pup tracks (ADR 9007). A second tag fetch runs alongside the own-channel one,
 // gated by the `upstream-merged` record below; the own-channel check keeps running unchanged.
 const upstreamRepo = process.env[UPSTREAM_REPO_ENV]?.trim() || UPSTREAM_REPO_DEFAULT;

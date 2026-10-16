@@ -753,7 +753,7 @@ function updateSource(deps: DoctorDeps, install: InstallKind): Finding {
       : warn(
           "update-source",
           `github.com/${repo} (COLLIE_UPDATE_REPO) — updates come from a fork`,
-          "unset COLLIE_UPDATE_REPO to take Collie's own releases",
+          `unset COLLIE_UPDATE_REPO to take ${DEFAULT_UPDATE_REPO} releases`,
         );
   }
   const origin = originOf(deps.exec, deps.ctx.root);
@@ -763,7 +763,7 @@ function updateSource(deps: DoctorDeps, install: InstallKind): Finding {
       : warn(
           "update-source",
           `github.com/${repo} (COLLIE_UPDATE_REPO) — updates come from a fork`,
-          "unset COLLIE_UPDATE_REPO to take Collie's own releases",
+          `unset COLLIE_UPDATE_REPO to take ${DEFAULT_UPDATE_REPO} releases`,
         );
   }
   if (origin.kind === "unresolvable") {

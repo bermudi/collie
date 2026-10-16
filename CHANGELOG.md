@@ -23,6 +23,10 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Fixed
+- **The update banner now knows what version is actually running.** The monitor compared releases against `package.json`, which a release commit moves without a rebuild — on a checkout install the banner decided it was already current the moment the release was cut and never fired. It now compares against the build stamp (`web/dist/build-info.json`), the same version the System page reports.
+- **The bridge and `collie update` resolve one update channel.** The monitor read `COLLIE_UPDATE_REPO` itself with a hardcoded default, so the banner and the updater could name different repos; it now goes through the shared `updateRepoOf`, and the env var, `.env` or `update_repo` move them together. Doctor's update-source remedy names the actual default channel instead of "Collie's own releases".
+
 ## [0.56.0] - 2026-10-15
 
 ### Added
