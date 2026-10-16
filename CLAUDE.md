@@ -89,6 +89,9 @@ release. 1.14.2 was cut this way on 2026-09-28.
      removed, a contract broken, a workflow that used to work and now does not.
 
    The person cutting the release decides. When in doubt, pick patch.
+
+   **On Pup a MINOR is also upstream-gated**: it ships only after an upstream minor or major has
+   been merged into `main` (the ADR 9007 signal is the prompt). Patches stay free.
 2. **Bump** all three version files to that number.
 3. **Rename `## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD`**, using the release date. The four
    `###` group headings and their bullets come along as they are; within a group the bullets stay

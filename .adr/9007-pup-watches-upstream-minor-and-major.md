@@ -47,6 +47,13 @@ scripts/record-upstream-merge.ts` (reads the version from `upstream/main`'s `her
 not the working tree's), then tests, build, and the merge commit — `upstream-merged` rides it. A
 hand merge works too, but the record step is then the merger's to remember.
 
+## Release cadence
+
+**Pup's minor releases are upstream-gated; patches are free.** A `0.x.0` ships only after an
+upstream minor or major has been merged into `main` — the minor number should mean "a new upstream
+line is in", and this signal is the prompt that one exists. Fork work between merges rides the
+patch number, so a merge is never a prerequisite for shipping a fix.
+
 ### Tag hygiene: a tag is not a release
 
 A merge makes upstream's annotated tags reachable from Pup's `main`, and `git push --follow-tags`
