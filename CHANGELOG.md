@@ -25,6 +25,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ### Added
 - **A pre-push guard refuses tags outside Pup's 0.x line.** A merge makes upstream's annotated tags reachable, and `git push --follow-tags` used to flush all of them onto `bermudi/collie`; the hook now blocks the push and names the offending tags. `PUSH_FOREIGN_TAGS=1` overrides once.
+- **One command merges upstream.** `scripts/merge-upstream.sh` runs the ADR 9007 ritual — fetch, `git merge --no-ff --no-commit`, `record-upstream-merge`, the lint/typecheck/test/build gate, the merge commit — and a `pup-version` merge driver (`merge=union` on `CHANGELOG.md`, `rerere` on) resolves the mechanical conflicts: the 0.x line in `package.json`, `web/package.json` and `herdr-plugin.toml` survives every merge. Leftover conflicts are printed and the script resumes where it stopped on re-run.
 
 ### Fixed
 - **The update channel counts releases, not tags.** A `--follow-tags` push after the 1.21.x merge put 130 of upstream's `v1.x` tags on the fork, and the raw-tag read announced upstream 1.21.2 as a new major over a running 0.56.1 — `collie update --major` would have detached onto upstream's own commit. The banner, `collie update` (checkout, staged, and binary paths), and `collie update --check` now intersect the tag list with the repo's GitHub releases, so a tag with no release behind it announces nothing and cannot be selected; a releases list that cannot be read fails the check before anything moves. Rehearsal mirrors stay unfiltered — the mirror is the fixture's truth.

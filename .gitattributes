@@ -12,3 +12,17 @@
 # The vendored speech engine is pinned by hash (ADR 0096). A Windows checkout with autocrlf would
 # rewrite the glue's line endings and the served bytes would no longer be the hashed bytes.
 web/public/stt/** -text
+
+# ── Pup merge machinery (ADRs 0020, 9006, 9007) ────────────────────────────────
+# The fork's 0.x version line must survive every upstream merge: the pup-version driver merges the
+# file normally, then pins `version` back to ours. Repo-local config registers it:
+#   git config merge.pup-version.driver 'bun scripts/merge-pup-version.ts %O %A %B %L'
+# (scripts/install-hooks.sh and scripts/merge-upstream.sh both do it.) Anchored with a leading
+# slash so vendored/example package.json files are not caught.
+/package.json merge=pup-version
+/web/package.json merge=pup-version
+/herdr-plugin.toml merge=pup-version
+
+# Both release lines prepend a section on every release, so a changelog conflict is always
+# "keep both". Union merge keeps all added lines.
+/CHANGELOG.md merge=union

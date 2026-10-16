@@ -39,9 +39,13 @@ upstream's newest strict tag moves its `(major, minor)` beyond the record.**
 
 ## Merge ritual
 
-Future merges are `git merge upstream/main`, then `bun scripts/record-upstream-merge.ts` (reads the
-version from `upstream/main`'s `herdr-plugin.toml`, not the working tree's), then tests and build.
-Commit `upstream-merged` with (or immediately after) the merge commit.
+`scripts/merge-upstream.sh` runs the ritual as one command: fetch, `git merge --no-ff --no-commit
+upstream/main` (`--no-ff`, because a fast-forward would adopt upstream's 1.x files wholesale),
+auto-resolve the version-line conflicts (the `pup-version` merge driver pins the
+0.x line in the three version files; `merge=union` keeps both sides of `CHANGELOG.md`), `bun
+scripts/record-upstream-merge.ts` (reads the version from `upstream/main`'s `herdr-plugin.toml`,
+not the working tree's), then tests, build, and the merge commit — `upstream-merged` rides it. A
+hand merge works too, but the record step is then the merger's to remember.
 
 ### Tag hygiene: a tag is not a release
 
