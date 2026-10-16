@@ -641,6 +641,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.COLLIE_GITHUB_REPO_TOKEN }}
         run: |
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::notice::Website notify skipped because COLLIE_GITHUB_REPO_TOKEN is not set; the site polls daily and catches the release anyway."
+            exit 0
+          fi
           gh api "repos/${GITHUB_REPOSITORY_OWNER}/collie-website/dispatches" \
             -f event_type=collie-released \
             -f "client_payload[tag]=$GITHUB_REF_NAME"
