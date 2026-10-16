@@ -185,6 +185,7 @@ import { Snooze } from "./snooze.ts";
 import { StateEngine } from "./state-engine.ts";
 import {
   bridgeStampSync,
+  githubCredential,
   githubReleaseUrl,
   mirrorValue,
   parseUpstreamMerged,
@@ -192,11 +193,13 @@ import {
   UpdateMonitor,
   UpdateStateStore,
   updateDigestBody,
+  updateMirror,
   upstreamMergeBody,
   UPSTREAM_MERGED_FILENAME,
   UPSTREAM_REPO_DEFAULT,
   UPSTREAM_REPO_ENV,
 } from "./update.ts";
+import { githubReleasedTagNames, releasedTagsOnly } from "./released-tags.ts";
 import { SWEEP_INTERVAL_MS, sweepUploads } from "./uploads.ts";
 import { crewTurnStart, readUpdateRun, updateLockHeld } from "./update-run.ts";
 import {
@@ -812,6 +815,17 @@ if (releaseReads.warning !== null) console.warn(`[update] ${releaseReads.warning
 // The upstream reads ride the same mirror seam: a rehearsal must not touch a real release on either
 // channel. No second warning — the line above already says the seam is set.
 const upstreamReads = releaseFetchers(upstreamRepo, process.env);
+// A tag is not a release (bridge/released-tags.ts): this repo's tag namespace can carry tags that
+// were never released here — upstream's whole history after a `--follow-tags` push — and a foreign
+// tag must never announce an update. `/releases` is the discriminator, fetched beside the tags in
+// the same credential and budget. A rehearsal mirror is its own fixture truth and serves no
+// releases list, so the filter stands down when one is set; a refused mirror already fails
+// fetchTags, and the composed read fails the same way it does.
+const updateCheckMirror = updateMirror(process.env);
+const releasedTagNames =
+  updateCheckMirror.ok && updateCheckMirror.base === null
+    ? githubReleasedTagNames(updateRepo, githubCredential(process.env), null)
+    : null;
 // The last upstream release merged, from the tracked `upstream-merged` file at the repo root (ADR
 // 9007). Read per check, never cached: a merge rewrites it and re-arms the signal. Missing or
 // garbage reads as null — the monitor logs loudly and never fires, with the rest of the banner
@@ -910,7 +924,7 @@ const updateMonitor = new UpdateMonitor({
   startupStamp: bridgeStampSync(bridgeDir, rootDir),
   // With the operator's GitHub token when the env holds one (#254): the same three names, in the
   // same order, that `collie update` reads, so the banner and the verb share one budget.
-  fetchTags: releaseReads.fetchTags,
+  fetchTags: releasedTagsOnly(releaseReads.fetchTags, releasedTagNames),
   // The newest release's own reading (M27/06) — one small GET beside the tag list, from the same
   // repo the release links point at. It answers null for every release that published none.
   fetchReleaseReading: releaseReads.fetchReleaseReading,

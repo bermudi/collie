@@ -20,6 +20,7 @@ import {
   parseReleaseManifest,
   readAllTags,
 } from "../bridge/update.ts";
+import { githubReleasesUrl, readAllReleasedTagNames } from "../bridge/released-tags.ts";
 import { STALE_AFTER_MS, inFlight, updateLockPath, type UpdateLock, type UpdateRun } from "../bridge/update-run.ts";
 import { STAGING_LOG_LINES, STAGING_LOG_PREFIX, stagingLogPath } from "../bridge/staging-log.ts";
 import { manifestVersionFrom, readBuildInfo } from "../bridge/version.ts";
@@ -496,6 +497,19 @@ function assertOrigin(deps: UpdateDeps, root: string = deps.ctx.root): boolean {
   return false;
 }
 
+/** The tag names `repo` actually RELEASED, through this deps' `net` seam — the discriminator every
+ *  tag-reading update path shares (bridge/released-tags.ts says why). Exported for the preflight's
+ *  `releasedListing`, which asks the same question of the same repo and renders the failure its own
+ *  way. The mirror case is handled by the callers that have one; this read never takes one. */
+export async function releasedTagNames(deps: Pick<UpdateDeps, "net">, repo: string) {
+  return readAllReleasedTagNames(repo, null, async (url) => {
+    const page = await deps.net.getJson(url);
+    // SAFETY: `Net.getJson` hands back what `Response.json()` produced, which IS a JsonValue by
+    // construction; `parseReleasesResponse` checks every field it keeps.
+    return page.ok ? { ok: true, value: page.value as JsonValue } : page;
+  });
+}
+
 /** The version in the checkout's own `herdr-plugin.toml` — the installed major is read from here. */
 function installedVersion(deps: UpdateDeps): string | null {
   return manifestVersionFrom(deps.files.read(join(deps.ctx.root, "herdr-plugin.toml")));
@@ -578,7 +592,9 @@ export interface CheckoutOutcome {
  */
 export function updateCheckout(
   deps: UpdateDeps,
-  opts: { crossMajor: boolean; toTag?: string | null } = { crossMajor: false },
+  opts: { crossMajor: boolean; toTag?: string | null; released?: ReadonlySet<string> | null } = {
+    crossMajor: false,
+  },
 ): CheckoutOutcome {
   const root = deps.ctx.root;
   const git = (args: readonly string[]): number => {
@@ -602,7 +618,7 @@ export function updateCheckout(
   const installed = installedVersion(deps);
   const toTag = opts.toTag ?? null;
   return isManagedCheckout(deps.exec, root)
-    ? updateManaged(deps, git, installed, opts.crossMajor, toTag)
+    ? updateManaged(deps, git, installed, opts.crossMajor, toTag, opts.released ?? null)
     : updateLinked(deps, git, installed, opts.crossMajor, toTag);
 }
 
@@ -673,6 +689,7 @@ function updateManaged(
   installed: string | null,
   crossMajor: boolean,
   toTag: string | null,
+  released: ReadonlySet<string> | null,
 ): CheckoutOutcome {
   const root = deps.ctx.root;
   const ls = deps.exec.capture("git", gitArgs(root, ["ls-remote", "--tags", tagRemote(deps.exec, root)]));
@@ -681,7 +698,12 @@ function updateManaged(
     return { code: EXIT.FAIL, moved: false, to: null, higher: null };
   }
   const head = deps.exec.capture("git", gitArgs(root, ["rev-parse", "HEAD"])).stdout.trim();
-  const managedTags = parseRemoteTags(ls.stdout);
+  // A tag is not a release (bridge/released-tags.ts): a remote can list tags that were never
+  // released here — a fork flushed with `--follow-tags` holds upstream's whole history — and
+  // `checkout --detach` on one lands on foreign code, verbatim. The caller answered which tags the
+  // update repo actually released; `null` is the unfiltered reading (a probe answered no, or a
+  // test), and an empty set still means "nothing may be taken".
+  const managedTags = parseRemoteTags(ls.stdout).filter((t) => released === null || released.has(t.tag));
   const asked = pinPlan(planUpdate({ tags: managedTags, installed, head, crossMajor }), {
     tags: managedTags,
     installed,
@@ -1150,7 +1172,26 @@ async function updateInPlace(deps: UpdateDeps, args: readonly string[]): Promise
   // The run's real start, for the record written at the end of it. Everything below this line is
   // the run: the fetch, the advance, the build, the restart.
   const startedAt = deps.now();
-  const advanced = updateCheckout(deps, { crossMajor: wantsMajor(args), toTag: wantsToTag(args) });
+  // The fork guard fires before ANY fetch — its own order (assertOrigin), and the releases read
+  // below is a fetch, so it is said here first. `updateCheckout` asserts again for its other
+  // callers; a pass is silent both times.
+  if (!assertOrigin(deps)) return EXIT.FAIL;
+  // A tag is not a release (bridge/released-tags.ts): a remote carrying foreign tags must not hand
+  // `checkout --detach` one of them, so a managed checkout plans only on tags the update repo
+  // actually released. Read here, ahead of the sync planner — a releases list that cannot be
+  // answered fails the update before a single ref moves, because an unverifiable tag list is not
+  // a plan. A linked clone never consults tags, so it is never asked for the set.
+  let released: ReadonlySet<string> | null = null;
+  if (isManagedCheckout(deps.exec, deps.ctx.root)) {
+    const repo = updateRepoOf(deps.ctx.env);
+    const names = await releasedTagNames(deps, repo);
+    if (!names.ok) {
+      netError(deps, "the releases check", githubReleasesUrl(repo), names.failure);
+      return EXIT.FAIL;
+    }
+    released = names.names;
+  }
+  const advanced = updateCheckout(deps, { crossMajor: wantsMajor(args), toTag: wantsToTag(args), released });
   if (advanced.code !== EXIT.OK) return advanced.code;
   // Nothing was taken AND what is on disk is whole: stop here. This used to fall through, so
   // "already current" and "nothing to cross to" were each followed by two installs, two typechecks,
@@ -1624,7 +1665,19 @@ async function updateBinary(deps: UpdateDeps, args: readonly string[]): Promise<
     netError(deps, "the release check", failedUrl, tagsResponse.failure);
     return EXIT.FAIL;
   }
-  const tags = parseApiTags(tagsResponse.tags);
+  let tags = parseApiTags(tagsResponse.tags);
+  // A tag is not a release (bridge/released-tags.ts): a remote carrying foreign tags would let the
+  // plan NAME one, and only the manifest GET below would contradict it (404, after staging opened).
+  // The releases the repo actually published are the candidate set; the rehearsal mirror is its
+  // own truth and serves no releases list, so it is asked nothing.
+  if (mirror.base === null) {
+    const released = await releasedTagNames(deps, repo);
+    if (!released.ok) {
+      netError(deps, "the releases check", githubReleasesUrl(repo), released.failure);
+      return EXIT.FAIL;
+    }
+    tags = tags.filter((t) => released.names.has(t.tag));
+  }
 
   // 4. The same plan the git paths make. `head: ""` is correct rather than a fudge: a binary install
   //    has no checked-out commit, so `planUpdate`'s commit arm must never fire and the VERSION
@@ -2209,7 +2262,16 @@ async function updateStagedCheckout(
   }
   const installed = installedVersion(deps);
   const head = deps.exec.capture("git", gitArgs(root, ["rev-parse", "HEAD"])).stdout.trim();
-  const stagedTags = parseRemoteTags(ls.stdout);
+  // A tag is not a release (bridge/released-tags.ts): this path worktrees a checkout AT the tag it
+  // plans on, so a foreign tag lands foreign code here exactly as it would on the managed path.
+  // Same read, same failure: unverifiable means nothing moves.
+  const stagedRepo = updateRepoOf(deps.ctx.env);
+  const stagedReleased = await releasedTagNames(deps, stagedRepo);
+  if (!stagedReleased.ok) {
+    netError(deps, "the releases check", githubReleasesUrl(stagedRepo), stagedReleased.failure);
+    return EXIT.FAIL;
+  }
+  const stagedTags = parseRemoteTags(ls.stdout).filter((t) => stagedReleased.names.has(t.tag));
   // The same pin, the same four refusals — see `updateBinary` above.
   const pinnedStaged = pinPlan(planUpdate({ tags: stagedTags, installed, head, crossMajor: wantsMajor(args) }), {
     tags: stagedTags,

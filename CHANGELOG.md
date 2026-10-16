@@ -23,6 +23,13 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Added
+- **A pre-push guard refuses tags outside Pup's 0.x line.** A merge makes upstream's annotated tags reachable, and `git push --follow-tags` used to flush all of them onto `bermudi/collie`; the hook now blocks the push and names the offending tags. `PUSH_FOREIGN_TAGS=1` overrides once.
+
+### Fixed
+- **The update channel counts releases, not tags.** A `--follow-tags` push after the 1.21.x merge put 130 of upstream's `v1.x` tags on the fork, and the raw-tag read announced upstream 1.21.2 as a new major over a running 0.56.1 — `collie update --major` would have detached onto upstream's own commit. The banner, `collie update` (checkout, staged, and binary paths), and `collie update --check` now intersect the tag list with the repo's GitHub releases, so a tag with no release behind it announces nothing and cannot be selected; a releases list that cannot be read fails the check before anything moves. Rehearsal mirrors stay unfiltered — the mirror is the fixture's truth.
+- **A missing website-dispatch token no longer fails the release run.** The `notify-website` step skips with a notice when `COLLIE_GITHUB_REPO_TOKEN` is unset — on the fork neither the token nor the target repo exists, so every release painted red after the release itself had already shipped.
+
 ## [0.56.1] - 2026-10-15
 
 ### Fixed

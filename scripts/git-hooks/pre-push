@@ -24,6 +24,32 @@ pushed_refs="$(cat)"
 # shells out to git too, so the variables are dropped once here, before anything inherits them.
 unset "${!GIT_@}" 2>/dev/null || true
 
+# ── Foreign-line tags (BLOCKS) ─────────────────────────────────────────────
+# 2026-10-16: a `git push --follow-tags` after an upstream merge flushed 130 of upstream's v1.*
+# tags into bermudi/collie. The update banner then announced upstream's 1.21.2 as "a new major",
+# and `collie update --major` would have detached onto upstream's own commit. Pup's own line is
+# 0.x, so any other tag pushed here is upstream's and arrived only by accident.
+# Override once: PUSH_FOREIGN_TAGS=1 git push (e.g. the day Pup's own line leaves 0.x).
+foreign=""
+while read -r local_ref _rest; do
+  case "$local_ref" in
+    refs/tags/v0.*) ;;
+    refs/tags/*) foreign="$foreign ${local_ref#refs/tags/}" ;;
+  esac
+done <<<"$pushed_refs"
+if [ -n "$foreign" ] && [ "${PUSH_FOREIGN_TAGS:-}" != "1" ]; then
+  {
+    echo
+    echo "✗ pre-push: refusing — this push carries tag(s) outside Pup's 0.x line:$foreign"
+    echo "  upstream's tags belong to upstream; a merge makes them reachable, and --follow-tags"
+    echo "  flushes them all. Push the branch by name; push a release tag explicitly:"
+    echo "      git push origin vX.Y.Z"
+    echo "  (Override once: PUSH_FOREIGN_TAGS=1 git push.)"
+    echo
+  } >&2
+  exit 1
+fi
+
 # ── Release tag (WARNS, never blocks) ───────────────────────────────────────
 # Betas 33 to 41 were cut in the version files and the CHANGELOG and never tagged, so nine releases
 # existed that nobody could install. The release workflow was fine; the `git tag` in front of it was

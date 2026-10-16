@@ -164,6 +164,35 @@ const deadNet: Net = {
   tlsCertificate: () => Promise.resolve({ ok: false, failure: { status: null, message: "no network in tests" } }),
 };
 
+/**
+ * `/releases` as the fixture's normal world answers it: every tag anywhere in this suite is a
+ * released one. The own-channel filter (bridge/released-tags.ts) asks this endpoint on the update
+ * paths now — a case whose net answers it otherwise gets what it scripted.
+ */
+const RELEASED = {
+  ok: true as const,
+  value: [
+    "v0.31.1",
+    "v0.32.0",
+    "v1.0.0",
+    "v1.0.0-beta.1",
+    "v1.0.0-beta.9",
+    "v1.0.0-beta.10",
+    "v1.1.0",
+    "v1.1.0-rc.1",
+    "v1.2.0",
+    "v1.2.0-beta.1",
+    "v2.0.0",
+    "v3.0.0",
+  ].map((tag_name) => ({ tag_name })),
+};
+/** The `getJson` of a world with one extra truth above {@link deadNet}: `/releases` answers. */
+const releasedNet: Net = {
+  ...deadNet,
+  getJson: (url) =>
+    url.includes("/releases?") ? Promise.resolve(RELEASED) : deadNet.getJson(url),
+};
+
 /** `git symbolic-ref -q HEAD` answering non-zero is what "detached, i.e. Herdr-managed" means. */
 const MANAGED: Scripted["answers"] = [[`${GIT} symbolic-ref -q HEAD`, { code: 1 }]];
 /** What `git remote get-url origin` answers on a checkout of Collie itself. Every case needs one:
@@ -216,7 +245,10 @@ function harness(
       exec,
       files,
       link,
-      net: { ...deadNet, getJson: (url) => (url.includes("/api/health") ? health() : deadNet.getJson(url)) },
+      net: {
+        ...releasedNet,
+        getJson: (url) => (url.includes("/api/health") ? health() : releasedNet.getJson(url)),
+      },
       host: hostFor("linux"),
       arch: "x64",
       restart: () => {
@@ -1089,6 +1121,56 @@ describe("update", () => {
     expect(h.io.stdout.join("\n")).not.toContain("NEW MAJOR");
   });
 
+  test("--major never crosses to a tag the repo has not released (a foreign tag is invisible)", async () => {
+    // The 2026-10-16 wound: `--follow-tags` filled bermudi/collie with upstream's v1.x tags, and the
+    // raw ls-remote read offered them to `--major`. LS_REMOTE still lists v1.0.0; the releases
+    // endpoint says only the 0.x line was ever released — so there is nothing to cross to.
+    const h = harness({
+      installed: "0.31.1",
+      answers: [
+        ...MANAGED,
+        [`${GIT} ls-remote --tags ${TAG_REMOTE}`, { stdout: LS_REMOTE }],
+        [`${GIT} rev-parse HEAD`, { stdout: "a1a1a1a1\n" }],
+        ...SHALLOW,
+      ],
+    });
+    const inner = h.deps.net.getJson;
+    h.deps.net = {
+      ...h.deps.net,
+      getJson: (url, opts) =>
+        url.includes("/releases?")
+          ? Promise.resolve({ ok: true as const, value: apiReleases("v0.31.1", "v0.32.0") })
+          : inner(url, opts),
+    };
+    expect(await cmdUpdate(h.deps, ["--major"])).toBe(EXIT.OK);
+    expect(h.io.stdout.join("\n")).toContain("no release above major 0");
+    // Nothing fetched, nothing detached onto the foreign tag.
+    expect(h.exec.calls.some((c) => c.includes("v1.0.0"))).toBe(false);
+    expect(gitRuns(h.exec).some((c) => c.startsWith("fetch"))).toBe(false);
+  });
+
+  test("a releases listing that cannot be read fails before any fetch, and the checkout is unchanged", async () => {
+    const h = harness({
+      installed: "0.31.1",
+      answers: [
+        ...MANAGED,
+        [`${GIT} ls-remote --tags ${TAG_REMOTE}`, { stdout: LS_REMOTE }],
+        [`${GIT} rev-parse HEAD`, { stdout: "a1a1a1a1\n" }],
+        ...SHALLOW,
+      ],
+    });
+    const inner = h.deps.net.getJson;
+    h.deps.net = {
+      ...h.deps.net,
+      getJson: (url, opts) =>
+        url.includes("/releases?")
+          ? Promise.resolve({ ok: false as const, failure: { status: 403, message: "HTTP 403" } })
+          : inner(url, opts),
+    };
+    expect(await cmdUpdate(h.deps)).toBe(EXIT.FAIL);
+    expect(gitRuns(h.exec)).toEqual([]);
+  });
+
 
   // ── One update at a time on this machine ───────────────────────────────────
   // 2026-10-14: two detached updaters for one run built into one tree. The in-place path took no lock
@@ -1306,6 +1388,8 @@ const DIGEST = "3f786850e387550fdab836ed7e6dc881de23001b9d9dbb3b9b2b0b0f1a2c3d4e
 
 /** The `/tags` payload as GitHub actually answers it — the document `parseTagsResponse` reads. */
 const apiTags = (...names: string[]) => names.map((name) => ({ name, commit: { sha: `sha-${name}` } }));
+/** `/releases` for the same names — a tag is not a release, and the update paths now ask. */
+const apiReleases = (...names: string[]) => names.map((tag_name) => ({ tag_name }));
 
 const manifestDoc = (over: JsonObject = {}) => ({
   schemaVersion: 1,
@@ -1326,6 +1410,8 @@ const manifestDoc = (over: JsonObject = {}) => ({
 
 interface BinaryOptions {
   tags?: readonly { name: string; commit: { sha: string } }[];
+  /** `/releases` as tag_name objects — defaults to every tag the fixture serves being released. */
+  releases?: readonly { tag_name: string }[];
   manifest?: JsonObject | null;
   /** The digest the download reports — a different one is the corruption case. */
   digest?: string;
@@ -1412,6 +1498,15 @@ function binaryHarness(over: BinaryOptions = {}): Harness {
     getJson: (url) => {
       if (url.includes("/api/health")) return health();
       if (url.includes("api.github.com")) {
+        // `/releases` rides before `/tags`: the released-set read (bridge/released-tags.ts) names
+        // the same names this fixture's tag list does — a tag it serves is a release it published.
+        if (url.includes("/releases?")) {
+          const tags = over.tags ?? apiTags("v1.0.0", `v${NEW}`);
+          return Promise.resolve({
+            ok: true as const,
+            value: over.releases ?? tags.map((t) => ({ tag_name: t.name })),
+          });
+        }
         return Promise.resolve(
           over.tagsFailure === undefined
             ? { ok: true as const, value: over.tags ?? apiTags("v1.0.0", `v${NEW}`) }
@@ -1621,6 +1716,7 @@ describe("collie update on a binary install", () => {
     expect(await cmdUpdate(plain.deps)).toBe(EXIT.OK);
     expect(viaGithub).toEqual([
       { url: "https://api.github.com/repos/AltanS/collie/tags?per_page=100", opts: undefined },
+      { url: "https://api.github.com/repos/AltanS/collie/releases?per_page=100", opts: undefined },
       { url: `https://github.com/AltanS/collie/releases/download/v${NEW}/collie-${NEW}.manifest.json`, opts: undefined },
       { url: `https://github.com/AltanS/collie/releases/download/v${NEW}/${PAYLOAD}.tar.gz`, opts: undefined },
     ]);
@@ -2363,7 +2459,10 @@ function stagedHarness(over: StagedOptions = {}): Harness {
       exec,
       files,
       link,
-      net: { ...deadNet, getJson: (url) => (url.includes("/api/health") ? health() : deadNet.getJson(url)) },
+      net: {
+        ...releasedNet,
+        getJson: (url) => (url.includes("/api/health") ? health() : releasedNet.getJson(url)),
+      },
       host: hostFor("linux"),
       arch: "x64",
       restart: () => {

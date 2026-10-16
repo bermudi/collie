@@ -341,9 +341,10 @@ Releases up to and including v1.15.0 also could not swap a running `collie.exe`.
 ### If the version did not move
 
 `collie update` asks GitHub directly on every run, `git ls-remote` for a checkout, the GitHub tags
-API for a binary install. It does not cache the release list. A release published seconds ago may
-still take a minute to show up, because GitHub itself needs a moment to catch up. Run
-`collie doctor` next. If that does not explain it, see
+API for a binary install. It does not cache the release list. A tag only counts when a GitHub
+Release exists behind it — a tag merely pushed to the repo is never an update candidate. A release
+published seconds ago may still take a minute to show up, because GitHub itself needs a moment to
+catch up. Run `collie doctor` next. If that does not explain it, see
 [When collie will not run](#when-collie-will-not-run).
 
 ### If GitHub rate-limits the release check

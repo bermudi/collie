@@ -164,8 +164,10 @@ all: `.github/workflows/release.yml` triggers on
 `push: tags: ["v*.*.*"]` and nothing else creates the GitHub Release the in-app update banner links
 to, so an untagged version exists only as a CHANGELOG heading and nobody can install it. So when
 that release lands and you push, **always push a matching annotated git tag with it** —
-`git tag -a vX.Y.Z -m "Collie X.Y.Z" && git push origin vX.Y.Z` (or `git push --follow-tags` so the
-tag ships *with* the release). One `v<x.y.z>` tag per shipped version on the remote.
+`git tag -a vX.Y.Z -m "Collie X.Y.Z" && git push origin vX.Y.Z`. One `v<x.y.z>` tag per shipped
+version on the remote. **On the Pup fork (`bermudi/collie`), never `git push --follow-tags`:** a
+merge makes upstream's `v1.x` tags reachable, and follow-tags flushes all of them — the pre-push
+hook refuses it, and ADR 9007 says why it must stay refused.
 
 **A release is published only from a commit whose CI run succeeded.** `release.yml` enforces it: its
 first job, `gate`, looks up the `ci.yml` run for the tagged commit, waits while that run is still in
@@ -181,7 +183,7 @@ gh run watch                 # or: gh run list --commit "$(git rev-parse HEAD)"
 git push origin vX.Y.Z
 ```
 
-`git push --follow-tags` in one go still works, because the gate waits rather than races. The
+`git push --follow-tags` in one go still works upstream, because the gate waits rather than races (on the Pup fork it does not — see above). The
 two-step form is preferred anyway, because a red CI then costs nothing: no tag exists yet, so you fix
 it on `main` and the release commit can still be amended before anything is public. Once the tag is
 pushed and CI is red, that door is shut: the fix is a follow-up patch release with a new tag, never a

@@ -92,6 +92,21 @@ const deadNet: Net = {
   tlsCertificate: () => Promise.resolve({ ok: false, failure: { status: null, message: "no network in tests" } }),
 };
 
+/**
+ * `/releases` as the fixture's normal world answers it (bridge/released-tags.ts): every tag this
+ * suite lists is a released one. Cases that script their own `net` get exactly what they scripted.
+ */
+const fixtureNet: Net = {
+  ...deadNet,
+  getJson: (url) =>
+    url.includes("/releases?")
+      ? Promise.resolve({
+          ok: true as const,
+          value: ["v0.31.1", "v0.32.0", "v1.0.0", "v2.0.0"].map((tag_name) => ({ tag_name })),
+        })
+      : deadNet.getJson(url),
+};
+
 const NOT_SPAWNED: RemoteResult = { code: 255, stdout: "", stderr: "ssh: connect: timed out", spawned: false };
 
 /** One remote turn, scripted by which script it was handed: the probe, then the preflight ask. */
@@ -179,7 +194,7 @@ function harness(
     exec,
     files,
     link: fakeLinkFs(),
-    net: over.net ?? deadNet,
+    net: over.net ?? fixtureNet,
     host: hostFor("linux"),
     store: { load: () => Promise.resolve(over.store ?? null) },
     ops: { get: (id) => Promise.resolve(over.ops?.[id] ?? null) },
@@ -460,7 +475,15 @@ describe("preflight — the bun check", () => {
       ...h.deps,
       ctx: context({}, { root: "/opt/app/versions/1.0.0" }),
       link,
-      net: { ...deadNet, getJson: () => Promise.resolve({ ok: true, value: [{ name: "v1.0.0", commit: { sha: "cccccccc" } }] }) },
+      net: {
+        ...deadNet,
+        getJson: (url) =>
+          Promise.resolve(
+            url.includes("/releases?")
+              ? { ok: true as const, value: [{ tag_name: "v1.0.0" }] }
+              : { ok: true as const, value: [{ name: "v1.0.0", commit: { sha: "cccccccc" } }] },
+          ),
+      },
     };
     const report = await preflight(deps);
     expect(report.checks.map((c) => c.id)).toEqual(["doctor", "disk", "upstream", "service"]);
@@ -1069,7 +1092,12 @@ describe("preflight — a folder a package manager owns", () => {
       answers: [[`${GIT} rev-parse --show-prefix`, { code: 128 }]],
       net: {
         ...deadNet,
-        getJson: () => Promise.resolve({ ok: true, value: [{ name: "v1.0.0", commit: { sha: "cccccccc" } }] }),
+        getJson: (url) =>
+          Promise.resolve(
+            url.includes("/releases?")
+              ? { ok: true as const, value: [{ tag_name: "v1.0.0" }] }
+              : { ok: true as const, value: [{ name: "v1.0.0", commit: { sha: "cccccccc" } }] },
+          ),
       },
       ...over,
     });
@@ -1118,7 +1146,7 @@ describe("preflight — a folder a package manager owns", () => {
         ...deadNet,
         getJson: (url) => {
           asked.push(url);
-          return Promise.resolve({ ok: true, value: [{ name: "v1.0.0", commit: { sha: "cccccccc" } }] });
+          return Promise.resolve({ ok: true as const, value: [{ name: "v1.0.0", commit: { sha: "cccccccc" } }] });
         },
       },
     });
@@ -1144,14 +1172,18 @@ describe("preflight — a folder a package manager owns", () => {
       answers: [[`git -C ${AUR} rev-parse --show-prefix`, { code: 128 }]],
       net: {
         ...deadNet,
-        getJson: () =>
-          Promise.resolve({
-            ok: true,
-            value: [
-              { name: "v1.0.0", commit: { sha: "cccccccc" } },
-              { name: "v2.0.0", commit: { sha: "dddddddd" } },
-            ],
-          }),
+        getJson: (url) =>
+          Promise.resolve(
+            url.includes("/releases?")
+              ? { ok: true as const, value: [{ tag_name: "v1.0.0" }, { tag_name: "v2.0.0" }] }
+              : {
+                  ok: true as const,
+                  value: [
+                    { name: "v1.0.0", commit: { sha: "cccccccc" } },
+                    { name: "v2.0.0", commit: { sha: "dddddddd" } },
+                  ],
+                },
+          ),
       },
     });
     h.files.entries.set(`${AUR}/herdr-plugin.toml`, { text: 'id = "herdr.collie"\nversion = "1.0.0"\n' });
@@ -1167,14 +1199,18 @@ describe("preflight — a folder a package manager owns", () => {
       installed: "1.0.0",
       net: {
         ...deadNet,
-        getJson: () =>
-          Promise.resolve({
-            ok: true,
-            value: [
-              { name: "v1.0.0", commit: { sha: "cccccccc" } },
-              { name: "v2.0.0", commit: { sha: "dddddddd" } },
-            ],
-          }),
+        getJson: (url) =>
+          Promise.resolve(
+            url.includes("/releases?")
+              ? { ok: true as const, value: [{ tag_name: "v1.0.0" }, { tag_name: "v2.0.0" }] }
+              : {
+                  ok: true as const,
+                  value: [
+                    { name: "v1.0.0", commit: { sha: "cccccccc" } },
+                    { name: "v2.0.0", commit: { sha: "dddddddd" } },
+                  ],
+                },
+          ),
       },
     });
     const check = byId(await preflight(h.deps), "upstream");

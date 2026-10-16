@@ -52,6 +52,7 @@ import {
   parseRemoteTags,
   planToTag,
   planUpdate,
+  releasedTagNames,
   type ReleaseTag,
   wantsToTag,
 } from "./update.ts";
@@ -467,7 +468,12 @@ export async function upstreamCheck(
     }
   }
 
-  const listed = await listTags(deps, install, configured);
+  const listed = await releasedListing(
+    deps,
+    configured,
+    await listTags(deps, install, configured),
+    !isCheckout(install),
+  );
   if (!listed.ok) return red("upstream", listed.reason, listed.remedy);
 
   // `--to-tag` asks a different question of the same listing: not "what would an update take" but
@@ -631,6 +637,36 @@ async function listTags(deps: UpdateCheckDeps, install: InstallKind, repo: strin
     };
   }
   return { ok: true, tags: parseApiTags(response.tags) };
+}
+
+/**
+ * A tag is not a release (bridge/released-tags.ts): the listing — whichever route produced it —
+ * restricted to the tags the repo actually released, so a foreign tag (a fork flushed with
+ * `--follow-tags` holds its upstream's whole history) can never plan an update or announce one
+ * here. A rehearsal mirror is its own fixture truth and serves no releases list, so a listing the
+ * mirror produced is trusted as it stands. A releases read that fails fails the check: an
+ * unverifiable tag list is no answer at all.
+ */
+async function releasedListing(
+  deps: UpdateCheckDeps,
+  repo: string,
+  listing: TagListing,
+  mirrorApplies: boolean,
+): Promise<TagListing> {
+  if (!listing.ok) return listing;
+  if (mirrorApplies) {
+    const mirror = updateMirror(deps.ctx.env);
+    if (mirror.ok && mirror.base !== null) return listing;
+  }
+  const released = await releasedTagNames(deps, repo);
+  if (!released.ok) {
+    return {
+      ok: false,
+      reason: `could not read github.com/${repo}'s releases — the tag list is unverifiable (${released.failure.message})`,
+      remedy: "check this machine's network, then re-run this check",
+    };
+  }
+  return { ok: true, tags: listing.tags.filter((t) => released.names.has(t.tag)) };
 }
 
 /**
