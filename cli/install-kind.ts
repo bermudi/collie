@@ -353,6 +353,15 @@ export function updateRepoOf(env: { readonly COLLIE_UPDATE_REPO?: string | undef
   return env.COLLIE_UPDATE_REPO?.trim() || DEFAULT_UPDATE_REPO;
 }
 
+const GITHUB_REPO_NAME = /^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_.-]+$/;
+
+/** `owner/repo` is the only string GitHub's `/releases` (or `/tags`) can answer. Anything else — a
+ *  rehearsal remote's local path, a non-GitHub host — is fixture truth and is asked nothing, the
+ *  same rule a `COLLIE_UPDATE_MIRROR` follows (bridge/released-tags.ts). */
+export function isGithubRepoName(repo: string): boolean {
+  return GITHUB_REPO_NAME.test(repo);
+}
+
 /**
  * A git remote URL → `owner/repo`, or null when it names no GitHub repository. All three spellings
  * git hands out are accepted (`https://`, `git@host:owner/repo`, `ssh://git@host/owner/repo`), a

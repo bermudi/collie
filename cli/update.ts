@@ -32,6 +32,7 @@ import {
   detectInstall,
   gitArgs,
   isGitCheckout,
+  isGithubRepoName,
   isManagedCheckout,
   originOf,
   originMatches,
@@ -1184,12 +1185,16 @@ async function updateInPlace(deps: UpdateDeps, args: readonly string[]): Promise
   let released: ReadonlySet<string> | null = null;
   if (isManagedCheckout(deps.exec, deps.ctx.root)) {
     const repo = updateRepoOf(deps.ctx.env);
-    const names = await releasedTagNames(deps, repo);
-    if (!names.ok) {
-      netError(deps, "the releases check", githubReleasesUrl(repo), names.failure);
-      return EXIT.FAIL;
+    // Only a GitHub `owner/repo` can answer `/releases`; anything else is fixture truth and is
+    // asked nothing — a rehearsal remote's local path serves the tag list but no releases list.
+    if (isGithubRepoName(repo)) {
+      const names = await releasedTagNames(deps, repo);
+      if (!names.ok) {
+        netError(deps, "the releases check", githubReleasesUrl(repo), names.failure);
+        return EXIT.FAIL;
+      }
+      released = names.names;
     }
-    released = names.names;
   }
   const advanced = updateCheckout(deps, { crossMajor: wantsMajor(args), toTag: wantsToTag(args), released });
   if (advanced.code !== EXIT.OK) return advanced.code;
@@ -2266,12 +2271,16 @@ async function updateStagedCheckout(
   // plans on, so a foreign tag lands foreign code here exactly as it would on the managed path.
   // Same read, same failure: unverifiable means nothing moves.
   const stagedRepo = updateRepoOf(deps.ctx.env);
-  const stagedReleased = await releasedTagNames(deps, stagedRepo);
-  if (!stagedReleased.ok) {
-    netError(deps, "the releases check", githubReleasesUrl(stagedRepo), stagedReleased.failure);
-    return EXIT.FAIL;
+  let stagedNames: ReadonlySet<string> | null = null;
+  if (isGithubRepoName(stagedRepo)) {
+    const stagedReleased = await releasedTagNames(deps, stagedRepo);
+    if (!stagedReleased.ok) {
+      netError(deps, "the releases check", githubReleasesUrl(stagedRepo), stagedReleased.failure);
+      return EXIT.FAIL;
+    }
+    stagedNames = stagedReleased.names;
   }
-  const stagedTags = parseRemoteTags(ls.stdout).filter((t) => stagedReleased.names.has(t.tag));
+  const stagedTags = parseRemoteTags(ls.stdout).filter((t) => stagedNames === null || stagedNames.has(t.tag));
   // The same pin, the same four refusals — see `updateBinary` above.
   const pinnedStaged = pinPlan(planUpdate({ tags: stagedTags, installed, head, crossMajor: wantsMajor(args) }), {
     tags: stagedTags,

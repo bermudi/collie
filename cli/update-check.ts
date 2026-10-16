@@ -22,6 +22,7 @@ import { isLocal, type Finding } from "./finding.ts";
 import {
   binaryLayout,
   classifyInstall,
+  isGithubRepoName,
   PACKAGED_SENTENCE,
   gitArgs,
   type InstallKind,
@@ -658,6 +659,8 @@ async function releasedListing(
     const mirror = updateMirror(deps.ctx.env);
     if (mirror.ok && mirror.base !== null) return listing;
   }
+  // A non-GitHub update repo cannot answer `/releases` — it is asked nothing, like a mirror.
+  if (!isGithubRepoName(repo)) return listing;
   const released = await releasedTagNames(deps, repo);
   if (!released.ok) {
     return {

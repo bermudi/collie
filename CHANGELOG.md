@@ -23,6 +23,9 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Fixed
+- **A non-GitHub update repo is asked nothing.** The tag-is-not-release check read `/releases` for whatever `COLLIE_UPDATE_REPO` held — a rehearsal remote's local path 404s at `api.github.com`, so a managed checkout's `collie update` and the `upstream` preflight died before a ref moved. A repo that is not `owner/repo`-shaped now skips the filter: like a rehearsal mirror, it is its own truth.
+
 ## [0.56.2] - 2026-10-16
 
 ### Added
