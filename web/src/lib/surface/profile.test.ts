@@ -27,6 +27,12 @@ function rawClaude(): JsonObject {
   return raw;
 }
 
+function rawDevin(): JsonObject {
+  const raw = parseJsonObject(readFileSync(join(PROFILES_DIR, "devin.json"), "utf8"));
+  if (raw === undefined) throw new Error("devin.json is not a JSON object");
+  return raw;
+}
+
 /** Set (or, with undefined, delete) the value at a path of keys inside a parsed profile. */
 function change(raw: JsonObject, path: readonly (string | number)[], value: JsonValue | undefined): JsonObject {
   const copy: JsonObject = JSON.parse(JSON.stringify(raw));
@@ -214,7 +220,6 @@ describe("the codex profile (M56 spec 13)", () => {
 
   const cases: [string, (string | number)[], JsonValue | undefined, string][] = [
     ["codex: Escape as the queue key", ["keys", "queueKey"], "Escape", "keys.queueKey"],
-    ["codex: Enter as the queue key", ["keys", "queueKey"], "Enter", "keys.queueKey"],
     ["codex: Escape as a command key", ["keys", "commandSubmit"], ["Escape"], "keys.commandSubmit"],
     ["codex: no command key", ["keys", "commandSubmit"], [], "keys.commandSubmit"],
     ["codex: a queue key on a harness whose Enter queues", ["keys", "enterWhileRunning"], "queues", "keys.queueKey"],
@@ -232,6 +237,21 @@ describe("the codex profile (M56 spec 13)", () => {
       expect(failure(change(rawCodex(), path, value)).path).toBe(field);
     });
   }
+
+  it("a harness whose Enter steers may name Enter as the queue key — it IS the in-turn commit (devin, live-verified 3000.11.92)", () => {
+    const devin = parseProfile(rawDevin());
+    expect(devin.keys.enterWhileRunning).toBe("steers");
+    expect(devin.keys.queueKey).toBe("Enter");
+  });
+
+  it("Enter is still off-limits as the queue key on every other Enter mode", () => {
+    for (const mode of ["submits", "ignored", "queues"] as const) {
+      const raw = change(change(rawCodex(), ["keys", "enterWhileRunning"], mode), ["keys", "queueKey"], "Enter");
+      expect(failure(raw), mode).toBeDefined();
+    }
+    const noMode = change(change(rawCodex(), ["keys", "enterWhileRunning"], undefined), ["keys", "queueKey"], "Enter");
+    expect(failure(noMode).path).toBe("keys.queueKey");
+  });
 });
 
 describe("the Codex range", () => {
@@ -736,8 +756,8 @@ describe("keys that differ by platform (M56 spec 14 review)", () => {
     expect(failure(change(raw(), ["keys", "submit"], { default: ["alt+Enter"], win32: [] })).path).toBe("keys.submit.win32");
   });
 
-  it("keys.queueKey names one key per platform, never Enter or Escape", () => {
-    expect(failure(change(raw(), ["keys", "queueKey"], { default: "alt+Enter", win32: "Enter" })).path).toBe("keys.queueKey");
+  it("keys.queueKey names one key per platform, never Escape — and never Enter unless Enter steers", () => {
+    expect(failure(change(change(raw(), ["keys", "enterWhileRunning"], "queues"), ["keys", "queueKey"], { default: "alt+Enter", win32: "Enter" })).path).toBe("keys.queueKey");
     expect(failure(change(raw(), ["keys", "queueKey"], { default: "Escape", win32: "ctrl+q" })).path).toBe("keys.queueKey");
     expect(failure(change(raw(), ["keys", "queueKey"], { win32: "ctrl+q" })).path).toBe("keys.queueKey.default");
     expect(parseProfile(change(raw(), ["keys", "queueKey"], "alt+Enter")).keys.queueKeyByPlatform).toBeUndefined();

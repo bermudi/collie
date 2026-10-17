@@ -3670,6 +3670,84 @@ describe("OMP: Ctrl+Q sends, Enter steers (M56 spec 14 review)", () => {
   });
 });
 
+// ── devin: Enter sends, and steers the running turn (live, 3000.11.92) ──────────────────────────
+
+/**
+ * Devin 3000.11.92 as live-verified (2026-10-17): a labelled rule over a `❭` prompt row over a plain
+ * rule, a `Context:` footer under it, and a `Running tools` row over the box while a turn runs.
+ * Enter during a turn STEERS — the text echoes above the box and reaches the agent mid-turn; devin
+ * has no second commit key, so the profile names Enter itself as the queue key.
+ */
+class DevinPane extends FakePane {
+  inTurn = false;
+  /** Texts Enter sent into the running turn: steering, which for devin IS the send. */
+  steered: string[] = [];
+
+  constructor() {
+    super("generic");
+    this.transcript = Array.from({ length: 12 }, (_, i) => ` an earlier row of the agent answer ${String(i)}`);
+    const base = this.writeKeys;
+    this.writeKeys = (paneId, keys) => {
+      for (const key of keys) {
+        if (key === "Enter") {
+          this.keysSeen.push(key);
+          const text = this.box.replace(/\n/gu, " ");
+          if (text.length > 0 && this.inTurn) this.steered.push(text);
+          else if (text.length > 0) this.transcript.push(` ❭ ${text}`);
+          this.box = "";
+          this.revision++;
+        } else void base(paneId, [key]);
+      }
+      return Promise.resolve(muxAck());
+    };
+  }
+
+  override render(): string {
+    const rows = [...this.transcript, ""];
+    if (this.inTurn) rows.push(" ⠦ Running tools · 1m 2s (esc twice to interrupt)");
+    rows.push(`─ ~/work ${"─".repeat(24)} (bypass permissions on) ─`);
+    const draft = this.box === "" ? (this.inTurn ? "Guide Devin while it works" : "Ask Devin to build features, fix bugs, or work on your code") : this.box;
+    draft.split("\n").forEach((line, i) => rows.push(i === 0 ? `❭ ${line}` : `  ${line}`));
+    rows.push(RULE, " SWE-2 Max                                            Context: 96k / 262k tokens (36%)");
+    return rows.join("\n");
+  }
+}
+
+function devin(): Rig & { pane: DevinPane } {
+  const pane = new DevinPane();
+  return { ...rig({ pane, harness: "devin", version: "3000.11.92" }), pane };
+}
+
+describe("devin: Enter sends, and steers the running turn (live, 3000.11.92)", () => {
+  test("an idle box is sent with Enter", async () => {
+    const { pane, send } = devin();
+    const answer = await send("fix the failing test in the parser");
+    expect(answer.receipt).toMatchObject({ outcome: "sent", profileId: "devin" });
+    expect(pane.transcript.at(-1)).toBe(" ❭ fix the failing test in the parser");
+  });
+
+  test("a send into a running turn steers: the queue key IS Enter, and devin gets the text now", async () => {
+    const { pane, send } = devin();
+    pane.inTurn = true;
+    const answer = await send("also fold in the new fixtures");
+    expect(answer.receipt).toMatchObject({ outcome: "sent", keys: ["probe", "Backspace", "Enter"] });
+    expect(pane.steered).toEqual(["also fold in the new fixtures"]);
+    // A steered send is not "queued": the receipt says queued only on the harness's own queued row,
+    // and devin draws none for a steer.
+    expect(answer.receipt?.queued).not.toBe(true);
+  });
+
+  test("a send into a running turn with NO version read is still held — the queued path needs the binary's version", async () => {
+    const pane = new DevinPane();
+    pane.inTurn = true;
+    const made = rig({ pane, harness: "devin", version: "not on the bridge's PATH", holds: new HoldStore(join(dir, "held")) });
+    const answer = await made.send("also fold in the new fixtures");
+    expect(answer.receipt).toMatchObject({ outcome: "held", version: null, keys: [] });
+    expect(pane.steered).toEqual([]);
+    expect(pane.keysSeen).not.toContain("Enter");
+  });
+});
+
 describe("a profile whose probe is provisional never skips the probe (M56 spec 14 review)", () => {
   const LONG = "this text is long enough that a verified profile would send it with no probe at all";
 

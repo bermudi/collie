@@ -48,6 +48,17 @@ export interface ServiceSpec {
   socket: string;
   port: number;
   /**
+   * The PATH the supervised bridge runs on, or `""` for the supervisor's default.
+   *
+   * The Send Protocol reads each harness's version by spawning its binary (`devin version`,
+   * `claude --version`, …), and a supervisor's default PATH sees none of them: agent CLIs live in
+   * the operator's user dirs (`~/bin`, `~/.local/bin`), which a systemd or launchd default PATH
+   * does not include — and a plugin action that writes the unit may itself run on a minimal env.
+   * Without a reported version every send into a running turn is refused and held. `""` writes no
+   * `Environment=PATH=` line at all: an empty PATH would hide even the system dirs.
+   */
+  searchPath: string;
+  /**
    * The discovered Host allowlist, comma-joined, or `""` when there is none.
    *
    * It is baked into the unit rather than left to `.env` because the bridge's Host gate fails closed
@@ -73,8 +84,23 @@ export function serviceSpec(ctx: CliContext, tailscaleHosts = "", host: Host = H
     configDir: ctx.configDir,
     socket: ctx.socket,
     port: ctx.port,
+    searchPath: harnessSearchPath(ctx.env.PATH, ctx.home),
     tailscaleHosts,
   };
+}
+
+/**
+ * The PATH the supervised bridge spawns on: the caller's own PATH, preceded by the conventional
+ * per-user binary dirs so a harness installed for the operator resolves even when the unit was
+ * written under a minimal environment (Herdr spawns plugin actions without the login PATH).
+ * The user dirs go FIRST — the same order a login shell gives them — so the binary the operator
+ * runs is the one the bridge versions. `""` when the caller had no PATH to carry.
+ */
+export function harnessSearchPath(path: string | undefined, home: string): string {
+  if (path === undefined || path.trim() === "") return "";
+  const userDirs = [join(home, "bin"), join(home, ".local", "bin")];
+  const dirs = path.split(":").filter((d) => d !== "" && !userDirs.includes(d));
+  return [...userDirs, ...dirs].join(":");
 }
 
 export function unitFilePath(home: string, instance: string | null = null): string {
@@ -112,12 +138,16 @@ export function bridgeCommand(spec: ServiceSpec): string[] {
  * from disk.
  */
 export function bridgeEnvironment(spec: ServiceSpec): EnvVars {
-  const env: EnvVars = {
+  const env: EnvVars = {};
+  // Assigned, never unconditionally — {@link ServiceSpec.searchPath}: `Environment=PATH=` with an
+  // empty value would strip the bridge of even the system dirs.
+  if (spec.searchPath !== "") env.PATH = spec.searchPath;
+  Object.assign(env, {
     HERDR_SOCKET_PATH: spec.socket,
     COLLIE_PORT: String(spec.port),
     HERDR_PLUGIN_CONFIG_DIR: spec.configDir,
     COLLIE_PLUGIN_ROOT: spec.root,
-  };
+  });
   // Only when there is one: an unsuffixed instance's unit and plist are unchanged by this knob's
   // existence. It is passed so the supervised process resolves the same context the CLI did —
   // notably `collie logs` and the pidfile, which are named after the instance.

@@ -9,6 +9,7 @@ import {
   bridgeCommand,
   bridgeEnvironment,
   collieBinary,
+  harnessSearchPath,
   launchAgentPlist,
   bakedTailscaleHosts,
   type ServiceSpec,
@@ -47,6 +48,7 @@ const SPEC: ServiceSpec = {
   configDir: "/home/pat/.config/collie",
   socket: "/home/pat/.config/herdr/herdr.sock",
   port: 8787,
+  searchPath: "",
   tailscaleHosts: "",
 };
 
@@ -70,6 +72,27 @@ describe("the discovered Host allowlist", () => {
     expect(bakedTailscaleHosts(launchAgentPlist(spec))).toBe("desk.ts.net");
     expect(bakedTailscaleHosts(systemdUnit(SPEC))).toBe("");
     expect(bakedTailscaleHosts(null)).toBe("");
+  });
+});
+
+describe("the supervised PATH", () => {
+  test("is baked into both supervisors so the bridge's harness version checks find the operator's binaries", () => {
+    const spec = { ...SPEC, searchPath: "/home/pat/bin:/home/pat/.local/bin:/usr/bin" };
+    expect(systemdUnit(spec)).toContain("Environment=PATH=/home/pat/bin:/home/pat/.local/bin:/usr/bin");
+    expect(launchAgentPlist(spec)).toContain("<key>PATH</key>\n        <string>/home/pat/bin:/home/pat/.local/bin:/usr/bin</string>");
+  });
+
+  test("an empty value writes NO PATH line — an empty one would strip even the system dirs", () => {
+    expect(systemdUnit(SPEC)).not.toContain("Environment=PATH=");
+    expect(launchAgentPlist(SPEC)).not.toContain("<key>PATH</key>");
+  });
+
+  test("harnessSearchPath puts the operator's user bin dirs first, deduplicated, and refuses an empty PATH", () => {
+    expect(harnessSearchPath("/usr/bin:/home/pat/bin", "/home/pat")).toBe("/home/pat/bin:/home/pat/.local/bin:/usr/bin");
+    expect(harnessSearchPath("/usr/bin", "/home/pat")).toBe("/home/pat/bin:/home/pat/.local/bin:/usr/bin");
+    expect(harnessSearchPath("/home/pat/bin:/home/pat/.local/bin:/usr/bin", "/home/pat")).toBe("/home/pat/bin:/home/pat/.local/bin:/usr/bin");
+    expect(harnessSearchPath(undefined, "/home/pat")).toBe("");
+    expect(harnessSearchPath("", "/home/pat")).toBe("");
   });
 });
 
@@ -276,6 +299,7 @@ describe("the Task Scheduler task (Windows)", () => {
     configDir: "C:\\Users\\pat\\AppData\\Roaming\\herdr\\plugins\\config\\herdr.collie",
     socket: "\\\\.\\pipe\\herdr",
     port: 8787,
+    searchPath: "",
     tailscaleHosts: "",
   };
   const CONHOST = "C:\\WINDOWS\\system32\\conhost.exe";

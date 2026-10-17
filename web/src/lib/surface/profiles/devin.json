@@ -105,7 +105,8 @@
       "confirm": "Enter",
       "cancel": "Escape"
     },
-    "enterWhileRunning": "queues"
+    "enterWhileRunning": "steers",
+    "queueKey": "Enter"
   },
   "collapse": {
     "pattern": "\\[Pasted text #\\d+ (?:\\+(?<lines>\\d+) lines|\\((?<chars>\\d+) chars\\))\\]"
@@ -117,7 +118,7 @@
   "probe": {
     "char": "⌁",
     "status": "provisional",
-    "note": "Anchors and keys taken from live devin 3000.11.92 screens on Herdr and the shipped keymap docs (2026-10-17), not a lab run: provisional. Devin's Enter during a turn sends the text into the running turn (placeholder 'Guide Devin while it works'); filed as 'queues' so the Send Protocol presses it instead of refusing every steer."
+    "note": "Anchors and keys taken from live devin 3000.11.92 screens on Herdr and the shipped keymap docs (2026-10-17), not a lab run: provisional. Live-verified on 3000.11.92: Enter with a draft during a turn steers — the text echoes above the box and reaches the agent mid-turn (placeholder 'Guide Devin while it works'). Enter IS the commit, so the queue key is Enter itself. Devin's own queue ('── N queued ── ↑ edit · ↵ send now' over '○' rows) is for prompts it cannot take mid-turn (e.g. compaction); its hint banner sits ABOVE the queued rows, which keys.queuedRow's shape cannot express."
   },
   "hooks": {}
 }

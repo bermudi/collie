@@ -267,8 +267,11 @@ export interface Profile {
     /**
      * The key that queues a message for after the running turn, on a harness whose Enter does not
      * queue (`enterWhileRunning` is not `queues`). Optional: without it, a send into a turn is refused.
-     * Never Escape and never Enter (what Enter does in a turn is `enterWhileRunning`). It may be the
-     * submit key itself, on a harness whose submit key sends on an idle box and queues in a turn.
+     * Never Escape. Never Enter either — UNLESS `enterWhileRunning` is `steers`: on such a harness
+     * Enter is the only way a send goes into a running turn, and what it does there is the harness's
+     * own steering, which the profile already declared (devin: Enter steers the running agent).
+     * It may otherwise be the submit key itself, on a harness whose submit key sends on an idle box
+     * and queues in a turn.
      */
     readonly queueKey?: string;
     /** The queue keys for the platforms that differ from `queueKey`, by `process.platform`. Optional. */
@@ -684,7 +687,10 @@ export function parseProfile(raw: JsonValue): Profile {
     );
     const checkQueueKey = (key: string): void => {
       if (/^(?:escape|esc)$/i.test(key)) fail("keys.queueKey", "must not be Escape");
-      if (/^(?:enter|return)$/i.test(key)) fail("keys.queueKey", "must not be Enter: keys.enterWhileRunning says what Enter does in a turn");
+      // Enter is the queue key only where the profile already says Enter steers the turn — devin:
+      // its one way into a running turn IS Enter, and Enter steers it. On any other Enter mode the
+      // key is still off-limits (a send into a turn may not steer it by accident).
+      if (/^(?:enter|return)$/i.test(key) && keys.enterWhileRunning !== "steers") fail("keys.queueKey", "must not be Enter: keys.enterWhileRunning says what Enter does in a turn");
     };
     const queueKey = queueNode.default[0] ?? fail("keys.queueKey", "must name one key");
     checkQueueKey(queueKey);

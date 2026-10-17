@@ -23,6 +23,9 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Fixed
+- **Mid-turn sends to Devin steer instead of parking in Collie's hold queue.** The supervised unit's PATH missed every agent CLI under `~/bin` and `~/.local/bin`, so the bridge read no binary version (`version: null`), refused to trust any profile mid-turn, and held each send until the turn ended — where it landed with `outcome: "unknown"`. The unit now carries a search path that puts the user's bin dirs ahead of the inherited PATH, and Devin's profile models the live-verified truth: Enter during a turn steers (it is Devin's only in-turn commit key, so the profile names it `queueKey`; the schema relaxes its Enter ban for `steers` profiles only).
+
 ## [0.57.1] - 2026-10-17
 
 **Urgent.** Devin panes cannot send text from the phone.
