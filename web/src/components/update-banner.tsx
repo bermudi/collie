@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, X } from "lucide-react";
 
 import { useLocale } from "@/hooks/use-locale";
+import { dismissUpdate } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { UpdateInfo } from "@/lib/types";
@@ -22,6 +23,10 @@ export interface UpdateNotice {
   command?: string;
   /** GitHub release page for the available version — the line links to it. Absent for the restart case. */
   href?: string;
+  /** The version this notice's ✕ is keyed to — set only when the notice may be put down. The bridge
+   *  records it (scope `upstream`), so the close holds on every screen and a NEWER release raises
+   *  the line again. Absent = no close. */
+  dismissableVersion?: string;
 }
 
 /**
@@ -73,11 +78,14 @@ export function updateNotice(update: UpdateInfo | undefined): UpdateNotice | nul
     };
   }
   // AN UPSTREAM MERGE IS WAITING. Names BOTH versions and says merge, never update. No command: the
-  // merge runs where the checkout lives, and the linked release page carries the notes.
+  // merge runs where the checkout lives, and the linked release page carries the notes. On the Pup
+  // it is closable, keyed by the upstream version — a dismissed 1.22.0 stays down while 1.22.1
+  // raises the line again.
   if (
     update.upstreamAvailable === true &&
     update.upstreamLatest !== undefined &&
-    update.upstreamMerged !== undefined
+    update.upstreamMerged !== undefined &&
+    update.dismissedUpstreamVersion !== update.upstreamLatest
   ) {
     return {
       line: t("settings.updateBanner.upstreamAvailable", {
@@ -85,6 +93,7 @@ export function updateNotice(update: UpdateInfo | undefined): UpdateNotice | nul
         merged: update.upstreamMerged,
       }),
       href: update.upstreamUrl ?? undefined,
+      dismissableVersion: update.upstreamLatest,
     };
   }
   // A MAJOR is out. It ranks below a routine release because it is the one thing the plain update
@@ -114,8 +123,12 @@ export function UpdateBanner({ className }: { className?: string }) {
   const data = useOptionalRootData();
   const notice = updateNotice(data?.update);
   const [copied, setCopied] = useState(false);
+  // OPTIMISTIC ONLY — the close itself is the bridge's (`dismissUpdate`); this covers the gap until
+  // the next poll carries `dismissedUpstreamVersion`, and a different version still shows.
+  const [closed, setClosed] = useState<string | null>(null);
 
   if (!notice) return null;
+  if (notice.dismissableVersion !== undefined && notice.dismissableVersion === closed) return null;
 
   async function copy() {
     if (!notice?.command) return;
@@ -166,6 +179,22 @@ export function UpdateBanner({ className }: { className?: string }) {
             )}
           </button>
         </>
+      ) : null}
+      {notice.dismissableVersion !== undefined ? (
+        <button
+          type="button"
+          aria-label={t("updateRibbon.dismiss")}
+          onClick={() => {
+            const version = notice.dismissableVersion;
+            setClosed(version ?? null);
+            // The close is the bridge's fact — a failed call is a courtesy lost, the next poll or
+            // the next tap sends it again.
+            if (version !== undefined) void dismissUpdate(version, "upstream").catch(() => {});
+          }}
+          className="ml-1 inline-flex size-4 items-center justify-center rounded align-middle text-muted-foreground/70 hover:text-foreground"
+        >
+          <X className="size-3" />
+        </button>
       ) : null}
     </div>
   );

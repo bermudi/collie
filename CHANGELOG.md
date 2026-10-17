@@ -23,6 +23,9 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Added
+- **The upstream-merge nudge can be put down.** The "Upstream X available (merged Y)" banner — in the footer and in the update ribbon — now carries a close, recorded on the bridge and keyed by the upstream version: dismissed 1.22.0 stays down everywhere, and 1.22.1 raises it again.
+
 ## [0.56.5] - 2026-10-16
 
 ### Changed

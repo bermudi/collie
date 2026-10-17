@@ -108,8 +108,37 @@ describe("update ribbon states", () => {
     expect(read()).toEqual({ kind: "available", version: "1.5.0" });
   });
 
-  it("(u) carries no close — only a merge re-arms it", () => {
-    expect(dismissTarget({ kind: "upstream", version: "1.22.0", merged: "1.21.3" })).toBeNull();
+  it("(u) is closable on the Pup, keyed by the upstream version", () => {
+    expect(dismissTarget({ kind: "upstream", version: "1.22.0", merged: "1.21.3" })).toEqual({
+      scope: "upstream",
+      version: "1.22.0",
+    });
+    // The close hides THAT merge's nudge; a newer upstream release is a different version and
+    // raises the band on its own.
+    expect(
+      read({
+        update: info({
+          releaseAvailable: false,
+          latest: null,
+          upstreamAvailable: true,
+          upstreamLatest: "1.22.0",
+          upstreamMerged: "1.21.3",
+        }),
+        dismissedUpstreamVersion: "1.22.0",
+      }),
+    ).toEqual({ kind: "silent" });
+    expect(
+      read({
+        update: info({
+          releaseAvailable: false,
+          latest: null,
+          upstreamAvailable: true,
+          upstreamLatest: "1.22.1",
+          upstreamMerged: "1.21.3",
+        }),
+        dismissedUpstreamVersion: "1.22.0",
+      }),
+    ).toEqual({ kind: "upstream", version: "1.22.1", merged: "1.21.3" });
   });
 
   it("an unreachable peer is a failed leg, not a moving one (M16/04)", () => {

@@ -81,7 +81,19 @@ describe("updateNotice", () => {
     ).toEqual({
       line: "Upstream 1.22.0 available (merged 1.21.3). Merge upstream/main on this machine.",
       href: url,
+      dismissableVersion: "1.22.0",
     });
+    // A dismissed upstream version drops the line until a newer one lands (Pup).
+    expect(
+      updateNotice(
+        someUpdate({
+          upstreamAvailable: true,
+          upstreamLatest: "1.22.0",
+          upstreamMerged: "1.21.3",
+          dismissedUpstreamVersion: "1.22.0",
+        }),
+      ),
+    ).toBeNull();
     // Own-channel wins the line when both are pending.
     expect(
       updateNotice(

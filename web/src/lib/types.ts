@@ -642,7 +642,7 @@ export interface MachineHistoryResponse {
  * and a package manager owns it". Two decisions, two fields on {@link UpdateInfo}: putting one down
  * must not put the other down with it, even when both name the same version.
  */
-export type DismissScope = "offer" | "crew";
+export type DismissScope = "offer" | "crew" | "upstream";
 
 /**
  * What the release ahead changes about the CREW LINK (mirrors `UpdateLinkChange` in
@@ -712,6 +712,12 @@ export interface UpdateInfo {
    * may be named again.
    */
   dismissedCrewAt?: number | null;
+  /**
+   * The UPSTREAM version whose merge notice the operator closed (Pup), or null. Version-keyed like
+   * the offer: a newer upstream release raises the band again. Absent on an older bridge, which
+   * reads as "nothing dismissed".
+   */
+  dismissedUpstreamVersion?: string | null;
   /**
    * The release ahead changes the crew wire, and by how much — absent when it does not (M27/06).
    *

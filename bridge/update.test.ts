@@ -545,6 +545,7 @@ function fakeStore(
   let dismissed: string | null = null;
   let dismissedCrew: string | null = null;
   let dismissedCrewAt: number | null = null;
+  let dismissedUpstream: string | null = null;
   let upstream: string | null = null;
   const saved: string[] = [];
   const pushes: string[] = [];
@@ -579,10 +580,13 @@ function fakeStore(
     dismissedVersion: () => dismissed,
     dismissedCrewVersion: () => dismissedCrew,
     dismissedCrewAt: () => dismissedCrewAt,
+    dismissedUpstreamVersion: () => dismissedUpstream,
     setDismissed: async (scope, v, notified, at) => {
       counter.writes += 1;
       if (scope === "offer") {
         dismissed = v;
+      } else if (scope === "upstream") {
+        dismissedUpstream = v;
       } else {
         dismissedCrew = v;
         dismissedCrewAt = at ?? null;
@@ -874,6 +878,7 @@ describe("UpdateMonitor", () => {
       dismissedVersion: store.dismissedVersion,
       dismissedCrewVersion: store.dismissedCrewVersion,
       dismissedCrewAt: store.dismissedCrewAt,
+      dismissedUpstreamVersion: store.dismissedUpstreamVersion,
       setDismissed: store.setDismissed,
       upstreamLastNotified: store.upstreamLastNotified,
       setUpstreamNotified: store.setUpstreamNotified,

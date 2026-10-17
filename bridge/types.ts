@@ -894,6 +894,13 @@ export interface UpdateStatus {
    * that version", which is what a close made before the stamp meant.
    */
   dismissedCrewAt?: number;
+  /**
+   * The UPSTREAM version whose merge notice the operator closed (Pup), or null.
+   *
+   * A third decision beside the offer and the crew close: the merge waiting is this machine's own
+   * fact, version-keyed like the offer — a newer upstream release re-raises the band.
+   */
+  dismissedUpstreamVersion: string | null;
   /** The running process is behind the on-disk bridge source — needs `systemctl --user restart collie`. */
   bridgeStale: boolean;
   /**
