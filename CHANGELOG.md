@@ -23,6 +23,9 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Fixed
+- **Devin panes send again without the "Type here" second tap.** Devin had a journal adapter but no input surface profile, so every send on a `devin:` pane read `unknown` and fell to the manual probed path ("ColliePup cannot read this screen"). The new `devin` profile frames Devin's `─ cwd ─ / ❭ / ─` box — including the bash-mode alternate where the prompt glyph is the typed `!` — so idle sends verify directly and sends during a turn take the queued path (Devin's Enter steers a running turn). Provisional until a send-lab run pins it.
+
 ## [0.57.0] - 2026-10-16
 
 ### Added

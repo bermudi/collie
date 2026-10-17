@@ -668,3 +668,33 @@ describe("frame alternates (M56 spec 14)", () => {
     expect(findInputFrame(lines("a", "   indented", "b"), OMP)).toBeNull();
   });
 });
+
+// Pup: devin's box is the same two rules and a `❭` prompt; in bash mode (`!` on an empty input)
+// the prompt glyph is the typed `!` itself and the top label gains ` (bash mode)`. Captured live
+// from devin 3000.11.92 on Herdr (2026-10-17).
+describe("the devin profile's frame", () => {
+  const DEVIN = requireProfile("devin").idle;
+  const TOP = `─ ~/work ${"─".repeat(20)} (bypass permissions on) ─`;
+  const BANGTOP = `─ ~/work (bash mode) ${"─".repeat(20)} (bypass permissions on) ─`;
+  const STATUS = `SWE-2 Max ${" ".repeat(40)}Context: 123k / 262k tokens (47%)`;
+
+  it("reads the placeholder and a draft on the idle box", () => {
+    const empty = findInputFrame(lines("reply", TOP, "❭ Ask Devin to build features, fix bugs, or work on your code", RULE, STATUS), DEVIN)!;
+    expect(empty.placeholder).toBe(true);
+    expect(findInputFrame(lines(TOP, "❭ hello there", RULE, STATUS), DEVIN)!.interior.text).toBe("hello there");
+  });
+
+  it("reads the running placeholder over the spinner row", () => {
+    const frame = findInputFrame(lines("⣀⡀ Running tools · 1m 2s (esc twice to interrupt)", TOP, "❭ Guide Devin while it works", RULE, STATUS), DEVIN)!;
+    expect(frame.placeholder).toBe(true);
+  });
+
+  it("reads the bash-mode box with the typed `!` in the hole", () => {
+    const frame = findInputFrame(lines("reply", BANGTOP, "! date", RULE, STATUS), DEVIN)!;
+    expect(frame.interior.text).toBe("! date");
+  });
+
+  it("finds no box on a bare transcript or a lone `!` word", () => {
+    expect(findInputFrame(lines("a", "   indented", "b"), DEVIN)).toBeNull();
+  });
+});
