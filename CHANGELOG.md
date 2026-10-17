@@ -23,8 +23,13 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+## [0.57.0] - 2026-10-16
+
 ### Added
-- **The upstream-merge nudge can be put down.** The "Upstream X available (merged Y)" banner — in the footer and in the update ribbon — now carries a close, recorded on the bridge and keyed by the upstream version: dismissed 1.22.0 stays down everywhere, and 1.22.1 raises it again.
+- **The upstream-merge nudge can be put down.** The "Upstream X available (merged Y)" banner — in the footer and in the update ribbon — now carries a close, recorded on the bridge and keyed by the upstream version: dismissed 1.22.0 stays down everywhere, and 1.22.1 raises it again. ([d5fe757](https://github.com/bermudi/collie/commit/d5fe7573182c87f482043076848c0bb2995ac1f0))
+
+### Changed
+- **Upstream 1.22.0 is in.** Verified sends with held sends during an agent's turn, typed receipts and notices at the Send slot; the experimental durable-agents lane — a Programs section on the phone, ask cards, the `@colliepwa/durable-sdk` npm package; theme files with four new themes and six UI faces; and new harness reads for Codex 0.163, Claude Code 2.1.301, pi, OmO, Grok, Muse, Antigravity and opencode. The full list sits under the 1.22.0 heading below. ([73860b2](https://github.com/bermudi/collie/commit/73860b2b9b95f5eae4fbc406c43bab66921c576a))
 
 ## [0.56.5] - 2026-10-16
 
