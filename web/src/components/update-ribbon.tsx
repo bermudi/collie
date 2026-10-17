@@ -120,6 +120,7 @@ export function UpdateRibbon() {
     bundleInstalling: stage === "installing",
     dismissedVersion: dismissedIn("offer", justDismissed, update?.dismissedVersion),
     dismissedCrewVersion: dismissedIn("crew", justDismissed, update?.dismissedCrewVersion),
+    dismissedUpstreamVersion: dismissedIn("upstream", justDismissed, update?.dismissedUpstreamVersion),
     // A tap in THIS tab covers the run on screen, whatever it settled at, so it carries no stamp. The
     // bridge's stamp takes over on the next poll.
     dismissedCrewAt: justDismissed?.scope === "crew" ? null : (update?.dismissedCrewAt ?? null),

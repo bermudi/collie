@@ -152,6 +152,7 @@ const quietStore: UpdateStore = {
   dismissedVersion: () => null,
   dismissedCrewVersion: () => null,
   dismissedCrewAt: () => null,
+  dismissedUpstreamVersion: () => null,
   setDismissed: async () => {},
 };
 

@@ -1019,6 +1019,7 @@ export class UpdateStateStore {
   private dismissed: string | null = null;
   private dismissedCrew: string | null = null;
   private dismissedCrewStamp: number | null = null;
+  private dismissedUpstream: string | null = null;
   private upstreamNotified: string | null = null;
   private readonly file: string;
 
@@ -1037,6 +1038,7 @@ export class UpdateStateStore {
       const closed = rec === null ? undefined : rec.dismissedVersion;
       const closedCrew = rec === null ? undefined : rec.dismissedCrewVersion;
       const closedCrewAt = rec === null ? undefined : rec.dismissedCrewAt;
+      const closedUpstream = rec === null ? undefined : rec.dismissedUpstreamVersion;
       const upstream = rec === null ? undefined : rec.upstreamLastNotified;
       this.lastVersion = typeof last === "string" ? last : null;
       // A record written before M17/08 carries neither dismissal. Both read as "nothing dismissed",
@@ -1048,6 +1050,9 @@ export class UpdateStateStore {
       // as "covers every run of that version": the close the operator made still holds.
       this.dismissedCrewStamp =
         typeof closedCrewAt === "number" && Number.isFinite(closedCrewAt) ? closedCrewAt : null;
+      // A record written before the Pup made the upstream nudge closable carries none. It reads as
+      // "nothing dismissed", so the next check's standing offer shows once more and can be put down.
+      this.dismissedUpstream = typeof closedUpstream === "string" ? closedUpstream : null;
       // A LEGACY record carries no timestamp. It reads as "no push yet" — the window opens at once
       // rather than crashing the monitor or pinning it shut for a day.
       this.pushedAt = typeof pushed === "string" ? pushed : null;
@@ -1082,6 +1087,12 @@ export class UpdateStateStore {
    *  the one above, and so a different field — see {@link DismissScope}. */
   dismissedCrewVersion(): string | null {
     return this.dismissedCrew;
+  }
+
+  /** The UPSTREAM version whose merge notice the operator closed (Pup), or null. Version-keyed like
+   *  the other two: a newer upstream release is a different fact and raises the band again. */
+  dismissedUpstreamVersion(): string | null {
+    return this.dismissedUpstream;
   }
 
   /** When the crew notice was closed (epoch ms, this machine's clock), or null when it never was or
@@ -1124,6 +1135,8 @@ export class UpdateStateStore {
   ): Promise<void> {
     if (scope === "offer") {
       this.dismissed = version;
+    } else if (scope === "upstream") {
+      this.dismissedUpstream = version;
     } else {
       this.dismissedCrew = version;
       this.dismissedCrewStamp = at ?? null;
@@ -1145,6 +1158,7 @@ export class UpdateStateStore {
       dismissedVersion: this.dismissed,
       dismissedCrewVersion: this.dismissedCrew,
       dismissedCrewAt: this.dismissedCrewStamp,
+      dismissedUpstreamVersion: this.dismissedUpstream,
       upstreamLastNotified: this.upstreamNotified,
     };
     const tmp = `${this.file}.tmp`;
@@ -1179,14 +1193,14 @@ export function restartCommandFor(kind: UpdateStatus["installKind"], instance: s
 // ── The monitor ───────────────────────────────────────────────────────────────
 
 /**
- * WHICH band was closed. Two decisions, never one key.
+ * WHICH band was closed. Three decisions, never one key.
  *
  * `offer` is "a release is available on this machine". `crew` is "another machine is standing
- * behind, and a package manager owns it". They are about different machines and they are put down
- * separately: hiding a peer's quiet notice must not also hide this host's own offer, even when the
- * two name the same version.
+ * behind, and a package manager owns it". `upstream` (Pup) is "an upstream merge is waiting".
+ * They are about different things and they are put down separately: hiding a peer's quiet notice
+ * must not also hide this host's own offer, even when the two name the same version.
  */
-export type DismissScope = "offer" | "crew";
+export type DismissScope = "offer" | "crew" | "upstream";
 
 /** Persistence seam — just what the monitor needs from {@link UpdateStateStore}. */
 export interface UpdateStore {
@@ -1203,6 +1217,8 @@ export interface UpdateStore {
   dismissedVersion(): string | null;
   /** The version whose quiet CREW notice was closed, or null. */
   dismissedCrewVersion(): string | null;
+  /** The UPSTREAM version whose merge notice was closed (Pup), or null. */
+  dismissedUpstreamVersion(): string | null;
   /** When that crew close was made (epoch ms), or null. A crew run that settles AFTER it is a new
    *  run, and the band may name it again. */
   dismissedCrewAt(): number | null;
@@ -1662,6 +1678,7 @@ export class UpdateMonitor {
       installKind: this.deps.installKind,
       dismissedVersion: this.deps.store.dismissedVersion(),
       dismissedCrewVersion: this.deps.store.dismissedCrewVersion(),
+      dismissedUpstreamVersion: this.deps.store.dismissedUpstreamVersion(),
       bridgeStale: this.bridgeStale(),
       // Two witnesses to one fact, and either is enough: the version files stopped naming what this
       // process runs, or the executable itself was replaced. The second catches the rebuild of an

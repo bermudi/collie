@@ -31,6 +31,11 @@
     ".tracker/**",
     ".adr/**",
     ".claude/**",
+    // (Pup) The detached updater keeps installed checkout copies under `versions/<v>/` with `current`
+    // as a symlink to the live one — each carries its own .oxlintrc.json and jsPlugins, which would
+    // lint vendored trees and double-register `anti-slop`.
+    "versions/**",
+    "current/**",
     // A program of its own, with its own package.json, lockfile, typecheck and tests (M50 spec 10). It is
     // example code a reader copies, written to the wire rather than to this codebase's rules.
     "examples/**",

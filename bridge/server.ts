@@ -2626,7 +2626,7 @@ export function startServer(opts: {
         // every client before the crew states could close.
         //
         const scope = record === null ? undefined : record.scope;
-        if (scope !== undefined && scope !== "offer" && scope !== "crew") {
+        if (scope !== undefined && scope !== "offer" && scope !== "crew" && scope !== "upstream") {
           return text("bad scope", 400);
         }
         await updateMonitor.dismiss(version, scope ?? "offer");

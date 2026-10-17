@@ -177,6 +177,9 @@ const UPDATE_INFO_KEYS = {
   // The newest urgent release in the delta (ADR 0046). Optional, and absent on every ordinary
   // release, so a solo payload is byte-identical to what it was.
   urgent: true,
+  // The upstream version whose merge notice was closed (Pup). Optional on the client, absent on an
+  // older bridge, reads as nothing dismissed.
+  dismissedUpstreamVersion: true,
   // The upstream merge signal (Pup, ADR 9007). Optional, and absent unless a merge is waiting, so a
   // solo payload without one is byte-identical to what it was.
   upstreamAvailable: true,
@@ -259,10 +262,11 @@ describe("solo zero-tax — the client's mirror types carry no crew dimension", 
       "bridgeStale",
       "checkedAt",
       "current",
-      // The two bands the operator can close (M17/08) — optional here, because a bridge older than
-      // the fields sends neither.
+      // The three bands the operator can close — this host's offer, the crew notice, and (Pup) the
+      // upstream merge nudge. Optional here, because a bridge older than the fields sends neither.
       "dismissedCrewAt",
       "dismissedCrewVersion",
+      "dismissedUpstreamVersion",
       "dismissedVersion",
       "installKind",
       "latest",

@@ -91,6 +91,7 @@
     "installKind": "detached-checkout",
     "dismissedVersion": null,
     "dismissedCrewVersion": null,
+    "dismissedUpstreamVersion": null,
     "bridgeStale": false,
     "restartNeeded": false,
     "checkedAt": null

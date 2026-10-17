@@ -151,6 +151,9 @@ export interface RibbonInput {
   /** When that crew close was made (`update.dismissedCrewAt`), or null for a close that covers every
    *  run of its version: an optimistic tap in this tab, or a close written before the stamp. */
   dismissedCrewAt?: number | null;
+  /** The UPSTREAM version whose merge notice was closed (`update.dismissedUpstreamVersion`, Pup).
+   *  Version-keyed: a newer upstream release raises the band again. */
+  dismissedUpstreamVersion?: string | null;
   /**
    * The crew census (`GET /api/update/check`'s `crew`, held by `lib/update-run-store.ts`). Read for
    * ONE thing: a failed leg whose member the census now shows level stops being named here (see
@@ -390,10 +393,13 @@ export function dismissTarget(view: RibbonView): Dismissal | null {
     // replaces it. An operator who has read it may put it down.
     case "peer-failed":
       return view.target === null ? null : { scope: "crew", version: view.target };
-    // AN UPSTREAM MERGE IS NOT CLOSABLE. The remedy is a merge on the operator's machine, not a tap,
-    // and putting it down would hide a standing fact no digest snooze covers. Only a merge re-arms it.
+    // ON THE PUP AN UPSTREAM MERGE IS CLOSABLE (2026-10-16). Upstream kept it unclosable — the
+    // remedy is a merge on the operator's machine, and putting it down hides a standing fact no
+    // digest snooze covers. The operator's call here is the narrower one: the close is keyed by the
+    // upstream version, so only that release's nudge goes away — a merge still re-arms it, and a
+    // NEWER upstream release is a different version that raises the band on its own.
     case "upstream":
-      return null;
+      return { scope: "upstream", version: view.version };
     default:
       return null;
   }
@@ -503,12 +509,14 @@ export function ribbonView(input: RibbonInput): RibbonView {
 
   // (u) — an upstream merge is waiting (Pup, ADR 9007). Below the own-channel offer, so an update
   // this machine can take always wins the row; above silence, so a merge worth hearing about is heard.
-  // No dismiss: the remedy is a merge on the operator's machine, and only a merge re-arms it. The tap
-  // navigates to Updates, where the card names the merge whole.
+  // On the Pup it IS closable, keyed by the upstream version: closing 1.22.0 hides the nudge for
+  // that merge alone, and 1.22.1 raises it again. The tap navigates to Updates, where the card
+  // names the merge whole.
   if (
     input.update?.upstreamAvailable === true &&
     input.update?.upstreamLatest !== undefined &&
-    input.update?.upstreamMerged !== undefined
+    input.update?.upstreamMerged !== undefined &&
+    input.dismissedUpstreamVersion !== input.update.upstreamLatest
   ) {
     return { kind: "upstream", version: input.update.upstreamLatest, merged: input.update.upstreamMerged };
   }
