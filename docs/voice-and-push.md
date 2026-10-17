@@ -118,7 +118,7 @@ it); `collie stt off` removes `stt.json` and the button is gone again, no restar
 [Whistle](https://huggingface.co/Cactus-Compute/whistle) is a small speech model by Cactus Compute.
 The file is 16.9 MB and the licence is Apache-2.0. It knows English, German, French, Spanish,
 Italian, Dutch and Polish, and finds the language itself. It needs no account, no key and no extra
-program. Collie carries the engine that runs it, so it works on Linux, macOS and NixOS.
+program. Collie carries the engine that runs it, so it works on Linux and NixOS.
 
 Whistle can run in two places. You choose per phone.
 

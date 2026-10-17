@@ -112,16 +112,13 @@ jobs:
           done
 
   # ── The per-platform payloads ──────────────────────────────────────────────
-  # One job per artifact, because two of the constraints are hard:
-  #   * macOS artifacts are BUILT ON macOS. A cross-produced Mach-O is unsigned, and an unsigned
-  #     arm64 binary does not execute on Apple Silicon at all — the kernel refuses it.
-  #   * linux-x64 ships Bun's BASELINE target. The default `bun-linux-x64` requires AVX2 and dies
-  #     with SIGILL on older hardware, which is exactly the hardware a self-hosted tool lives on.
-  #     Collie is I/O-bound (a Unix socket and static files), so the baseline penalty is not
-  #     observable here.
-  # The matrix ships all four targets; macos-x64 is cross-compiled on the macos-14 row (#385). A
-  # platform with no row gets `collie update`'s honest "no artifact for your platform, build from
-  # source" rather than a wrong binary.
+  # One job per artifact. linux-x64 ships Bun's BASELINE target: the default `bun-linux-x64`
+  # requires AVX2 and dies with SIGILL on older hardware, which is exactly the hardware a
+  # self-hosted tool lives on. Collie is I/O-bound (a Unix socket and static files), so the
+  # baseline penalty is not observable here.
+  # On the Pup the matrix ships the two Linux targets only (ADR 9009). A platform with no row
+  # gets `collie update`'s honest "no artifact for your platform, build from source" rather than
+  # a wrong binary.
   payload:
     needs: gate
     strategy:
@@ -131,21 +128,15 @@ jobs:
           - platform: linux-x64
             runs-on: ubuntu-latest
             bun-target: bun-linux-x64-baseline
-          - platform: macos-arm64
-            runs-on: macos-14
-            bun-target: bun-darwin-arm64
           - platform: linux-arm64
             runs-on: ubuntu-24.04-arm
             bun-target: bun-linux-arm64
-          - platform: macos-x64
-            runs-on: macos-14
-            bun-target: bun-darwin-x64-baseline
     runs-on: ${{ matrix.runs-on }}
     steps:
       - uses: actions/checkout@v4
       # The build environment is `flake.nix`, not whatever Bun a setup action resolved on the day.
-      # This installer is the one that covers all three shipped runners — Linux x86_64, Linux
-      # aarch64 and macOS aarch64 — and it turns flakes on out of the box.
+      # This installer is the one that covers both shipped runners — Linux x86_64 and Linux
+      # aarch64 — and it turns flakes on out of the box.
       - uses: DeterminateSystems/nix-installer-action@v22
 
       - name: Build the payload
@@ -185,16 +176,6 @@ jobs:
             --target "$BUN_TARGET" \
             --outfile "$stage/bin/collie"
           chmod 0755 "$stage/bin/collie"
-
-          # Ad-hoc codesign makes the binary RUNNABLE on Apple Silicon. It makes no claim about who
-          # produced it — notarization is a recorded gap (M14/01 §6.2), and the quarantine attribute
-          # a BROWSER download sets is documented in docs/install.md with its one-line removal.
-          case "$PLATFORM" in
-            macos-*)
-              codesign --force --sign - --timestamp=none "$stage/bin/collie"
-              codesign -dv "$stage/bin/collie"
-              ;;
-          esac
 
           cp -R web/dist "$stage/web/dist"
           # The files the bridge and the installer's closing text read at run time. `herdr-plugin.toml`
@@ -240,19 +221,6 @@ jobs:
 
           bash scripts/check-payload-links.sh "$stage/bin/collie"
 
-          # The macos-x64 binary is cross-compiled on an arm64 runner and cannot run here: Rosetta has
-          # no AVX and Bun's x64 runtime dies with SIGILL under it, baseline target or not. So that row
-          # is checked by what it IS, an x86_64 Mach-O that carries a signature, and not by running it.
-          if [ "$PLATFORM" = "macos-x64" ]; then
-            archs="$(lipo -archs "$stage/bin/collie")"
-            [ "$archs" = "x86_64" ] || { echo "the macos-x64 binary is '$archs', not x86_64" >&2; exit 1; }
-            echo "✓ $root/bin/collie is x86_64 (not run: no x86_64 runtime on this runner)"
-            tar -czf "$RUNNER_TEMP/$root.tar.gz" -C "$RUNNER_TEMP" "$root"
-            echo "root=$root" >> "$GITHUB_OUTPUT"
-            echo "tarball=$RUNNER_TEMP/$root.tar.gz" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
           reported="$("$stage/bin/collie" version)"
           case "$reported" in
             "$version"*) ;;
@@ -284,11 +252,9 @@ jobs:
         run: |
           set -eu
           # One entry of the manifest's `artifacts[]`, emitted per platform and merged in the release
-          # job. The hasher is resolved rather than assumed: Linux runners have `sha256sum`, macOS
-          # has `shasum`, and a missing one must FAIL here — a pipeline into `cut` would hide it and
-          # publish a manifest with an empty digest.
-          if command -v sha256sum >/dev/null 2>&1; then SHA="sha256sum"; else SHA="shasum -a 256"; fi
-          line="$($SHA "$TARBALL")"
+          # job. The hasher is named, not assumed: a missing `sha256sum` must FAIL here — a pipeline
+          # into `cut` would hide it and publish a manifest with an empty digest.
+          line="$(sha256sum "$TARBALL")"
           sha="${line%% *}"
           [ ${#sha} -eq 64 ] || { echo "no usable sha256 tool on this runner" >&2; exit 1; }
           size="$(wc -c < "$TARBALL" | tr -d ' ')"
@@ -297,22 +263,18 @@ jobs:
           mkdir -p "$RUNNER_TEMP/out"
           cp "$TARBALL" "$RUNNER_TEMP/out/$name"
           printf '%s  %s\n' "$sha" "$name" > "$RUNNER_TEMP/out/$name.sha256"
-          case "$os" in
-            linux) libc='"glibc"'; variant='"baseline"'; extra='' ;;
-            *)     libc='null';    variant='null';       extra=', "codesign": "adhoc", "notarized": false' ;;
-          esac
           cat > "$RUNNER_TEMP/out/$PLATFORM.artifact.json" <<JSON
           {
             "name": "$name",
             "platform": "$PLATFORM",
             "os": "$os",
             "arch": "$arch",
-            "libc": $libc,
-            "variant": $variant,
+            "libc": "glibc",
+            "variant": "baseline",
             "bunTarget": "$BUN_TARGET",
             "size": $size,
             "sha256": "$sha",
-            "payloadRoot": "$PAYLOAD_ROOT"$extra
+            "payloadRoot": "$PAYLOAD_ROOT"
           }
           JSON
 
@@ -403,8 +365,8 @@ jobs:
           # This step's cwd is $RUNNER_TEMP/assets, outside the checkout, so the flake must be
           # named by path — `nix develop` alone finds no flake.nix above the assets directory.
           nix develop "$GITHUB_WORKSPACE" --command bun -e 'JSON.parse(await Bun.file(process.argv[1]).text())' "collie-$version.manifest.json"
-          # A sidecar beside EVERY asset, including the manifest — `sha256sum -c <asset>.sha256` on
-          # Linux, `shasum -a 256 -c` on macOS, both unmodified.
+          # A sidecar beside EVERY asset, including the manifest — `sha256sum -c <asset>.sha256`,
+          # unmodified.
           for f in *.tar.gz *.manifest.json; do
             [ -e "$f.sha256" ] || sha256sum "$f" > "$f.sha256"
           done

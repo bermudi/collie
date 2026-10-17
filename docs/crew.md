@@ -257,13 +257,13 @@ every 5 seconds while a phone has the Machines pages or the Crew tab open. Eithe
 gets at least one reading. A member sends its last reading with the answer it already gives the lead. The lead keeps one point per minute for
 each machine, for 24 hours. A Collie with no crew keeps the same day for its own machine.
 
-| what | Linux | macOS |
-| --- | --- | --- |
-| CPU | yes | yes |
-| Memory | yes, without the page cache | yes, without the file cache |
-| Load average | yes | yes |
-| Network | yes, physical interfaces only | no |
-| Disks | yes | yes |
+| what | Linux |
+| --- | --- |
+| CPU | yes |
+| Memory | yes, without the page cache |
+| Load average | yes |
+| Network | yes, physical interfaces only |
+| Disks | yes |
 
 **Disks are the ones that hold your files.** Collie reads the filesystem that holds your home folder,
 the one that holds the root, and the one that holds Collie's state

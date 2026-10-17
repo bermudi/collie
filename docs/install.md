@@ -51,7 +51,7 @@ a Herdr plugin can mirror tmux.
 
 ## Requirements
 
-Collie runs on Linux and macOS.
+Collie runs on Linux.
 
 | Tool | Needed for | Purpose |
 | --- | --- | --- |
@@ -72,7 +72,7 @@ Soft dependencies, needed only for these features:
 | Tool | Needed for |
 | --- | --- |
 | Node.js | Formats MagicDNS names in logs. |
-| systemd / launchd | Service supervision; falls back to `nohup`. |
+| systemd | Service supervision; falls back to `nohup`. |
 | [`web-push`](https://www.npmjs.com/package/web-push) | Optional, see [Web Push](voice-and-push.md#web-push-optional). |
 
 ## Install
@@ -84,7 +84,6 @@ Find your system below, run its commands, then go on to [Start it](#start-it).
 | Linux | [The install script](#linux) |
 | Arch Linux, Omarchy | [`collie-bin` package](#arch-linux-and-omarchy) |
 | NixOS, or Nix on any system | [Flake package](#nixos-and-nix) |
-| macOS, Apple Silicon or Intel | [The install script](#macos) |
 | Any of these, inside Herdr | [Herdr plugin](#herdr-plugin) |
 
 ### Linux
@@ -129,30 +128,8 @@ nix profile install github:AltanS/collie#collie
 collie start
 ```
 
-This works on NixOS and any system with Nix on `x86_64-linux`, `aarch64-linux`, and
-`aarch64-darwin`. There is no NixOS module yet. [Nix](#nix) under Package details has the rest.
-
-### macOS
-
-```bash
-curl -fsSL https://colliepwa.dev/install.sh | sh
-collie start
-```
-
-The published Mac binaries cover Apple Silicon (`macos-arm64`) and Intel (`macos-x64`), and
-require **macOS 13 or newer**, the minimum their Bun build links against. The Intel binary uses
-Bun's baseline target, so it also runs on Macs without AVX2.
-
-`collie start` registers a launchd agent in `~/Library/LaunchAgents`. It starts Collie at login and
-restarts it on failure. It also runs `tailscale serve`, so the `tailscale` command must be on your
-PATH. The Tailscale app for Mac can install that command from its settings.
-
-> **Note.** A Mac reached only over SSH has no login session for launchd. `collie start` reports
-> this and runs the bridge in the background without supervision: no restart on failure, nothing
-> at login.
-
-macOS has no package yet. [mise](#mise) works on a Mac, as does the `aarch64-darwin`
-[Nix](#nix) output.
+This works on NixOS and any system with Nix on `x86_64-linux` and `aarch64-linux`.
+There is no NixOS module yet. [Nix](#nix) under Package details has the rest.
 
 ### Standalone
 
@@ -222,7 +199,7 @@ herdr plugin install AltanS/collie
 herdr plugin action invoke start --plugin herdr.collie
 ```
 
-Start the Herdr server first (`herdr` or `herdr server &`). This works on Linux and macOS.
+Start the Herdr server first (`herdr` or `herdr server &`). It runs on Linux.
 
 To install from a local clone instead:
 
@@ -239,7 +216,7 @@ That is the whole opt-in ([Prereleases](upgrading.md#prereleases)).
 
 A package is a standalone install managed by your package manager: it installs, updates, and
 removes. Commands for each manager appear above and under [Package details](#package-details),
-along with [mise](#mise) for Linux and macOS.
+along with [mise](#mise).
 
 A package is not a Herdr plugin. To show Collie's buttons in Herdr, link the installed tree once:
 
@@ -294,7 +271,7 @@ collie start                                             # standalone
 
 `start` will:
 1. Build `web/dist` if missing.
-2. Launch the bridge under `systemd --user` (or launchd/`nohup`).
+2. Launch the bridge under `systemd --user` (or `nohup`).
 3. Run `tailscale serve --bg 8787` (HTTPS :443 → 127.0.0.1:8787).
 4. Print the connection banner.
 
@@ -319,8 +296,8 @@ tailscale serve (https) → tailnet :443 -> 127.0.0.1:8787
 If the health check fails (`⚠ Collie isn't answering on :8787 yet`), see
 [Troubleshooting](troubleshooting.md#troubleshooting).
 
-The bridge runs as a `systemd --user` service or macOS launchd agent. It starts at login and
-restarts on failure ([`ARCHITECTURE.md`](../ARCHITECTURE.md) §3). On Linux,
+The bridge runs as a `systemd --user` service. It starts at login and
+restarts on failure ([`ARCHITECTURE.md`](../ARCHITECTURE.md) §3).
 `loginctl enable-linger $USER` keeps it running across reboots
 ([Surviving reboots](upgrading.md#surviving-reboots)).
 
@@ -470,7 +447,7 @@ update sticks, see **[Manage & update](upgrading.md)**.
 Three steps, in this order. Each one removes one layer and nothing else.
 
 **1. Remove the service and the port mapping.** This stops the bridge, deletes the `systemd --user`
-unit (the launchd agent on macOS) and takes down Collie's own `tailscale serve` mapping. The
+unit and takes down Collie's own `tailscale serve` mapping. The
 program files and your `.env` stay.
 
 ```bash
@@ -516,8 +493,7 @@ collie stop                                             # standalone
 The `PKGBUILD`, the Nix expression and their notes live in `packaging/` in this repository. Every
 package carries the compiled binary the release already publishes, so nothing is built on your
 machine: no Bun, no `git`, no compilation. The whole release folder lands under one prefix, with
-`collie` on your PATH as a symlink into it. macOS has no package yet; the `aarch64-darwin` flake
-output is the closest thing.
+`collie` on your PATH as a symlink into it.
 
 #### Arch
 
@@ -600,8 +576,8 @@ nix profile install github:AltanS/collie#collie
 collie start
 ```
 
-The flake exports `packages.<system>.collie` for `x86_64-linux`, `aarch64-linux` and
-`aarch64-darwin`. It fetches that platform's release tarball by the sha256 in the release's own
+The flake exports `packages.<system>.collie` for `x86_64-linux` and
+`aarch64-linux`. It fetches that platform's release tarball by the sha256 in the release's own
 integrity manifest, patches the binary's interpreter on Linux, and installs the release tree to
 `<store-path>/lib/collie` with `bin/collie` as a symlink into it. Run it once without installing
 with `nix run github:AltanS/collie#collie -- doctor`.
@@ -629,42 +605,6 @@ nix profile remove collie
 That drops the store path from your profile and nothing else. Your own files stay, as listed under
 [Uninstall](#uninstall).
 
-##### Home Manager agents on macOS
-
-```bash
-collie status
-launchctl print "user/$(id -u)/herdr.collie"
-```
-
-`collie status` discovers the instance's label in both `gui/<uid>` and `user/<uid>` and
-reports its domain and process state. If both domains contain the label, it reports both;
-a stopped GUI agent does not hide a running background agent. No environment override is needed.
-
-For an existing Home Manager-managed Collie agent, these settings select the background domain
-(Home Manager 26.11 or later):
-
-```nix
-launchd.agents.collie = {
-  domain = "user";
-  config.Label = "herdr.collie";
-};
-```
-
-This is an addition to your agent definition, not a complete service module. Keep its command,
-environment, and log paths configured in Home Manager. Run the bridge with `collie _exec-bridge`,
-not `collie start`, so launchd supervises the bridge without Collie rewriting the managed plist.
-Keep credentials and pairing state outside the Nix store. Configure the front door separately
-with `collie serve`, or use the [external-proxy setup](deployment.md#variant-c--reverse-proxy-as-the-only-front-door-no-tailscale).
-
-For a named instance, use the label `herdr.collie-<name>` and the same `COLLIE_INSTANCE`,
-`COLLIE_PORT`, and configuration directory in the agent and your CLI environment
-([multiple instances](deployment.md#multiple-collie-instances-on-one-host)).
-
-> **Note.** Home Manager owns the service lifecycle. Update or remove its declaration and
-> activate Home Manager rather than running `collie start`, `stop`, `restart`, or `uninstall`.
-> Those commands still manage Collie's GUI-domain agent; status discovery does not transfer
-> ownership. Continue using `collie pair`, `devices`, `url`, and `logs` normally.
-
 #### mise
 
 ```bash
@@ -673,8 +613,8 @@ collie start
 ```
 
 `mise use -g` writes the tool into `~/.config/mise/config.toml` and puts the release's `bin/` on
-your PATH. The `github` backend fetches that platform's release tarball, so this works on Linux and
-macOS with no Bun and no compilation. The whole tree lands under
+your PATH. The `github` backend fetches that platform's release tarball, so this works on Linux
+with no Bun and no compilation. The whole tree lands under
 `~/.local/share/mise/installs/github-altan-s-collie/<version>/`, `web/dist` and `herdr-plugin.toml`
 included, and `collie` resolves its own root from there.
 
@@ -691,12 +631,7 @@ reports the tool as up to date and moves nothing.
 The restart is not optional. Every version gets its own directory, and `collie start` bakes the
 directory it ran from into the service definition, so the service keeps serving the old version out
 of the old directory until you restart it. `collie restart` rewrites that definition with the new
-path: the `systemd --user` unit on Linux, the `~/Library/LaunchAgents` plist on macOS. One command
-on both.
-
-> **Note.** A Mac administered only over SSH has no `gui/<uid>` domain to load an agent into. There
-> `collie start` says so and runs an unsupervised background bridge instead, with no restart on
-> failure and nothing at login. `collie restart` still moves it to the new directory.
+path: the `systemd --user` unit. One command does it.
 
 > **Note.** `collie update` declines here, and it names no package manager: it says `cannot tell how
 > this Collie was installed`. A mise tree sits inside your home directory, carries no `.git` of its

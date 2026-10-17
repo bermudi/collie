@@ -119,9 +119,9 @@ changes.
 
 ## What you need
 
-- A Linux or macOS host with Claude Code installed.
+- A Linux host with Claude Code installed.
 - A terminal multiplexer: Herdr, tmux, zellij, tuios or tern. Herdr and tuios detect agents directly. On tmux, zellij
-  and tern, Collie uses beacon hooks, which require Linux.
+  and tern, Collie uses beacon hooks.
 - Tailscale installed on the host and phone, with HTTPS enabled on your tailnet. For other setups,
   see [Deployment](deployment.md).
 - An iPhone or an Android phone.

@@ -5,7 +5,8 @@ import { describe, expect, test } from "bun:test";
 
 // The invariants of the release pipeline that only the workflow file holds, read as YAML (Bun's own
 // parser), so a reformat cannot fool them and a moved line cannot hide from them:
-//   1. the Linux and macOS rows stay in `payload`, with `fail-fast: true`, exactly as they were;
+//   1. the two Linux rows stay in `payload`, with `fail-fast: true`, exactly as they were — on the
+//      Pup there are no other rows (ADR 9009);
 //   2. `release` runs only behind a green `payload`, and the jobs after it read its result by name.
 // What GitHub does with these conditions was checked once on a throwaway branch (2026-10-02); this
 // keeps the file saying what was checked.
@@ -44,16 +45,14 @@ const job = (name: string): Job => {
   return found;
 };
 
-describe("release.yml: the Linux and macOS rows", () => {
-  test("stay in `payload`, behind the gate, with fail-fast true and the same four rows", () => {
+describe("release.yml: the Linux rows", () => {
+  test("stay in `payload`, behind the gate, with fail-fast true and the same two rows", () => {
     const payload = job("payload");
     expect(payload.needs).toBe("gate");
     expect(payload.strategy?.["fail-fast"]).toBe(true);
     expect(payload.strategy?.matrix?.include).toEqual([
       { platform: "linux-x64", "runs-on": "ubuntu-latest", "bun-target": "bun-linux-x64-baseline" },
-      { platform: "macos-arm64", "runs-on": "macos-14", "bun-target": "bun-darwin-arm64" },
       { platform: "linux-arm64", "runs-on": "ubuntu-24.04-arm", "bun-target": "bun-linux-arm64" },
-      { platform: "macos-x64", "runs-on": "macos-14", "bun-target": "bun-darwin-x64-baseline" },
     ]);
   });
 });

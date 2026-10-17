@@ -24,7 +24,8 @@ Running a crew? Update the lead first; members follow on their own. Details:
 ## [Unreleased]
 
 ### Changed
-- **The Windows lane is removed.** The `windows.yml` workflow, the release's `payload-windows` job and zip-asset gate, the Windows build and test scripts, `install.ps1`, the Windows docs page and the `win-rehearse` recipe step are deleted: releases carry Linux and macOS assets only, `collie update` on a Windows host answers "no artifact for your platform", and upstream's dormant win32 code paths stay so wholesale merges stay clean ([ADR 9008](./.adr/9008-pup-drops-windows.md)).
+- **The Windows lane is removed.** The `windows.yml` workflow, the release's `payload-windows` job and zip-asset gate, the Windows build and test scripts, `install.ps1`, the Windows docs page and the `win-rehearse` recipe step are deleted: `collie update` on a Windows host answers "no artifact for your platform", and upstream's dormant win32 code paths stay so wholesale merges stay clean ([ADR 9008](./.adr/9008-pup-drops-windows.md)).
+- **The macOS lane is removed.** The release's `macos-arm64` and `macos-x64` payload rows and their codesign steps are deleted, and so is `aarch64-darwin` from the flake, the Nix package and the Herdr plugin's platform list: releases carry Linux x64 and arm64 assets only, `install.sh` and `collie update` on a Mac answer "no artifact for your platform", and upstream's launchd code paths stay dormant like the win32 ones ([ADR 9009](./.adr/9009-pup-ships-linux-only.md)).
 
 ## [0.56.4] - 2026-10-16
 

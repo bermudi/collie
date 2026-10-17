@@ -43,8 +43,7 @@ write_manifest() {
   "commit": "0000000000000000000000000000000000000000",
   "artifacts": [
     { "name": "collie-$2-linux-x64.tar.gz",   "platform": "linux-x64",   "sha256": "$3" },
-    { "name": "collie-$2-linux-arm64.tar.gz", "platform": "linux-arm64", "sha256": "$ARM_SHA" },
-    { "name": "collie-$2-macos-arm64.tar.gz", "platform": "macos-arm64", "sha256": "$MAC_SHA" }
+    { "name": "collie-$2-linux-arm64.tar.gz", "platform": "linux-arm64", "sha256": "$ARM_SHA" }
   ],
   "extras": []
 }
@@ -101,9 +100,8 @@ check "PKGBUILD sha256sums_aarch64 is the linux-arm64 hash" \
 check "sources.json version is the manifest's version" "grep -q '\"version\": \"9.9.9\"' '$sources'"
 check "sources.json linux-x64 sha256" "grep -q '$X64_SHA' '$sources'"
 check "sources.json linux-arm64 sha256" "grep -q '$ARM_SHA' '$sources'"
-check "sources.json darwin-arm64 takes the macos-arm64 hash" "grep -q '$MAC_SHA' '$sources'"
 check "sources.json url is built from repo, tag and asset name" \
-  "grep -q 'https://github.com/AltanS/collie/releases/download/v9.9.9/collie-9.9.9-macos-arm64.tar.gz' '$sources'"
+  "grep -q 'https://github.com/AltanS/collie/releases/download/v9.9.9/collie-9.9.9-linux-arm64.tar.gz' '$sources'"
 
 # The rewrite is FIELD-SCOPED, not a pass over the whole file: everything that is not a declared
 # field survives it. The comment blocks and the package() body are the evidence.
@@ -210,7 +208,8 @@ rc=$?
 check "an unmapped platform exits non-zero" "test $rc -ne 0"
 check "it names the unmapped platform" "grep -q 'linux-riscv' '$tmp/extra.log'"
 
-# The Windows zip is listed and deliberately not packaged (M43): it must not stop the job.
+# A manifest cut before the Pup dropped the other platforms can still name the Windows zip and
+# both macOS tarballs — all three are known-and-not-packaged, so none may stop the job.
 cat > "$tmp/windows.json" <<JSON
 {
   "schemaVersion": 1, "repo": "AltanS/collie", "tag": "v9.9.9", "version": "9.9.9",
@@ -226,7 +225,7 @@ JSON
 fresh_root "$tmp/root3"
 bun "$script" --manifest "$tmp/windows.json" --root "$tmp/root3" > "$tmp/windows.log" 2>&1
 rc=$?
-check "windows-x64 and macos-x64 entries, known and not packaged, pass" "test $rc -eq 0"
+check "windows-x64 and both macos entries, known and not packaged, pass" "test $rc -eq 0"
 check "the AUR hash still comes from linux-x64" \
   "test \"\$(bash -c 'source \"\$1\"; printf %s \"\${sha256sums_x86_64[0]}\"' bash '$tmp/root3/packaging/aur/PKGBUILD')\" = '$X64_SHA'"
 
@@ -235,15 +234,14 @@ cat > "$tmp/short.json" <<JSON
 {
   "schemaVersion": 1, "repo": "AltanS/collie", "tag": "v9.9.9", "version": "9.9.9",
   "artifacts": [
-    { "name": "collie-9.9.9-linux-x64.tar.gz",   "platform": "linux-x64",   "sha256": "$X64_SHA" },
-    { "name": "collie-9.9.9-linux-arm64.tar.gz", "platform": "linux-arm64", "sha256": "$ARM_SHA" }
+    { "name": "collie-9.9.9-linux-x64.tar.gz",   "platform": "linux-x64",   "sha256": "$X64_SHA" }
   ]
 }
 JSON
 bun "$script" --manifest "$tmp/short.json" --root "$tmp/root2" > "$tmp/short.log" 2>&1
 rc=$?
 check "a mapped platform the manifest lacks exits non-zero" "test $rc -ne 0"
-check "it names the missing platform" "grep -q 'macos-arm64' '$tmp/short.log'"
+check "it names the missing platform" "grep -q 'linux-arm64' '$tmp/short.log'"
 
 bun "$script" --manifest "$tmp/nope.json" --root "$tmp/root2" > /dev/null 2>&1
 rc=$?

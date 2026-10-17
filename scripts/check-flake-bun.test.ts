@@ -58,7 +58,7 @@ describe("flake.nix and MIN_BUN", () => {
     // fetch the old archives under the new name, and every claim above it would be a lie.
     const source = readFileSync(join(ROOT, "flake.nix"), "utf8");
     const urls = [...source.matchAll(/url = "([^"]*oven-sh\/bun[^"]*)";/g)].map((m) => m[1]!);
-    expect(urls).toHaveLength(3);
+    expect(urls).toHaveLength(2);
     for (const url of urls) {
       expect(url).toContain("bun-v${finalAttrs.version}");
     }

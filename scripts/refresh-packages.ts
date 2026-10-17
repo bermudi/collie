@@ -64,24 +64,23 @@ const AUR_ARCHES = [
 ] as const;
 
 /**
- * `sources.json`'s platform keys, and the manifest platform each one reads. The names differ on
- * one row: the release workflow's matrix says `macos-arm64`, Nix says `darwin`, and this table is
- * where that translation lives so neither file has to know about the other's spelling.
+ * `sources.json`'s platform keys, and the manifest platform each one reads. On the Pup the two
+ * lists spell the same names (ADR 9009); the table stays so the package and the manifest can still
+ * drift apart loudly rather than silently.
  */
 const NIX_PLATFORMS = [
   { key: "linux-x64", platform: "linux-x64" },
   { key: "linux-arm64", platform: "linux-arm64" },
-  { key: "darwin-arm64", platform: "macos-arm64" },
 ] as const;
 
 /**
  * Platforms a release may list that these packages deliberately do not carry. The AUR and Nix
- * packages are Linux and macOS packages; `macos-x64` is a tarball for `install.sh` alone: the AUR
- * package is Linux only and the nixpkgs pin has no x86_64-darwin (#385). `windows-x64` stays on the
- * list so a manifest cut before Windows was dropped can still be read. A platform here is known, so
- * its entry never stops this job, and it is not required, so a release without it passes too.
+ * packages are Linux packages; on the Pup the release ships nothing else (ADR 9009), so every
+ * entry here is a platform a manifest cut BEFORE the drop may still name — `windows-x64`,
+ * `macos-arm64`, `macos-x64`. A platform here is known, so its entry never stops this job, and it
+ * is not required, so a release without it passes too.
  */
-const NOT_PACKAGED: ReadonlySet<string> = new Set(["windows-x64", "macos-x64"]);
+const NOT_PACKAGED: ReadonlySet<string> = new Set(["windows-x64", "macos-arm64", "macos-x64"]);
 
 interface NixPlatform {
   url: string;
