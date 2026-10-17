@@ -513,7 +513,7 @@ manager it runs under a transient unit of its own, named `collie-api-update-<sta
 journalctl --user -u 'collie-api-update-*' --since '30 min ago'
 ```
 
-Everywhere else, macOS included, the updater's own output goes to a file in the state directory:
+Everywhere else, the updater's own output goes to a file in the state directory:
 
 ```bash
 cat ~/.local/state/collie/update-runner.log
@@ -816,9 +816,6 @@ loginctl enable-linger $USER
 ```
 
 Verify status with `systemctl --user status collie`.
-
-On macOS, `start` manages `~/Library/LaunchAgents/herdr.collie.plist` automatically. It runs at user
-login. Check status with `launchctl print gui/$(id -u)/herdr.collie`.
 
 ---
 

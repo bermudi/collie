@@ -194,7 +194,7 @@ COLLIE_DURABLE_TOKEN=your-32-byte-random-token-here
 
 Set one of the two, never both. A URL without a token, or both set, is a config error: the peer
 starts, names the error in its log, and shows the program as unreachable with that reason.
-The socket transport is for Linux and macOS.
+The socket transport is for Linux.
 
 | | private socket | https with a token |
 | --- | --- | --- |

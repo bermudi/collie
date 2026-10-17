@@ -11,8 +11,7 @@ install script. For other setups, see [Install](install.md).
 
 ## What you need
 
-- A Linux or macOS computer (the host). A Mac needs macOS 13 or newer,
-  Apple Silicon or Intel.
+- A Linux computer (the host).
 - An iPhone or an Android phone.
 - A Tailscale account.
 
@@ -29,9 +28,6 @@ sudo tailscale up --operator=$USER
 ```
 
 `--operator=$USER` lets your user run `tailscale serve`, which Collie needs in step 4.
-
-On a Mac, install Tailscale from [tailscale.com/download](https://tailscale.com/download)
-and sign in. Install the `tailscale` command from the app settings. Collie calls it.
 
 Next, set up the tailnet and the phone:
 

@@ -108,9 +108,10 @@ release. 1.14.2 was cut this way on 2026-09-28.
    Leaving it alone is the ordinary case; a release does not owe the lock a bump.
 6. **Run `scripts/check-version.sh`** — it must print `✓`. Then tag and push (next paragraph).
 
-   On the Pup there is no Windows lane: the `windows.yml` workflow, the `payload-windows` job and
-   the asset gate upstream carried are removed here ([ADR 9008](./.adr/9008-pup-drops-windows.md)),
-   so a release is only ever held by `gate` reading `ci.yml`.
+   On the Pup the release ships Linux only: upstream's `windows.yml` workflow, `payload-windows`
+   job and asset gate ([ADR 9008](./.adr/9008-pup-drops-windows.md)) and the two `macos-*` payload
+   rows with their codesign steps ([ADR 9009](./.adr/9009-pup-ships-linux-only.md)) are removed
+   here, so a release is only ever held by `gate` reading `ci.yml`.
 
 **A PR from a fork is the exception: leave all four files alone.** Bump nothing, add no CHANGELOG
 line — send the functional commits only. The version is the maintainer's to pick, because it depends

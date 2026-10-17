@@ -224,7 +224,7 @@ Compare: [v2.0.0...v2.1.0](https://github.com/AltanS/collie/compare/v2.0.0...v2.
 \`\`\`
 curl -fLO https://github.com/AltanS/collie/releases/download/v2.1.0/collie-2.1.0-linux-x64.tar.gz
 curl -fLO https://github.com/AltanS/collie/releases/download/v2.1.0/collie-2.1.0-linux-x64.tar.gz.sha256
-sha256sum -c collie-2.1.0-linux-x64.tar.gz.sha256   # macOS: shasum -a 256 -c
+sha256sum -c collie-2.1.0-linux-x64.tar.gz.sha256
 \`\`\`
 
 A sha256 catches a corrupt or truncated download. It does not prove who built the file,

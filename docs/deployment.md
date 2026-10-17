@@ -597,7 +597,7 @@ the CLI searches for configuration.
 ### Run a service unit per instance
 
 `collie start` writes the unit when the environment sets the instance. The operator does not write
-it by hand. On macOS it writes a launchd plist under `~/Library/LaunchAgents/` instead. The unit
+it by hand. The unit
 sets `COLLIE_PORT`, `COLLIE_INSTANCE`, `COLLIE_PLUGIN_ROOT`, `HERDR_PLUGIN_CONFIG_DIR`, and
 `EnvironmentFile=-<config dir>/.env`. `--instance <name>` on `ExecStart` exists solely so two
 instances that share one binary can distinguish their bridges (`cli/unit.ts` `systemdUnit()`):

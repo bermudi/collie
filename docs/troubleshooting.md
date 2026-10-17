@@ -7,8 +7,7 @@ Symptoms below, in order — search the page for yours. **`Os { NotFound }` from
 reboot** · **a pane is stuck narrow** · **Collie refuses to open a tmux window** ·
 **`tmux list: output did not parse`** · **`herdr plugin list` shows the old version** ·
 **stale UI after a rebuild** · **I saved a machine in Herdr and the phone does not show it** ·
-**an update started from the phone stays at staging** · **a phone update on macOS leaves Collie
-unloaded** · **on macOS, `collie status` says "loaded, not running"** · **a pane shows no prompt-cache chip** · **a pane has no Chat or History** · **a new Codex pane says it has no history
+**an update started from the phone stays at staging** · **a pane shows no prompt-cache chip** · **a pane has no Chat or History** · **a new Codex pane says it has no history
 yet** · **the phone says Collie cannot read a screen the agent is not showing** · **an agent is greyed
 out on the New page** · **Start says there is no folder, or says it could not confirm**.
 
@@ -90,10 +89,8 @@ push says it's disabled (the keys never reached the bridge — run `push-keys` a
 them in Settings → Alerts); or it reports a send and nothing arrives (the phone is on a
 plain-HTTP origin, which is not a secure context — Settings flags it `insecure`).
 
-**Collie is gone after a reboot.** On Linux this is almost always lingering, so run
-`loginctl enable-linger $USER` ([Surviving reboots](upgrading.md#surviving-reboots)). On macOS the launchd agent starts at
-**login**, so check you're actually logged in (not sitting at the login window) and that the agent is
-loaded: `launchctl print gui/$(id -u)/herdr.collie`.
+**Collie is gone after a reboot.** This is almost always lingering, so run
+`loginctl enable-linger $USER` ([Surviving reboots](upgrading.md#surviving-reboots)).
 
 **A pane's terminal is stuck narrow, and a full-screen app inside it is squashed** (Copilot CLI,
 `top`, any TUI drawn into a strip while the rest of the mirror stays blank)**.** The pane's terminal
@@ -232,32 +229,6 @@ staging leaves behind. A suffixed instance keeps them in `~/.local/state/collie-
 whose lock you removed will flip `current` with nothing guarding it. Leave `versions/` alone. The
 half-staged version directory is harmless, the retry builds into it again, and the retention sweep
 removes what it no longer needs.
-
-**A phone update on macOS leaves Collie unloaded.** Run this on the Mac:
-
-```
-collie restart
-```
-
-On Collie up to 1.8.x, an update tapped on the phone could stop the launchd agent and never load it
-again, so the phone lost the service and `launchctl print gui/$(id -u)/herdr.collie` found nothing.
-The runner shared the agent's process group, and restarting the agent killed it half way.
-`collie restart` writes the agent's plist again and loads it. From 1.9.0 on, the bridge
-starts the runner in a session of its own. If a phone update still unloads the agent after that, run
-the same command and add a note to [#213](https://github.com/AltanS/collie/issues/213).
-
-**On macOS, `collie start` finishes but `collie status` says "loaded, not running".** The launchd job is
-loaded and no process runs, so the log is empty. Start the job by hand:
-
-```
-launchctl kickstart gui/$(id -u)/herdr.collie
-collie status
-```
-
-A suffixed instance has its own label, for example `herdr.collie-next`. From 1.17.0 on, `collie start`
-and `collie restart` do this step for you and print a warning with this command when no process
-shows up. If the job stays "loaded, not running" after that, read the log with `collie logs`, then
-add a note to [#213](https://github.com/AltanS/collie/issues/213).
 
 **An agent is greyed out on the New page.** The reason follows its name in brackets. "not installed"
 means the machine did not find the agent's command on the `PATH` your login shell uses. In a

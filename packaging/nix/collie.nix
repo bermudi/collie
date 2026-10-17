@@ -26,12 +26,11 @@
 }:
 
 let
-  # Nix system → the platform key `sources.json` uses. Three rows: the release also ships a
-  # macOS Intel payload, but the nixpkgs pin has no x86_64-darwin, so it is not listed here.
+  # Nix system → the platform key `sources.json` uses. Two rows: on the Pup the release ships the
+  # two Linux payloads and nothing else (ADR 9009).
   platformKeys = {
     "x86_64-linux" = "linux-x64";
     "aarch64-linux" = "linux-arm64";
-    "aarch64-darwin" = "darwin-arm64";
   };
 
   system = stdenv.hostPlatform.system;
@@ -55,7 +54,6 @@ stdenv.mkDerivation {
 
   # The binary is a Bun single-file executable built against glibc, so on Linux it carries a
   # /lib64 interpreter and an rpath that no NixOS machine has. autoPatchelfHook rewrites both.
-  # Darwin needs none of it: the release job ad-hoc signs that binary and it runs as shipped.
   nativeBuildInputs = lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
 
   dontConfigure = true;

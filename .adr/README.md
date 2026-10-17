@@ -186,6 +186,7 @@ the pointer, it was a supersede.
 | [9006](./9006-pup-is-upstream-plus-devin-and-worktree-nest.md) | Pup is upstream plus Devin and the worktree nest | Accepted (Pup) |
 | [9007](./9007-pup-watches-upstream-minor-and-major.md) | Pup watches upstream's minor and major, and says merge | Accepted (Pup) |
 | [9008](./9008-pup-drops-windows.md) | Pup drops Windows: the workflow, the release's payload job and zip gate, the installer, the docs page and the recipe step are removed; upstream's win32 code paths stay dormant because excising them would fight every wholesale merge (supersedes 0075 on Pup) | Accepted (Pup) |
+| [9009](./9009-pup-ships-linux-only.md) | Pup ships Linux only: the release's two macOS payload rows and their codesign machinery are removed, and so is `aarch64-darwin` from the flake, the Nix package and the Herdr plugin's platform list; `macos-*` joins `windows-x64` in `NOT_PACKAGED` and Darwin code paths stay dormant for the same merge-economics reason as win32 | Accepted (Pup) |
 
 Numbers are claimed across **both** branches: 0011–0016 were accepted here on `v1` while `main` was
 still at 0010, so a new ADR continues from the highest number in use anywhere, not the highest one on

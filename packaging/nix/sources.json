@@ -8,10 +8,6 @@
     "linux-arm64": {
       "url": "https://github.com/AltanS/collie/releases/download/v1.21.3/collie-1.21.3-linux-arm64.tar.gz",
       "sha256": "d8ec73fe23ea54104751e95d17e46246a862c28c469eb0fc3e6e3493e9a6bb40"
-    },
-    "darwin-arm64": {
-      "url": "https://github.com/AltanS/collie/releases/download/v1.21.3/collie-1.21.3-macos-arm64.tar.gz",
-      "sha256": "6396b93d3d3774b4b28e0f9cca107ca5a64df82182b3823da71ef47746acbd75"
     }
   }
 }

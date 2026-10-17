@@ -9,13 +9,11 @@
   outputs =
     { self, nixpkgs }:
     let
-      # The three shipped release targets, and nothing else. `.github/workflows/release.yml`'s
-      # `payload` matrix is the list this mirrors; a fourth row there is commented out and stays out
-      # here too.
+      # The shipped release targets, and nothing else — on the Pup that is the two Linux rows of
+      # `.github/workflows/release.yml`'s `payload` matrix (ADR 9009).
       systems = [
         "x86_64-linux"
         "aarch64-linux"
-        "aarch64-darwin"
       ];
 
       # The pinned Bun. It must be at least `MIN_BUN` in cli/update-check.ts — the two are one fact
@@ -25,7 +23,7 @@
 
       # nixpkgs at the revision above ships an older Bun than MIN_BUN, so the version is pinned here
       # rather than taken from the set. Only `version` and the release archives move; the
-      # derivation — autopatchelf on Linux, the ICU relink and the ad-hoc signature on Darwin — is
+      # derivation — autopatchelf on Linux — is
       # nixpkgs' and stays nixpkgs'. The hashes are the sha256 of the published archives. Those
       # patches must not reach a shipped binary, because `bun build --compile` copies the running
       # bun as its base, so the release compiles on the unpatched archive instead — `bun.src`, the
@@ -40,10 +38,6 @@
             __intentionallyOverridingVersion = true;
             passthru = prevAttrs.passthru // {
               sources = {
-                "aarch64-darwin" = pkgs.fetchurl {
-                  url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-darwin-aarch64.zip";
-                  hash = "sha256-2Jc86DX6eGflzHmv7m/G8a4BF6pL1fwlRv0AxRL3E4Y=";
-                };
                 "aarch64-linux" = pkgs.fetchurl {
                   url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-linux-aarch64.zip";
                   hash = "sha256-WAzndTMQjcaxC+wXITl+T1qkTpCXJtokUdSD38XlgdY=";

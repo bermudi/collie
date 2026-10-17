@@ -416,7 +416,7 @@ function verifyBlock(repo: string, tag: string, version: string): string[] {
 		"```",
 		`curl -fLO ${base}/${asset}`,
 		`curl -fLO ${base}/${asset}.sha256`,
-		`sha256sum -c ${asset}.sha256   # macOS: shasum -a 256 -c`,
+		`sha256sum -c ${asset}.sha256`,
 		"```",
 		"",
 		"A sha256 catches a corrupt or truncated download. It does not prove who built the file,",

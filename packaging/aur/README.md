@@ -12,7 +12,7 @@ this is the same channel.
 This is also the PKGBUILD Omarchy's own package repository gets: one file serves both channels, and
 [`../omarchy/README.md`](../omarchy/README.md) is what the pull request there consists of.
 
-`x86_64` and `aarch64` are packaged; the macOS tarball is not.
+`x86_64` and `aarch64` are packaged — on the Pup they are the only payloads shipped.
 
 ## What lands where
 
