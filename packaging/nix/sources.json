@@ -1,13 +1,13 @@
 {
-  "version": "1.21.3",
+  "version": "0.56.5",
   "platforms": {
     "linux-x64": {
-      "url": "https://github.com/AltanS/collie/releases/download/v1.21.3/collie-1.21.3-linux-x64.tar.gz",
-      "sha256": "2192d08a7ac07dfadea226a56ceb38b3e23bd117e5cb954bc4f566dd37516789"
+      "url": "https://github.com/bermudi/collie/releases/download/v0.56.5/collie-0.56.5-linux-x64.tar.gz",
+      "sha256": "d565e3c4ef4dbd2fde88524f9918f14d7d226910deb0da55a7e0ef9d6e51474f"
     },
     "linux-arm64": {
-      "url": "https://github.com/AltanS/collie/releases/download/v1.21.3/collie-1.21.3-linux-arm64.tar.gz",
-      "sha256": "d8ec73fe23ea54104751e95d17e46246a862c28c469eb0fc3e6e3493e9a6bb40"
+      "url": "https://github.com/bermudi/collie/releases/download/v0.56.5/collie-0.56.5-linux-arm64.tar.gz",
+      "sha256": "3238a7a99d00a82887b34f224a690aa988ca5f5a94e01270fa4c01c531f115ea"
     }
   }
 }
