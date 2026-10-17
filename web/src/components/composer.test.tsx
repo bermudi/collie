@@ -397,7 +397,7 @@ describe("Composer: the Surface table (M56 spec 06)", () => {
   it.each([
     ["stale", /too old/i],
     ["contested", /did not agree/i],
-    ["torn", /changed while Collie read it/i],
+    ["torn", /changed while ColliePup read it/i],
   ] as const)("unknown (%s): Send asks for a fresh read, and the notice names the reason", async (reason, words) => {
     const surface: Surface = { ...STALE, reason };
     server.use(...sendHandler((request) => sendAnswer(request.id, "refused", "bound", { surface })));
@@ -559,7 +559,7 @@ describe("Composer: a read dialog is refused at the thumb", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() => expect(container.querySelector('[data-slot="composer-refusal"]')).toHaveTextContent(/cannot read this screen/i));
-    expect(container.textContent?.match(/Collie cannot read this screen/g)).toHaveLength(1);
+    expect(container.textContent?.match(/ColliePup cannot read this screen/g)).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Answer the dialog" })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Hide this notice" }));

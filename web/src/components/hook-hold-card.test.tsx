@@ -67,10 +67,10 @@ describe("HookHoldCard", () => {
       ["sent", "Sent. The agent goes on when the tool runs."],
       ["desk", "The desk answered first."],
       ["keys", "The keys on the screen card answered this dialog."],
-      ["elsewhere", "Another Collie answered."],
+      ["elsewhere", "Another ColliePup answered."],
       ["void", "The hook stopped. Answer the dialog on the screen."],
       ["timeout", "The hold timed out. Answer the dialog on the screen."],
-      ["mismatch", "The request changed. Collie let the hook go."],
+      ["mismatch", "The request changed. ColliePup let the hook go."],
     ];
     for (const [state, text] of cases) {
       const { unmount } = render(<HookHoldCard note={{ ...NOTE, state }} onAnswer={() => undefined} />);

@@ -870,7 +870,7 @@ describe("the Send Protocol on this machine (M56 spec 14)", () => {
     draw({ sendProtocol: true });
     const user = await type("hello");
     await user.click(sendButton());
-    expect(await screen.findByText("Collie cannot read this conversation now. Try again in a moment.")).toBeInTheDocument();
+    expect(await screen.findByText("ColliePup cannot read this conversation now. Try again in a moment.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Go to the question" })).toBeNull();
     await user.click(sendButton());
     expect(await screen.findByText("The durable agent did not say it took the message. Read the chat before you send it again.")).toBeInTheDocument();

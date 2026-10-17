@@ -942,7 +942,7 @@ describe("AgentChat: a dialog tap answers the pane's ask", () => {
     const posted = answerWith(({ id }) => ({ receipt: { askId: id, outcome: "refused", reason: "ask_gone", keys: [] } }));
     renderChat({ text: MENU_TEXT, agent: withAsk(ASK_A) });
     await user.click(await screen.findByRole("button", { name: "Yes" }));
-    await waitFor(() => expect(screen.getByTestId("ask-status")).toHaveTextContent("The dialog is gone; Collie read the screen again"));
+    await waitFor(() => expect(screen.getByTestId("ask-status")).toHaveTextContent("The dialog is gone; ColliePup read the screen again"));
     expect(posted).toHaveLength(1);
   });
 
