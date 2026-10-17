@@ -117,7 +117,7 @@ describe("pushTitle — the English comes from the catalogue", () => {
       "machine.disk": "Disk stays full on {machine}",
       "frontdoor.gone": "ColliePup's front door is gone",
       "ask.permission": "Permission needed in {pane}",
-      "ask.flood": "A program on {host} is raising many asks",
+      "ask.flood": "A durable agent on {host} is raising many asks",
     });
   });
 
