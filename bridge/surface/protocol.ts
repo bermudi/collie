@@ -2747,6 +2747,19 @@ export class SendProtocol {
     // closes, so S2 sees the box again, still holding the text. That is no missing evidence.
     const lastFrame = result.snap?.frame ?? null;
     if (result.verdict !== "pass" && queued && lastFrame !== null && wsFree(boxText(lastFrame)) === wsFree(sentText) && wsFree(sentText).length > 0) {
+      // On a `steers` harness the likelier truth behind this screen is that Enter never reached the
+      // box at all — a drop mid-repaint leaves the draft sitting exactly as typed, no dialog. Pressing
+      // it again takes that same draft, so one resend is tried before the `dialog_after_enter` guess.
+      // (Enter on a box that emptied in the gap is a no-op.)
+      if (state.match?.profile.keys.enterWhileRunning === "steers") {
+        await this.keysThroughGate(state, commitKeys(state), "unknown");
+        const again = await this.poll(state, "s2", BOUNDS.s2, (snap) => {
+          if (snap.frame === null) return "wait";
+          return boxText(snap.frame).length === 0 || showsSteeredEcho(state.match, snap, sentText) ? "pass" : "wait";
+        });
+        state.marks.s2 = again.snap ?? state.marks.s2;
+        if (again.verdict === "pass") return;
+      }
       throw new Ended("unknown", "dialog_after_enter", sawNote(result.snap, { offers: ["keys"], detail: ENTER_MISSED_BOX }));
     }
     if (result.verdict !== "pass") throw new Ended("unknown", "no_evidence", { detail: "The submit key went out, but the box did not show it was taken." });
