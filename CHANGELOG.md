@@ -23,6 +23,14 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+## [0.57.7] - 2026-10-18
+
+**Urgent.** Sends to pi fail outright — the profile presses a submit key this pi version does not have — and a send whose Enter is dropped still ends `unknown` at idle.
+
+### Fixed
+- **A send resends the submit key once when the first never landed.** Agent boxes can drop an injected Enter mid-repaint, leaving the draft sitting exactly as typed — S2 read that as "a dialog took the Enter" and reported `unknown` even though nothing had consumed the key (seen live on Devin, idle and mid-turn). When the box still holds the sent text, the submit keys go out once more and the box is watched again before the refusal stands.
+- **pi's submit and queue key are Enter.** The profile was verified through pi 1.1.0, whose composer took `alt+Enter`; pi 1.3.0 submits on Enter — a plain prompt or a mid-turn steer — so sends reported `unknown` while the draft sat in the box. Versions past 1.1.0 are now marked provisional. ([056ee2e](https://github.com/bermudi/collie/commit/056ee2e18b2fc5534506dab10199935cc3096dd2))
+
 ## [0.57.6] - 2026-10-18
 
 **Urgent.** A send to a Devin pane mid-turn can leave the draft sitting in the box — the Enter never landed — and report `unknown` instead of just pressing it again.
