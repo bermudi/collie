@@ -23,8 +23,12 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+## [0.57.4] - 2026-10-18
+
+**Urgent.** A send to a Devin pane mid-turn can refuse `probe_failed` while the box is perfectly fine — the probe stops looking after ~360ms.
+
 ### Fixed
-- **The send probe waits long enough for a busy pane to echo.** The probe step's read budget starved its own time budget: three reads at doubling gaps meant the probe character got only ~360ms to appear — under its nominal 900ms — so a mid-turn Devin (or any pane mid-repaint) could fail `probe_failed` with the char simply not rendered yet. The probe now gets five reads over up to 1.5s, so the typed half can actually reach its documented window.
+- **The send probe waits long enough for a busy pane to echo.** The probe step's read budget starved its own time budget: three reads at doubling gaps meant the probe character got only ~360ms to appear — under its nominal 900ms — so a mid-turn Devin (or any pane mid-repaint) could fail `probe_failed` with the char simply not rendered yet. The probe now gets five reads over up to 1.5s, so the typed half can actually reach its documented window. ([20b1ab8](https://github.com/bermudi/collie/commit/20b1ab83e20b4a9154c476272f87a9d769dee256))
 
 ## [0.57.3] - 2026-10-18
 
