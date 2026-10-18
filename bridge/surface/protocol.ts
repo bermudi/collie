@@ -2092,6 +2092,15 @@ export class SendProtocol {
       throw new Ended("refused", "draft_present", { surface, framed: s0.frame !== null, detail: "The box already holds a draft." });
     }
     if (takesManualSend(surface)) {
+      // A bare shell is a known pane, not an unrecognized program: its prompt reads unknown(no-match)
+      // for want of a profile, and the probe below still proves where the text lands before any of it
+      // goes out. On the most common pane that confirm added a tap and no safety, so a shell with a
+      // plain screen — no frame, no cue, no lifted ask — skips it. A cue or a dialog keeps the look
+      // first, and so does every harness the engine cannot name (Pup).
+      if (state.target.harness === "" && surface.reason === "no-match") {
+        this.noteManualSend(state);
+        return;
+      }
       if (state.request.rowsHash === undefined) {
         throw new Ended("refused", "unconfirmed", { surface, rowsHash: s0.rowsHash, detail: "Collie cannot read this screen. Check the pane, then tap Type here." });
       }
@@ -2102,6 +2111,15 @@ export class SendProtocol {
       return;
     }
     throw new Ended("refused", "not_free", { surface, detail: "The input box is not free." });
+  }
+
+  /** Count a manual send the person was not asked to confirm (a bare shell's plain prompt). */
+  private noteManualSend(state: RunState): void {
+    try {
+      this.deps.ledger?.noteManual(this.keyOf(state));
+    } catch (err) {
+      console.warn(`[surface] manual counter failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   /**

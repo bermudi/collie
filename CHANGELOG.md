@@ -23,6 +23,9 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Fixed
+- **Shell panes send in one tap again.** Every pane with no profile — which is every bare shell — took the manual Send's two-tap ("cannot read this screen", then the "Type here" chip) since upstream's Send Protocol landed, and a plain re-send can never carry the rows hash, so it read as a refusal loop. A shell is a known pane (the engine names it `""`), not an unrecognized program, and the probe still proves where the text lands before any of it goes out: a shell whose screen shows no cue and no dialog now sends directly. Unknown harnesses and any screen carrying a cue keep the look-first commit.
+
 ## [0.57.2] - 2026-10-17
 
 **Urgent.** Sends made while a Devin turn runs never arrive — they park until the turn ends, then land unverified.
