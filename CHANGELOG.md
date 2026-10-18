@@ -23,8 +23,12 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+## [0.57.3] - 2026-10-18
+
+**Urgent.** Bare shell panes refuse every send with "cannot read this screen" — the most basic flow on the phone.
+
 ### Fixed
-- **Shell panes send in one tap again.** Every pane with no profile — which is every bare shell — took the manual Send's two-tap ("cannot read this screen", then the "Type here" chip) since upstream's Send Protocol landed, and a plain re-send can never carry the rows hash, so it read as a refusal loop. A shell is a known pane (the engine names it `""`), not an unrecognized program, and the probe still proves where the text lands before any of it goes out: a shell whose screen shows no cue and no dialog now sends directly. Unknown harnesses and any screen carrying a cue keep the look-first commit.
+- **Shell panes send in one tap again.** Every pane with no profile — which is every bare shell — took the manual Send's two-tap ("cannot read this screen", then the "Type here" chip) since upstream's Send Protocol landed, and a plain re-send can never carry the rows hash, so it read as a refusal loop. A shell is a known pane (the engine names it `""`), not an unrecognized program, and the probe still proves where the text lands before any of it goes out: a shell whose screen shows no cue and no dialog now sends directly. Unknown harnesses and any screen carrying a cue keep the look-first commit. ([aea3cb5](https://github.com/bermudi/collie/commit/aea3cb58cd6af33eb61cf059693d862adf45ab56))
 
 ## [0.57.2] - 2026-10-17
 
