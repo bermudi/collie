@@ -493,6 +493,29 @@ function showsQueued(snap: Snap, queuedRow: QueuedRow | undefined, text: string)
   return false;
 }
 
+/**
+ * A steered send's own witness (`enterWhileRunning: "steers"`): the harness echoes the text it took
+ * into the transcript under the box's own prompt glyph — Devin prints the steered message on a `❭`
+ * row above the box while the draft may keep drawing until the turn picks it up. The echo is earlier
+ * and stronger evidence than the emptied box, so a row that matches a prompt anchor with the text (or
+ * the text's start, when the echo wraps or clips) says the send went in. Only rows above the box are
+ * read: the box's own prompt row would carry the still-drawn draft.
+ */
+function showsSteeredEcho(match: ProfileMatch | null, snap: Snap, text: string): boolean {
+  if (match?.profile.keys.enterWhileRunning !== "steers" || snap.frame === null) return false;
+  const want = wsFree(text);
+  if (want.length === 0) return false;
+  const above = snap.texts.slice(0, snap.frame.top);
+  for (const row of above) {
+    for (const layout of [match.profile.idle.frame, ...(match.profile.idle.frameAlternates ?? [])]) {
+      const draft = new RegExp(layout.prompt.pattern, "u").exec(row.trimEnd())?.groups?.["draft"];
+      const echo = draft === undefined ? "" : wsFree(draft);
+      if (echo.length >= Math.min(8, want.length) && (want.startsWith(echo) || echo.includes(want))) return true;
+    }
+  }
+  return false;
+}
+
 /** Reads in a row with no frame before a queued send counts the box as gone: one may be a torn read. */
 const FRAMELESS_READS = 2;
 
@@ -2694,11 +2717,11 @@ export class SendProtocol {
           return "fail";
         }
         if (snap.frame === null) return command ? "pass" : "wait";
-        // Queued: the running sign showed before Enter, so only the box letting go of the text is
-        // evidence that the harness took it.
-        if (queued) return boxText(snap.frame).length === 0 ? "pass" : "wait";
+        // Queued: the running sign showed before Enter, so only the box letting go of the text — or
+        // a steered send's own echo into the transcript — is evidence that the harness took it.
+        if (queued) return boxText(snap.frame).length === 0 || showsSteeredEcho(state.match, snap, sentText) ? "pass" : "wait";
         if (command && !wsFree(boxText(snap.frame)).includes(wsFree(withoutLead(lines).join("")))) return "pass";
-        return boxText(snap.frame).length === 0 || runningSign(snap.rows, snap.frame, state.match?.profile.idle.runningRows) ? "pass" : "wait";
+        return boxText(snap.frame).length === 0 || showsSteeredEcho(state.match, snap, sentText) || runningSign(snap.rows, snap.frame, state.match?.profile.idle.runningRows) ? "pass" : "wait";
       }
       if (landing === null) return "wait";
       if (command) return flat(snap.plain).includes(flat([landing.probed.slice(0, landing.index) + lines.join("") + afterProbe(landing)])) ? "wait" : "pass";

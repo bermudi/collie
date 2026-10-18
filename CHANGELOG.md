@@ -23,6 +23,9 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Fixed
+- **A steered send to a Devin pane reports sent.** Enter mid-turn echoes the text into the transcript under the `❭` glyph and the box may keep drawing the draft until the turn picks it up — S2 only watched the box empty, so a send that went in read `unknown: the box did not show it was taken`. S2 now also counts the steer echo above the box as evidence, on either the queued or the direct path.
+
 ## [0.57.4] - 2026-10-18
 
 **Urgent.** A send to a Devin pane mid-turn can refuse `probe_failed` while the box is perfectly fine — the probe stops looking after ~360ms.
