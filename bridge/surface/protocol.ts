@@ -111,7 +111,7 @@ import { HOLD_BRIDGE_MAX, HOLD_PANE_MAX, heldRow, type HeldEntry, type HoldStore
 /** The step bounds, written as (max reads, max ms). */
 export const BOUNDS = {
   s0: { reads: 2, ms: 1200 },
-  probe: { reads: 3, ms: 900 },
+  probe: { reads: 5, ms: 1500 },
   s1: { reads: 6, ms: 2500 },
   s2: { reads: 6, ms: 3000 },
 } as const;

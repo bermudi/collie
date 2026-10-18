@@ -23,6 +23,9 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Fixed
+- **The send probe waits long enough for a busy pane to echo.** The probe step's read budget starved its own time budget: three reads at doubling gaps meant the probe character got only ~360ms to appear — under its nominal 900ms — so a mid-turn Devin (or any pane mid-repaint) could fail `probe_failed` with the char simply not rendered yet. The probe now gets five reads over up to 1.5s, so the typed half can actually reach its documented window.
+
 ## [0.57.3] - 2026-10-18
 
 **Urgent.** Bare shell panes refuse every send with "cannot read this screen" — the most basic flow on the phone.
