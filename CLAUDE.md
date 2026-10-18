@@ -573,6 +573,17 @@ lint guard, the crew-wire guard or the `flake.lock` guard.
 
 ## Herdr socket gotchas (see HERDR_API.md for the full, verified contract)
 
+- **Send-path verification never touches the operator's live session** — no test sends, no
+  keystrokes, not even into "idle" panes, and no `pane read` of the operator's chats to scope
+  targets (animated-radish, 2026-10-18: junk steers landed in live devin/pi panes — mid-turn —
+  and those agents answered them). Spin a disposable session instead: `herdr --session <name>
+  server` in the background (the `--session` flag selects it; `HERDR_SESSION` env is not a thing),
+  workspaces in a scratch dir, agents started fresh in them; the bridge auto-discovers the socket
+  under `~/.config/herdr/sessions/`, so `/api/send?session=<name>` exercises the same gate and the
+  same code as the operator's session — equally real, zero blast radius. Clean up after:
+  `herdr session stop <name>` (stopped, not deleted) plus `collie devices revoke <label>` for every
+  throwaway pairing, then confirm `collie devices list` shows only the operator's real devices —
+  earlier verify runs had left pairings behind.
 - RPC is **one-shot**: one request per connection; the server closes after one reply. `id` must be
   a **string**. Only `events.subscribe` streams.
 - `pane.send_keys` grammar is **`+`-joined, not tmux**: `ctrl+c` (NOT `C-c`), `shift+tab`, `Up`,
