@@ -23,8 +23,12 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+## [0.57.6] - 2026-10-18
+
+**Urgent.** A send to a Devin pane mid-turn can leave the draft sitting in the box — the Enter never landed — and report `unknown` instead of just pressing it again.
+
 ### Fixed
-- **A mid-turn send to Devin resends Enter once when the first never landed.** Devin's box can drop an injected Enter mid-repaint, leaving the draft sitting exactly as typed — S2 read that as "a dialog took the Enter" and reported `unknown` even though nothing had consumed the key. When the box still holds the sent text on a `steers` harness, the submit keys go out once more and the box is watched again before the refusal stands.
+- **A mid-turn send to Devin resends Enter once when the first never landed.** Devin's box can drop an injected Enter mid-repaint, leaving the draft sitting exactly as typed — S2 read that as "a dialog took the Enter" and reported `unknown` even though nothing had consumed the key. When the box still holds the sent text on a `steers` harness, the submit keys go out once more and the box is watched again before the refusal stands. ([c8b8aa0](https://github.com/bermudi/collie/commit/c8b8aa06b093107c0756d04c154122fea44d9aaa))
 
 ## [0.57.5] - 2026-10-18
 
