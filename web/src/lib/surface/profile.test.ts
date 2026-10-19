@@ -448,11 +448,11 @@ const SPEC14_CASES: readonly Spec14Case[] = [
     ],
     collapse: { text: "[paste #2 +12 lines]", group: "lines", value: "12" },
     reservedLeads: ["/", "!"],
-    submit: ["alt+Enter"],
+    submit: ["Enter"],
     commandSubmit: ["Enter"],
     probeStatus: "verified",
     enterWhileRunning: "steers",
-    queueKey: "alt+Enter",
+    queueKey: "Enter",
   },
 ];
 
@@ -724,23 +724,21 @@ describe("the Claude ranges and the ledger", () => {
 describe("keys that differ by platform (M56 spec 14 review)", () => {
   const raw = (): JsonObject => parseJsonObject(readFileSync(join(PROFILES_DIR, "pi.json"), "utf8"))!;
 
-  it("pi sends and queues with Alt+Enter, and with Ctrl+Q on Windows", () => {
+  it("pi sends and steers with Enter on every platform", () => {
     const pi = loadProfiles().get("pi")!;
-    expect(pi.keys.submit).toEqual(["alt+Enter"]);
-    expect(pi.keys.queueKey).toBe("alt+Enter");
-    const win = forPlatform(pi, "win32");
-    expect(win.keys.submit).toEqual(["ctrl+q"]);
-    expect(win.keys.queueKey).toBe("ctrl+q");
-    expect(win.keys.commandSubmit).toEqual(["Enter"]);
+    expect(pi.keys.submit).toEqual(["Enter"]);
+    expect(pi.keys.queueKey).toBe("Enter");
+    expect(pi.keys.commandSubmit).toEqual(["Enter"]);
+    expect(forPlatform(pi, "win32")).toBe(pi);
     expect(forPlatform(pi, "linux")).toBe(pi);
     expect(forPlatform(pi, "darwin")).toBe(pi);
   });
 
   it("the bridge's match carries the platform's keys", () => {
     const match = profileForPlatform("pi", "0.87.1", "win32", { log: () => {} });
-    expect(match?.profile.keys.submit).toEqual(["ctrl+q"]);
+    expect(match?.profile.keys.submit).toEqual(["Enter"]);
     expect(match?.status).toBe("verified");
-    expect(profileForPlatform("pi", "0.87.1", "linux", { log: () => {} })?.profile.keys.submit).toEqual(["alt+Enter"]);
+    expect(profileForPlatform("pi", "0.87.1", "linux", { log: () => {} })?.profile.keys.submit).toEqual(["Enter"]);
     expect(profileForPlatform("nothing-known", "1.0.0", "win32")).toBeNull();
   });
 

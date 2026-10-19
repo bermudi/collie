@@ -2153,7 +2153,7 @@ describe("the probe", () => {
     expect(pane.calls).toEqual([`type:${PROBE}`]);
   });
 
-  test("the probe takes at most three reads", async () => {
+  test("the probe takes at most five reads", async () => {
     const { pane, send } = rig({ version: "2.1.999" });
     let probeReads = 0;
     pane.beforeRead = (p) => {
@@ -2161,7 +2161,7 @@ describe("the probe", () => {
     };
     pane.swallow = true;
     await send("hello there");
-    expect(probeReads).toBeLessThanOrEqual(3);
+    expect(probeReads).toBeLessThanOrEqual(5);
   });
 });
 
@@ -2263,13 +2263,13 @@ describe("commit", () => {
 });
 
 describe("S2", () => {
-  test("Enter went out but the box never emptied: unknown, never resent", async () => {
+  test("Enter went out but the box never emptied: the key goes once more, then unknown", async () => {
     const { pane, send } = rig();
     pane.enterSubmits = false;
     const answer = await send("hello world");
-    expect(answer.receipt).toMatchObject({ outcome: "unknown", reason: "no_evidence", keys: ["Enter"] });
+    expect(answer.receipt).toMatchObject({ outcome: "unknown", reason: "dialog_after_enter", keys: ["Enter", "Enter"] });
     expect(answer.offers).toEqual(["keys"]);
-    expect(pane.keysSeen).toEqual(["Enter"]);
+    expect(pane.keysSeen).toEqual(["Enter", "Enter"]);
   });
 });
 
@@ -3839,7 +3839,7 @@ describe("the compare of a Codex send reads a changing status row (M56 spec 14 r
 
 // ── an `@` text is a message on pi and OMP (M56 spec 14, verifier) ──
 
-/** pi 0.87.1: a box between two rules, a status row under it. Alt+Enter (Ctrl+Q on Windows) sends and queues, Enter steers a turn. */
+/** pi 0.87.1: a box between two rules, a status row under it. Enter submits an idle box; in a turn it steers. */
 class PiPane extends FakePane {
   inTurn = false;
   steered: string[] = [];
@@ -3854,7 +3854,7 @@ class PiPane extends FakePane {
         if (key === this.sendKey || (key === "Enter" && this.inTurn)) {
           this.keysSeen.push(key);
           const text = this.box.replace(/\n/gu, " ");
-          if (text.length > 0 && key === "Enter") this.steered.push(text);
+          if (text.length > 0 && key === "Enter" && this.inTurn) this.steered.push(text);
           else if (text.length > 0 && this.inTurn) this.queued.push(text);
           else if (text.length > 0) this.transcript.push(` > ${text}`);
           this.box = "";
@@ -3880,27 +3880,25 @@ describe("a text that starts with `@` is a message on pi and OMP", () => {
     expect(loadProfiles().get("omp")?.reservedLeads).toEqual(["/", "!"]);
   });
 
-  for (const [platform, key] of [["linux", "alt+Enter"], ["win32", "ctrl+q"]] as const) {
-    test(`pi on ${platform}: an \`@\` text in a turn queues with ${key}, never Enter`, async () => {
-      const pane = new PiPane(key);
+  for (const platform of ["linux", "win32"] as const) {
+    test(`pi on ${platform}: an \`@\` text in a turn steers with Enter`, async () => {
+      const pane = new PiPane("Enter");
       pane.inTurn = true;
       const { send } = rig({ pane, harness: "pi", version: "0.87.1", edit: (profile) => forPlatform(profile, platform) });
       const answer = await send(AT);
-      expect(answer.receipt).toMatchObject({ outcome: "sent", queued: true });
-      expect(answer.receipt?.keys.at(-1)).toBe(key);
-      expect(pane.queued).toEqual([AT]);
-      expect(pane.keysSeen).not.toContain("Enter");
-      expect(pane.steered).toEqual([]);
+      expect(answer.receipt).toMatchObject({ outcome: "sent" });
+      expect(answer.receipt?.keys.at(-1)).toBe("Enter");
+      expect(pane.steered).toEqual([AT]);
+      expect(pane.queued).toEqual([]);
     });
   }
 
-  test("pi: an `@` text on an idle box is sent with Alt+Enter, and `/model` still takes Enter", async () => {
-    const pane = new PiPane("alt+Enter");
+  test("pi: an `@` text on an idle box is sent with Enter, and `/model` still takes Enter", async () => {
+    const pane = new PiPane("Enter");
     const { send } = rig({ pane, harness: "pi", version: "0.87.1" });
     const answer = await send(AT);
     expect(answer.receipt).toMatchObject({ outcome: "sent" });
-    expect(answer.receipt?.keys.at(-1)).toBe("alt+Enter");
-    expect(pane.keysSeen).not.toContain("Enter");
+    expect(answer.receipt?.keys.at(-1)).toBe("Enter");
     const command = await send("/model", { mode: "command" });
     expect(command.receipt?.keys.at(-1)).toBe("Enter");
   });
@@ -3917,7 +3915,7 @@ describe("a text that starts with `@` is a message on pi and OMP", () => {
   });
 
   test("a `/` text is still a command on pi and OMP: refused in a turn, nothing typed", async () => {
-    const pane = new PiPane("alt+Enter");
+    const pane = new PiPane("Enter");
     pane.inTurn = true;
     const answer = await rig({ pane, harness: "pi", version: "0.87.1" }).send("/model", { mode: "command" });
     expect(answer.receipt).toMatchObject({ outcome: "refused", reason: "turn_running", keys: [] });

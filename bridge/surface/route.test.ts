@@ -261,9 +261,9 @@ describe("the reply route runs the protocol (M56 spec 06)", () => {
       expect(replySendOf(rt).harnessOf("%9")).toBeNull();
       const { audit } = auditLines();
       expect((await replyThroughProtocol(replySendOf(rt), "%9", "main", { text: "hi", submit: true }, context(audit))).status).toBe(404);
-      // A shell has no profile: the first tap is refused unconfirmed and offers the commit tap.
+      // A shell has no profile, but a plain prompt reads clean: the first tap sends directly.
       const shell = await (await replyThroughProtocol(replySendOf(rt), "%7", "main", { text: "ls -la", submit: true }, context(audit))).json();
-      expect(shell.send).toMatchObject({ receipt: { outcome: "refused", reason: "unconfirmed", profileId: null }, offers: ["commit", "keys"] });
+      expect(shell.send).toMatchObject({ receipt: { outcome: "sent", profileId: null }, offers: [] });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
