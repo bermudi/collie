@@ -21,8 +21,7 @@ import type { CapState, CounterKey, ExampleEntry, InboxEntry } from "../../../br
 import { liftDialog, readerBlocks } from "../../../web/src/lib/surface/lift";
 import { profileFor, type ProfileMatch } from "../../../web/src/lib/surface/profile";
 import { askOf } from "../../../web/src/lib/surface/surface";
-import { agentOf } from "../../../web/src/test/surface-corpus";
-import { factOf, viewOf, type ScreenView } from "./screens";
+import { agentOf, factOf, viewOf, type ScreenView } from "./screens";
 import type { AskFact, ScreenFact, SendFact } from "./verdict";
 import type { WalkPane } from "./walk";
 

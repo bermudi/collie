@@ -23,6 +23,16 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Changed
+
+- **The test suite is removed.** Every `*.test.*`, `*.spec.*`, e2e/browser spec, shell test,
+  fixture dir and test-only harness (vitest/playwright configs, `web/src/test`, `cli/fakes.ts`,
+  fixture loaders, `sdk-pack-check.sh`, `surface-corpus.ts`) is deleted, along with the CI jobs
+  and package scripts that ran them. CI now gates on version consistency, lint and typecheck only;
+  behavior is validated by running the product. Done at the operator's direction after the restored
+  suite passed green on a release that could not send to a pane — the suite measured nothing real.
+  Restorable from history if ever wanted back.
+
 ## [0.57.8] - 2026-10-18
 
 **Urgent.** Sends to Devin and pi panes report wrong or fail outright — every fix cut over the weekend ships in this release.

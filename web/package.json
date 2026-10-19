@@ -10,11 +10,7 @@
     "playground": "COLLIE_PLAYGROUND=1 vite --host --port 5199 --strictPort",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "e2e": "vite build && playwright test",
-    "e2e:ui": "playwright test --ui"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
