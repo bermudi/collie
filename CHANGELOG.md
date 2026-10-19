@@ -23,8 +23,12 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+## [0.57.8] - 2026-10-18
+
+**Urgent.** Sends to Devin and pi panes report wrong or fail outright — every fix cut over the weekend ships in this release.
+
 ### Fixed
-- **The test suite is back.** Commit e69bc094 deleted all 867 test and fixture files while leaving CI configured to run them, which broke every commit after it and blocked the 0.57.3–0.57.7 release gates. This restores the suite whole; those versions' send fixes ship in this release.
+- **The test suite is back.** Commit e69bc094 deleted all 867 test and fixture files while leaving CI configured to run them, which broke every commit after it and blocked the 0.57.3–0.57.7 release gates. This restores the suite whole; those versions' send fixes ship in this release. ([1efe332](https://github.com/bermudi/collie/commit/1efe332b41736fac02c7df8cc7b33be2d32e889d))
 
 ## [0.57.7] - 2026-10-18
 
