@@ -23,6 +23,9 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Fixed
+- **The test suite is back.** Commit e69bc094 deleted all 867 test and fixture files while leaving CI configured to run them, which broke every commit after it and blocked the 0.57.3–0.57.7 release gates. This restores the suite whole; those versions' send fixes ship in this release.
+
 ## [0.57.7] - 2026-10-18
 
 **Urgent.** Sends to pi fail outright — the profile presses a submit key this pi version does not have — and a send whose Enter is dropped still ends `unknown` at idle.
