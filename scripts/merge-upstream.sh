@@ -75,10 +75,11 @@ fi
 bun scripts/record-upstream-merge.ts "$REF"
 git add upstream-merged
 
-echo "── gate: lint, typecheck, test, build"
+# The `bun run test` step left with the suite it ran (f72903a1); re-add it beside typecheck if a
+# suite returns.
+echo "── gate: lint, typecheck, build"
 bun run lint
 bun run typecheck
-bun run test
 bun run build
 
 git commit --no-edit

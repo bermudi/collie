@@ -33,6 +33,12 @@ Running a crew? Update the lead first; members follow on their own. Details:
   suite passed green on a release that could not send to a pane — the suite measured nothing real.
   Restorable from history if ever wanted back.
 
+### Fixed
+
+- **The upstream-merge ritual's gate drops the removed suite's step.** `bun run test` no longer
+  exists, so `scripts/merge-upstream.sh` died at the gate on every run; the step goes back beside
+  typecheck if a suite returns.
+
 ## [0.57.8] - 2026-10-18
 
 **Urgent.** Sends to Devin and pi panes report wrong or fail outright — every fix cut over the weekend ships in this release.
