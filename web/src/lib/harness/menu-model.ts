@@ -66,6 +66,15 @@ export interface MenuModel {
    * it MUST be non-empty and MUST change when the region's text changes.
    */
   signature: string;
+  /**
+   * Present on a card lifted off a notice drawn ABOVE the agent's live input box (Claude Code's
+   * "Heads up" notice, surface/notice.ts): the box keeps the keyboard, so the card owns none of it
+   * (dialog-contract.ts `blockOwnsKeyboard`) and the composer stays free. `draft` says the box holds
+   * text: a digit typed then would join the draft instead of answering, so the card's keys are off.
+   * `body`, when the notice printed one (the explanation after Learn more), is the inclusive range of
+   * the card's own `lines` that holds it, counted from the notice's head row.
+   */
+  liveBox?: { draft: boolean; body?: { start: number; end: number } };
 }
 
 /** Whether two derivations are the SAME on-screen menu — the decisive check for a COMMITTING key.
@@ -75,6 +84,8 @@ export interface MenuModel {
  *  Part of the CONTRACT, not of any harness: the race guard (lib/dialog-guard.ts) compares whatever
  *  adapter produced the block through exactly these two functions. */
 export function menusEqual(a: MenuModel, b: MenuModel): boolean {
+  // A notice card over a box that now holds a draft (`liveBox.draft`): a digit would join the draft.
+  if (a.liveBox?.draft === true || b.liveBox?.draft === true) return false;
   return a.signature === b.signature && menusSameIdentity(a, b);
 }
 

@@ -14,6 +14,8 @@
 // from nothing but the rows.
 
 import { displayWidth } from "../text-width";
+import { insideList, listedBottom, ownListUnder } from "./command-list";
+import { readAboveNotice } from "./notice";
 import type { FrameAnchor, Profile } from "./profile";
 
 /** The profile block this module reads. */
@@ -22,6 +24,8 @@ export type IdleProfile = Profile["idle"];
 /** One styled run of a row. The attribute flags are the SGR ones the placeholder test can name. */
 export interface FrameRun {
   readonly text: string;
+  /** The run's foreground colour; absent for the terminal's default ink (`idle.frame.underPainted`). */
+  readonly fg?: string | undefined;
   readonly bold?: boolean;
   readonly dim?: boolean;
   readonly italic?: boolean;
@@ -41,7 +45,7 @@ export interface RowSpan {
 }
 
 /** Which profile anchor matched. `top`, `prompt` and `bottom` are on every frame. */
-export type FrameAnchorHit = "top" | "label" | "prompt" | "draft" | "bottom" | "placeholder-text" | "placeholder-sgr";
+export type FrameAnchorHit = "top" | "label" | "prompt" | "draft" | "bottom" | "placeholder-text" | "placeholder-sgr" | "placeholder-fg";
 
 export interface Frame {
   /** The row of the top edge. */
@@ -63,7 +67,8 @@ export interface Frame {
     readonly text: string;
   };
   /** True when the interior shows the profile's placeholder: one of its texts, or nothing but runs
-   *  in the placeholder's SGR attribute. An empty interior is not a placeholder. */
+   *  in the placeholder's SGR attribute, or nothing but runs in one of its foreground colours.
+   *  An empty interior is not a placeholder. */
   readonly placeholder: boolean;
   /** Rows a fold must ignore when it compares two reads. `above` is the band over the top edge;
    *  `status` and `footer` are the run under the bottom edge, when the rows there walk as one.
@@ -76,6 +81,13 @@ export interface Frame {
     readonly named: readonly NamedRow[];
   };
   readonly anchorsHit: readonly FrameAnchorHit[];
+  /**
+   * With the layout's `ownPrompt`: the box's own prompt glyph, the prompt row's text in front of the
+   * draft hole, as that row and the column the hole starts in (the row's length when the prompt
+   * anchor matched no hole). The cue read of a harness that draws its dialogs in the box's place
+   * reads it as blank (cues.ts `readCuesFor`). Absent otherwise.
+   */
+  readonly ownPrompt?: { readonly row: number; readonly end: number };
 }
 
 /** A row under the bottom edge that a named footer row of the profile matches. */
@@ -104,6 +116,7 @@ interface CompiledInterior {
   readonly maxPad: number;
   readonly continuation: RegExp | null;
   readonly under: RegExp | null;
+  readonly underPainted: boolean;
 }
 
 interface CompiledFooterRow {
@@ -117,6 +130,10 @@ interface Compiled {
   readonly bottom: CompiledAnchor;
   readonly footerRows: readonly CompiledFooterRow[];
   readonly interior: CompiledInterior;
+  /** The ghost text's colours (`idle.inlineHint`); null for a profile that names none. */
+  readonly hint: ReadonlySet<string> | null;
+  /** The placeholder's colours (`idle.placeholders.fg`); null for a profile that names none. */
+  readonly placeholderFg: ReadonlySet<string> | null;
 }
 
 const compiledByIdle = new WeakMap<IdleProfile, Compiled>();
@@ -147,9 +164,13 @@ function compile(idle: IdleProfile): Compiled {
       trailerRow: trailer === undefined ? null : new RegExp(trailer.row, "u"),
       trailerPad: trailer?.pad === undefined ? null : new RegExp(trailer.pad, "u"),
       maxPad: trailer?.maxPad ?? 0,
-      continuation: continuation === undefined ? null : new RegExp(continuation, "u"),
+      // `d` gives the text group's offset, so the ghost text test reads the runs under it.
+      continuation: continuation === undefined ? null : new RegExp(continuation, "du"),
       under: under === undefined ? null : new RegExp(under, "u"),
+      underPainted: idle.frame.underPainted === true,
     },
+    hint: idle.inlineHint === undefined ? null : new Set(idle.inlineHint.fg),
+    placeholderFg: idle.placeholders.fg === undefined ? null : new Set(idle.placeholders.fg),
   };
   compiledByIdle.set(idle, compiled);
   return compiled;
@@ -214,6 +235,30 @@ export function interiorRow(text: string, idle: IdleProfile): boolean {
   return isBlank(text) || textColumn(text) >= idle.frame.continuationIndent;
 }
 
+/** Whether a row's first visible run is painted: a foreground colour, or dim. A cell that shows no
+ *  glyph (a reverse-video cursor) is not visible here, whatever its colours. */
+function paintedRow(row: FrameRow): boolean {
+  const run = row.segments.find((segment) => segment.text.trim() !== "");
+  return run !== undefined && (run.fg !== undefined || run.dim === true);
+}
+
+/**
+ * Whether the rows under the bottom edge are a status line an extension draws in the harness's place
+ * (`idle.frame.underPainted`): a painted row straight under the edge, and from it to the screen's last
+ * row one run with no blank row, at most `volatile.below.maxRows` tall. That is where a footer sits.
+ * The harness paints its other rows too (a dialog's title, a picker's list, the transcript), so a
+ * painted row alone is no footer: under a rule pair that is not the box (a picker taller than the
+ * pane, a read cut inside the screen) those rows stand apart by a blank row or run on past the bound.
+ */
+function paintedFooter(rows: readonly FrameRow[], texts: readonly string[], bottom: number, idle: IdleProfile): boolean {
+  const first = bottom + 1;
+  let end = texts.length;
+  while (end > first && isBlank(texts[end - 1]!)) end--;
+  if (end <= first || end - first > idle.volatile.below.maxRows || !paintedRow(rows[first]!)) return false;
+  for (let j = first; j < end; j++) if (isBlank(texts[j]!)) return false;
+  return true;
+}
+
 /** The placeholder attribute as a run flag, or null when the profile names one this module cannot
  *  read (then only the texts can mark a placeholder). */
 function sgrFlag(sgr: number): keyof Omit<FrameRun, "text"> | null {
@@ -234,13 +279,11 @@ function sgrFlag(sgr: number): keyof Omit<FrameRun, "text"> | null {
 }
 
 /**
- * Whether every visible character in the draft hole is drawn in the placeholder attribute. The prompt
- * row is read from the hole's offset, so the marker in front of it never counts; the rows under it
- * are read whole. False when the hole holds nothing visible.
+ * Whether every visible character in the draft hole passes `test` on its run. The prompt row is read
+ * from the hole's offset, so the marker in front of it never counts; the rows under it are read
+ * whole. False when the hole holds nothing visible.
  */
-function holeIsFaint(rows: readonly FrameRow[], prompt: number, holeStart: number, last: number, sgr: number): boolean {
-  const flag = sgrFlag(sgr);
-  if (flag === null) return false;
+function holeEvery(rows: readonly FrameRow[], prompt: number, holeStart: number, last: number, test: (run: FrameRun) => boolean): boolean {
   let sawContent = false;
   for (let j = prompt; j <= last; j++) {
     let offset = 0;
@@ -249,11 +292,22 @@ function holeIsFaint(rows: readonly FrameRow[], prompt: number, holeStart: numbe
       offset += run.text.length;
       const visible = run.text.slice(from);
       if (visible.trim().length === 0) continue;
-      if (run[flag] !== true) return false;
+      if (!test(run)) return false;
       sawContent = true;
     }
   }
   return sawContent;
+}
+
+/** Whether every visible character in the draft hole is drawn in the placeholder attribute. */
+function holeIsFaint(rows: readonly FrameRow[], prompt: number, holeStart: number, last: number, sgr: number): boolean {
+  const flag = sgrFlag(sgr);
+  return flag !== null && holeEvery(rows, prompt, holeStart, last, (run) => run[flag] === true);
+}
+
+/** Whether every visible character in the draft hole is drawn in one of the placeholder's colours. */
+function holeIsGhostColoured(rows: readonly FrameRow[], prompt: number, holeStart: number, last: number, colours: ReadonlySet<string> | null): boolean {
+  return colours !== null && holeEvery(rows, prompt, holeStart, last, (run) => run.fg !== undefined && colours.has(run.fg));
 }
 
 /** Whether a draft text is one of the profile's placeholder texts, or starts with one of its prefixes. */
@@ -261,6 +315,118 @@ function isPlaceholderText(text: string, idle: IdleProfile): boolean {
   if (text.length === 0) return false;
   if (idle.placeholders.texts.includes(text)) return true;
   return (idle.placeholders.prefixes ?? []).some((prefix) => text.startsWith(prefix));
+}
+
+/**
+ * Whether the hole shows the profile's placeholder, by its text, its attribute or its colours; each
+ * way that holds adds its anchor to `anchorsHit`. The three tests are whole-hole: one visible run
+ * that is neither faint nor ghost-coloured leaves the text a draft.
+ */
+function readPlaceholder(
+  rows: readonly FrameRow[],
+  prompt: number,
+  holeStart: number,
+  last: number,
+  text: string,
+  idle: IdleProfile,
+  colours: ReadonlySet<string> | null,
+  anchorsHit: FrameAnchorHit[],
+): boolean {
+  const byText = isPlaceholderText(text, idle);
+  const bySgr = holeIsFaint(rows, prompt, holeStart, last, idle.placeholders.sgr);
+  const byFg = holeIsGhostColoured(rows, prompt, holeStart, last, colours);
+  if (byText) anchorsHit.push("placeholder-text");
+  if (bySgr) anchorsHit.push("placeholder-sgr");
+  if (byFg) anchorsHit.push("placeholder-fg");
+  return byText || bySgr || byFg;
+}
+
+/** One piece of the draft: its row, and its first and past-last offset in the row's text. */
+interface DraftPiece {
+  readonly row: number;
+  readonly start: number;
+  readonly end: number;
+}
+
+/** The piece of `text` from `from` to `to`, trimmed at both ends, or null when it holds nothing visible. */
+function trimmedPiece(row: number, text: string, from: number, to: number): DraftPiece | null {
+  const slice = text.slice(from, to);
+  const trimmed = slice.trim();
+  if (trimmed.length === 0) return null;
+  const start = from + (slice.length - slice.trimStart().length);
+  return { row, start, end: start + trimmed.length };
+}
+
+/** The run attributes that make a style, beside the foreground colour. */
+const RUN_FLAGS = ["bold", "dim", "italic", "underline", "strike"] as const;
+
+const LETTERS = /^\p{L}+$/u;
+
+/**
+ * Where the profile's ghost text starts in the draft's last piece (`idle.inlineHint`), or null when the
+ * piece ends in none. The run under the piece's last character is the ghost only when all of these
+ * hold: its foreground is one of the profile's colours, it carries no other attribute, its part inside
+ * the piece is letters only and nothing visible follows in the run, and it opens straight after a
+ * visible character of the piece in another style. A harness paints its word completion so, after the
+ * cursor at the end of the draft; a run that fails any test is read as typed text.
+ */
+function hintStart(row: FrameRow, piece: DraftPiece, colours: ReadonlySet<string>): number | null {
+  let from = 0;
+  let previous: FrameRun | null = null;
+  for (const run of row.segments) {
+    const to = from + run.text.length;
+    if (to < piece.end) {
+      if (run.text.length > 0) previous = run;
+      from = to;
+      continue;
+    }
+    const before = previous;
+    if (from <= piece.start || before === null) return null;
+    if (run.fg === undefined || !colours.has(run.fg) || RUN_FLAGS.some((flag) => run[flag] === true)) return null;
+    if (!LETTERS.test(run.text.slice(0, piece.end - from)) || run.text.slice(piece.end - from).trim().length > 0) return null;
+    if (!/\S$/u.test(before.text)) return null;
+    const sameStyle = before.fg === run.fg && RUN_FLAGS.every((flag) => (before[flag] === true) === (run[flag] === true));
+    return sameStyle ? null : from;
+  }
+  return null;
+}
+
+/** A bracketed run and nothing else: an argument hint's shape (`[<model-id>]`). */
+const BRACKETED = /^\[[^\]]+\]$/u;
+
+/**
+ * Where a bracketed argument hint starts in the prompt row's hole (`commandList.argumentHint`), or
+ * null when the hole ends in none: the hole's last visible run opens with a space, is bracketed and
+ * nothing else, wears the bottom rule's foreground colour, and follows one of the inside list's
+ * entries as the whole text before it. A bracketed run typed as an argument wears the draft's own
+ * colour, so it stays draft text and a box that shows more than was sent still stops a send.
+ */
+function argumentHintStart(row: FrameRow, text: string, holeStart: number, holeEnd: number, rule: FrameRow | undefined, entries: readonly string[]): number | null {
+  const ruleFg = rule?.segments.find((segment) => segment.text.trim() !== "")?.fg;
+  if (ruleFg === undefined) return null;
+  let from = 0;
+  let last: { readonly run: FrameRun; readonly at: number } | null = null;
+  for (const run of row.segments) {
+    if (from >= holeStart && from < holeEnd && run.text.trim() !== "") last = { run, at: from };
+    from += run.text.length;
+  }
+  if (last === null || last.at <= holeStart) return null;
+  if (last.run.fg !== ruleFg || !last.run.text.startsWith(" ") || !BRACKETED.test(last.run.text.trim())) return null;
+  return entries.includes(text.slice(holeStart, last.at).trim()) ? last.at : null;
+}
+
+/**
+ * The draft as one line: each piece's text joined with one space, with the profile's ghost text cut off
+ * the end of the last piece ({@link hintStart}).
+ */
+function draftText(rows: readonly FrameRow[], texts: readonly string[], pieces: readonly DraftPiece[], hint: ReadonlySet<string> | null): string {
+  const last = pieces[pieces.length - 1];
+  const ghost = last === undefined || hint === null ? null : hintStart(rows[last.row]!, last, hint);
+  return pieces
+    .map((piece) => texts[piece.row]!.slice(piece.start, piece === last && ghost !== null ? ghost : piece.end).trim())
+    .filter((part) => part.length > 0)
+    .join(" ")
+    .trim();
 }
 
 /** The statusline run and the footer under the bottom edge (`Frame.volatile`). */
@@ -426,40 +592,66 @@ export function frameAt(rows: readonly FrameRow[], bottom: number, idle: IdlePro
   const hole = promptMatch.groups?.draft;
   const holeStart = promptMatch.indices?.groups?.draft?.[0] ?? texts[prompt]!.length;
   if (hole !== undefined) anchorsHit.push("draft");
-  const parts = [(hole ?? "").trim()];
-  for (let j = prompt + 1; j < bottom; j++) {
-    const part = texts[j]!.trim();
-    if (part.length > 0) parts.push(part);
+  // A list drawn inside the box under the prompt row (`commandList` side `inside`) is no draft:
+  // its rows stay out of the text, but only under a hole that opens with the entries' own first
+  // character (the list opens for that input alone), so a wrapped prose draft whose rows happen
+  // to be entry-shaped keeps them.
+  const inside = insideList(texts, prompt, bottom, idle.volatile.below.commandList, rows);
+  const listed = inside !== null && (hole ?? "").trim().startsWith(inside.entries[0]!.charAt(0)) ? inside : null;
+  // A bracketed argument hint after a complete entry (`commandList.argumentHint`) is no draft
+  // either: the hole ends where the hint starts, so the read is the command as typed.
+  let holeEnd = holeStart + (hole ?? "").length;
+  if (listed !== null && idle.volatile.below.commandList?.argumentHint === true) {
+    const cut = argumentHintStart(rows[prompt]!, texts[prompt]!, holeStart, holeEnd, rows[bottom], listed.entries);
+    if (cut !== null) holeEnd = cut;
   }
-  const text = parts.join(" ").trim();
+  const pieces: DraftPiece[] = [];
+  const holePiece = trimmedPiece(prompt, texts[prompt]!, holeStart, holeEnd);
+  if (holePiece !== null) pieces.push(holePiece);
+  for (let j = prompt + 1; j < bottom; j++) {
+    if (listed !== null && j >= listed.first && j <= listed.last) continue;
+    const piece = trimmedPiece(j, texts[j]!, 0, texts[j]!.length);
+    if (piece !== null) pieces.push(piece);
+  }
+  const text = draftText(rows, texts, pieces, c.hint);
   anchorsHit.push("bottom");
 
-  const byText = isPlaceholderText(text, idle);
-  const bySgr = holeIsFaint(rows, prompt, holeStart, bottom - 1, idle.placeholders.sgr);
-  if (byText) anchorsHit.push("placeholder-text");
-  if (bySgr) anchorsHit.push("placeholder-sgr");
+  const placeholder = readPlaceholder(rows, prompt, holeStart, bottom - 1, text, idle, c.placeholderFg, anchorsHit);
 
   let end = texts.length;
   while (end > bottom + 1 && isBlank(texts[end - 1]!)) end--;
   const { status, footer, named } = walkBelowNamed(texts, bottom, end, idle, c.footerRows);
-  const aboveRows = Math.min(idle.volatile.above.maxRows, top);
-  const above = aboveRows > 0 ? { first: top - aboveRows, last: top - 1 } : null;
+  const above = bandAbove(texts, top, idle);
 
   return {
     top,
     bottom,
     label: label.length > 0 ? label : null,
     interior: { first: top + 1, prompt, last: bottom - 1, text },
-    placeholder: byText || bySgr,
+    placeholder,
     volatile: { above, status, footer, named },
     anchorsHit,
   };
 }
 
-/** The text a row adds to the draft on the interior walk: the profile's `text` group, or the trimmed row. */
-function interiorPiece(text: string, continuation: RegExp | null): string {
-  const hit = continuation?.exec(text.trimEnd())?.groups?.text;
-  return (hit ?? (continuation === null ? text : "")).trim();
+/**
+ * The volatile band above a box whose top edge is `top`: up to `volatile.above.maxRows` rows, counted up
+ * from the first row of a notice the profile names over the box (`idle.notices`) when one stands there,
+ * so the notice's own rows never fill the band and a dialog drawn above it is still read.
+ */
+function bandAbove(texts: readonly string[], top: number, idle: IdleProfile): { first: number; last: number } | null {
+  const notice = readAboveNotice(texts, top, idle.notices ?? [], idle.noticeGaps ?? []);
+  const from = notice === null ? top : notice.first;
+  const aboveRows = Math.min(idle.volatile.above.maxRows, from);
+  return aboveRows > 0 ? { first: from - aboveRows, last: top - 1 } : null;
+}
+
+/** The piece a row adds to the draft on the interior walk: the profile's `text` group, or the trimmed row. */
+function interiorPiece(row: number, text: string, continuation: RegExp | null): DraftPiece | null {
+  if (continuation === null) return trimmedPiece(row, text, 0, text.length);
+  const hit = continuation.exec(text.trimEnd());
+  const span = hit?.indices?.groups?.text;
+  return span === undefined ? null : trimmedPiece(row, text, span[0], span[1]);
 }
 
 /**
@@ -475,10 +667,17 @@ function interiorFrameAt(rows: readonly FrameRow[], bottom: number, idle: IdlePr
   if (bottomText === undefined) return null;
   const open = c.bottom.open;
   if (!open && anchored(bottomText, c.bottom) === null) return null;
+  // Set when the row under the box is not the harness's own: the box then stands only over the typed
+  // command's own list (`idle.volatile.below.commandList`), checked once the box's text is read.
+  let listed = false;
   if (c.interior.under !== null && !open) {
-    // The row the harness always draws under its box: the first row there that is not blank.
-    const under = texts.slice(bottom + 1).find((text) => !isBlank(text));
-    if (under !== undefined && !c.interior.under.test(under.trimEnd())) return null;
+    // The row the harness always draws under its box: the first row there that is not blank. Where
+    // the profile says so (`underPainted`), an extension's own status line passes too (paintedFooter).
+    const at = texts.findIndex((text, i) => i > bottom && !isBlank(text));
+    if (at >= 0 && !c.interior.under.test(texts[at]!.trimEnd()) && !(c.interior.underPainted && paintedFooter(rows, texts, bottom, idle))) {
+      if (idle.volatile.below.commandList === undefined) return null;
+      listed = true;
+    }
   }
   const budget = idle.frame.maxDraftRows;
 
@@ -530,12 +729,14 @@ function interiorFrameAt(rows: readonly FrameRow[], bottom: number, idle: IdlePr
 
   const hole = promptMatch.groups?.draft;
   const holeStart = promptMatch.indices?.groups?.draft?.[0] ?? texts[prompt]!.length;
-  const parts: string[] = [];
+  const pieces: DraftPiece[] = [];
   for (let j = top + 1; j <= last; j++) {
-    const piece = j === prompt ? (hole ?? "").trim() : interiorPiece(texts[j]!, c.interior.continuation);
-    if (piece.length > 0) parts.push(piece);
+    const piece = j === prompt ? trimmedPiece(j, texts[j]!, holeStart, holeStart + (hole ?? "").length) : interiorPiece(j, texts[j]!, c.interior.continuation);
+    if (piece !== null) pieces.push(piece);
   }
-  const text = parts.join(" ").trim();
+  const text = draftText(rows, texts, pieces, c.hint);
+  // A list pushed the harness's own row down: only the typed command's own list may stand there.
+  if (listed && ownListUnder(texts, bottom, text, idle.volatile.below.commandList) === null) return null;
 
   const label = topMatch.groups?.label?.trim() ?? "";
   const anchorsHit: FrameAnchorHit[] = ["top"];
@@ -543,27 +744,25 @@ function interiorFrameAt(rows: readonly FrameRow[], bottom: number, idle: IdlePr
   anchorsHit.push("prompt");
   if (hole !== undefined) anchorsHit.push("draft");
   anchorsHit.push("bottom");
-  const byText = isPlaceholderText(text, idle);
-  const bySgr = prompt <= last && holeIsFaint(rows, prompt, holeStart, last, idle.placeholders.sgr);
-  if (byText) anchorsHit.push("placeholder-text");
-  if (bySgr) anchorsHit.push("placeholder-sgr");
+  const placeholder = readPlaceholder(rows, prompt, holeStart, last, text, idle, c.placeholderFg, anchorsHit);
 
   let end = texts.length;
   while (end > bottom + 1 && isBlank(texts[end - 1]!)) end--;
-  // An open box ends on the screen's last row, so nothing is under it to walk or name.
+  // An open box has no edge to walk a statusline from: rows under it (a widget) stay in the cues' sight.
   const { status, footer, named } = open ? { status: null, footer: null, named: [] } : walkBelowNamed(texts, bottom, end, idle, c.footerRows);
-  const aboveRows = Math.min(idle.volatile.above.maxRows, top);
-  const above = aboveRows > 0 ? { first: top - aboveRows, last: top - 1 } : null;
+  const above = bandAbove(texts, top, idle);
 
-  return {
+  const frame: Frame = {
     top,
     bottom,
     label: label.length > 0 ? label : null,
     interior: { first: top + 1, prompt, last: open ? bottom : bottom - 1, text },
-    placeholder: byText || bySgr,
+    placeholder,
     volatile: { above, status, footer, named },
     anchorsHit,
   };
+  // The layout's own prompt glyph (`ownPrompt`): only on a box whose every row the profile's `rows` named.
+  return idle.frame.ownPrompt === true && c.interior.rows !== null ? { ...frame, ownPrompt: { row: prompt, end: holeStart } } : frame;
 }
 
 const compiledOverlays = new WeakMap<IdleProfile, readonly RegExp[]>();
@@ -618,14 +817,53 @@ function alternatesOf(idle: IdleProfile): readonly IdleProfile[] {
   return list;
 }
 
+/**
+ * The frame of an open box over the last non-blank row `end - 1`. Each row passed over on the way up
+ * is blank or a row the profile's `rows` pattern does not accept: a row the box draws (an edge, a draft
+ * row) is never passed, so a read cut inside the box still finds no frame.
+ */
+function openFrame(rows: readonly FrameRow[], end: number, idle: IdleProfile): Frame | null {
+  const under = compile(idle).interior.rows;
+  for (let b = end - 1; b >= 0 && end - 1 - b <= idle.frame.maxTailRows; b--) {
+    const frame = interiorFrameAt(rows, b, idle);
+    if (frame !== null) return frame;
+    const text = rowText(rows[b]!);
+    if (under === null || (!isBlank(text) && under.test(text.trimEnd()))) return null;
+  }
+  return null;
+}
+
 function findLayout(rows: readonly FrameRow[], idle: IdleProfile): Frame | null {
   const c = compile(idle);
   let end = rows.length;
   while (end > 0 && isBlank(rowText(rows[end - 1]!))) end--;
-  // An open box has no bottom edge: its last row is the last row of the screen.
-  if (c.bottom.open) return end === 0 ? null : interiorFrameAt(rows, end - 1, idle);
+  // An open box has no bottom edge: its last row is the last row of the screen, or a row at most
+  // `maxTailRows` above it when rows the box never draws stand under it (an extension's widget, #468).
+  if (c.bottom.open) return openFrame(rows, end, idle) ?? listedLayout(rows, end, idle);
   for (let b = end - 1; b >= 0 && end - 1 - b <= idle.frame.maxTailRows; b--) {
     if (anchored(rowText(rows[b]!), c.bottom) !== null) return frameAt(rows, b, idle);
   }
-  return null;
+  return listedLayout(rows, end, idle);
+}
+
+/** How far up from the screen's end a box past its own command list is looked for: a list and its footer are never taller. */
+const LISTED_REACH = 64;
+
+/**
+ * The box over the typed command's own list (`idle.volatile.below.commandList`), when the search at the
+ * screen's end found none: a list taller than `maxTailRows` pushes the box's bottom edge, or an open
+ * box's last row, out of that search's reach. The row right over the list is tried as that edge, and
+ * the box found there is kept only when the list's pointer rests on exactly the box's text. A list that
+ * points at another command, or at none, finds no box here.
+ */
+function listedLayout(rows: readonly FrameRow[], end: number, idle: IdleProfile): Frame | null {
+  const list = idle.volatile.below.commandList;
+  if (list === undefined) return null;
+  const texts = rows.map(rowText);
+  const bottom = listedBottom(texts, end, LISTED_REACH, list);
+  if (bottom === null) return null;
+  const c = compile(idle);
+  const frame = c.bottom.open ? interiorFrameAt(rows, bottom, idle) : anchored(texts[bottom]!, c.bottom) === null ? null : frameAt(rows, bottom, idle);
+  if (frame === null || frame.placeholder) return null;
+  return ownListUnder(texts, bottom, frame.interior.text, list) === null ? null : frame;
 }

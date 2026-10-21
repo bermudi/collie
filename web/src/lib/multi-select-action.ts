@@ -6,7 +6,9 @@
 //
 //   - DIGIT mode (Claude): a digit TOGGLES its option on/off (pointer-independent, deterministic).
 //     "Chat about this" aborts the tool. The review screen's 1/2 submit/cancel. Each of these is one
-//     guarded keystroke.
+//     guarded keystroke, except with the pointer on the free-text field (`pointer: "field"`), where
+//     a digit is typed into the field: the toggle, the escape and a step key first move the pointer
+//     off it with one Up and read that back (`offField`).
 //   - POINTER mode (Muse): a digit merely MOVES the pointer (verified target row first) and review
 //     swallows digits entirely, so toggle is digit-jump + verified Enter and review submit/cancel is
 //     a verified pointer walk + a freshly-bound Enter (the irreversible keystroke carries a fresh
@@ -28,16 +30,24 @@
 // pointer-independent-but-not-checkbox-independent `multiSelectIdentity` so the macro's own Down/Up
 // moves don't read as drift while a box flipped by another device does. Both comparators are the
 // neutral contract in harness/multi-select-model.ts, wired to this kind by harness/dialog-contract.ts.
+//
+// The `type` intent (ADR 0113) is the shared answer recipe (lib/answer-field.ts), then one bound
+// `Enter` only if the typed row reads unticked, then a park of the pointer on the option row above the
+// field. Not on the advance row: with the pointer on `Submit`/`Next` an option's digit does nothing
+// (ASK_FIELD_NOTES.md § Multi-select), so every checkbox tap after the answer would be dead.
 
+import { fillAnswerField, type FieldAccess } from "./answer-field";
 import { type MultiSelectModel } from "./blocks";
 import {
   guardDialog,
+  pollDialog,
   readDialog,
   sendBoundKeys,
   type DialogTarget,
 } from "./dialog-guard";
 import { multiSelectIdentity } from "./harness/multi-select-model";
 import { defaultSleep, type ActionResult, type Sleep } from "./harness/guard";
+import { t } from "./i18n";
 import { paneScopeKey, type Scope } from "./scope";
 
 /** One tap's intent, resolved to keystrokes by {@link submitMultiSelectIntent}. Shared with the
@@ -52,7 +62,9 @@ export type MultiSelectIntent =
   | { kind: "confirm" } //           review: submit the answers (digit 1, pointer walk + Enter, or
   //                                 the declared `submitKeys`)
   | { kind: "cancel" } //            review: back out (digit 2, pointer walk + Enter, or `cancelKeys`)
-  | { kind: "back" }; //             review: back to the checkbox screen (the declared `backKeys`)
+  | { kind: "back" } //              review: back to the checkbox screen (the declared `backKeys`)
+  | { kind: "type"; text: string }; // checkbox: type an answer into the field, tick it, park on the
+  //                                 option row above it
 
 /** The multi-select identity comparators, part of the neutral contract
  *  (harness/multi-select-model.ts). Re-exported under their original names so existing call sites and
@@ -117,6 +129,7 @@ async function dispatchIntent(
   args: GuardArgs & { intent: MultiSelectIntent },
 ): Promise<ActionResult> {
   const { intent } = args;
+  if (intent.kind === "type") return runTypeAnswer(args, intent.text);
   if (intent.kind === "advance") {
     if (args.multi.phase !== "checkbox") return { status: "changed" };
     // No advance row to walk onto: the harness declared the advance as keys, so it is one guarded
@@ -129,20 +142,27 @@ async function dispatchIntent(
     // emits an out-of-range / non-option `n` must never inject a stray digit into the live terminal.
     // (The entry guard then confirms that model is still on screen, so the digit maps to a real,
     // present option.)
-    if (args.multi.phase !== "checkbox" || !args.multi.options.some((o) => o.n === intent.n)) {
+    if (args.multi.phase !== "checkbox" || !isToggleable(args.multi, intent.n)) {
       return { status: "changed" };
     }
-    if (args.multi.toggle === "pointer") return runToggleMacro(args, intent.n);
-    return guardedKey(args, [String(intent.n)]);
+    const aimed = await offField(args);
+    if (!aimed.ok) return aimed.result;
+    // The recipe of the tapped model: identity compares `toggle`, so the aimed one has the same.
+    if (args.multi.toggle === "pointer") return runToggleMacro(aimed.args, intent.n);
+    return guardedKey(aimed.args, [String(intent.n)]);
   }
   if (intent.kind === "nav") {
     // Only a wizard STEP has anywhere to navigate to; a standalone multiSelect has no siblings.
     if (args.multi.phase !== "checkbox" || !args.multi.steps) return { status: "changed" };
-    return guardedKey(args, intent.keys);
+    const aimed = await offField(args);
+    if (!aimed.ok) return aimed.result;
+    return guardedKey(aimed.args, intent.keys);
   }
   if (intent.kind === "escape") {
     if (args.multi.phase !== "checkbox" || !args.multi.escape) return { status: "changed" };
-    return guardedKey(args, [String(args.multi.escape.n)]);
+    const aimed = await offField(args);
+    if (!aimed.ok) return aimed.result;
+    return guardedKey(aimed.args, [String(args.multi.escape.n)]);
   }
   if (intent.kind === "back") {
     if (args.multi.phase !== "review" || !args.multi.backKeys) return { status: "changed" };
@@ -162,6 +182,16 @@ async function dispatchIntent(
   if (args.multi.submit === "pointer") return runReviewMacro(args, "cancel");
   if (args.multi.submit === "keys") return guardedKey(args, args.multi.cancelKeys);
   return guardedKey(args, ["2"]);
+}
+
+/**
+ * Whether digit `n` toggles a row the card offers: an option, or the answer field while it holds text
+ * and is not focused (its digit toggles its tick, measured; a focused field would type the digit).
+ */
+function isToggleable(multi: Extract<MultiSelectModel, { phase: "checkbox" }>, n: number): boolean {
+  if (multi.options.some((o) => o.n === n)) return true;
+  const field = multi.field;
+  return field !== undefined && field.n === n && field.text !== "" && !field.focused;
 }
 
 /** Entry guard, then send exactly `keys` (one keystroke against the dialog). */
@@ -234,9 +264,10 @@ async function runAdvanceMacro(args: GuardArgs): Promise<ActionResult> {
   if (!guarded.ok) return guarded.result;
 
   const sleep = args.sleep ?? defaultSleep;
-  // Bound the walk: enough nudges to cross every navigable row (options + free-text + Submit + Chat)
-  // with slack for a couple of swallowed keys, so a wedged pane can't loop forever.
-  const maxSteps = args.multi.options.length + 6;
+  // Bound the walk: enough nudges to cross every navigable row (options + the field + Submit + Chat)
+  // with slack for a couple of swallowed keys, so a wedged pane can't loop forever. On a focused,
+  // wrapped answer field a Down first moves the caret down one visual line, so each line costs a step.
+  const maxSteps = args.multi.options.length + 6 + (args.multi.field?.lines ?? 0);
   // Enter stays protected by the identity check that runs before every macro write.
   const sendMacroStep = bindFirstWriter(args, guarded.region);
 
@@ -251,14 +282,143 @@ async function runAdvanceMacro(args: GuardArgs): Promise<ActionResult> {
       // This macro deliberately does not predict another screen's shape.
       return (await sendMacroStep(["Enter"])) ?? { status: "sent" };
     }
-    // Nudge toward the advance row: Down for every row above it (options / free-text / none), and Up
-    // on the off chance the pointer starts on the bottom "Chat about this" row (advance is above it).
+    // Nudge toward the advance row: Down for every row above it (options, the answer field — `field`,
+    // focused or not — and none), and Up on the off chance the pointer starts on the bottom "Chat about
+    // this" row (advance is above it). Down from a focused single-line field lands on the advance row.
     const sent = await sendMacroStep([m.pointer === "chat" ? "Up" : "Down"]);
     if (sent) return sent;
     await sleep(NAV_SETTLE_MS);
   }
   // Never landed on the advance row within the bounded walk — refresh rather than blind-send.
   return { status: "changed" };
+}
+
+// Leaving the field is ONE Up and then reads until the pointer shows it went. A redraw that has not
+// caught up is never a reason for a second Up: that one would move a pointer that did leave.
+const LEAVE_FIELD_MAX_READS = 6;
+
+/**
+ * Aim a digit or a step key off the free-text field: while the pointer stands on it (`field`), a
+ * digit is typed into it and Left/Right move its cursor. With the pointer anywhere else this returns
+ * the arguments untouched and reads nothing. On the field it runs: entry guard → ONE Up, bound to the
+ * entry region (an arrow is never typed into the field) → fresh reads until the pointer is seen off
+ * it. It hands back that read's model, and the caller sends its key through its OWN entry guard
+ * against it. That guard's commit comparison fails on a screen where the field has focus again, so a
+ * pointer that went back in the gap gets no digit. Never sends the caller's key itself.
+ */
+async function offField(
+  args: GuardArgs,
+): Promise<{ ok: true; args: GuardArgs } | { ok: false; result: ActionResult }> {
+  if (args.multi.phase !== "checkbox" || args.multi.pointer !== "field") return { ok: true, args };
+  const guarded = await guardDialog(target(args));
+  if (!guarded.ok) return guarded;
+  const sent = await sendBoundKeys(args, ["Up"], guarded.region);
+  if (sent.status !== "sent") return { ok: false, result: sent };
+
+  const sleep = args.sleep ?? defaultSleep;
+  for (let read = 0; read < LEAVE_FIELD_MAX_READS; read++) {
+    await sleep(NAV_SETTLE_MS);
+    const m = await readMacroDialog(args, sleep);
+    if (!m) continue;
+    // Drift guard: a successor dialog, a flipped box, or the checkbox screen gone — no further key.
+    if (!multiSelectIdentity(m, args.multi) || m.phase !== "checkbox") {
+      return { ok: false, result: { status: "changed" } };
+    }
+    if (m.pointer !== "field" && m.pointer !== null) return { ok: true, args: { ...args, multi: m } };
+  }
+  // Never saw the pointer leave the field: refresh rather than type a digit into it.
+  return { ok: false, result: { status: "changed" } };
+}
+
+type Checkbox = Extract<MultiSelectModel, { phase: "checkbox" }>;
+type Proved = { ok: true; proof: MultiSelectModel } | { ok: false; result: ActionResult };
+
+const fieldOn = (m: MultiSelectModel) => (m.phase === "checkbox" ? m.field : undefined);
+
+/** How the answer recipe reads a multi-select question: its `field`, against the dialog tapped. The
+ *  field's digit toggles its tick and never focuses it, so the recipe always walks onto the row. */
+function multiFieldAccess(tapped: Checkbox): FieldAccess<"multi-select"> {
+  return {
+    fieldOf: (m) => {
+      const field = fieldOn(m);
+      if (field === undefined) return null;
+      const { n, focused, text, pointer } = field;
+      return { key: String(n), focused, text, pointer };
+    },
+    sameDialog: (m) => multiSelectIdentity(m, tapped),
+    digitFocuses: false,
+  };
+}
+
+/**
+ * Answer the question in the person's own words (ADR 0113): the shared recipe (lib/answer-field.ts)
+ * walks onto the field, clears what the person saw in it, types `text` and proves it arrived; then the
+ * row is ticked if it reads unticked, and the pointer parked on the option row above the field, where
+ * the options' digits toggle again. Nothing commits: the person still taps Submit or Next.
+ */
+async function runTypeAnswer(args: GuardArgs, text: string): Promise<ActionResult> {
+  if (args.multi.phase !== "checkbox" || !args.multi.field) return { status: "changed" };
+  const sleep = args.sleep ?? defaultSleep;
+  const filled = await fillAnswerField({ ...target(args), sleep }, multiFieldAccess(args.multi), text);
+  if (!filled.ok) return filled.result;
+  // The recipe proved the field holds exactly the sanitised text, so the proof's text is ours.
+  const ours = fieldOn(filled.proof)?.text ?? "";
+  const ticked = await tickField(args, filled.proof, ours, sleep);
+  if (!ticked.ok) return ticked.result;
+  return parkAboveField(args, ticked.proof, ours, sleep);
+}
+
+/**
+ * Typing into an empty field ticks it, but a field someone unticked and we cleared may stay unticked.
+ * `Enter` on the focused field TOGGLES the tick (ASK_FIELD_NOTES.md § Multi-select), so it is sent at
+ * most ONCE, only on a read that shows the row unticked, bound to that read; then the tick is verified.
+ * Never another Enter: a second one would untick it again.
+ */
+async function tickField(args: GuardArgs, proof: MultiSelectModel, ours: string, sleep: Sleep): Promise<Proved> {
+  if (fieldOn(proof)?.checked) return { ok: true, proof };
+  const sent = await sendBoundKeys(args, ["Enter"], proof.regionSignature);
+  if (sent.status !== "sent") return { ok: false, result: sent };
+  const polled = await pollDialog({ ...target(args), sleep }, (m) => {
+    const field = fieldOn(m);
+    return field !== undefined && field.checked && field.text === ours;
+  });
+  if (polled.status === "drifted") return { ok: false, result: { status: "changed", why: "tick: drift" } };
+  if (polled.status === "timeout") {
+    return { ok: false, result: { status: "error", error: t("promptAction.answer.notTicked") } };
+  }
+  return { ok: true, proof: polled.model };
+}
+
+/**
+ * Walk the pointer off the focused field onto the option row directly above it, so the card's toggles
+ * work again: a focused field types every digit, and with the pointer on `Submit`/`Next` an option's
+ * digit does nothing (ASK_FIELD_NOTES.md § Multi-select). `Up`, bound to the read that showed where
+ * the pointer was, then a poll until the screen moved, until a read shows the pointer on an option
+ * above the field with our text still in it and ticked. An `Up` inside a wrapped value moves the caret
+ * up a visual line first, so the bound is the field's lines plus slack. A read that drifted or shows
+ * the field changed refuses; a park that runs out of steps still reports `sent`: the answer is in and
+ * ticked, and a toggle, escape or step key tapped next moves the pointer off first (`offField`). Never an
+ * `Enter`: on the field it would untick.
+ */
+async function parkAboveField(args: GuardArgs, proof: MultiSelectModel, ours: string, sleep: Sleep): Promise<ActionResult> {
+  const bound = (fieldOn(proof)?.lines ?? 1) + 3;
+  let current = proof;
+  for (let step = 0; step < bound; step++) {
+    if (current.phase === "checkbox" && current.pointer === "option" && current.field?.pointer === "above") {
+      return { status: "sent" };
+    }
+    const sent = await sendBoundKeys(args, ["Up"], current.regionSignature);
+    if (sent.status !== "sent") return sent;
+    const before = current.regionSignature;
+    const moved = await pollDialog({ ...target(args), sleep }, (m) => m.regionSignature !== before);
+    if (moved.status === "drifted") return { status: "changed", why: "park: drift" };
+    // A caret move inside a wrapped value repaints nothing: the next Up goes from the same read.
+    if (moved.status === "timeout") continue;
+    const field = fieldOn(moved.model);
+    if (field === undefined || field.text !== ours || !field.checked) return { status: "changed", why: "park: drift" };
+    current = moved.model;
+  }
+  return { status: "sent" };
 }
 
 // The pointer-mode toggle needs no walk (the digit jumps straight there), only retries for a

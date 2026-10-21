@@ -62,8 +62,8 @@ export type ToolCall =
   | { kind: "fetch"; url: string }
   /** A file was removed or renamed. `to` is the destination of a move. */
   | { kind: "delete" | "move"; path: string; to?: string }
-  /** A subagent ran. */
-  | { kind: "task"; agent: string; summary: string }
+  /** A subagent ran. `agentId` names the subagent's own log when the harness records one. */
+  | { kind: "task"; agent?: string; summary: string; agentId?: string }
   /**
    * The agent asked the operator to choose. One entry per question the call carried. `answers[i]` is
    * the list of chosen labels for question `i`, present only once the call completed with answers.
@@ -93,6 +93,9 @@ const NAMES = {
   // Muse's file verbs (bridge/journal/muse.ts): without these its workhorse calls read as `other`.
   edit_file: "edit",
   write_file: "edit",
+  // Kiro's file verbs (bridge/journal/kiro.ts).
+  fs_write: "edit",
+  str_replace: "edit",
   // execute
   bash: "execute",
   shell: "execute",
@@ -103,6 +106,8 @@ const NAMES = {
   run: "execute",
   bashoutput: "execute",
   exec_command: "execute",
+  // Kiro's shell tool.
+  execute_bash: "execute",
   // read
   read: "read",
   read_file: "read",
@@ -221,7 +226,13 @@ function readQuestions(o: JsonObject): ToolQuestion[] | undefined {
       if (description !== undefined) entry.description = description;
       options.push(entry);
     }
-    const parsed: ToolQuestion = { question, multiple: q.multiple === true || q.multiSelect === true, options };
+    // Muse spells multi-select as a nested `selection: {mode: "multiple", …}` instead of a flag.
+    const selectionMultiple = isRecord(q.selection) && q.selection.mode === "multiple";
+    const parsed: ToolQuestion = {
+      question,
+      multiple: q.multiple === true || q.multiSelect === true || selectionMultiple,
+      options,
+    };
     const header = text(q.header, MAX_HEADER_CHARS);
     if (header !== undefined) parsed.header = header;
     questions.push(parsed);
@@ -290,12 +301,15 @@ export function classifyToolCall(name: string, input: JsonValue | undefined, sum
       if (to !== undefined) call.to = to;
       return call;
     }
-    case "task":
-      return {
-        kind: "task",
-        agent: str(o, "subagent_type", "agent", "agent_type") ?? "agent",
-        summary: str(o, "description", "task") ?? summary,
-      };
+    case "task": {
+      // NO WORD STANDS IN FOR A MISSING NAME. A Claude Code Agent call that names no subagent type
+      // carries its `model` ("opus", "sonnet") instead, and that says more than the word "agent" did.
+      // With neither, the field is absent and the card draws plain "Agent".
+      const call: ToolCall = { kind: "task", summary: str(o, "description", "task") ?? summary };
+      const agent = str(o, "subagent_type", "agent", "agent_type") ?? str(o, "model");
+      if (agent !== undefined) call.agent = agent;
+      return call;
+    }
     default:
       return { kind: "other", name, summary };
   }

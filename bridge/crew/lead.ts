@@ -1,6 +1,9 @@
 import type { JsonValue } from "../json.ts";
 import type { SnapshotView } from "../sessions.ts";
 import { parsePeerMachineStats } from "../machine-parse.ts";
+import { WALKY_REPORT_FIELD } from "../walky/crew.ts";
+import { readWalkyReport } from "../walky/parse.ts";
+import type { WalkyReceipt } from "../walky/types.ts";
 import type { MachineSample, MuxConfig, SessionCard, SnapshotResponse } from "../types.ts";
 import { forwardToPeer, type ForwardDeps, type ForwardTransport } from "./forward.ts";
 import {
@@ -185,7 +188,12 @@ export interface CrewLeadDeps {
     link: CrewLink,
     view: SnapshotView,
     freshPreflight?: boolean,
-    follow?: { readonly leadRelease?: string | null; readonly turn?: string | null },
+    follow?: {
+      readonly leadRelease?: string | null;
+      readonly leadLine?: string | null;
+      readonly turn?: string | null;
+      readonly walkyAck?: string | null;
+    },
   ) => Promise<PeerOutcome<unknown>>;
   /**
    * §20's half of the sweep (M16/04): what this lead may state about ITSELF, and the queue that
@@ -234,6 +242,24 @@ export interface CrewLeadDeps {
    * it is. Optional, so a lead built without the machine watch sweeps exactly as before.
    */
   readonly onMachineStats?: (memberId: string, sample: MachineSample, at: number) => void;
+  /**
+   * A member's walky talky report, read off the answer this sweep just parsed (CREW_PROTOCOL §21):
+   * the receipts it holds for messages from elsewhere that this lead has not acked, and the report's
+   * cursor (null from a member before the ack). Called only when the answer carried at least one
+   * receipt, so a member with nothing to say costs nothing. The receiver decides which of them it
+   * believes (`bridge/walky/crew.ts` → `mergeReport`) and keeps the cursor for {@link walkyAck}.
+   */
+  readonly onWalkyReceipts?: (memberId: string, receipts: readonly WalkyReceipt[], cursor: string | null) => void;
+  /**
+   * The cursor this lead acks on its next snapshot dial of a member (§21, added 2026-10-18): sent
+   * as `X-Crew-Walky-Ack`, read per dial. Absent, or null: no header, and the member keeps its report.
+   */
+  readonly walkyAck?: (memberId: string) => string | null;
+  /**
+   * The members whose snapshot answered on this sweep, after their answers are banked (§21, added
+   * 2026-10-18): walky talky pushes a member's outcomes again from here. Never awaited.
+   */
+  readonly onWalkySwept?: (memberIds: readonly string[]) => void;
   /**
    * A member answered §18.10's named `lead_conflict`: **it follows somebody else now.**
    *
@@ -306,6 +332,12 @@ export interface FollowDistribution {
    * boot would keep a whole crew waiting for a restart.
    */
   readonly leadRelease: () => string | null;
+  /**
+   * This lead's release line, and its step when the release it states is where a rollback or a
+   * switch back to Stable landed (`X-Crew-Lead-Line`, M60 spec 01). Sent only beside the release.
+   * Optional: a caller that passes none sends no line, which every member reads as Stable.
+   */
+  readonly leadLine?: () => string | null;
   /**
    * This lead's own run record, resolved, or null. The queue reads it to tell a lead still taking
    * the release from one whose update rolled back and will never state the target (A1). Optional:
@@ -390,6 +422,17 @@ export class CrewLead {
    * past one.
    */
   private readonly muxAsked = new Set<string>();
+  /**
+   * The release each member's last sweep answer named, so a change between two sweeps can be seen.
+   *
+   * A member's hello is asked once per link ({@link muxAsked}), and a member that updates restarts so
+   * fast that no sweep may fail in between. Its old hello then stayed the lead's whole answer: on
+   * 2026-10-17 a lead restarted at 1.22.1 while its member still ran 1.21.3, the member followed 28 s
+   * later, and the lead kept "no Surface reader" and refused every text to it until the lead itself
+   * restarted. A changed version forgets the hello, so the same sweep asks once more, and a member
+   * that rolled back is learned the same way.
+   */
+  private readonly sweptVersions = new Map<string, string>();
   /**
    * The state each member's last journal line named. A line is written when this string changes and
    * never otherwise, so the sweep's 1.5 s cadence cannot turn a down peer into a stream.
@@ -477,6 +520,7 @@ export class CrewLead {
         this.muxBlocks.delete(id);
         this.sessionCards.delete(id);
         this.surfaceVersions.delete(id);
+        this.sweptVersions.delete(id);
         this.muxAsked.delete(id);
         this.loggedState.delete(id);
         this.contactResets.delete(id);
@@ -507,13 +551,16 @@ export class CrewLead {
       }
 
       const leadRelease = follow?.leadRelease() ?? null;
+      const leadLine = leadRelease === null ? null : (follow?.leadLine?.() ?? null);
       // The dial each member is about to make, claimed BEFORE the call and carried beside the answer
       // — the link's `runAtStart`. See {@link CrewLead.dialGenerations}.
       const dialled = new Map(due.map((link) => [link.memberId, this.nextDialGeneration(link.memberId)]));
       const outcomes = await sweepPeers(due, (link) =>
         this.deps.snapshot(link, SWEEP_VIEW, opts.freshPreflight === true || this.verdictMissing(link.memberId, follow), {
           leadRelease,
+          leadLine,
           turn: follow?.turns.turnFor(link.memberId) ?? null,
+          walkyAck: this.deps.walkyAck?.(link.memberId) ?? null,
         }),
       );
       // Every member whose answer survived the fence. The dropped ones are removed from `outcomes`
@@ -550,6 +597,10 @@ export class CrewLead {
         // goes through the same seam the verdict probe uses, so it arms no timer (§10.1) and at most
         // one hello per member is ever in flight. Any other outcome forgets the answer instead, so
         // the next return re-asks rather than serving a block from before the link dropped.
+        // A member that now names another release than its last sweep did has restarted on it, and
+        // its hello may say something else (its reader version above all). Forget the old one, so the
+        // line below asks once. The next sweep names the same release and asks nothing.
+        if (seen !== null) this.noteSweptVersion(memberId, seen);
         if (outcome.ok) this.learnCapabilities(link);
         else this.muxAsked.delete(memberId);
         // §18.10: this member follows somebody else. Handed straight over — a lead that has been
@@ -571,6 +622,9 @@ export class CrewLead {
           // re-checks every field and answers `null` for anything it cannot trust.
           const load = this.deps.onMachineStats === undefined ? null : parsePeerMachineStats(outcome.value as JsonValue);
           if (load !== null) this.deps.onMachineStats?.(memberId, load, this.now());
+          // §21: that member's walky report, off the same answer. SAFETY: the same cast and reason.
+          const walky = this.deps.onWalkyReceipts === undefined ? null : readWalkyReport(outcome.value as JsonValue, WALKY_REPORT_FIELD);
+          if (walky !== null && walky.receipts.length > 0) this.deps.onWalkyReceipts?.(memberId, walky.receipts, walky.cursor);
         }
         const previous = this.memory.get(memberId);
         const next = foldPeerMemory(previous, outcome, this.now());
@@ -587,6 +641,8 @@ export class CrewLead {
           this.deps.onPeerSnapshot?.(memberId, next.body);
         }
       }
+      // §21: every member that answered may take its walky outcomes now. Handed over, never awaited.
+      this.deps.onWalkySwept?.(folded.filter((link) => outcomes.get(link.memberId)?.ok === true).map((link) => link.memberId));
       // §20's fold, after every member's answer is banked: who is behind, who is moving, who fell
       // back, and who has now missed three sweeps. A turn RELEASED here earns an immediate re-sweep
       // — the third of the three triggers — so the next member starts within one sweep of its turn
@@ -937,6 +993,15 @@ export class CrewLead {
   private learnCapabilities(link: CrewLink): void {
     if (this.muxAsked.has(link.memberId)) return;
     this.probe(link);
+  }
+
+  /** Bank the release one sweep answer named, and forget the member's hello when it changed. See {@link sweptVersions}. */
+  private noteSweptVersion(memberId: string, version: string): void {
+    const before = this.sweptVersions.get(memberId);
+    this.sweptVersions.set(memberId, version);
+    if (before === undefined || before === version) return;
+    this.muxAsked.delete(memberId);
+    this.log(`[crew] ${memberId}: now runs ${version} (was ${before}), asking its hello again`);
   }
 
   /** Record the Surface reader version one hello carried, or drop the entry when it carried none. */

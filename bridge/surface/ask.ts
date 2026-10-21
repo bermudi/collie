@@ -212,7 +212,7 @@ export function planFor(dialog: LiftedDialog, index: number): AskPlan | null {
     }
     case "wizard": {
       const m = dialogModelOf(block, "wizard");
-      if (m === null || m.phase !== "question") return null;
+      if (m === null || m.phase !== "question" || m.field?.focused === true) return null;
       const option = m.options[index];
       if (option === undefined) return null;
       const split = splitWalk(option.keys);
@@ -741,7 +741,16 @@ export class AskAnswerer {
 
   private async steps(state: AskRun): Promise<void> {
     const { answer, entry, target } = state;
-    if (entry === undefined || entry.state === "voided") throw new AskEnded("refused", "ask_gone");
+    if (entry === undefined) throw new AskEnded("refused", "ask_gone");
+    if (entry.state === "voided") {
+      // Voided is not always gone: a newer read minted another ask when the dialog CHANGED (an
+      // arrow moved the highlight a moment before the tap). The reply then carries the screen's ask,
+      // so the phone redraws the card and the next tap uses the new id. "Gone" told it the dialog
+      // had closed while it was still up (the /model picker, 2026-10-17).
+      const replaced = await this.look(target, entry.generation);
+      if (replaced !== null && replaced.id !== answer.askId) throw new AskEnded("refused", "ask_changed", { ask: replaced });
+      throw new AskEnded("refused", "ask_gone");
+    }
     if (answer.hash !== entry.ask.hash) {
       // Not the dialog the id was minted for. The id is spent by now, so the reply carries the
       // screen's ask under a new id (a look, no key), or the phone would tap the spent id again.

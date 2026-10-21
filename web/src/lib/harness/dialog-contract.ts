@@ -34,7 +34,7 @@ import {
   unreadDialogsSameIdentity,
   type UnreadDialogModel,
 } from "./unread-dialog-model";
-import { wizardsEqual, type WizardModel } from "./wizard-model";
+import { wizardsEqual, wizardsSameIdentity, type WizardModel } from "./wizard-model";
 
 /** The model each interactive block kind carries. Keys are exactly the non-`raw` `Block["kind"]`s —
  *  a new interactive kind that lands without an entry here fails to typecheck in `dialogModelOf`. */
@@ -63,6 +63,9 @@ export type DialogKind = keyof DialogModels;
  * `autocomplete` it would have locked the composer out of a pane whose input box is demonstrably live.
  */
 export function blockOwnsKeyboard(block: Block): boolean {
+  // A menu lifted off a notice ABOVE a live input box (`MenuModel.liveBox`) is the one card whose
+  // screen leaves the keyboard to the box: the notice's keys act only on a box holding one digit.
+  if (block.kind === "menu" && block.menu.liveBox !== undefined) return false;
   return block.kind in DIALOG_CONTRACT;
 }
 
@@ -76,6 +79,7 @@ export function dialogNounOf(blocks: readonly Block[]): DialogNoun | null {
   for (const block of blocks) {
     switch (block.kind) {
       case "menu":
+        if (block.menu.liveBox !== undefined) break;
         return "menu";
       case "prompt-select":
         return block.prompt.family === "permission" || block.prompt.family === "trust" ? "permission" : "question";
@@ -154,6 +158,12 @@ export interface DialogComparators<M> {
    * Absent on the kinds that never carry one, and `undefined` for a model that does not: whole rows.
    */
   columns?(m: M): ColumnRange | undefined;
+  /**
+   * The tail window the region may end in (`expected_tail_lines`, lib/tail-lines.ts), for a model
+   * whose harness paints live chrome of its own under the dialog. Absent on the kinds that never carry
+   * one, and `undefined` for a model that does not: the bridge's default window.
+   */
+  tail?(m: M): number | undefined;
 }
 
 /** The shape of the contract table: one row of comparators per interactive block kind. */
@@ -171,11 +181,15 @@ export const DIALOG_CONTRACT: DialogContract = {
     region: (m) => m.signature,
     styled: (m) => m.styledSignature,
     columns: (m) => m.bindColumns,
+    tail: (m) => m.bindTail,
   },
   wizard: {
-    // Every wizard key commits too — a digit selects AND advances; Left/Right change the step.
+    // Every wizard key commits too — a digit selects AND advances; Left/Right change the step. The
+    // answer recipe (lib/answer-field.ts) moves the pointer and fills the field itself, so its
+    // mid-flight polls key on the identity that ignores both; its entry guard still takes the
+    // byte-faithful `wizardsEqual`, so a field that changed since the render refuses there.
     commits: wizardsEqual,
-    identity: wizardsEqual,
+    identity: wizardsSameIdentity,
     signature: (m) => m.signature,
     region: (m) => m.signature,
   },
@@ -198,7 +212,10 @@ export const DIALOG_CONTRACT: DialogContract = {
   menu: {
     // A footer-named key COMMITS (in the `/model` picker, Enter writes the user's default), so it
     // takes the full signature check; an arrow only moves the highlight — which is precisely what
-    // changes the signature — so it compares identity without the leftRight label.
+    // changes the signature — so it compares identity without the leftRight label. A card off a notice
+    // above a live box (`liveBox`) has digit keys only (letter keys only, under a `letters` head), each
+    // printed on its key row, and no arrows: its region is the notice's rows, which the bridge finds in
+    // its fresh read or refuses the tap.
     commits: menusEqual,
     identity: menusSameIdentity,
     signature: (m) => m.signature,

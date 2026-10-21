@@ -658,6 +658,8 @@ export interface UpdateClaim {
   readonly members: readonly string[];
   /** The last step the screen showed, so a document that boots mid-run opens on it. */
   readonly lastPhase: string | null;
+  /** A rollback, not an update (M60 spec 01): the screen's words before the run's record lands. */
+  readonly rollback?: true;
 }
 
 let claim: UpdateClaim | null = loadClaim();
@@ -677,7 +679,7 @@ function loadClaim(): UpdateClaim | null {
       return null;
     }
     const skipped = parsed.skipped;
-    return {
+    const read: UpdateClaim = {
       startedAt,
       runId: asJsonString(parsed.runId) ?? null,
       target: asJsonString(parsed.target) ?? null,
@@ -688,6 +690,7 @@ function loadClaim(): UpdateClaim | null {
       members: Array.isArray(parsed.members) ? parsed.members.flatMap((name) => asJsonString(name) ?? []) : [],
       lastPhase: asJsonString(parsed.lastPhase) ?? null,
     };
+    return asJsonBoolean(parsed.rollback) === true ? { ...read, rollback: true } : read;
   } catch {
     // No storage (private mode, a locked-down embed): the claim lives for this document only, which
     // is what it did before update mode.
@@ -721,9 +724,10 @@ export function noteUpdateStarted(
     bundleAtStart?: string | null;
     lead?: string | null;
     members?: readonly string[];
+    rollback?: boolean;
   } = {},
 ): void {
-  saveClaim({
+  const next: UpdateClaim = {
     startedAt: at,
     runId,
     target: extra.target ?? null,
@@ -733,7 +737,8 @@ export function noteUpdateStarted(
     lead: extra.lead ?? null,
     members: extra.members ?? [],
     lastPhase: null,
-  });
+  };
+  saveClaim(extra.rollback === true ? { ...next, rollback: true } : next);
 }
 
 /** The step the screen is on, kept with the claim for the next document. Written only on a change. */

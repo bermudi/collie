@@ -39,10 +39,16 @@ export type CommandWhileRunning = "queues" | "runs" | "drops" | "steers";
 export interface QueuedRow {
   /** A regular expression source for the row that starts the text, with the named group `text`. */
   readonly pattern: string;
-  /** A regular expression source for the hint row under the queued texts. */
+  /** A regular expression source for the hint row by the queued texts. */
   readonly hint: string;
-  /** How many blank rows may stand between the last queued text and the hint. */
+  /** How many blank rows may stand between the queued texts and the hint. */
   readonly hintGap: number;
+  /**
+   * The hint row stands over the queued texts, not under them: the witness reads downward from it.
+   * Muse draws its queue that way (lab, Muse Code 1.4.10, 2026-10-18). Absent: under, as Claude
+   * Code and Codex draw it.
+   */
+  readonly hintAbove?: boolean;
 }
 
 export interface VersionRange {
@@ -85,12 +91,106 @@ export interface FrameAnchor {
   readonly open?: true;
 }
 
+/** A notice the harness draws above its live box (`idle.notices`), read by surface/notice.ts. */
+export interface NoticeHead {
+  /** A regular expression source, matched on the notice's first row with its trailing spaces cut: it must not need a trailing space. */
+  readonly head: string;
+  /**
+   * True for a head that may stand over a body: after its continuation rows and a blank row, rows
+   * indented by two spaces or more, down to the key block. Optional.
+   */
+  readonly body?: true;
+  /**
+   * True for a head whose key block prints single letters (`y: Yes   n: No`) instead of digits: the
+   * reader takes lettered keys under this head and no other, and digits under it no more. Optional.
+   */
+  readonly letters?: true;
+}
+
 /** A named row under the box (`idle.volatile.below.footerRows`). */
 export interface FooterRow {
   /** What the row is, for a trace or a log line. */
   readonly name: string;
   /** A regular expression source, matched on the row with its trailing space cut. */
   readonly pattern: string;
+}
+
+/**
+ * A row under a box that says the box belongs to another screen of the harness, not to the
+ * conversation (`idle.volatile.below.otherScreens`).
+ */
+export interface OtherScreenRow {
+  /** The screen in plain words, for the receipt's detail: "agents screen". */
+  readonly name: string;
+  /** A regular expression source, matched on the row with its trailing space cut. */
+  readonly pattern: string;
+}
+
+/**
+ * The harness's own completion list for a slash command (`idle.volatile.below.commandList`), drawn
+ * in the rows at the box while the box holds the command: one entry per row, the command in the
+ * left column and its description in a second column, a long description wrapped onto rows indented
+ * to that column. A pointer marks the entry Enter picks. Each source is matched on a row with its
+ * trailing space cut; `pointer` and `entry` hold the command in the named group `command`.
+ */
+export interface CommandListRows {
+  /** The highlighted entry: the pointer glyph, the command, and maybe its description. */
+  readonly pointer: string;
+  /** Any other entry: the command, and maybe its description. */
+  readonly entry: string;
+  /** A row of the list that is no entry, under an entry: a wrapped description, or a count row ("(1/24)"). */
+  readonly wrapped: string;
+  /**
+   * The lead the list leaves off its commands: a list that shows `model` for `/model` names `/` here,
+   * and the pointed command reads as the lead and the name. Optional: with none, the group `command`
+   * is the command as typed.
+   */
+  readonly lead?: string;
+  /**
+   * Where the harness draws the list at the box: under its bottom edge, over its top edge, or
+   * inside it, between the prompt row and the bottom edge. Optional: under and above, under first.
+   */
+  readonly sides?: readonly CommandListSide[];
+  /**
+   * The harness's own rows that stay on screen under a list drawn under the box (a folder row and a
+   * stats row): the first row after the list matches `pattern`, and from it to the screen's last row
+   * the rows are one run with no blank row, at most `maxRows` tall. Optional: with none, the list runs
+   * to the screen's last row.
+   */
+  readonly footer?: CommandListFooter;
+  /**
+   * Prefixes the harness lists some commands under, with the bare name after them: OMP lists a skill
+   * as `skill:<name>`. A pointer on `<namespace><name>` also stands for the typed `<lead><name>`, but
+   * only when no entry of the list is `<lead><name>` itself. A profile names a namespace only when the
+   * harness runs the pointed entry on Enter and lists `<namespace><name>` for a typed `<lead><name>`
+   * only when no command of that name exists, so both spellings run the same entry. Optional.
+   */
+  readonly namespaces?: readonly string[];
+  /**
+   * The highlighted entry carries no pointer glyph: it is the entry-shaped row whose command run
+   * is painted bold, and `pointer` then names the same shape as `entry`. A read with no styled
+   * rows at hand finds no pointer on such a list, never a guessed one. Optional.
+   */
+  readonly pointerBold?: boolean;
+  /**
+   * The harness paints a bracketed argument hint (` [<model-id>]`) after a complete command in
+   * the box, in the bottom rule's colour, and takes it away the moment an argument is typed: it
+   * is no draft text, so the frame leaves it out of the draft it reads. Only a trailing bracketed
+   * run in that colour after one of the inside list's own entries is left out; a bracketed run
+   * typed in the draft's own colour stays. Optional.
+   */
+  readonly argumentHint?: boolean;
+}
+
+/** A side of the box a command list stands on. */
+export type CommandListSide = "under" | "above" | "inside";
+
+/** The rows that stay under a command list drawn under the box ({@link CommandListRows.footer}). */
+export interface CommandListFooter {
+  /** A regular expression source for the footer's first row, matched with its trailing space cut. */
+  readonly pattern: string;
+  /** The footer's most rows. */
+  readonly maxRows: number;
 }
 
 /**
@@ -150,7 +250,31 @@ export interface FrameLayout {
    * (its status line) tells them apart. Optional; a closed box only.
    */
   readonly under?: string;
+  /**
+   * The interior walk only, with `under`. True when a PAINTED footer passes the `under` test too,
+   * whatever its words: a row straight under the bottom edge whose first visible run has a foreground
+   * colour or is dim, opening one run with no blank row that ends the screen and is at most
+   * `volatile.below.maxRows` tall. An extension may replace the harness's status line with its own
+   * (pi's `ctx.ui.setFooter`, issue 485), and it paints it as the harness does, while a draft row cut
+   * from its box is plain. The run's shape is the rest of the test: the harness paints a picker's
+   * list and a dialog's title too, and those stand apart by a blank row or run past the bound. Optional.
+   */
+  readonly underPainted?: boolean;
+  /**
+   * The interior walk only, with `rows`. True when the text in front of the draft hole on the prompt
+   * row is the box's own prompt glyph, never a dialog's pointer. On a harness that draws its dialogs in
+   * the box's place (`idle.dialogsInBox`) the modal cues read the rows from the top edge down, and there
+   * this glyph reads as blank. Without it a draft that wraps reads as a pointer on a listed row (the
+   * glyph's row, and a wrapped row in the hole's column) between two rules, which is an overlay. `rows`
+   * must name every row the box may hold, so a box with any other row inside is no box. Optional.
+   */
+  readonly ownPrompt?: boolean;
+}
 
+/** The ghost text after the cursor ({@link Profile.idle.inlineHint}). */
+export interface InlineHint {
+  /** The foreground colours the ghost text is painted in, each as `rgb(r,g,b)`. */
+  readonly fg: readonly string[];
 }
 
 /** How the frame module walks to a box. `edges` is the walk up from a bottom edge to a prompt row and a top edge. */
@@ -182,6 +306,13 @@ export interface Profile {
       readonly prefixes?: readonly string[];
       /** The SGR attribute the placeholder renders with (2 is faint). */
       readonly sgr: number;
+      /**
+       * The foreground colours the placeholder renders in, each as `rgb(r,g,b)`, for a harness that
+       * paints the text of an empty box (a tip, a prompt suggestion) in a grey of its own and no
+       * faint attribute. A hole whose every visible run wears one of these colours is a placeholder
+       * too; one run in any other colour is typed text. Optional.
+       */
+      readonly fg?: readonly string[];
     };
     readonly volatile: {
       readonly above: {
@@ -208,14 +339,39 @@ export interface Profile {
          * its own. No modal cue reads a row one of them matches. Optional.
          */
         readonly footerRows?: readonly FooterRow[];
+        /**
+         * Rows that another screen of the harness draws under a box of its own, each with the
+         * screen's name in plain words and a regular expression source (Claude Code's agents screen
+         * and its key-hint row, "enter to return · ..."). A box with such a row under it is not the
+         * conversation's box: once text is typed, a message never gets Enter there, whatever the
+         * row count under the box. Optional.
+         */
+        readonly otherScreens?: readonly OtherScreenRow[];
+        /**
+         * The harness's completion list for a slash command ({@link CommandListRows}). At a box that
+         * holds a command, a list whose pointer rests on that same command is the command's own
+         * typeahead, not a dialog: Enter there picks the typed command. A list that points at another
+         * command, or at none, reads as before. Where the list hides the rows the frame walk checks
+         * under the box (a footer row, an open box's tail), a box is still found past the list, but
+         * only when the list is its own. Never Escape. Optional.
+         */
+        readonly commandList?: CommandListRows;
       };
     };
     /**
      * Rows that mean a turn runs, as regular expression sources, read on the volatile band above the
      * box, the frame's bottom edge and the rows under it (cues.ts `runningSign`). Optional: the generic running signs above the box
-     * always count. For a harness that marks a turn on its own status rows.
+     * always count. For a harness that marks a turn on its own status rows. The prompt row is read
+     * too, for a harness that swaps its prompt glyph while a turn runs: a draft that happens to match
+     * only reads as a turn, which sends nothing.
      */
     readonly runningRows?: readonly string[];
+    /**
+     * The prompt row of a box that answers a question the agent asked, as a regular expression source
+     * read on the frame's prompt row. A send typed there answers that question, so a person may send
+     * into it, but a held send never goes there: it waits for an ordinary box. Optional.
+     */
+    readonly answerPrompt?: string;
     /**
      * Rows that mean a dialog is drawn over the screen above a live box, as regular expression
      * sources, read on every row above the box. A harness that draws its pickers and notices over
@@ -231,11 +387,35 @@ export interface Profile {
      */
     readonly dialogsInBox?: boolean;
     /**
+     * Notices the harness draws above its live box while the box keeps the keys, each named by its
+     * head row. A notice is that head, up to three continuation rows indented by two spaces, and one
+     * row of `<digit>: <label>` keys, with only blank rows under it down to the box. Its keys act only
+     * on a box that holds one digit, so no modal cue reads its rows, and a send whose whole text is one
+     * of its keys takes the manual Send. Optional.
+     */
+    readonly notices?: readonly NoticeHead[];
+    /**
+     * Rows the harness may draw between a notice's key row and the box's top edge (`idle.notices`),
+     * as regular expression sources, matched with trailing spaces cut. None may match a blank row.
+     * The notice reader skips them as it skips blank rows, and every cue read leaves them out with
+     * the notice. Any other row there is no notice. Read only beside `idle.notices`. Optional.
+     */
+    readonly noticeGaps?: readonly string[];
+    /**
      * Other shapes of the same box, tried in order when `frame` finds none. A harness whose border
      * style the person can change (OMP) draws more than one. Each is a full frame as `frame` is.
      * The first shape that finds a box wins, so a shape that is easy to match goes last. Optional.
      */
     readonly frameAlternates?: readonly FrameLayout[];
+    /**
+     * The ghost text the harness paints after the cursor at the end of the draft (OMP's word
+     * completion: `push` typed, `ed` painted after it), named by the exact foreground colours it is
+     * painted in, each as `rgb(r,g,b)`. Every frame shape reads such a run as blank, but only when the
+     * run is letters only, has no other attribute, stands last in the draft on the draft's last row,
+     * and follows a visible draft character in another style. Any other run stays draft text, so a box
+     * that shows more than was typed stops a send. Optional.
+     */
+    readonly inlineHint?: InlineHint;
   };
   readonly keys: {
     /**
@@ -279,7 +459,8 @@ export interface Profile {
     /**
      * How the harness draws a message it queued during a turn, when that is known: a row whose
      * `pattern` holds the text in the named group `text` (later rows of a wrapped text are indented),
-     * and a `hint` row at most `hintGap` blank rows under the last of them. Optional.
+     * and a `hint` row at most `hintGap` blank rows from the texts — under the last of them, or over
+     * the first when `hintAbove` is set. Optional.
      */
     readonly queuedRow?: QueuedRow;
     /**
@@ -311,6 +492,11 @@ export interface Profile {
   readonly paste?: {
     /** The harness takes a bracketed paste as text, so a send may paste where the multiplexer can. */
     readonly bracketed: boolean;
+    /**
+     * A harness that swallows a submit key sent too soon after the text (Muse, #507) names the pause,
+     * in ms, a send waits after the write before the reads that can send it. Optional.
+     */
+    readonly settleMs?: number;
   };
   /** How the bridge keeps an ask (M56 spec 08). Optional: a profile without it uses the default lifetime. */
   readonly ask?: {
@@ -517,7 +703,82 @@ function footerRows(value: JsonValue | undefined): FooterRow[] {
   });
 }
 
-/** `idle.volatile.below`: its row counts, and the hint rows and named footer rows only when the profile names them. */
+/** `idle.volatile.below.otherScreens`: each row a unique name and a pattern that cannot match a blank row. */
+function otherScreens(value: JsonValue | undefined): OtherScreenRow[] {
+  const path = "idle.volatile.below.otherScreens";
+  const names = new Set<string>();
+  return list(value, path).map((item, i) => {
+    const at = `${path}[${String(i)}]`;
+    const node = object(item, at);
+    const name = text(field(node, "name", at), `${at}.name`);
+    if (names.has(name)) fail(`${at}.name`, "is used twice");
+    names.add(name);
+    const compiled = pattern(field(node, "pattern", at), `${at}.pattern`);
+    if (compiled.test("")) fail(`${at}.pattern`, "must not match a blank row");
+    return { name, pattern: compiled.source };
+  });
+}
+
+/**
+ * `idle.volatile.below.commandList`: three patterns that cannot match a blank row, the pointer and the
+ * entry holding the group `command`; a lead with no space in it, the sides as unique words, and a footer
+ * whose pattern cannot match a blank row, only when the profile names them.
+ */
+function commandList(value: JsonValue | undefined): CommandListRows {
+  const path = "idle.volatile.below.commandList";
+  const node = object(value, path);
+  const one = (key: "pointer" | "entry" | "wrapped"): string => {
+    const at = `${path}.${key}`;
+    const compiled = pattern(field(node, key, path), at);
+    if (compiled.test("")) fail(at, "must not match a blank row");
+    if (key !== "wrapped" && !compiled.source.includes("(?<command>")) fail(at, "must hold the named group command");
+    return compiled.source;
+  };
+  const base: CommandListRows = { pointer: one("pointer"), entry: one("entry"), wrapped: one("wrapped") };
+  const withLead = node.lead === undefined ? base : { ...base, lead: commandListLead(node.lead, `${path}.lead`) };
+  const withSides = node.sides === undefined ? withLead : { ...withLead, sides: commandListSides(node.sides, `${path}.sides`) };
+  const withFooter = node.footer === undefined ? withSides : { ...withSides, footer: commandListFooter(node.footer, `${path}.footer`) };
+  const withNamespaces = node.namespaces === undefined ? withFooter : { ...withFooter, namespaces: commandListNamespaces(node.namespaces, `${path}.namespaces`) };
+  if (node.pointerBold !== undefined && node.pointerBold !== true && node.pointerBold !== false) fail(`${path}.pointerBold`, "must be true or false");
+  if (node.argumentHint !== undefined && node.argumentHint !== true && node.argumentHint !== false) fail(`${path}.argumentHint`, "must be true or false");
+  const withPointerBold = node.pointerBold === true ? { ...withNamespaces, pointerBold: true } : withNamespaces;
+  return node.argumentHint === true ? { ...withPointerBold, argumentHint: true } : withPointerBold;
+}
+
+/** `commandList.namespaces`: unique words with no space in them. */
+function commandListNamespaces(value: JsonValue, path: string): string[] {
+  const namespaces = textList(value, path, 1);
+  namespaces.forEach((namespace, i) => {
+    if (namespace.length === 0 || /\s/u.test(namespace)) fail(`${path}[${String(i)}]`, "must be a word with no space");
+    if (namespaces.indexOf(namespace) !== i) fail(`${path}[${String(i)}]`, "is named twice");
+  });
+  return namespaces;
+}
+
+function commandListLead(value: JsonValue, path: string): string {
+  const lead = text(value, path);
+  if (/\s/u.test(lead)) fail(path, "must hold no space");
+  return lead;
+}
+
+function commandListSides(value: JsonValue, path: string): CommandListSide[] {
+  const sides = textList(value, path, 1);
+  const known: ReadonlySet<string> = new Set(["under", "above", "inside"]);
+  sides.forEach((side, i) => {
+    if (!known.has(side)) fail(`${path}[${String(i)}]`, 'must be "under", "above" or "inside"');
+    if (sides.indexOf(side) !== i) fail(`${path}[${String(i)}]`, "is named twice");
+  });
+  return sides.filter((side): side is CommandListSide => side === "under" || side === "above" || side === "inside");
+}
+
+function commandListFooter(value: JsonValue, path: string): CommandListFooter {
+  const node = object(value, path);
+  const compiled = pattern(field(node, "pattern", path), `${path}.pattern`);
+  if (compiled.test("")) fail(`${path}.pattern`, "must not match a blank row");
+  return { pattern: compiled.source, maxRows: whole(field(node, "maxRows", path), `${path}.maxRows`, 1) };
+}
+
+/** `idle.volatile.below`: its row counts, and the hint rows, named footer rows, other screens' rows and command list only when the profile names them. */
 function volatileBelow(node: JsonObject): Profile["idle"]["volatile"]["below"] {
   const maxRows = whole(field(node, "maxRows", "idle.volatile.below"), "idle.volatile.below.maxRows", 0);
   const footerMaxRows = whole(field(node, "footerMaxRows", "idle.volatile.below"), "idle.volatile.below.footerMaxRows", 0);
@@ -526,16 +787,66 @@ function volatileBelow(node: JsonObject): Profile["idle"]["volatile"]["below"] {
     node.hints === undefined
       ? base
       : { ...base, hints: list(node.hints, "idle.volatile.below.hints").map((item, i) => pattern(item, `idle.volatile.below.hints[${String(i)}]`).source) };
-  return node.footerRows === undefined ? withHints : { ...withHints, footerRows: footerRows(node.footerRows) };
+  const withFooter = node.footerRows === undefined ? withHints : { ...withHints, footerRows: footerRows(node.footerRows) };
+  const withScreens = node.otherScreens === undefined ? withFooter : { ...withFooter, otherScreens: otherScreens(node.otherScreens) };
+  return node.commandList === undefined ? withScreens : { ...withScreens, commandList: commandList(node.commandList) };
 }
-/** `idle.placeholders`: the texts and the SGR attribute, and the prefixes only when the profile names them. */
+/** `idle.notices`: each an object whose head pattern compiles and cannot match a blank row, and whose `body` and `letters`, when named, are true. */
+function parseNotices(value: JsonValue | undefined): NoticeHead[] {
+  const path = "idle.notices";
+  return list(value, path).map((item, i) => {
+    const at = `${path}[${String(i)}]`;
+    const node = object(item, at);
+    const head = pattern(field(node, "head", at), `${at}.head`);
+    if (head.test("") || head.test(" ")) fail(`${at}.head`, "must not match a blank row");
+    if (node.body !== undefined && node.body !== true) fail(`${at}.body`, "must be true when named");
+    if (node.letters !== undefined && node.letters !== true) fail(`${at}.letters`, "must be true when named");
+    if (node.body === true && node.letters === true) return { head: head.source, body: true, letters: true };
+    if (node.body === true) return { head: head.source, body: true };
+    if (node.letters === true) return { head: head.source, letters: true };
+    return { head: head.source };
+  });
+}
+
+/** `idle.noticeGaps`: each a pattern that compiles and cannot match a blank row. */
+function parseNoticeGaps(value: JsonValue | undefined): string[] {
+  const path = "idle.noticeGaps";
+  return list(value, path).map((item, i) => {
+    const at = `${path}[${String(i)}]`;
+    const gap = pattern(item, at);
+    if (gap.test("") || gap.test(" ")) fail(at, "must not match a blank row");
+    return gap.source;
+  });
+}
+
+/** A list of foreground colours: at least one, each written `rgb(r,g,b)` as the ANSI reader gives it, none twice. */
+function colourList(value: JsonValue, path: string): string[] {
+  const fg = textList(value, path, 1);
+  fg.forEach((colour, i) => {
+    const at = `${path}[${String(i)}]`;
+    const parts = /^rgb\((\d{1,3}),(\d{1,3}),(\d{1,3})\)$/u.exec(colour);
+    if (parts === null || parts.slice(1).some((part) => Number(part) > 255)) fail(at, "must read rgb(r,g,b) with each part 0 to 255");
+    if (fg.indexOf(colour) !== i) fail(at, "is named twice");
+  });
+  return fg;
+}
+
+/** `idle.inlineHint`: the ghost text's foreground colours. */
+function parseInlineHint(value: JsonValue): InlineHint {
+  const path = "idle.inlineHint";
+  const node = object(value, path);
+  return { fg: colourList(field(node, "fg", path), `${path}.fg`) };
+}
+
+/** `idle.placeholders`: the texts and the SGR attribute, and the prefixes and colours only when the profile names them. */
 function parsePlaceholders(node: JsonObject): Profile["idle"]["placeholders"] {
   const base = {
     texts: textList(field(node, "texts", "idle.placeholders"), "idle.placeholders.texts", 0),
     sgr: whole(field(node, "sgr", "idle.placeholders"), "idle.placeholders.sgr", 0),
   };
-  if (node.prefixes === undefined) return base;
-  return { ...base, prefixes: textList(node.prefixes, "idle.placeholders.prefixes", 1) };
+  const withPrefixes = node.prefixes === undefined ? base : { ...base, prefixes: textList(node.prefixes, "idle.placeholders.prefixes", 1) };
+  if (node.fg === undefined) return withPrefixes;
+  return { ...withPrefixes, fg: colourList(node.fg, "idle.placeholders.fg") };
 }
 
 /** `idle.frame.trailer`: the last row inside the box, and the padding rows under it. */
@@ -561,7 +872,7 @@ function parseFrame(frameNode: JsonObject): FrameLayout {
     maxTailRows: whole(field(frameNode, "maxTailRows", "idle.frame"), "idle.frame.maxTailRows", 0),
   };
   if (walk === "edges") {
-    for (const key of ["rows", "trailer", "continuation"] as const) {
+    for (const key of ["rows", "trailer", "continuation", "ownPrompt"] as const) {
       if (frameNode[key] !== undefined) fail(`idle.frame.${key}`, "belongs to the interior walk");
     }
     const edgeBottom = anchor(field(frameNode, "bottom", "idle.frame"), "idle.frame.bottom", null, true);
@@ -572,10 +883,18 @@ function parseFrame(frameNode: JsonObject): FrameLayout {
   const withRows = frameNode.rows === undefined ? interior : { ...interior, rows: pattern(frameNode.rows, "idle.frame.rows").source };
   const withTrailer = frameNode.trailer === undefined ? withRows : { ...withRows, trailer: parseTrailer(frameNode.trailer) };
   const withUnder = frameNode.under === undefined ? withTrailer : { ...withTrailer, under: pattern(frameNode.under, "idle.frame.under").source };
-  if (frameNode.continuation === undefined) return withUnder;
+  if (frameNode.underPainted !== undefined && frameNode.underPainted !== true && frameNode.underPainted !== false) {
+    fail("idle.frame.underPainted", "must be true or false");
+  }
+  if (frameNode.underPainted === true && frameNode.under === undefined) fail("idle.frame.underPainted", "needs an under pattern");
+  const withPainted = frameNode.underPainted === true ? { ...withUnder, underPainted: true } : withUnder;
+  if (frameNode.ownPrompt !== undefined && frameNode.ownPrompt !== true && frameNode.ownPrompt !== false) fail("idle.frame.ownPrompt", "must be true or false");
+  if (frameNode.ownPrompt === true && frameNode.rows === undefined) fail("idle.frame.ownPrompt", "needs a rows pattern");
+  const withOwnPrompt = frameNode.ownPrompt === true ? { ...withPainted, ownPrompt: true } : withPainted;
+  if (frameNode.continuation === undefined) return withOwnPrompt;
   const continuation = pattern(frameNode.continuation, "idle.frame.continuation");
   if (!continuation.source.includes("(?<text>")) fail("idle.frame.continuation", "must hold the named group text");
-  return { ...withUnder, continuation: continuation.source };
+  return { ...withOwnPrompt, continuation: continuation.source };
 }
 
 export function parseProfile(raw: JsonValue): Profile {
@@ -642,7 +961,12 @@ export function parseProfile(raw: JsonValue): Profile {
   if (idleNode.dialogsInBox !== undefined && idleNode.dialogsInBox !== true && idleNode.dialogsInBox !== false) {
     fail("idle.dialogsInBox", "must be true or false");
   }
-  const idleBlock: Profile["idle"] = idleNode.dialogsInBox === true ? { ...withOverlay, dialogsInBox: true } : withOverlay;
+  const withDialogs: Profile["idle"] = idleNode.dialogsInBox === true ? { ...withOverlay, dialogsInBox: true } : withOverlay;
+  const withNotices: Profile["idle"] = idleNode.notices === undefined ? withDialogs : { ...withDialogs, notices: parseNotices(idleNode.notices) };
+  const withGaps: Profile["idle"] = idleNode.noticeGaps === undefined ? withNotices : { ...withNotices, noticeGaps: parseNoticeGaps(idleNode.noticeGaps) };
+  const withHint: Profile["idle"] = idleNode.inlineHint === undefined ? withGaps : { ...withGaps, inlineHint: parseInlineHint(idleNode.inlineHint) };
+  const idleBlock: Profile["idle"] =
+    idleNode.answerPrompt === undefined ? withHint : { ...withHint, answerPrompt: pattern(idleNode.answerPrompt, "idle.answerPrompt").source };
 
   const keysNode = object(field(root, "keys", ""), "keys");
   const clearNode = object(field(keysNode, "clear", "keys"), "keys.clear");
@@ -671,11 +995,15 @@ export function parseProfile(raw: JsonValue): Profile {
     const queuedNode = object(keysNode.queuedRow, "keys.queuedRow");
     const rowPattern = pattern(field(queuedNode, "pattern", "keys.queuedRow"), "keys.queuedRow.pattern");
     if (!rowPattern.source.includes("(?<text>")) fail("keys.queuedRow.pattern", "must hold the named group text");
-    const queuedRow: QueuedRow = {
+    if (queuedNode.hintAbove !== undefined && queuedNode.hintAbove !== true && queuedNode.hintAbove !== false) {
+      fail("keys.queuedRow.hintAbove", "must be true or false");
+    }
+    const queuedBase: QueuedRow = {
       pattern: rowPattern.source,
       hint: pattern(field(queuedNode, "hint", "keys.queuedRow"), "keys.queuedRow.hint").source,
       hintGap: whole(field(queuedNode, "hintGap", "keys.queuedRow"), "keys.queuedRow.hintGap", 0),
     };
+    const queuedRow: QueuedRow = queuedNode.hintAbove === true ? { ...queuedBase, hintAbove: true } : queuedBase;
     keys = { ...keys, queuedRow };
   }
   if (keysNode.queueKey !== undefined) {
@@ -737,7 +1065,11 @@ export function parseProfile(raw: JsonValue): Profile {
     const pasteNode = object(root.paste, "paste");
     const bracketed = pasteNode.bracketed;
     if (bracketed !== true && bracketed !== false) fail("paste.bracketed", "must be true or false");
-    paste = { bracketed: bracketed === true };
+    const settleMs = asJsonNumber(pasteNode.settleMs);
+    if (pasteNode.settleMs !== undefined && (settleMs === undefined || !Number.isInteger(settleMs) || settleMs < 1 || settleMs > 5000)) {
+      fail("paste.settleMs", "must be a whole number of ms from 1 to 5000");
+    }
+    paste = settleMs === undefined ? { bracketed: bracketed === true } : { bracketed: bracketed === true, settleMs };
   }
 
   let ask: Profile["ask"];

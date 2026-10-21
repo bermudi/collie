@@ -13,6 +13,11 @@
 # rewrite the glue's line endings and the served bytes would no longer be the hashed bytes.
 web/public/stt/** -text
 
+# The skill texts the CLI embeds and writes into a harness. A CRLF checkout would put `\r` in the
+# rendered skill. The code strips it as well (cli/docs-embed.ts), because an installed copy can be CRLF.
+cli/skill.md text eol=lf
+cli/skills/*.md text eol=lf
+
 # ── Pup merge machinery (ADRs 0020, 9006, 9007) ────────────────────────────────
 # The fork's 0.x version line must survive every upstream merge: the pup-version driver merges the
 # file normally, then pins `version` back to ours. Repo-local config registers it:
