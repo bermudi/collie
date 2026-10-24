@@ -78,6 +78,7 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
 | P005 | Upstream-merge signal: `upstream-merged` + the (major, minor) fire rule + dismissible nudge (ADR 9007) | `cat upstream-merged` vs upstream's newest stable tag | deliberate | stop tracking upstream |
 | P006 | Linux-only releases: windows workflow and zip gate dropped (ADR 9008), macOS rows and codesign dropped (ADR 9009) | `ls .github/workflows` — no `windows.yml` | deliberate | platform support returns |
 | P007 | Test suite removed (operator directive); gate is lint + typecheck + build | `ls web/vitest.config.ts` fails | deliberate divergence | a suite returns — re-add `bun run test` to the gate (marked in `merge-upstream.sh`) |
+| P008 | The app's copy names the fork: every i18n string that names the app says ColliePup, swept again at each sync (`web/src/lib/i18n/messages/*`) | `grep -rP '\bCollie\b(?!Pup)' web/src/lib/i18n/messages/` prints nothing | local, deliberately | fork retirement |
 
 ### Merge tripwires
 
@@ -89,6 +90,13 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
 - **P001's seam** is the journal registry and the send-verification surface — upstream's harness
   grammar work lands in the same files the steered-send logic reads.
 - **P002's seam** is view-level: keep the nesting out of the API shape upstream defines.
+- **New test files upstream adds arrive as PLAIN ADDS, never as conflicts** — the delete/modify
+  conflicts only cover files that existed when P007 landed. After resolving, sweep the merge's
+  staged list by pattern (`git diff --cached --name-only | grep -E '\.test\.|\.spec\.|/tests/'`)
+  and `git rm` what matches.
+- **`web/src/fixtures/` and `web/src/test/handlers.ts` are not the suite** — the playground
+  imports both, and P007 deliberately kept them. Sweeping them by name breaks `collie build`
+  (the 2026-10-24 merge did exactly that; the gate caught it).
 
 ## Maintenance policy
 
@@ -115,6 +123,25 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
   pushing `main`, tags, or packaging branches publishes — operator's call.
 
 ## Sync / import log
+
+### 2026-10-24 — 1.24.0-edge.2 → `upstream/main` 35d3ccfc (edge.3, edge.4 and past, 187 commits, 7ebc600f)
+
+- `upstream-merged` stays 1.24.0 — upstream has not cut a stable 1.24.0; `UPSTREAM` carries the
+  advance. The merge brings Stop-with-receipt, Steer (pi/Codex/OMP), the paste chip, machine
+  glyphs, usage dots, walky take-back, four new harness bars, the SDK's `./durable-harness`
+  entry, and the Bun 1.4.4 pin (eMudhra revocation).
+- Conflicts: the test-suite re-import (84 delete/modify, re-deleted) plus 25 new test files that
+  arrived as plain adds; CLAUDE.md's release recipe (the Pup paragraph kept); `flake.nix` (darwin
+  stays deleted, Bun 1.4.4 hashes taken); `ci.yml` (typecheck-only gate kept, the durable-harness
+  example's typecheck gained); `.adr/README.md` and `agent-icon-data.ts` (unions); nine
+  dictionaries (theirs' translations, our ColliePup). The three version files went through the
+  driver without a word to print.
+- The gate caught an over-deletion of the kept playground fixtures (see tripwires), was repaired,
+  and then ran green: lint, both typechecks, build. No test suite ran (P007) — behavior is
+  validated by running the product; the browser leg does not exist on this fork.
+- Follow-up: the ColliePup sweep extended to the merge's strings and to a few the earlier pass
+  missed (5a4b9696; P008 now inventoried). Unreleased past v0.57.8. `main` not pushed — that is
+  the operator's call.
 
 ### 2026-10-21 — 1.22.0 → 1.24.0 (upstream dev tip, `v1.24.0-edge.2`, ed781b6e)
 
