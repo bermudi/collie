@@ -47,6 +47,13 @@ Running a crew? Update the lead first; members follow on their own. Details:
   records `upstream-merged` after the gate, so a failed gate leaves a clean, committed tree the
   script can resume from instead of a dirty one its entry check rejects (Pup).
 
+- **Pi panes keep their 0.57.7 keymap; the Steer affordance stays off for pi.** Pup's pi
+  profile submits and queues on Enter (pi 1.1.1, measured for 0.57.7); upstream's steer
+  grammar then arrived with `keys.steer: Enter` — the same key as the queue — which the new
+  profile validation refuses at boot. The steer keys are dropped rather than guessed: a send
+  during a pi turn queues on Enter exactly as before, and re-enabling Steer on pi needs pi's
+  real steer keymap (Pup).
+
 ## [0.57.9] - 2026-10-24
 
 ### Changed
