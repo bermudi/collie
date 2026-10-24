@@ -235,7 +235,7 @@ export const en = {
     "A device is already using that name. Pick a different one. The code is still good.",
   "settings.devices.pair.failure.badRequest":
     "The code or the name wasn’t usable. A name is 1–48 characters.",
-  "settings.devices.pair.failure.identityRequired": "Pairing needs your Tailscale identity, which this address doesn’t send. Open Collie at its tailnet address and pair there. Your code wasn’t tried, so it is still good.",
+  "settings.devices.pair.failure.identityRequired": "Pairing needs your Tailscale identity, which this address doesn’t send. Open ColliePup at its tailnet address and pair there. Your code wasn’t tried, so it is still good.",
 
   // --- settings.connection ---
   "settings.connection.title": "Connection",
@@ -493,7 +493,7 @@ export const en = {
   // The last ten sends for a pane, from the receipts (M56 spec 09). No text, no screen rows.
   "sendReceipts.title": "Recent sends",
   "sendReceipts.empty": "No sends to this pane yet.",
-  "sendReceipts.kept": "Collie keeps the line of a send on this machine for seven days. A line that looks like a secret is not kept.",
+  "sendReceipts.kept": "ColliePup keeps the line of a send on this machine for seven days. A line that looks like a secret is not kept.",
   "sendReceipts.outcome.sent": "Sent",
   "sendReceipts.outcome.effective": "Confirmed",
   "sendReceipts.outcome.typed_not_submitted": "Typed, not sent",
@@ -655,7 +655,7 @@ export const en = {
   // --- chat.stream (the chat body itself) ---
   "chat.stream.empty": "Send a message to start.",
   "chat.empty.sharedFolder":
-    "Two {harness} sessions share this folder, so Collie cannot tell which one is this pane's. Start the agent with its resume command and session id, then Collie reads the right one.",
+    "Two {harness} sessions share this folder, so ColliePup cannot tell which one is this pane's. Start the agent with its resume command and session id, then ColliePup reads the right one.",
   "chat.stream.working": "Still working…",
   "chat.stream.questionPending": "A question is waiting in the terminal. Your next message answers it.",
   "chat.stream.queued": "Waiting to send",
@@ -1039,7 +1039,7 @@ export const en = {
   "keys.queue.send": "Send",
   "keys.queue.clearAria": "Clear queued keys",
 
-  // --- nav (app header, Collie mark, settings gear) ---
+  // --- nav (app header, ColliePup mark, settings gear) ---
   "nav.settings.aria": "Settings",
   "nav.home.aria.default": "ColliePup home",
   "nav.home.aria.lost": "ColliePup home, not connected",
@@ -1104,7 +1104,7 @@ export const en = {
   "newPage.browse.empty": "No folders here",
   "newPage.browse.more": "and more, type to narrow",
   "newPage.browse.nothing": "Nothing to browse here",
-  "newPage.browse.stale": "This machine runs an older Collie. Update this machine to browse its folders.",
+  "newPage.browse.stale": "This machine runs an older ColliePup. Update this machine to browse its folders.",
   "newPage.browse.refused": "This device may not browse folders on this machine.",
   "newPage.branch": "New worktree",
   "newPage.branch.note": "A new branch in its own folder, so this agent does not change the files of another.",
@@ -1326,9 +1326,9 @@ export const en = {
   "belt.stop.receipt.pressedDialog": "Stop sent. A dialog opened. Answer it on its card.",
   "belt.stop.receipt.refused.dialogOpen": "A dialog is open. Answer it on its card first.",
   "belt.stop.receipt.refused.draftPresent": "The box holds your text and this harness's stop key would clear it.",
-  "belt.stop.receipt.refused.noProfile": "Collie cannot read this pane, so it does not press blind.",
+  "belt.stop.receipt.refused.noProfile": "ColliePup cannot read this pane, so it does not press blind.",
   "belt.stop.receipt.refused.turnIdle": "The turn had already ended.",
-  "belt.stop.receipt.refused.unreadable": "Collie could not read the screen. Nothing was pressed.",
+  "belt.stop.receipt.refused.unreadable": "ColliePup could not read the screen. Nothing was pressed.",
   "belt.stop.receipt.refused.pressFailed": "The terminal did not take the key. Nothing was stopped.",
   "belt.stop.receipt.refused.paneGone": "This pane is gone.",
   "belt.stop.receipt.refused.unsupportedBuild": "This machine cannot stop from the phone yet. Update it.",
@@ -1706,7 +1706,7 @@ export const en = {
   // a code with no key here is a COMPILE error, and a code a newer bridge invents falls back to the
   // English sentence that body already carries.
   //
-  // `{reason}` is NEVER Collie's text: it is the multiplexer's own refusal, passed through byte for
+  // `{reason}` is NEVER ColliePup's text: it is the multiplexer's own refusal, passed through byte for
   // byte (bridge/error-codes.ts). Those messages are a translated FRAME around a raw remainder —
   // translate the frame, leave the slot where the sentence reads naturally in your language.
   "apiError.unknown": "Something went wrong. Try again.",
@@ -1988,7 +1988,7 @@ export const en = {
   "updates.entry.status.peersBehind.other": "{count} peers behind",
   "updates.entry.status.available": "{version} available",
   "updates.entry.status.upToDate": "Up to date",
-  "updates.entry.status.unknown": "Unknown, can’t reach Collie",
+  "updates.entry.status.unknown": "Unknown, can’t reach ColliePup",
 
   // --- updateRibbon (the ONE top-of-app update band), M16/02 ---
   // Every string in this block is held to a 40-CHARACTER BUDGET in all six locales, enforced by
@@ -2029,7 +2029,7 @@ export const en = {
   // the band STATES the fact and names the manager. It does not instruct: the phone cannot run
   // pacman, and a line that told the operator to would be telling them to go somewhere else.
   "updateRibbon.availablePackaged": "ColliePup {version} available via {manager}.",
-  // The same host under a prefix Collie does not recognise: there is no manager to name, so the band
+  // The same host under a prefix ColliePup does not recognise: there is no manager to name, so the band
   // states the version and points at the page that carries the boundary sentence.
   "updateRibbon.availablePackagedUnnamed": "ColliePup {version} available.",
   // The band's own control in the states that can also be PUT DOWN. `ui/notice.tsx` forbids a
@@ -2862,7 +2862,7 @@ export const en = {
   "walky.crew.skippedRow": "{label} ({address}): skipped",
   "walky.crew.refusals": "Not sent on this machine: {list}",
 
-  // --- Sent (M61): the record of shell lines sent through Collie ---
+  // --- Sent (M61): the record of shell lines sent through ColliePup ---
   "sent.button": "Sent",
   "sent.title": "Sent",
   "sent.search.placeholder": "Search sent lines",
@@ -2875,12 +2875,12 @@ export const en = {
   "sent.empty": "Lines you send to a shell show up here.",
   "sent.empty.query": "No sent line matches “{query}”.",
   "sent.off": "Sent is off on this machine.",
-  "sent.old": "This machine runs an older Collie. Update it to use Sent.",
+  "sent.old": "This machine runs an older ColliePup. Update it to use Sent.",
   "sent.error": "Could not load Sent.",
   "sent.retry": "Try again",
   "sent.machine.unreachable": "{machine} did not answer.",
   "sent.machine.timeout": "{machine} took too long to answer.",
-  "sent.machine.old": "{machine} runs an older Collie.",
+  "sent.machine.old": "{machine} runs an older ColliePup.",
   "sent.machine.off": "Sent is off on {machine}.",
   "sent.times.one": "{count} time",
   "sent.times.other": "{count} times",

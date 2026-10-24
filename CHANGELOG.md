@@ -47,6 +47,8 @@ Running a crew? Update the lead first; members follow on their own. Details:
   the model tag, a take-back for a held walky talky message, harness bars for opencode, Grok, Muse
   Code and Antigravity, the SDK's experimental `./durable-harness` entry, and Bun 1.4.4 in every
   build, which rejects certificates issued under the compromised eMudhra intermediates.
+- **Every dictionary names the app ColliePup.** The fork's rename of the app's own copy now covers
+  the strings upstream's 1.24.0 edge work added, and the handful the earlier pass missed (Pup).
 
 ### Fixed
 
