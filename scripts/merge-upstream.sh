@@ -73,7 +73,7 @@ if [ -n "$(unmerged)" ]; then
 fi
 
 bun scripts/record-upstream-merge.ts "$REF"
-git add upstream-merged
+git add upstream-merged UPSTREAM
 
 # The `bun run test` step left with the suite it ran (f72903a1); re-add it beside typecheck if a
 # suite returns.

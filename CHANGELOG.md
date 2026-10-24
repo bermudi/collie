@@ -38,6 +38,9 @@ Running a crew? Update the lead first; members follow on their own. Details:
   behavior is validated by running the product. Done at the operator's direction after the restored
   suite passed green on a release that could not send to a pane — the suite measured nothing real.
   Restorable from history if ever wanted back.
+- **The merge ritual records the integrated upstream commit.** `scripts/record-upstream-merge.ts`
+  now writes a `UPSTREAM` file (ref and full commit id) beside `upstream-merged`, and
+  `scripts/merge-upstream.sh` commits it with the merge (Pup).
 
 ### Fixed
 

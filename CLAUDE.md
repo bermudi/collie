@@ -12,6 +12,11 @@ decisions [`.adr/`](./.adr/) · adding a harness
 [`HARNESS_CONTRIBUTING.md`](./HARNESS_CONTRIBUTING.md) · adding a multiplexer
 [`MUX_CONTRIBUTING.md`](./MUX_CONTRIBUTING.md).
 
+**This checkout is the Pup fork** (`bermudi/collie`) of `AltanS/collie`: upstream plus two
+features, its own 0.x line, Linux-only payloads, no test suite. The fork's purpose, conventions,
+carried changes and sync log live in [`FORK.md`](./FORK.md) — read it before any fork work
+(upstream merges, releases, patch decisions).
+
 ## Decision records — read before reopening a settled question
 
 [`.adr/`](./.adr/) holds the decisions whose reasoning would otherwise live only in a PR thread —

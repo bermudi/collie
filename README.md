@@ -12,6 +12,11 @@
   <sub>A real Collie build running in the page against faked data.</sub>
 </p>
 
+> **This is Pup**, bermudi's fork of [AltanS/collie](https://github.com/AltanS/collie): upstream
+> plus the Devin journal adapter and a worktree-nested herd list, on its own 0.x release line,
+> Linux only. Why it exists and how it tracks upstream: [`FORK.md`](./FORK.md). Product questions
+> belong upstream; fork-specific ones here.
+
 ColliePWA is an open-source (MIT) mobile client for [Herdr](https://herdr.dev), with experimental
 support for [tmux](https://github.com/tmux/tmux) and [zellij](https://zellij.dev). It is a
 self-hosted web app (PWA) for driving terminal AI agents such as Claude Code, Codex and OpenCode
