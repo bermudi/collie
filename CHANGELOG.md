@@ -23,6 +23,8 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+## [0.57.9] - 2026-10-24
+
 ### Changed
 
 - **Upstream 1.24.0 is in.** Walky talky — agent sessions messaging each other and you, with
@@ -31,6 +33,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
   AskUserQuestion fields; Kiro, Hermes and Cursor harness reads; subagent and Tasks sheets; folder
   browse on the New page; command suggestions above the box; and Muse's diffs, names, slash commands
   and queued sends. The full list sits under the 1.23.0 and 1.24.0 headings below.
+  ([ed781b6](https://github.com/bermudi/collie/commit/ed781b6e0f348ac3990efa41b356ad285dc9a452))
 - **The test suite is removed.** Every `*.test.*`, `*.spec.*`, e2e/browser spec, shell test,
   fixture dir and test-only harness (vitest/playwright configs, `web/src/test`, `cli/fakes.ts`,
   fixture loaders, `sdk-pack-check.sh`, `surface-corpus.ts`) is deleted, along with the CI jobs
@@ -38,23 +41,28 @@ Running a crew? Update the lead first; members follow on their own. Details:
   behavior is validated by running the product. Done at the operator's direction after the restored
   suite passed green on a release that could not send to a pane — the suite measured nothing real.
   Restorable from history if ever wanted back.
+  ([f72903a](https://github.com/bermudi/collie/commit/f72903a15cda97ff456f16f795e0852f52f00b38))
 - **The merge ritual records the integrated upstream commit.** `scripts/record-upstream-merge.ts`
   now writes a `UPSTREAM` file (ref and full commit id) beside `upstream-merged`, and
   `scripts/merge-upstream.sh` commits it with the merge (Pup).
+  ([0213f1b](https://github.com/bermudi/collie/commit/0213f1bd9ecde9afa9fce4c882730135ae4134ff))
 - **Upstream's 1.24.0 edge.3 and edge.4 are in.** A running turn can be stopped from the phone
   (arm, tap, receipt), and on pi, Codex and OMP a held send can steer the turn or wait for it; also
   the paste chip in the composer, machine glyphs in the pane switcher, context and limit dots beside
   the model tag, a take-back for a held walky talky message, harness bars for opencode, Grok, Muse
   Code and Antigravity, the SDK's experimental `./durable-harness` entry, and Bun 1.4.4 in every
   build, which rejects certificates issued under the compromised eMudhra intermediates.
+  ([7ebc600](https://github.com/bermudi/collie/commit/7ebc600f2215d57e8f9e81ebbde3842d06630960))
 - **Every dictionary names the app ColliePup.** The fork's rename of the app's own copy now covers
   the strings upstream's 1.24.0 edge work added, and the handful the earlier pass missed (Pup).
+  ([5a4b969](https://github.com/bermudi/collie/commit/5a4b96961142a2bf6801361dd5e8e289326eb5b4))
 
 ### Fixed
 
 - **The upstream-merge ritual's gate drops the removed suite's step.** `bun run test` no longer
   exists, so `scripts/merge-upstream.sh` died at the gate on every run; the step goes back beside
   typecheck if a suite returns.
+  ([220f623](https://github.com/bermudi/collie/commit/220f623795195c1470ce46a2de7a0462ed7debed))
 
 ## [0.57.8] - 2026-10-18
 
