@@ -23,6 +23,16 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Changed
+
+- **The merge ritual absorbs upstream's strict releases, wherever upstream cuts them.**
+  `scripts/merge-upstream.sh` now merges the main line and then upstream's newest strict
+  `vX.Y.Z` tag when the main line does not contain it — upstream cuts stable releases from
+  `release-1.x` branches it does not always merge back — and `upstream-merged` records the
+  newest strict tag proven an ancestor of HEAD, never a version that only exists in some
+  branch's manifest. Two October dev-tip merges had recorded 1.24.0, a version that does not
+  exist, disarming the update signal until 1.25.0 while 1.23.2–1.23.4 went unabsorbed (Pup).
+
 ## [0.57.9] - 2026-10-24
 
 ### Changed

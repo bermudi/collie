@@ -1,6 +1,7 @@
 # 9007: Pup watches upstream's minor and major, and says merge
 
-- **Status:** Accepted
+- **Status:** Accepted — merge ritual and record semantics amended by
+  [9010](./9010-pup-absorbs-upstream-strict-releases.md) (2026-10-24); the fire rule stands
 - **Date:** 2026-10-16
 - **Relates to:** [9006](./9006-pup-is-upstream-plus-devin-and-worktree-nest.md) (the merge ritual this signal re-arms)
 
