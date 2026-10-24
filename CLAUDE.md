@@ -392,7 +392,7 @@ component, not a spec. On 2026-10-17 the specs that did not pass that test moved
   crew leg** (`-c e2e/rig/crew.config.ts`): the same phone against a lead and a member, for the walky
   talky cases that need a crew. It is **the gate before
   every release tag**, and **the proof for a change to a harness reader, the Surface, the Send
-  Protocol or the ask code**: run it on the branch, and all thirty-four cases (twenty-seven solo, seven
+  Protocol or the ask code**: run it on the branch, and all thirty-seven cases (thirty solo, seven
   on the crew leg) pass on the first tap. A
   unit test cannot show that a tap works on a real screen. `web/e2e/rig/nightly.ts` also runs it every
   night on `origin/main`, once for each main commit and set of agent versions. The README beside it

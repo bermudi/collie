@@ -55,6 +55,13 @@ jobs:
         run: cd examples/durable-member && bun install --frozen-lockfile
       - name: Typecheck (example)
         run: cd examples/durable-member && bun run typecheck
+      # The durable-harness entry (M66) is a program with its own lockfile too — durable-harness and
+      # @workflow/* never enter the root install or durable-member's. Its typecheck rides this job;
+      # its tests do not (the suite is removed on this fork).
+      - name: Install (durable-harness example)
+        run: cd examples/durable-harness && bun install --frozen-lockfile
+      - name: Typecheck (durable-harness example)
+        run: cd examples/durable-harness && bun run typecheck
 
   # The test suite was removed at the operator's direction (see CHANGELOG): this workflow gates on
   # version consistency, lint and typecheck only. Behavior is validated by running the product.
