@@ -19,16 +19,20 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
   (ADR 9006, 2026-10-14). ADR 9004 names the re-branch base tag `1.11.0-rc.1`; that tag is absent
   from the upstream remote, so the port-era line it replaced stays preserved on
   `backup/main-pre-rebranch` instead.
-- **Current integrated base:** [`UPSTREAM`](./UPSTREAM). The runtime record the update monitor
-  reads is the tracked [`upstream-merged`](./upstream-merged) file
-  ([ADR 9007](./.adr/9007-pup-watches-upstream-minor-and-major.md)) — written by the merge ritual,
+- **Current integrated base:** [`UPSTREAM`](./UPSTREAM) — the main line only; a strict-release
+  absorb leaves it alone (ADR 9010). The runtime record the update monitor reads is the tracked
+  [`upstream-merged`](./upstream-merged) file
+  ([ADR 9007](./.adr/9007-pup-watches-upstream-minor-and-major.md), amended by
+  [9010](./.adr/9010-pup-absorbs-upstream-strict-releases.md)) — written by the merge ritual,
   never by hand.
 - **Issues:** fork-specific behavior here; product questions belong upstream.
 
 ## Conventions that break the defaults
 
-- **Upstream arrives only through `scripts/merge-upstream.sh`** — fetch, `git merge --no-ff`,
-  mechanical conflict passes, record, gate, commit. No rebase, no cherry-pick ports (ADR 9006).
+- **Upstream arrives only through `scripts/merge-upstream.sh`** — fetch, `git merge --no-ff`
+  the main line, then absorb upstream's newest strict release tag when the main line does not
+  contain it (upstream cuts stable releases from `release-1.x` branches; ADR 9010), mechanical
+  conflict passes, record, gate, commit. No rebase, no cherry-pick ports (ADR 9006).
   The script registers the `merge.pup-version` driver and `rerere` itself; merging by hand
   without them can adopt upstream's version files wholesale.
 - **The `upstream` remote fetches with `--no-tags`** (deliberate). Upstream's tags are resolved
@@ -60,7 +64,10 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
   - The two carried features come through each merge alive.
   - The 0.x version line survives — a merge whose version files adopted upstream's numbers has
     silently broken the channel.
-  - `upstream-merged` advances only inside the merge ritual, only to a version actually merged.
+  - `upstream-merged` holds the newest upstream **strict release** whose commits are in `main`
+    (ADR 9010); it is written only by the ritual, only to a tag that exists on the upstream
+    remote. A merge that named a version from some branch's manifest has silently disarmed the
+    signal — a dev-tip manifest can carry a number nobody can download.
   - The release workflow stays Linux-only; the dropped windows/macOS rows stay dropped.
 - **Release gate:** `scripts/merge-upstream.sh` runs lint + typecheck + build; `collie build`
   gates on version consistency; a tag publishes only from a green `ci.yml` run (`release.yml`'s
@@ -74,8 +81,8 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
 | P001 | Devin support: journal adapter (`bridge/journal/devin.ts`, the journal registry) plus the steered-send surface (echo-as-sent-witness, one resend of a dropped submit key) | `bun scripts/journal-probe.ts` against a real devin log; a live send from the phone | local, deliberately | upstream ships a Devin adapter, or devin leaves the herd |
 | P002 | Worktree-nested herd list on the dashboard (`web/src/lib/dash-view.ts`, [ADR 9005](./.adr/9005-the-herd-list-nests-a-worktree-under-its-repo.md)) | the dashboard after a worktree opens | local, deliberately | upstream nests worktrees itself |
 | P003 | 0.x version line + `merge.pup-version` driver keeping it across merges (`scripts/merge-pup-version.ts`) | `scripts/check-version.sh` | deliberate (the update channel reads origin tags) | mode change or fork retirement |
-| P004 | Own-channel update monitor: check-only banner reads `bermudi/collie` tags; ADR 0020's major-consent gate rides it (`bridge/update.ts`) | `git grep -n bermudi/collie bridge/update.ts` | deliberate | fork retirement |
-| P005 | Upstream-merge signal: `upstream-merged` + the (major, minor) fire rule + dismissible nudge (ADR 9007) | `cat upstream-merged` vs upstream's newest stable tag | deliberate | stop tracking upstream |
+| P004 | Own update channel, carried two ways: the deployment's `[update] update_repo` in `~/.config/collie/config.toml` names `bermudi/collie` (upstream's own `COLLIE_UPDATE_REPO` seam — env, `.env`, or config), and the carried `bridge/released-tags.ts` guard makes a tag with no GitHub release invisible and unselectable as an update target | `grep -A1 '^\[update\]' ~/.config/collie/config.toml`; `rg -n releasedTagsOnly bridge/index.ts cli/update.ts` | the seam is upstream's design (deliberately used, not duplicated); the released-tags guard is deliberately local | fork retirement |
+| P005 | Upstream-merge signal: `upstream-merged` + the (major, minor) fire rule + dismissible nudge; the ritual absorbs the newest strict release the main line lacks (ADR 9007, amended by 9010) | `cat upstream-merged` vs upstream's newest strict tag — the record must never name a version that is not a released tag | deliberate | stop tracking upstream |
 | P006 | Linux-only releases: windows workflow and zip gate dropped (ADR 9008), macOS rows and codesign dropped (ADR 9009) | `ls .github/workflows` — no `windows.yml` | deliberate | platform support returns |
 | P007 | Test suite removed (operator directive); gate is lint + typecheck + build | `ls web/vitest.config.ts` fails | deliberate divergence | a suite returns — re-add `bun run test` to the gate (marked in `merge-upstream.sh`) |
 | P008 | The app's copy names the fork: every i18n string that names the app says ColliePup, swept again at each sync (`web/src/lib/i18n/messages/*`) | `grep -rP '\bCollie\b(?!Pup)' web/src/lib/i18n/messages/` prints nothing | local, deliberately | fork retirement |
@@ -97,6 +104,16 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
 - **`web/src/fixtures/` and `web/src/test/handlers.ts` are not the suite** — the playground
   imports both, and P007 deliberately kept them. Sweeping them by name breaks `collie build`
   (the 2026-10-24 merge did exactly that; the gate caught it).
+- **Upstream cuts strict releases from `release-1.x` branches `upstream/main` does not always
+  contain** — the ritual absorbs the newest strict tag (ADR 9010). Merging it after the main
+  line can conflict where main moved the same seams: the 2026-10-24 v1.23.4 absorb hit
+  `protocol.ts` (main's steer constants vs the release's notice wording — both kept) and the
+  dictionaries.
+- **The dictionaries are a three-way surface, never a take-theirs**: ours is main's superset
+  (plus the ColliePup sweep), theirs is the older release line. Taking theirs wholesale drops
+  main's keys and typecheck fails on every missing string (done and repaired on 2026-10-24).
+  Resolve as ours + theirs' delta (`git diff <merge-base> <tag> -- web/src/lib/i18n/messages/`
+  applied three-way), then run the ColliePup sweep again.
 
 ## Maintenance policy
 
@@ -123,6 +140,26 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
   pushing `main`, tags, or packaging branches publishes — operator's call.
 
 ## Sync / import log
+
+### 2026-10-24 (second sync) — `upstream/main` unchanged; strict `v1.23.4` absorbed via release-1.23 (1.23.2–1.23.4, 14 commits)
+
+- The signal was found disarmed: two dev-tip merges had recorded `upstream-merged = 1.24.0`, a
+  version that does not exist, while `release-1.23`'s 1.23.2–1.23.4 never reached
+  `upstream/main`. ADR 9010 landed first — the ritual now absorbs the newest strict tag, and the
+  record is the newest strict tag proven by ancestry. `upstream-merged` corrected 1.24.0 →
+  1.23.4; the banner re-arms for stable 1.24.0.
+- The absorb merged `v1.23.4`: pi-pane-under-inset-editor sends (#544), notice-key first-line
+  answers, anchored Grok/opencode running-turn patterns, Replace/Cancel for a slash command onto
+  a draft. Conflicts: `protocol.ts` (steer constants vs notice wording — both kept;
+  replace-as-command auto-merged), the dictionaries (ours-as-superset plus theirs' delta, then
+  the ColliePup sweep again), `prompt-select.ts`/fixtures/`ci.yml`/`herdr-plugin.toml` ours
+  (main's newer line already carried theirs' work), `flake.nix` by rerere, 33 test re-imports
+  re-deleted plus one plain add swept. First dictionary resolution took theirs wholesale and
+  typecheck caught the missing 1.24 keys; repaired before the merge commit was final.
+- Gate green: lint, typecheck, build. No test suite ran (P007). Unreleased at this writing.
+- Found unset beside this: the deployment had no `COLLIE_UPDATE_REPO` — its banner watched
+  `AltanS/collie`. `~/.config/collie/config.toml` now sets `[update] update_repo =
+  "bermudi/collie"`, effective on the bridge's next restart.
 
 ### 2026-10-24 — 1.24.0-edge.2 → `upstream/main` 35d3ccfc (edge.3, edge.4 and past, 187 commits, 7ebc600f)
 
