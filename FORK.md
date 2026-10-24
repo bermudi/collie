@@ -140,13 +140,12 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
   and then ran green: lint, both typechecks, build. No test suite ran (P007) — behavior is
   validated by running the product; the browser leg does not exist on this fork.
 - Follow-up: the ColliePup sweep extended to the merge's strings and to a few the earlier pass
-  missed (5a4b9696; P008 now inventoried). Unreleased past v0.57.8. `main` not pushed — that is
-  the operator's call.
+  missed (5a5b9696; P008 now inventoried). Shipped in 0.57.9 (2026-10-24).
 
 ### 2026-10-21 — 1.22.0 → 1.24.0 (upstream dev tip, `v1.24.0-edge.2`, ed781b6e)
 
 - Test-suite removal (operator directive) carried through the merge as re-deletions; the merge
-  gate lost its test step (220f6237). Unreleased as of 2026-10-24 — `main` sits past `v0.57.8`.
+  gate lost its test step (220f6237). Shipped in 0.57.9 (2026-10-24).
 
 ### 2026-10-16 — 1.21.3 → 1.22.0 (73860b2b via 3f30ec00)
 
