@@ -158,8 +158,15 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
   typecheck caught the missing 1.24 keys; repaired before the merge commit was final.
 - Gate green: lint, typecheck, build. No test suite ran (P007). Unreleased at this writing.
 - Found unset beside this: the deployment had no `COLLIE_UPDATE_REPO` — its banner watched
-  `AltanS/collie`. `~/.config/collie/config.toml` now sets `[update] update_repo =
-  "bermudi/collie"`, effective on the bridge's next restart.
+  `AltanS/collie`. `~/.config/herdr/plugins/config/herdr.collie/config.toml` now sets `[update]
+  update_repo = "bermudi/collie"`, effective on the bridge's next restart.
+- The deployment was then moved onto this tree (`versions/v0.57.9-main`, unit repointed,
+  bridge restarted) — and boot refused: upstream's steer grammar arrived with
+  `keys.steer: Enter` for pi while Pup's 0.57.7 adaptation (a3c16f25) had made Enter pi's
+  submit/queue key; the new profile validation rejects the collision. Fixed by dropping pi's
+  steer keys (f823a167) — pi queues on Enter exactly as 0.57.7 shipped; Steer stays off for pi
+  until its real 1.x steer keymap is measured. This is the class of catch the removed profile
+  suite used to make (P007's price, paid once).
 
 ### 2026-10-24 — 1.24.0-edge.2 → `upstream/main` 35d3ccfc (edge.3, edge.4 and past, 187 commits, 7ebc600f)
 
