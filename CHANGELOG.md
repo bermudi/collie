@@ -31,7 +31,8 @@ Running a crew? Update the lead first; members follow on their own. Details:
   `release-1.x` branches it does not always merge back — and `upstream-merged` records the
   newest strict tag proven an ancestor of HEAD, never a version that only exists in some
   branch's manifest. Two October dev-tip merges had recorded 1.24.0, a version that does not
-  exist, disarming the update signal until 1.25.0 while 1.23.2–1.23.4 went unabsorbed (Pup).
+  exist, disarming the update signal until 1.25.0 while 1.23.2–1.23.4 went unabsorbed. The gate
+  runs before the record, so a failed gate leaves a clean tree the ritual can resume from (Pup).
 
 ### Fixed
 
@@ -41,6 +42,10 @@ Running a crew? Update the lead first; members follow on their own. Details:
   answer (letters and digits alike), Grok's and opencode's running-turn patterns are anchored so
   a draft that names them is not a running turn, and a slash command onto a draft offers Replace
   and Cancel rather than Add (Pup).
+
+- **A failed merge gate no longer blocks the ritual's resume.** `scripts/merge-upstream.sh`
+  records `upstream-merged` after the gate, so a failed gate leaves a clean, committed tree the
+  script can resume from instead of a dirty one its entry check rejects (Pup).
 
 ## [0.57.9] - 2026-10-24
 

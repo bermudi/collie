@@ -7,8 +7,9 @@
 # `git merge --no-ff --no-commit` the main line → absorb upstream's newest STRICT release tag
 # when the main line does not contain it (upstream cuts stable releases from release-1.x
 # branches main does not always merge back; ADR 9010) → auto-resolve the conflicts that are only
-# ever mechanical → record `upstream-merged` → run the gate (lint, typecheck, build) → commit.
-# Each merge lands as its own merge commit; the record rides after the last one.
+# ever mechanical → run the gate (lint, typecheck, build) → record `upstream-merged` → commit.
+# Each merge lands as its own merge commit; the record rides after the last one, once the gate
+# is green — a failed gate leaves a clean tree the script can resume from.
 #
 # The version files are normally resolved by the pup-version driver DURING the merge; the pass
 # below is the fallback for a file left conflicted whose ours-vs-theirs differs only in the
@@ -120,8 +121,9 @@ fi
 
 absorb_strict_release
 
-bun scripts/record-upstream-merge.ts "$REF"
-git add upstream-merged UPSTREAM
+# The gate runs before the record so a failure leaves a clean, committed tree the script can
+# resume from ("already up to date … already absorbed") instead of a dirty one the entry check
+# rejects. The record files change nothing the gate could read.
 
 # The `bun run test` step left with the suite it ran (f72903a1); re-add it beside typecheck if a
 # suite returns.
@@ -129,6 +131,9 @@ echo "── gate: lint, typecheck, build"
 bun run lint
 bun run typecheck
 bun run build
+
+bun scripts/record-upstream-merge.ts "$REF"
+git add upstream-merged UPSTREAM
 
 if ! git diff --cached --quiet; then
   git commit -m "chore(fork): record upstream-merged $(cat upstream-merged)"
