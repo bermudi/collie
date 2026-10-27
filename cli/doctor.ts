@@ -60,9 +60,12 @@ import { DEVICES_FILENAME, isExpired, parseRegistryText } from "../bridge/pairin
 import { pairedRegistryOf } from "./pairing.ts";
 import { collieVersionBare, type CliContext } from "./context.ts";
 import { aboutCrew, bad, ok, skipped, warn, type DoctorStatus, type Finding } from "./finding.ts";
+import { parseAccountWindowsSetting } from "../bridge/account-windows-setting.ts";
+import { accountWindowsDoctorLine, grokAuthPath, hasOpencodeGoEntry, opencodeAuthPath } from "../bridge/account-windows.ts";
 import { explicitMux, probeMuxes, refusedMux, type MuxSighting } from "./mux.ts";
 import { cacheFindings } from "./cache-findings.ts";
 import { surfaceFindings } from "./surface-findings.ts";
+import { harnessFindings, harnessReader, type ReadHarness } from "./harness-findings.ts";
 import { durableFindings, sourcesFindings } from "./durable-findings.ts";
 import { historyFindings, type SnapshotRead } from "./history.ts";
 import { EXIT, type Io } from "./io.ts";
@@ -177,6 +180,12 @@ export interface DoctorDeps {
   readonly ui?: Ui | null;
   /** The Whistle model check's stand-in pin, for the tests. Production leaves it. */
   readonly whistle?: WhistleSeams;
+  /**
+   * Reads each harness's binary and version for the harnesses table (`cli/harness-findings.ts`). It
+   * runs the harness's own version command, which is a read. Absent means no table, which is what
+   * the tests that are not about it see.
+   */
+  readonly harnesses?: ReadHarness;
 }
 
 // ── §8.6's window, and the shoulder before it ────────────────────────────────
@@ -262,6 +271,7 @@ export async function cmdDoctor(deps: DoctorDeps, args: readonly string[]): Prom
     await beacons(deps, hookEntries.length > 0),
     skillWalkyTalky(deps),
     ...walkyRefusals(deps),
+    accountWindowsFinding(deps),
     // The Whistle model (ADR 0096): one finding when the model, or the host engine that needs it, is
     // on this host, and none otherwise. A host that never heard of Whistle reads exactly as before.
     ...(await whistleModelFindings(deps)),
@@ -282,6 +292,8 @@ export async function cmdDoctor(deps: DoctorDeps, args: readonly string[]): Prom
     // What the input readers saw, per harness and version, over the last seven days (M56 spec 09): a
     // summary line and one line per row, read from the bridge's own day files. A read, like the rest.
     ...surfaceFindings({ ctx: deps.ctx, files: deps.files, now: deps.now }),
+    // The binary and version of every harness with a profile, and what the profile says (1.24.1).
+    ...(deps.harnesses === undefined ? [] : await harnessFindings(deps.harnesses)),
     restartPending(deps, install, runtimeMarker, await ownRead()),
     // STAMPED `crew` when it is a comparison at all (ADR 0050), while still PRINTING here, where it
     // always has. `clock` measures this machine against a member's `Date` header and its own remedy
@@ -401,12 +413,15 @@ async function render(
   crew: readonly Finding[],
 ): Promise<void> {
   const heading = `collie doctor — ${collieVersionBare(deps.ctx.root, (p) => deps.files.read(p))} · mode ${mode}`;
+  // The first line, before the heading, so a person with two lanes sees which one this run read.
+  const instance = instanceLine(deps.ctx);
   const crewNote = ["crew: none — this collie is not in a crew.", soloCrewHint(deps.host)];
   // One findings list, two renderings. The terminal gets the columns laid out and the statuses
   // coloured; everything else gets exactly the lines below, which are what `--json`'s human twin has
   // always printed and what scripts/collie-cli.test.sh greps.
   if (deps.ui != null) {
     await deps.ui.doctor({
+      instance,
       heading,
       local,
       crewTitle: crew.length === 0 ? "crew:" : `crew: ${data?.crew?.name ?? "?"}`,
@@ -415,6 +430,7 @@ async function render(
     });
     return;
   }
+  deps.io.out(instance);
   deps.io.out(heading);
   deps.io.out("");
   deps.io.out("local:");
@@ -443,15 +459,27 @@ function line(f: Finding): string {
 
 // ── Local checks ─────────────────────────────────────────────────────────────
 
+/** The `collie` finding, with the instance and state directory this run read. */
+interface IdentityFinding extends Finding {
+  readonly instance: string | null;
+  readonly stateDir: string;
+}
+
 /**
  * The very first line: this Collie's own version and platform. Not a check — there is nothing to
  * pass or fail — but an operator pasting a `doctor --json` block into a GitHub issue should never
  * have to be asked "which version was this" as a follow-up question.
  */
-function identity(deps: DoctorDeps): Finding {
+function identity(deps: DoctorDeps): IdentityFinding {
   const version = collieVersionBare(deps.ctx.root, (p) => deps.files.read(p));
   const platform = platformId(process.platform, process.arch) ?? `${process.platform}-${process.arch}`;
-  return ok("collie", `v${version} · ${platform}`);
+  // `instance` and `stateDir` ride on this finding so `--json` names the state it read (1.24.1).
+  return { ...ok("collie", `v${version} · ${platform}`), instance: deps.ctx.instance, stateDir: deps.ctx.stateDir };
+}
+
+/** The first line of the human report: the instance (`COLLIE_INSTANCE`, or the default) and the state directory read. */
+function instanceLine(ctx: CliContext): string {
+  return `instance: ${ctx.instance ?? "default"} · state ${ctx.stateDir}`;
 }
 
 /**
@@ -2106,6 +2134,26 @@ function walkyRefusals(deps: DoctorDeps): Finding[] {
 }
 
 /**
+ * `account-windows` — whether the bridge reads the operator's own harness logins to ask the vendors for
+ * the 5-hour and 7-day windows (ADR 0118), what each harness reads and where it asks. Never a warning:
+ * off is a choice, and on reads nothing until a pane of the harness exists. OpenCode and Grok are off
+ * unless named (or `all`), unverified until one real login has proven their shape. The line names files and
+ * hosts, never anything in a file. It looks at OpenCode's auth store for an `opencode-go` entry and at
+ * Grok's login file for existence, so the line can say which of them has a login.
+ */
+export function accountWindowsFinding(deps: Pick<DoctorDeps, "ctx" | "host" | "files">): Finding {
+  const { env, home } = deps.ctx;
+  const setting = parseAccountWindowsSetting(env["COLLIE_ACCOUNT_WINDOWS"]);
+  // A file of an off harness is not looked at, not even to say whether it has a login.
+  const store = setting.harnesses.includes("opencode") ? deps.files.read(opencodeAuthPath(env, home)) : null;
+  const facts = {
+    opencodeGoKey: store !== null && hasOpencodeGoEntry(store),
+    grokLogin: setting.harnesses.includes("grok") && deps.files.exists(grokAuthPath(env, home)),
+  };
+  return ok("account-windows", accountWindowsDoctorLine(setting, env, home, deps.host.platform, facts));
+}
+
+/**
  * `beacons` — how many agents have identified themselves here, and how many of those are gone.
  *
  * An expired beacon is ORDINARY and never a warning: agents end. Its pane goes back to reading as a
@@ -2369,5 +2417,6 @@ export function doctorDeps(base: {
     beacons: beaconReader(base.ctx.stateDir),
     now: () => Date.now(),
     ownerOnly: realOwnerOnlyDeps,
+    harnesses: harnessReader(base.ctx.env),
   };
 }

@@ -5,7 +5,7 @@ import { useRevalidator } from "react-router";
 import { Check, FileText, Image, Keyboard, ListEnd, ListTodo, Loader2, Mic, Monitor, Navigation, Paperclip, Pencil, Send, Settings2, Slash, Square, Terminal, TriangleAlert, X, Zap } from "lucide-react";
 
 import { StatusDot } from "@/components/status-badge";
-import { applyDraftFontSize, fontStack, inputFocusZoomsPage, sentSuggestionsOf } from "@/hooks/use-display-prefs";
+import { applyDraftFontSize, fontStack, inputFocusZoomsPage, reportOfferOf, sentSuggestionsOf } from "@/hooks/use-display-prefs";
 import type { DisplayPrefs, Hand } from "@/hooks/use-display-prefs";
 import { usePendingConfirm } from "@/hooks/use-pending-confirm";
 import { useDirectTyping } from "@/hooks/use-direct-typing";
@@ -27,7 +27,7 @@ import { SentSheet } from "@/components/sent-sheet";
 import { SuggestionStrip } from "@/components/suggestion-strip";
 import { useSentSuggestions } from "@/hooks/use-sent-suggestions";
 import { QuickActionsContent } from "@/components/quick-actions";
-import { ActionsRow } from "@/components/actions-row";
+import { ActionsRow, type GeneralAction } from "@/components/actions-row";
 import { SectionLabel } from "@/components/ui/section-label";
 import { Collapse } from "@/components/ui/collapse";
 import { BottomSheet } from "@/components/ui/sheet";
@@ -86,8 +86,12 @@ import { isSelfEcho, normalizeDraft } from "@/hooks/use-terminal-draft";
 import { adapterFor } from "@/lib/harness";
 import { useLive } from "@/lib/liveness";
 import { useCatchingUp, useLocked } from "@/lib/idle";
-import { OfflineDraftNote, TerminalDraftPreview } from "@/components/terminal-draft-preview";
-import { isLead, scopeKey, type Scope } from "@/lib/scope";
+import { ClearNotice, OfflineDraftNote, TerminalDraftPreview } from "@/components/terminal-draft-preview";
+import { ReportCard } from "@/components/report-card";
+import { textToKeySequence } from "@/lib/key-queue";
+import { isLead, paneScopeKey, scopeKey, type Scope } from "@/lib/scope";
+import { closeTrouble, noteSend, openReport, streakIds, useTroubleOffer } from "@/lib/report/store";
+import { takeBeltIntent } from "@/lib/belt-intent";
 import type { PaneSubagent, PaneTodo } from "@/lib/types";
 import { AgentsSheet, subagentName } from "@/components/agents-sheet";
 import { SubagentSheetCtx, type SubagentTarget } from "@/components/chat-cards";
@@ -99,7 +103,7 @@ import { useHandsFree, useSttCapability } from "@/lib/stt";
 import { NoEchoNotice } from "@/components/no-echo-notice";
 import type { TranscriptEntry } from "@/lib/types";
 import { findUnknownSendMatch, type UnknownSend } from "@/lib/unknown-send";
-import { phoneRefusal, readingRefusal, refusalKey, SendRefusalNotice, stopNotice, type SendRefusal } from "@/components/send-notice";
+import { clearNotice, phoneRefusal, readingRefusal, refusalKey, SendRefusalNotice, stopNotice, type SendRefusal } from "@/components/send-notice";
 import { mintRequestId } from "@/lib/worktree-name";
 
 /** The status line a verified send leaves, by where the text went. */
@@ -152,6 +156,11 @@ interface ComposerProps {
    * the menu has no such row, whatever the harness is.
    */
   canSteer?: boolean | undefined;
+  /**
+   * The pane's Chat holds a returned queued card (ADR 0122): a Stop put a queued message back in the
+   * box. A send refused `draft_present` then points at that card instead of at an unseen draft.
+   */
+  returnedDraft?: boolean;
   /** True for a bare shell pane — tweaks the placeholder copy. */
   isShell: boolean;
   /** The pane's folder, absolute. Sent (M61) lists "This folder" with it; absent, it offers the machine only. */
@@ -177,8 +186,9 @@ interface ComposerProps {
    */
   composing?: boolean;
   /**
-   * The belt draws Stop (M68 spec 02): the turn runs and the bridge says a key exists (`stopFor`,
-   * lib/harness-bar.ts, decided by the pane). Absent or false and no Stop is drawn.
+   * The belt draws Stop (M68 spec 02): the bridge says a key exists (`stopFor`, lib/harness-bar.ts,
+   * decided by the pane). The turn only decides whether it is live or dimmed. Absent or false and no
+   * Stop is drawn.
    */
   stopOffered?: boolean;
   /** The "Answer the dialog" word's tap: scroll to the dialog card and focus its first button. It sends
@@ -278,6 +288,18 @@ interface ComposerProps {
    * left of the field, Send on the outer edge, Attach beside the field.
    */
   hand?: Hand;
+
+  /**
+   * Drawn directly above the actions belt, under any open dock: the pane's joystick handle band when
+   * Settings → Pane navigation is Joystick (ADR 0121). The pane decides; absent, nothing is drawn.
+   */
+  aboveBelt?: ReactNode;
+
+  /**
+   * One more floating notice from the pane, nearest the belt in the floating group (ADR 0061): the Two
+   * fingers first-arm hint (ADR 0121). The pane decides; absent, nothing is drawn.
+   */
+  floatingHint?: ReactNode;
 
   /**
    * The Screen pill on the belt (M56 spec 07): the raw rows of the terminal, without cards, one tap
@@ -406,6 +428,22 @@ function revokePreview(attachment: ComposerAttachment) {
 }
 
 /** What the belt's X took out of the box, held in memory for its Undo (M40 spec 04). */
+/** What the last Clear answered, while its floating notice stands (ADR 0116, the Clear paragraph). */
+interface ClearNote {
+  /** The pane the Clear was for: the notice never shows on another. */
+  readonly paneId: string;
+  readonly refusal: SendRefusal;
+  /** The text the Clear removed, while Restore is offered; null once it is not. */
+  readonly draft: string | null;
+  /** When the receipt came back: the notice goes after {@link CLEAR_NOTE_MS}. */
+  readonly at: number;
+  /** A read since the Clear showed the box without a draft (see the composer's effect). */
+  readonly seenEmpty: boolean;
+}
+
+/** How long a Clear's floating notice, and its Restore, stand. */
+export const CLEAR_NOTE_MS = 120_000;
+
 interface ClearedDraft {
   text: string;
   /** The chips, preview URLs included: those stay alive until the window ends. */
@@ -418,7 +456,7 @@ interface ClearedDraft {
 
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { paneId, instance, surface, unreachableNote, scope, stopOffered = false, agent, canSteer, isShell, cwd, gone, readOnly, composing, onAnswerDialog, dialogCard = false, text, terminalDraft, rawTerminalDraft, prefs, display, onSent, onOpenMessages, held: heldRows, chatEntries, pullHandle, draftNoticeSlot, changesPill, stale, hand = "right", screen, todos, subagents },
+  { paneId, instance, surface, unreachableNote, scope, stopOffered = false, agent, canSteer, returnedDraft = false, isShell, cwd, gone, readOnly, composing, onAnswerDialog, dialogCard = false, text, terminalDraft, rawTerminalDraft, prefs, display, onSent, onOpenMessages, held: heldRows, chatEntries, pullHandle, draftNoticeSlot, changesPill, stale, hand = "right", aboveBelt, floatingHint, screen, todos, subagents },
   ref,
 ) {
   const revalidator = useRevalidator();
@@ -471,6 +509,9 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   // The field itself is off only when nothing typed here can ever leave for this pane: a gone pane,
   // a read-only device, a box out of reach. Derived from the slot, never passed in.
   const locked = fieldLocked(slot);
+  // Clear (ADR 0116) is offered while the box holds a draft and no dialog owns the keys. The Surface's own
+  // words, so a stale or unreadable read greys it; the keys door and the link are `way.keysSendable`.
+  const clearOffered = way.keysSendable && shownSurface.composer === "draft" && shownSurface.modal === "none";
   const offlineRef = useRef(offline);
   offlineRef.current = offline;
   // The one-line note while Send is off for want of a live read: what happens to the words already
@@ -521,6 +562,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   // Compared by VALUE (its cache key), never by object identity: a scope is a value passed as an
   // object, and an identity compare here would re-run the save/restore below on every poll.
   const scopeId = scopeKey(scope);
+  // Report a problem (ADR 0123): this pane's failure streak, and whether this device offers the card.
+  const reportKey = paneScopeKey(scope, paneId);
+  const reportOn = isLead(scope) && reportOfferOf(prefs);
+  const reportCount = useTroubleOffer(reportKey);
   const draftPaneRef = useRef({ scope, scopeId, paneId });
   // THE BELT'S X AND ITS UNDO (M40 spec 04, issue #291). The X empties this box in one tap
   // (`clearByHand`); until the operator's next act the same slot is Undo, and this is what Undo puts
@@ -730,6 +775,78 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       else setStatus(describeThrownError(e), "error");
     }
   }
+  // What the last Clear answered, for the floating notice: its words, and the text it cleared while Restore
+  // is offered. `seenEmpty` turns true once a read shows the box without a draft, so the read from before the
+  // Clear, still on screen when the receipt lands, does not end the offer.
+  const [clearNote, setClearNote] = useState<ClearNote | null>(null);
+  // CLEAR (ADR 0116, the Clear paragraph): the Keys board's button that empties the harness's box. One fresh
+  // request id per tap; the bridge presses the profile's clear key as this person's tap and reads back. No arm:
+  // Restore types a cleared draft back (below). A thrown
+  // error that says nothing about the key (a timeout, a dropped link) is the Clear's `unknown`. The button is
+  // offered only while the Surface reads a draft and no dialog, and the link is up; the bridge decides again.
+  //
+  // The receipt floats above the belt with the other floating notices (`floating`, ADR 0061), not in the
+  // send notice under the box: a notice that came and went there moved the composer and the belt (Altan's
+  // phone, 2026-10-24). A `cleared` receipt carries the text it cleared, and the notice offers Restore.
+  async function clearBox(): Promise<void> {
+    const requestId = mintRequestId();
+    try {
+      const receipt = await api.clearPane(paneId, { requestId }, scope);
+      const draft = receipt.outcome === "cleared" && receipt.draft !== undefined && receipt.draft !== "" ? receipt.draft : null;
+      setClearNote({ paneId, refusal: clearNotice(receipt), draft, at: Date.now(), seenEmpty: false });
+    } catch (e) {
+      if (api.outcomeUnknown(e)) setClearNote({ paneId, refusal: clearNotice({ requestId, outcome: "unknown" }), draft: null, at: Date.now(), seenEmpty: false });
+      else setStatus(describeThrownError(e), "error");
+    }
+  }
+  // RESTORE (ADR 0116, the Clear paragraph): the cleared text typed back into the box as this person's taps
+  // through the keys route (`POST /api/pane/:id/keys`, the key gate's `person_tap`, the way Type mode types),
+  // with no Enter: a line break or a tab in the text becomes a space (`boundedDraft`), so no key in it
+  // submits. The keys route audits a typed character only as a mask, never the text. One Restore per Clear:
+  // the offer goes as the tap leaves, so a second tap cannot type the text twice; a refusal that says
+  // nothing was typed gives it back.
+  const [restoring, setRestoring] = useState(false);
+  async function restoreDraft(): Promise<void> {
+    const note = clearNote;
+    if (note === null || note.draft === null || restoring) return;
+    const keys = textToKeySequence(note.draft.replace(/[\r\n\t]+/gu, " "));
+    setRestoring(true);
+    setClearNote({ ...note, draft: null });
+    try {
+      const res = await api.sendKeys(paneId, keys, scope);
+      if (res.ok) {
+        setClearNote(null);
+        onSent();
+      } else {
+        setClearNote((now) => (now === null ? now : { ...now, draft: note.draft }));
+        setStatus(describeApiError(res), "error");
+      }
+    } catch (e) {
+      setStatus(describeThrownError(e), "error");
+    } finally {
+      setRestoring(false);
+    }
+  }
+  // The Clear notice's lifetime. It goes after CLEAR_NOTE_MS, and on another pane. Restore ends, with the
+  // notice, once a read after the Clear shows a draft in the box again: the person typed there, or Restore
+  // did, so the text the Clear took is no longer what the box lacks.
+  useEffect(() => {
+    if (clearNote === null) return;
+    const left = clearNote.at + CLEAR_NOTE_MS - Date.now();
+    const timer = setTimeout(() => setClearNote(null), Math.max(0, left));
+    return () => clearTimeout(timer);
+  }, [clearNote]);
+  useEffect(() => {
+    setClearNote((note) => (note === null || note.paneId === paneId ? note : null));
+  }, [paneId]);
+  const boxComposer = shownSurface.composer;
+  useEffect(() => {
+    setClearNote((note) => {
+      if (note === null) return note;
+      if (boxComposer !== "draft") return note.seenEmpty ? note : { ...note, seenEmpty: true };
+      return note.seenEmpty && note.draft !== null ? null : note;
+    });
+  }, [boxComposer, clearNote?.at]);
   // The reason a destructive line is held for a second tap, said at the Send slot (it was a header line,
   // which holds nothing a person must act on, M56 spec 07). Shown only while the confirm is armed.
   const [destructiveNote, setDestructiveNote] = useState<string | null>(null);
@@ -1161,12 +1278,33 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       />
     ) : null;
 
+  // Report a problem (ADR 0123): after three failed sends in a row on this pane, a card offers the report
+  // sheet. It floats with the others, under the held card, so it moves nothing; the cross keeps it quiet
+  // until the streak ends. Off on a crew member's pane (the next slice) and when Settings turned it off.
+  const reportCard =
+    reportOn && reportCount > 0 ? (
+      <ReportCard
+        count={reportCount}
+        onReport={() => openReport({ paneId, scope, requestIds: streakIds(reportKey) })}
+        onClose={() => closeTrouble(reportKey)}
+      />
+    ) : null;
+
   // The place both float in: a column, the held card on top and the draft or offline notice nearest
   // the belt, with a small gap. Pass-through wrapper (`pointer-events-none`); each card takes touches
   // back. In the pane view's slot the slot does the positioning; alone, the column floats above this
   // composer's own top edge. No `Collapse`: it is absolute, so it holds no space at all.
+  // The last Clear's answer floats nearest the belt (ADR 0116, the Clear paragraph): its words, and Restore
+  // while the cleared text is kept, the box reads empty and no dialog owns the keys, so the text is never
+  // typed into a dialog or onto a draft.
+  const restoreOpen =
+    clearNote !== null && clearNote.draft !== null && clearNote.seenEmpty && way.keysSendable && shownSurface.composer === "empty" && shownSurface.modal === "none";
+  const clearCard =
+    clearNote !== null && clearNote.paneId === paneId ? (
+      <ClearNotice refusal={clearNote.refusal} onRestore={restoreOpen ? () => void restoreDraft() : null} restoring={restoring} onDismiss={() => setClearNote(null)} />
+    ) : null;
   const floating =
-    heldCard !== null || floatingNotice !== null ? (
+    heldCard !== null || reportCard !== null || floatingNotice !== null || clearCard !== null || (floatingHint !== undefined && floatingHint !== null) ? (
       <div
         data-slot="floating-cards"
         className={cn(
@@ -1175,7 +1313,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         )}
       >
         {heldCard}
+        {reportCard}
         {floatingNotice}
+        {clearCard}
+        {floatingHint}
       </div>
     ) : null;
 
@@ -1442,6 +1583,11 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         return false;
       }
       const { reply, reading } = res;
+      // Report a problem (ADR 0123): the answer joins this pane's streak. Plain rules over the outcome and
+      // reason (lib/report/trouble.ts); nothing is sent and nothing is retried. This machine's panes only.
+      if (reportOn && reply.outcome !== null) {
+        noteSend(reportKey, paneId, { requestId: res.requestId, outcome: reply.outcome, reason: reply.reason, cap: reply.cap !== null, at: Date.now() });
+      }
       if (reading.clear) {
         setProtocolOffer(null);
         afterVerifiedSend(resend?.shown ?? t, isDraft, verifiedNote(reading.note, when));
@@ -1450,7 +1596,12 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       // A resend makes no offer: an offer would carry the row's text, which may be masked.
       const offered = reading.offers.length > 0 && resend === undefined;
       setProtocolOffer(offered ? { text: t, isDraft, rowsHash: reply.rowsHash, offers: reading.offers, capAck: reading.cap !== null } : null);
-      setSendRefusal(readingRefusal(reading), reply.surface ?? shownSurface, offered);
+      const refusal = readingRefusal(reading);
+      setSendRefusal(
+        returnedDraft && reading.note === "draft" ? { ...refusal, sentence: translate("composer.protocol.draftIsReturned") } : refusal,
+        reply.surface ?? shownSurface,
+        offered,
+      );
       // An `unknown` outcome is an open question the journal can still answer (#511): remember the
       // send, so its text landing as a user turn retires this notice and the kept draft. A resend
       // carries no text of its own to recognise, so it is never remembered.
@@ -1547,8 +1698,22 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   const refusalScreen = sendRefusal?.screen === true && screen !== undefined && !screen.on;
   const refusalKeys = way.keysOpen && drawer !== "keys";
   // What the field's placeholder says: the facts first (a pane that is gone, a device that may not
-  // write, a box out of reach), then Type mode, then the ordinary reply or shell line. The placeholder
-  // names no other state: the notices, the Screen pill and the Send slot carry those.
+  // write, a box out of reach), then Type mode, then the shell line, then (M69) the Steer hint while a
+  // turn runs on a harness that can steer, then the ordinary reply line. The placeholder names no other
+  // state: the notices, the Screen pill and the Send slot carry those.
+  //
+  // THE STEER HINT LIVES HERE, NOT IN A ROW OF ITS OWN. It was a line above the box inside a Collapse,
+  // so it opened and closed with every turn and moved the belt and the field (Altan, 2026-10-25: a
+  // composer hint must not shift the layout). A placeholder takes no height of its own, and it goes
+  // when the first character is typed, which is when the operator no longer needs it.
+  // The hint is ONE short sentence so it never wraps at placeholder:text-xs; a wrapped placeholder grows a
+  // `field-sizing-content` field.
+  const steerWords =
+    way.state !== "gone" && way.state !== "readOnly" && way.state !== "unreachable" && !direct.active && !isShell && steerRow;
+  // A box the bridge proved stale (2026-10-25: the screen shows an input box that did not take keys)
+  // says so in the same place, before the Steer hint: a send probes the box first, so the person knows
+  // why a send may come back refused.
+  const staleWords = way.state !== "gone" && way.state !== "readOnly" && way.state !== "unreachable" && !direct.active && !isShell && surface.staleFrame === true;
   const placeholderWords =
     way.state === "gone"
       ? translate("composer.placeholder.gone")
@@ -1560,7 +1725,11 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             ? translate("composer.placeholder.direct")
             : isShell
               ? translate("composer.placeholder.shell")
-              : translate("composer.placeholder.reply");
+              : staleWords
+                ? translate("composer.stale.hint")
+                : steerWords
+                  ? translate("composer.steer.hint")
+                  : translate("composer.placeholder.reply");
 
   // Coalesce revalidations from a burst of key presses, LEADING edge first: the first press in a
   // burst refetches immediately, and only presses that arrive inside the window collapse into one
@@ -1897,6 +2066,35 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       ? attachments.find((a) => a.n === editingPaste.n && a.kind === "paste")
       : undefined;
 
+  // Collie's own pills, as the belt below draws them, kept so that a large screen's belt tap in another
+  // column can run one by id once this composer mounts for that pane (ADR 0120, lib/belt-intent.ts).
+  const beltPills = useRef<readonly GeneralAction[]>([]);
+  const keepBelt = (pills: GeneralAction[]): GeneralAction[] => {
+    beltPills.current = pills;
+    return pills;
+  };
+  const beltTap = useRef({ locked, send, stop: stopOffered ? stopTurn : null, changesPill, agents: subagentList.length > 0 });
+  beltTap.current = { locked, send, stop: stopOffered ? stopTurn : null, changesPill, agents: subagentList.length > 0 };
+  // The tap moved the focus here and left its act, which runs once, through the same handler and gates
+  // as a tap on this belt. A pill this belt does not draw, or draws disabled, does nothing.
+  useEffect(() => {
+    const intent = takeBeltIntent(paneScopeKey(scope, paneId));
+    if (intent === null) return;
+    const tap = beltTap.current;
+    if (intent.kind === "action") {
+      const pill = beltPills.current.find((a) => a.id === intent.id);
+      if (pill !== undefined && pill.disabled !== true) pill.onSelect();
+    } else if (intent.kind === "run") {
+      if (!tap.locked) void tap.send(intent.text, false);
+    } else if (intent.kind === "changes") {
+      tap.changesPill?.onClick();
+    } else if (intent.kind === "agents") {
+      if (tap.agents) setAgentsOpen(true);
+    } else if (tap.stop !== null) {
+      void tap.stop();
+    }
+  }, [scope, paneId]);
+
   return (
     <>
       <div
@@ -1969,6 +2167,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               onSend={(keys) => direct.sendPaneKeys(keys)}
               presets={keyPresets}
               board={keyBoard}
+              clearBox={{ available: clearOffered, onClear: clearBox }}
               onQueueChange={setQueuedKeys}
               disabled={!way.keysSendable}
             />
@@ -2059,8 +2258,9 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             which were two rows of a phone's glass answering one question. The row itself is
             actions-row.tsx; everything below is only what each action DOES.
   */}
+        {aboveBelt}
         <ActionsRow
-          general={[
+          general={keepBelt([
               // Keys and Quick are TOGGLES for the in-flow dock above (not overlays): tap to
               // open, tap again to close. `expanded` ties each to the dock; the "on" tint marks
               // it pressed while open. Both share the single-valued `drawer`, so opening one
@@ -2189,12 +2389,13 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                   display.onToggle();
                 },
               },
-          ]}
+          ])}
           agent={agent}
           mine={operatorCommands}
           onRun={(command) => send(command, false)}
           disabled={locked}
-          // Stop, for a running turn the bridge has a key for (M68 spec 02); a link that is down greys it.
+          // Stop, for a pane the bridge has a key for (M68 spec 02): live while the turn runs, dimmed in
+          // place otherwise; a link that is down greys it.
           stop={stopOffered ? { onStop: stopTurn, paneId, running: surface.turn === "running" } : undefined}
           // The pane switcher: a Switch pill pinned at this belt's right end, above Send, and the
           // belt itself as the drag surface behind it. The pane decides whether there is one
@@ -2384,14 +2585,6 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             {translate("composer.draft.holdsMask")}
           </p>
         </Collapse>
-        {/* M69: what the plain tap does, and where the other choice is, while a turn runs on a harness
-            that can steer. Only then: a pane without `canSteer` draws nothing here, and a closed
-            Collapse holds no height, so its layout does not move. */}
-        <Collapse open={steerRow && !direct.active}>
-          <p data-slot="composer-steer-hint" className="px-1 pb-1 text-xs leading-snug text-muted-foreground">
-            {translate("composer.steer.hint")}
-          </p>
-        </Collapse>
         {/* ── ONE BOX, ONE ROW: THE FIELD, ATTACH, THE PRIMARY ACTION ──────────────────────
             The field, the attach control and Send used to be three shapes on one line: a
             bordered field with a button tucked into its bottom-right corner, and a round primary
@@ -2566,6 +2759,11 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               // the field's right side takes no padding of its own, and the box's `gap-1` to attach
               // is what keeps the text off it.
               "min-w-0 flex-1 min-h-9 pl-2 py-1.5",
+              // The Steer hint is longer than the reply words, so it is drawn smaller. The FIELD'S HEIGHT
+              // does not change with it: `text-base` gives the field a unitless line-height, so the
+              // placeholder's line box can only shrink (12px x 1.33 against 14-16px x 1.5), and the empty
+              // field is already held at `min-h-9` above (at most 16px x 1.5 + 12px of padding = 36px).
+              (staleWords || steerWords) && "placeholder:text-xs",
               // Mirrored, the field's right side stands against the box's border, so it takes the
               // inset the left used to take from Attach.
               hand === "left" && "pr-2",

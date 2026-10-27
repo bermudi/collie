@@ -126,6 +126,8 @@ export const WALK_PAIRS: readonly WalkPair[] = [
   // pi's example permission-gate (pi 0.87.1), pi's own selector: Down at 120 columns, Up at 80.
   ["pi", "pi--v0871-permission-gate.txt", "pi--v0871-permission-gate-moved.txt"],
   ["pi", "pi--v0871-permission-gate-narrow.txt", "pi--v0871-permission-gate-narrow-moved.txt"],
+  // gentle-pi 4.2.0's review-consent screen (pi 1.3.0): no rule frame, footer last; the Effect paragraph follows the pointer.
+  ["pi", "pi--v130-gentle-review-consent.txt", "pi--v130-gentle-review-consent-moved.txt"],
   // Kiro V3 2.33.0: the startup workspace trust dialog, before and after one Down at each width.
   ["kiro", "kiro--v3-workspace-trust-continue-w120.txt", "kiro--v3-workspace-trust-exit-w120.txt"],
   ["kiro", "kiro--v3-workspace-trust-continue-w60.txt", "kiro--v3-workspace-trust-exit-w60.txt"],
@@ -218,5 +220,17 @@ export const WALK_GAPS = {
   "omp | select | Pick a colour": {
     since: "2026-10-03",
     reason: "no pointer-only pair: the two captures differ by a `✎ note` mark, which is note state, not the pointer",
+  },
+  "omp | select | Which of these would be most useful for your work right now?": {
+    since: "2026-10-25",
+    reason:
+      "no second capture yet: one 18.12.6 capture of an Ask with option previews, pointer on the first row; " +
+      "ask-dialog.ts draws a preview under its option whatever the pointer, and ask.test.ts derives the moved screen",
+  },
+  "omp | select | What work should I plan?": {
+    since: "2026-10-25",
+    reason:
+      "no second capture yet: one 18.12.6 capture of the plan-mode Ask, pointer on the first row; the grammar is " +
+      "the previews dialog's, whose moved screen ask.test.ts derives",
   },
 } satisfies Record<string, WalkGap>;

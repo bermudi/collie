@@ -24,7 +24,8 @@ import { lstat, readdir } from "node:fs/promises";
 import type { CacheProbe } from "../cache/engine.ts";
 import type { JsonObject, JsonValue } from "../json.ts";
 import { basename, dirname, join } from "node:path";
-import { asRecord, asText, probeTail, tokenCount, walkBack } from "./cache-probe.ts";
+import { asRecord, asText, FileSum, probeTail, tokenCount, walkBack } from "./cache-probe.ts";
+import { type MeasuredContext, piAgentDirLookups, WindowCatalog } from "./model-window.ts";
 import {
   containedRealpath,
   containedRealpathIn,
@@ -50,7 +51,7 @@ import {
 } from "./reduce.ts";
 import { clamp, type Clamped, MAX_RESULT_CHARS, MAX_TEXT_CHARS, stripAnsi, summarizeToolInput } from "./text.ts";
 import { parseUnifiedDiff } from "./diff.ts";
-import { answerLabels, classifyToolCall, questionKey, type ToolCall } from "./tool-call.ts";
+import { answerLabels, classifyToolCall, planTasks, questionKey, type ToolCall } from "./tool-call.ts";
 import type {
   AgentSessionRef,
   JournalAdapter,
@@ -230,13 +231,38 @@ function enrichCall(
     }
     return;
   }
+  if (call.kind === "plan") {
+    // Gentle Shell's `todo` result holds the WHOLE list whatever the action was (277 of 277 local
+    // results, 2026-10-16); the input of an `update` holds one task. An empty or absent list leaves
+    // what the input said.
+    const gentle = details?.gentleTodo;
+    const tasks = gentle !== null && typeof gentle === "object" && !Array.isArray(gentle) ? planTasks(gentle.tasks) : [];
+    if (tasks.length > 0) call.tasks = tasks;
+    return;
+  }
   if (call.kind === "execute") {
+    // A background start answers before the command ran: no status line is no exit code YET, and the
+    // end notice gives the real one (see `endNotice`).
+    if (call.background) return;
     const status = PI_EXIT_STATUS.exec(text);
     if (status !== null) call.exitCode = Number(status[1]);
     else if (!isError) call.exitCode = 0;
     return;
   }
   if (call.kind === "question") {
+    // Gentle Shell's `ask_user_choice` writes the pick as `details.selection.label` and collie's own
+    // `ask_user` as `details.answer`, both for a one-question call. A dismissal
+    // (`details.cancelled`) carries neither and fills nothing.
+    const selection = details?.selection;
+    const picked =
+      selection !== null && typeof selection === "object" && !Array.isArray(selection) ? selection.label : details?.answer;
+    if (call.questions.length === 1 && typeof picked === "string" && picked.trim() !== "") {
+      const labels = answerLabels(picked);
+      if (labels.length > 0) {
+        call.answers = [labels];
+        return;
+      }
+    }
     // One list of chosen labels per question, in question order (`[["Blue"]]`), the shape the
     // question card reads. pi's own log does not write it; OpenClaw's `ask_user` answers do, once
     // its normaliser has put them in order (journal/openclaw.ts). Anything of another shape is left
@@ -273,16 +299,33 @@ function enrichCall(
     return;
   }
   if (call.kind === "other") {
-    // The one thing an unrecognised pi tool records that a view can draw: the answer a question got.
-    // It joins the STRUCTURED summary only — the part's own `summary` is the call's one-line form and
-    // stays exactly what `summarizeToolInput` made of the input.
+    // An unrecognised pi tool that records an answer (one with a `question` but no options, so not a
+    // question card). It joins the STRUCTURED summary only — the part's own `summary` is the call's
+    // one-line form and stays exactly what `summarizeToolInput` made of the input.
     const answer = details?.answer;
     if (typeof answer === "string" && answer.trim() !== "") call.summary = `${call.summary} → ${answer}`;
   }
 }
 
 /** A pi call waiting for its result, plus each question's `id` by its text when the call asked any. */
-type PiPending = PendingTool & { questionIds?: ReadonlyMap<string, string> };
+type PiPending = PendingTool & {
+  questionIds?: ReadonlyMap<string, string>;
+  /** Set when the call draws no part of its own: its result lands on this card instead (ADR 0119). */
+  foldInto?: PendingTool;
+};
+
+/** The object under `details[key]`, or `undefined`. */
+function detailsOf(details: JsonValue | undefined, key: string): JsonObject | undefined {
+  if (details === null || details === undefined || typeof details !== "object" || Array.isArray(details)) return undefined;
+  const inner = details[key];
+  return inner !== null && typeof inner === "object" && !Array.isArray(inner) ? inner : undefined;
+}
+
+/** A string field, or `undefined` when absent, blank or another type. */
+function field(o: JsonObject | undefined, key: string): string | undefined {
+  const v = o?.[key];
+  return typeof v === "string" && v.trim() !== "" ? v : undefined;
+}
 
 /** The `id` of each question a call's input names, keyed by the question's text. */
 function questionIdsOf(input: JsonValue | undefined): Map<string, string> {
@@ -447,12 +490,178 @@ const PI_KNOWN: KnownTypes = {
   parts: ["text", "thinking", "image", "toolCall"],
 };
 
+/** The statuses Gentle Shell and Oh My Pi write when a subagent or a background job has ended. */
+const FINAL_WORK_STATUS: ReadonlySet<string> = new Set(["completed", "failed", "cancelled", "exited", "stopped"]);
+
+/** The statuses an Oh My Pi `task` start writes for a subagent that has not ended yet. */
+const OMP_RUNNING_STATUS: ReadonlySet<string> = new Set(["pending", "running"]);
+
+/** The objects of `details[key]` when it is a list, else none. */
+function detailRows(details: JsonValue | undefined, key: string): JsonObject[] {
+  if (details === null || details === undefined || typeof details !== "object" || Array.isArray(details)) return [];
+  const list = details[key];
+  if (!Array.isArray(list)) return [];
+  return list.filter((row): row is JsonObject => row !== null && typeof row === "object" && !Array.isArray(row));
+}
+
+/**
+ * The status an Oh My Pi `async-result` notice gives one job. The row's `details.jobs[]` carries no
+ * status (OMP 18.6.1); the notice's own text does, as `<task-result id="<job>" … status="<s>">`. A
+ * notice that names none is a delivered result, so `completed`.
+ */
+function asyncResultStatus(content: string, jobId: string): string {
+  for (const m of content.matchAll(/<task-result\b([^>]*)>/g)) {
+    const attrs = m[1] ?? "";
+    if (/\bid="([^"]*)"/.exec(attrs)?.[1] !== jobId) continue;
+    const status = /\bstatus="([^"]*)"/.exec(attrs)?.[1];
+    if (status !== undefined && status !== "") return status;
+  }
+  return "completed";
+}
+
 export function createPiReducer(): RowReducer {
   // toolCall id → the part awaiting its result and the turn it went out in, so a later `toolResult`
   // row lands on its own call and can name where that call is drawn.
   const pendingTools = new Map<string, PiPending>();
   // What this reducer met and had no branch for, asked for once per session by the canary.
   const unknown = createUnknownCounter(PI_KNOWN);
+  // The newest plan card, which a later non-`write` `todo` call folds into (ADR 0119).
+  let heldPlan: PendingTool | undefined;
+  // Subagent task id / background job id → the card that started it, so the end notice (or a
+  // `subagent_result`) can find it. Kept after the work ends: a result can be asked for later. Bounded
+  // by `rememberPending`; what falls off is the oldest id, whose notice the window has long passed.
+  const workCards = new Map<string, PendingTool>();
+  // An Oh My Pi job card → its progress names, the `label` an end row may name it by. Weak, so a card
+  // the window and `workCards` both let go of costs nothing here.
+  const jobLabels = new WeakMap<PendingTool, readonly string[]>();
+
+  /**
+   * Oh My Pi's `task` start (OMP 18.6.1, read off a real session on 2026-10-25). The result answers at
+   * once with `details.async: {state: "running", jobId}` and one `details.progress[]` row per subagent
+   * (`id`, `agent`, `status: "pending"`). The card is ongoing while the job runs, remembered under the
+   * job id and under each progress id, and carries the job id as `jobId`. A failed spawn (`isError`,
+   * no `async`) never reaches here. True when the details had this shape at all.
+   */
+  function startOmpJob(target: PendingTool, raw: JsonValue | undefined): boolean {
+    const call = target.part.call;
+    if (call?.kind !== "task") return false;
+    const job = detailsOf(raw, "async");
+    const progress = detailRows(raw, "progress");
+    if (job === undefined && progress.length === 0) return false;
+    const agent = progress.map((row) => field(row, "agent")).find((a) => a !== undefined);
+    if (call.agent === undefined && agent !== undefined) call.agent = agent;
+    const running =
+      field(job, "state") === "running" || progress.some((row) => OMP_RUNNING_STATUS.has(field(row, "status") ?? ""));
+    if (!running) return true;
+    // A second job of one name gets `<name>-2` as its job id while its progress id stays `<name>`, so
+    // a progress id an ongoing card already holds is left to that card. The job id is taken last and
+    // always: it is the name the end notice uses.
+    jobLabels.set(target, progress.flatMap((row) => field(row, "id") ?? []));
+    for (const row of progress) {
+      const id = field(row, "id");
+      const held = id === undefined ? undefined : workCards.get(id);
+      if (id !== undefined && (held === undefined || held.part.call?.kind !== "task" || held.part.call.ongoing !== true))
+        rememberPending(workCards, id, target);
+    }
+    const jobId = field(job, "jobId") ?? field(progress[0], "id");
+    if (jobId !== undefined) {
+      rememberPending(workCards, jobId, target);
+      call.jobId = jobId;
+    }
+    call.ongoing = true;
+    return true;
+  }
+
+  /**
+   * The one ongoing job card whose progress names include `label`, or undefined when none or several
+   * do. Two same-named jobs and a notice for an id neither holds: ending either could end the wrong
+   * one, so neither ends, and the quiet bound clears a count left too high.
+   */
+  function onlyOngoingByLabel(label: string): PendingTool | undefined {
+    const found = new Set<PendingTool>();
+    for (const card of workCards.values()) {
+      const call = card.part.call;
+      if (call?.kind === "task" && call.ongoing === true && jobLabels.get(card)?.includes(label) === true) found.add(card);
+    }
+    return found.size === 1 ? found.values().next().value : undefined;
+  }
+
+  /**
+   * Oh My Pi's end of a job: an `async-result` notice (`details.jobs[]`: `jobId`, `label`) or any tool
+   * result whose `details.jobs[]` rows carry a `status` (`wait`: `id`, `label`, `status`). A job is
+   * found by its id; an id no card holds falls back to its label only when exactly one ongoing card
+   * carries that label. Only a final status ends the card, the same set Gentle Shell's notices use.
+   */
+  function settleOmpJobs(rows: readonly JsonObject[], statusOf: (row: JsonObject, id: string) => string | undefined, changed: Set<string>): void {
+    for (const row of rows) {
+      const id = field(row, "jobId") ?? field(row, "id");
+      const label = field(row, "label");
+      const key = id ?? label;
+      const held = id === undefined ? undefined : workCards.get(id);
+      const card = held ?? (label === undefined ? undefined : onlyOngoingByLabel(label));
+      if (card === undefined || key === undefined) continue;
+      const status = statusOf(row, key);
+      if (status !== undefined) settle(card, { status }, changed);
+    }
+  }
+
+  /** Mark a card ongoing and remember it by id, when its start result says the work is still running. */
+  function startWork(target: PendingTool, raw: JsonValue | undefined): void {
+    const call = target.part.call;
+    if (call?.kind !== "task" && call?.kind !== "execute") return;
+    if (detailsOf(raw, "gentleAgents") === undefined && startOmpJob(target, raw)) return;
+    const agents = call.kind === "task" ? detailsOf(raw, "gentleAgents") : undefined;
+    const jobs = call.kind === "execute" ? detailsOf(raw, "gentleJobs") : undefined;
+    const info = agents ?? jobs;
+    if (info === undefined) return;
+    const agent = field(agents, "agent");
+    if (call.kind === "task" && call.agent === undefined && agent !== undefined) call.agent = agent;
+    // `subagent_result` asks about work another card started; it never starts any of its own.
+    if (target.part.name.toLowerCase() === "subagent_result") return;
+    const id = field(info, agents ? "taskId" : "jobId");
+    if (id !== undefined) rememberPending(workCards, id, target);
+    const status = field(info, "status");
+    if (status === "queued" || status === "running") call.ongoing = true;
+  }
+
+  /** A `gentle-agents.result` / `gentle-jobs.notice` row: the work it names has ended. */
+  function endNotice(row: PiRow, changed: Set<string>): void {
+    const type = row.customType;
+    if (type === "async-result") {
+      const content = customText(row.content);
+      settleOmpJobs(detailRows(row.details, "jobs"), (job, id) => field(job, "status") ?? asyncResultStatus(content, id), changed);
+      return;
+    }
+    if (type !== "gentle-agents.result" && type !== "gentle-jobs.notice") return;
+    const agents = type === "gentle-agents.result";
+    const info = detailsOf(row.details, agents ? "gentleAgents" : "gentleJobs");
+    if (info !== undefined) settle(workCards.get(field(info, agents ? "taskId" : "jobId") ?? ""), info, changed);
+  }
+
+  /**
+   * End a held card when `info` (a `gentleAgents` / `gentleJobs` record) reports a final status.
+   * The end notice is the usual source; a cancelled subagent has none, and only the status a later
+   * `subagent_status` or `subagent_cancel` result reports says it is over (a real session,
+   * 2026-10-15). A status still running or queued leaves the card as it is.
+   */
+  function settle(card: PendingTool | undefined, info: JsonObject, changed: Set<string>): void {
+    const status = field(info, "status");
+    if (status === undefined || !FINAL_WORK_STATUS.has(status)) return;
+    const call = card?.part.call;
+    if (card === undefined || (call?.kind !== "task" && call?.kind !== "execute")) return;
+    delete call.ongoing;
+    const exitCode = info.exitCode;
+    let failed = status === "failed";
+    if (call.kind === "execute" && typeof exitCode === "number" && Number.isFinite(exitCode)) {
+      call.exitCode = exitCode;
+      failed ||= exitCode !== 0;
+    }
+    if (failed) {
+      if (card.part.result) card.part.result.isError = true;
+      else card.part.result = toolResult("", true);
+    }
+    changed.add(card.uuid);
+  }
 
   // ── THE BRANCH CHAIN ────────────────────────────────────────────────────────
   // pi keeps every branch in ONE append-only log. Every row names its parent, and the session's
@@ -468,6 +677,12 @@ export function createPiReducer(): RowReducer {
   // way, which a remove verb could never have done.
   const chain = new Map<string, BranchLink>();
   let leaf: string | null = null;
+
+  /** A card on a turn the branch left can no longer be folded into: the new branch draws its own. */
+  function forget(uuid: string): void {
+    if (heldPlan?.uuid === uuid) heldPlan = undefined;
+    for (const [id, card] of workCards) if (card.uuid === uuid) workCards.delete(id);
+  }
 
   /** Remember this row, and if it rewound, flip the flags the rewind changed. */
   function link(rowId: string, parentId: string | null, entries: TranscriptEntry[], changed: Set<string>): void {
@@ -486,6 +701,7 @@ export function createPiReducer(): RowReducer {
           if (off && entry.abandoned !== true) {
             entry.abandoned = true;
             changed.add(entry.uuid);
+            forget(entry.uuid);
           } else if (!off && entry.abandoned === true) {
             delete entry.abandoned;
             changed.add(entry.uuid);
@@ -527,6 +743,8 @@ export function createPiReducer(): RowReducer {
     // the model, which is the same distinction Claude's `isMeta` draws, so it is dropped.
     if (type === "custom_message") {
       if (row.display !== true) return;
+      // The notice is still drawn below; it also ends the card that started the work.
+      endNotice(row, changed);
       const text = customText(row.content);
       if (text.trim() !== "")
         entries.push({ uuid, ts, role: "note", parts: [{ kind: "text", ...clamp(text, MAX_TEXT_CHARS) }] });
@@ -546,12 +764,30 @@ export function createPiReducer(): RowReducer {
     noteBlockTypes(note, m.content);
 
     if (m.role === "toolResult") {
+      // Oh My Pi's `wait` (and any result that lists jobs with a status) settles the jobs it names,
+      // whether or not its own call is still held.
+      settleOmpJobs(detailRows(m.details, "jobs"), (job) => field(job, "status"), changed);
       const id = typeof m.toolCallId === "string" ? m.toolCallId : "";
       const target = pendingTools.get(id);
       const resultText = stripAnsi(textBlocks(m.content));
       const isError = m.isError === true;
       const imageUrl = extractImageUrl(m.content);
-      if (target) {
+      if (target?.foldInto) {
+        // A call that drew no part of its own: its result lands on the card it folds into.
+        const card = target.foldInto;
+        pendingTools.delete(id);
+        if (card.part.call?.kind === "plan") {
+          const tasks = planTasks(detailsOf(m.details, "gentleTodo")?.tasks);
+          if (tasks.length > 0) card.part.call.tasks = tasks;
+        } else {
+          // `subagent_result`: the answer replaces the start notice's text. The work is over only
+          // when the status it reports says so: one asked for too early answers "running".
+          card.part.result = toolResult(resultText, isError, imageUrl);
+          const info = detailsOf(m.details, "gentleAgents");
+          if (info !== undefined) settle(card, info, changed);
+        }
+        changed.add(card.uuid);
+      } else if (target) {
         // Mutated in place — the part already sits in an emitted entry, which is why results attach
         // without reordering anything.
         pendingTools.delete(id);
@@ -559,8 +795,13 @@ export function createPiReducer(): RowReducer {
         // `details` rides on the RESULT ROW, not on a content block — it is pi's own record of what
         // the call did, and the only place a patch or an answer ever appears.
         if (target.part.call) enrichCall(target.part.call, m.details, resultText, isError, target.questionIds);
+        if (!isError) startWork(target, m.details);
         // Both mutations above landed in a turn that went out rows ago. Name it.
         changed.add(target.uuid);
+        // A status call about ANOTHER card's task (`subagent_status`, `subagent_cancel`).
+        const info = detailsOf(m.details, "gentleAgents");
+        const other = workCards.get(field(info, "taskId") ?? "");
+        if (info !== undefined && other !== undefined && other !== target) settle(other, info, changed);
       } else if (resultText.trim() !== "" || imageUrl) {
         // Orphan result (its call fell outside a tail-read window) — kept unattached so the window
         // never silently drops output.
@@ -629,6 +870,23 @@ export function createPiReducer(): RowReducer {
           summary,
           call: classifyToolCall(name, b.arguments, summary),
         };
+        // A call that folds into an earlier card draws nothing: a `todo` update into the held plan,
+        // a `subagent_result` into the card of its `task_id` (ADR 0119).
+        const input = b.arguments !== null && typeof b.arguments === "object" && !Array.isArray(b.arguments) ? b.arguments : {};
+        const lower = name.toLowerCase();
+        let foldInto: PendingTool | undefined;
+        if (lower === "todo" && input.action !== "write") {
+          foldInto = heldPlan;
+          // A `clear` ends the list: its result is empty, so the card keeps the list as it last
+          // stood, and the next `add` starts a card of its own.
+          if (input.action === "clear") heldPlan = undefined;
+        }
+        else if (lower === "subagent_result") foldInto = workCards.get(field(input, "task_id") ?? "");
+        if (foldInto !== undefined) {
+          if (typeof b.id === "string") rememberPending(pendingTools, b.id, { part, uuid, foldInto });
+          continue;
+        }
+        if (lower === "todo") heldPlan = { part, uuid };
         if (typeof b.id === "string") {
           part.id = b.id;
           // The turn is named here, before it exists, because `uuid` is read off the row above and
@@ -807,12 +1065,14 @@ export class PiTranscriptSource implements TranscriptSource {
 /** pi's journal adapter. `agent` matches the Herdr snapshot's `agent` string. */
 export function piJournal(roots: string | readonly string[]): JournalAdapter {
   const source = new PiTranscriptSource(roots);
+  const catalog = new WindowCatalog();
+  const costs = new FileSum('"cost"', piRowCost);
   return {
     agent: "pi",
     source,
     parse: parsePiTranscript,
     reducer: createPiReducer,
-    cacheProbe: (ref) => piCacheProbe(source, ref),
+    cacheProbe: (ref) => piCacheProbe(source, ref, catalog, costs),
   };
 }
 
@@ -833,8 +1093,87 @@ export function piJournal(roots: string | readonly string[]): JournalAdapter {
 //
 // Oh My Pi needs nothing here: `omp` is an alias of `pi` in registry.ts, so an omp pane resolves to
 // this adapter and to `pi.*` rules alike.
+//
+// THE CONTEXT (.adr/0115, amended 2026-10-25) is a turn row's `input + cacheRead + cacheWrite`: pi
+// counts the cache apart from `input`, so the three together are what the request carried. pi's own
+// footer adds the reply's `output` too; Collie counts what went in, as it does for Claude. A turn that
+// failed writes zeros and is passed over ({@link piContextOf}). A `compaction` row after the turn means
+// the next request carries less, and no turn has measured it yet, so the probe names no context then.
+// The log names no window (a `model_change` row names the model only), so the window comes from the
+// catalog in the agent dir ({@link piAgentDirOf}, bridge/journal/model-window.ts), and a model it does
+// not name has no context dot.
 
-async function piCacheProbe(source: PiTranscriptSource, ref: AgentSessionRef): Promise<CacheProbe | null> {
+/**
+ * The agent dir a session log belongs to: the parent of the nearest `sessions` folder above it. A
+ * session is `<agent>/sessions/<folder>/<file>.jsonl`, and Oh My Pi nests a subagent's log one level
+ * deeper, under a folder named after its parent session. A root set to some other folder names no
+ * agent dir, and then no catalog is read.
+ */
+export function piAgentDirOf(path: string): string | null {
+  let folder = dirname(path);
+  for (let depth = 0; depth < 3; depth++) {
+    folder = dirname(folder);
+    if (basename(folder) === "sessions") return dirname(folder);
+  }
+  return null;
+}
+
+/** The sum of a usage row's input-side counts, or undefined when the row names none of them. */
+function piContextTokens(usage: JsonObject): number | undefined {
+  const parts = [tokenCount(usage.input), tokenCount(usage.cacheRead), tokenCount(usage.cacheWrite)];
+  if (parts.every((n) => n === undefined)) return undefined;
+  const sum = parts.reduce<number>((total, n) => total + Math.max(0, n ?? 0), 0);
+  return sum > 0 ? sum : undefined;
+}
+
+/**
+ * The context the newest MEASURED turn carried, with its provider and model, or undefined. A turn
+ * that failed writes a usage row of zeros, and the context it would have sent is the one before it,
+ * so such a row is passed over. A `compaction` met first ends the search with no reading.
+ */
+export function piContextOf(lines: readonly string[]): MeasuredContext | undefined {
+  const found = walkBack(lines, (raw): MeasuredContext | null | undefined => {
+    const entry = asRecord(raw);
+    if (entry === null) return undefined;
+    if (entry.type === "compaction") return null;
+    if (entry.type !== "message") return undefined;
+    const message = asRecord(entry.message);
+    if (message === null || message.role !== "assistant") return undefined;
+    const usage = asRecord(message.usage);
+    const tokens = usage === null ? undefined : piContextTokens(usage);
+    if (tokens === undefined) return undefined;
+    const out: MeasuredContext = { tokens };
+    const provider = asText(message.provider);
+    const model = asText(message.model);
+    if (provider !== undefined) out.provider = provider;
+    if (model !== undefined) out.model = model;
+    return out;
+  });
+  return found ?? undefined;
+}
+
+/**
+ * THE SESSION COST (.adr/0115, amended 2026-10-25) is the sum of `message.usage.cost.total`, in US
+ * dollars, over every assistant row of the file; pi and Oh My Pi write the same shape (verified on pi
+ * logs and on Oh My Pi 18.6.1). An aborted turn writes zeros and adds nothing. Branches pi abandoned
+ * stay in the file and were paid for, so they count. A tail holds a handful of turns, so the sum runs
+ * over the whole file once and then over the appended bytes only ({@link FileSum}).
+ */
+export function piRowCost(raw: JsonValue): number | undefined {
+  const entry = asRecord(raw);
+  if (entry === null || entry.type !== "message") return undefined;
+  const message = asRecord(entry.message);
+  if (message === null || message.role !== "assistant") return undefined;
+  const total = tokenCount(asRecord(asRecord(message.usage)?.cost)?.total);
+  return total === undefined || total < 0 ? undefined : total;
+}
+
+async function piCacheProbe(
+  source: PiTranscriptSource,
+  ref: AgentSessionRef,
+  catalog?: WindowCatalog,
+  costs?: FileSum,
+): Promise<CacheProbe | null> {
   const tail = await probeTail(source, ref);
   if (tail === null) return null;
   // The thinking level is the NEWEST one the walk meets, whether a `thinking_level_change` row (written
@@ -874,6 +1213,17 @@ async function piCacheProbe(source: PiTranscriptSource, ref: AgentSessionRef): P
     return probe;
   });
   if (found === undefined) return null;
+  const context = piContextOf(tail.lines);
+  if (context !== undefined) {
+    found.contextTokens = context.tokens;
+    const agentDir = piAgentDirOf(tail.path);
+    if (catalog !== undefined && agentDir !== null && context.provider !== undefined && context.model !== undefined) {
+      const window = await catalog.window(agentDir, piAgentDirLookups(agentDir), context.provider, context.model);
+      if (window !== undefined) found.contextWindow = window;
+    }
+  }
+  const summed = costs === undefined ? undefined : await costs.read(tail.path);
+  if (summed !== undefined && summed.sum > 0) found.costUsd = summed.sum;
   // A turn that carried no level of its own: the level row the session opened with, or the last
   // change before the turn, still stands. Only the level is looked for past the turn.
   effort ??= walkBack(tail.lines, (raw) => {

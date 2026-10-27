@@ -12,12 +12,15 @@ import {
   noteServerFailure,
   type ReadFailureKind,
 } from "./connection-health";
+import { noteSnapshotTaken } from "./snapshot-clock";
 import { markDead as markPaneDead, markLive as markPaneLive } from "./liveness";
 import { abortSignalAfter, abortSignalAny } from "./env";
 import { asJsonObject, asJsonString, parseJsonObject, type JsonObject } from "./json";
 import { readHeldCancelAnswer, readSendReceipts, readSendReply, type SendReply } from "./send-protocol";
-import type { HeldCancelAnswer, SendReceiptRow, SendRequestBody } from "./surface/send";
+import { readReportContext, type ReportContext } from "./report/context";
+import { REQUEST_ID, type HeldCancelAnswer, type SendReceiptRow, type SendRequestBody } from "./surface/send";
 import type { AnswerBody } from "./surface/ask";
+import { boundedDraft, CLEAR_OUTCOMES, CLEAR_REASONS, type ClearBody, type ClearReceipt } from "./surface/clear";
 import { STOP_OUTCOMES, STOP_REASONS, type StopBody, type StopReceipt } from "./surface/stop";
 import { readAskTapReply, type AskTapReply } from "./ask-reply";
 import { authHeader, clearNotPaired, EXPIRED_BODY, markExpired, markNotPaired, NOT_PAIRED_BODY } from "./pairing";
@@ -597,7 +600,10 @@ export async function fetchSnapshot(
   // anchor so escalation is measured from here. A snapshot that 200s but reports `bridge:
   // "disconnected"` is NOT live (the pill/banner still escalate on it), so it must NOT reset the
   // clock, or the "Herdr is down" escalation could never surface.
-  if (snap.bridge !== "disconnected") markLive();
+  if (snap.bridge !== "disconnected") {
+    markLive();
+    noteSnapshotTaken();
+  }
   return snap;
 }
 
@@ -858,6 +864,7 @@ export async function fetchChat(
   opts: ChatRequest = {},
   scope?: Scope,
   signal?: AbortSignal,
+  { seen = true }: { seen?: boolean } = {},
 ): Promise<ChatAnswer> {
   const q = new URLSearchParams();
   if (opts.limit) q.set("limit", String(opts.limit));
@@ -874,11 +881,13 @@ export async function fetchChat(
 
   const headers = new Headers({
     [XHR_HEADER]: XHR_HEADER_VALUE,
-    // Watching a session IS looking at the pane, the same reading history takes (bridge/server.ts →
-    // marksPaneSeen), so a Chat screen left open keeps the pane's unseen mark clear.
-    "x-collie-seen": "1",
     ...authHeader(),
   });
+  // Watching a session IS looking at the pane, the same reading history takes (bridge/server.ts →
+  // marksPaneSeen), so a Chat screen left open keeps the pane's unseen mark clear. `seen: false` is
+  // the large screen's read-only column beside the focused one (ADR 0120): on screen, but only the
+  // focused pane counts as opened, so it leaves the mark alone, as fetchPane's prefetch does.
+  if (seen) headers.set("x-collie-seen", "1");
   if (cached !== undefined) headers.set("if-none-match", cached);
 
   // The live window is a poll read and gets the poll deadline. A `?before=` page is a tap the operator
@@ -1464,7 +1473,11 @@ function stopReceiptOf(body: JsonObject | undefined, requestId: string): StopRec
     const keys = Array.isArray(body.keys) ? body.keys.map(asJsonString).filter((key): key is string => key !== undefined) : undefined;
     // Only a `pressed` receipt carries a reason, and only `dialog_open`: the key opened a dialog.
     const opened = outcome === "pressed" && reason === "dialog_open" ? { reason } : {};
-    return keys === undefined ? { requestId: id, outcome, ...opened } : { requestId: id, outcome, ...opened, keys };
+    // The queued sends a read-back saw back in the input box (ADR 0122); a bridge one release behind
+    // sends none, and a word that is no request id is dropped rather than shown.
+    const back = Array.isArray(body.returned) ? body.returned.map(asJsonString).filter((rid): rid is string => rid !== undefined && REQUEST_ID.test(rid)) : [];
+    const returned = back.length > 0 ? { returned: back } : {};
+    return keys === undefined ? { requestId: id, outcome, ...opened, ...returned } : { requestId: id, outcome, ...opened, ...returned, keys };
   }
   return reason === undefined ? null : { requestId: id, outcome, reason };
 }
@@ -1481,6 +1494,61 @@ async function postStop(paneId: string, requestId: string, scope: Scope | undefi
   const receipt = stopReceiptOf(got, requestId);
   if (receipt === null) throw new ApiError("The abort route sent a body this phone cannot read.", 502);
   if (receipt.keys !== undefined) stampSend(paneId);
+  return receipt;
+}
+
+/**
+ * What a Clear's 400, 404 or 405 means. This build's Clear route answers a missing pane with its own receipt
+ * (`refused`, `pane_gone`). A refusal in the bridge's error shape (a `code`: an unknown host or session) is
+ * thrown as that refusal. Anything else is a build with no Clear for a screen pane (a crew member before
+ * the Clear answers a bare 404 from its crew router; a pane that takes guarded controls answers 405).
+ * Nothing was pressed either way.
+ */
+function clearMissed(body: JsonObject, status: 400 | 404 | 405, requestId: string): ClearReceipt {
+  if (body.outcome === "refused" && body.reason === "pane_gone") return { requestId, outcome: "refused", reason: "pane_gone" };
+  const fields = asJsonString(body.code) === undefined ? undefined : apiErrorFieldsOf(body);
+  if (fields !== undefined) throw new ApiError(fields.error ?? "The clear route refused the Clear.", status, fields);
+  return { requestId, outcome: "refused", reason: "unsupported_build" };
+}
+
+/** A Clear's failed answers that are still answers: the three of `recoverOutcome`, a 400 and a 405 (see {@link clearMissed}). */
+const clearRecover = (status: number, detail: string): JsonObject | null =>
+  status === 400 || status === 405 ? { ...parseJsonObject(detail), [HTTP_STATUS]: status } : recoverOutcome(status, detail);
+
+/** The receipt a Clear answered, or null for a body that is none. A 404, 400 or 405 never pressed a key. */
+function clearReceiptOf(body: JsonObject | undefined, requestId: string): ClearReceipt | null {
+  if (body === undefined) return null;
+  if (body[HTTP_STATUS] === 404) return clearMissed(body, 404, requestId);
+  if (body[HTTP_STATUS] === 400) return clearMissed(body, 400, requestId);
+  if (body[HTTP_STATUS] === 405) return clearMissed(body, 405, requestId);
+  // The lead could not hear the member's answer in time (`write_outcome_unknown`): the key may have gone in.
+  if (body[HTTP_STATUS] === 504) return { requestId, outcome: "unknown" };
+  // `unknown` is the phone's word, never the bridge's: only the two the bridge answers are read.
+  const outcome = CLEAR_OUTCOMES.find((word) => word === body.outcome && word !== "unknown");
+  if (outcome === undefined) return null;
+  const id = asJsonString(body.requestId) ?? requestId;
+  if (outcome === "cleared") {
+    // The cleared text, for Restore: bounded again here, since the phone types it back.
+    const draft = asJsonString(body.draft);
+    return draft === undefined || draft === "" ? { requestId: id, outcome } : { requestId: id, outcome, draft: boundedDraft(draft) };
+  }
+  const reason = CLEAR_REASONS.find((word) => word === body.reason);
+  return reason === undefined ? null : { requestId: id, outcome, reason };
+}
+
+async function postClear(paneId: string, requestId: string, scope: Scope | undefined): Promise<ClearReceipt> {
+  // The operator is watching from the tap on, as every write to a pane assumes (poll-intent).
+  stampSend(paneId);
+  const body: ClearBody = { requestId };
+  const got = await req<JsonObject>(
+    withScope(`/api/pane/${encodeURIComponent(paneId)}/clear`, scope),
+    { method: "POST", body: JSON.stringify(body) },
+    sendRecover(clearRecover),
+  );
+  const receipt = clearReceiptOf(got, requestId);
+  if (receipt === null) throw new ApiError("The clear route sent a body this phone cannot read.", 502);
+  // A refusal after the keys went in (a box that would not empty) still moved the pane: look soon.
+  stampSend(paneId);
   return receipt;
 }
 
@@ -1582,6 +1650,22 @@ export async function getSendReceipts(paneId: string, scope?: Scope): Promise<Se
   if (normalizeScope(scope).host) return [];
   const got = await req<JsonObject>(withScope(`/api/send/receipts?pane=${encodeURIComponent(paneId)}`, scope), undefined, sendRecover());
   return readSendReceipts(got).receipts.slice();
+}
+
+/**
+ * GET /api/report/context (ADR 0123): this machine's setup for a problem report, and with `screen` the
+ * pane's last rows, masked by the bridge. A paired device's read; it changes nothing. This machine's
+ * own panes only: the bridge refuses a crew member's pane, so the sheet does not ask for one.
+ */
+export async function getReportContext(paneId: string | null, screen: boolean, scope?: Scope): Promise<ReportContext> {
+  const params = new URLSearchParams();
+  if (paneId !== null) params.set("pane", paneId);
+  if (screen) params.set("screen", "1");
+  const query = params.toString();
+  const got = await req<JsonObject>(withScope(`/api/report/context${query === "" ? "" : `?${query}`}`, scope));
+  const context = readReportContext(got);
+  if (context === null) throw new ApiError("The report route sent a body this phone cannot read.", 502);
+  return context;
 }
 
 /**
@@ -1732,6 +1816,17 @@ export function abortPane(
   const body: JsonObject = { requestId: abort.requestId };
   if (abort.target !== null && abort.target !== undefined) Object.assign(body, abort.target);
   return postControl(paneId, "abort", body, scope);
+}
+
+/**
+ * POST /api/pane/:id/clear: empty the harness's input box (ADR 0116, the Clear paragraph).
+ *
+ * A pane with a screen takes the request id alone: the bridge reads the Surface, presses the profile's
+ * clear key as this person's tap, reads back, and answers a {@link ClearReceipt} (`cleared`, or `refused`
+ * with a reason, always a 200). The same request id answers the same receipt and presses once.
+ */
+export function clearPane(paneId: string, clear: { requestId: string }, scope?: Scope): Promise<ClearReceipt> {
+  return postClear(paneId, clear.requestId, scope);
 }
 
 /**
@@ -1896,14 +1991,22 @@ interface StartLaunchBody {
   shell?: true;
   starter?: string;
   cwd?: string;
+  /** The pane whose space this opens a new tab in (the route's own `paneId` field). Absent: a new space. */
+  paneId?: string;
   requestId: string;
 }
 
 /**
  * POST /api/launch from the New page: one kind, an optional folder, and a request id the phone
  * minted for this intent. A retry with the same id answers the first pane (`replayed: true`).
+ * `besidePaneId` starts it as a new TAB in that pane's space instead of a new space; the bridge
+ * then takes the pane's folder when none is named. A starter ignores it (it makes no tab by hand).
  */
-export function startLaunch(what: BranchableWhat, opts: { cwd?: string; requestId: string }, scope?: Scope): Promise<CreateResponse> {
+export function startLaunch(
+  what: BranchableWhat,
+  opts: { cwd?: string; requestId: string; besidePaneId?: string },
+  scope?: Scope,
+): Promise<CreateResponse> {
   const body: StartLaunchBody = { requestId: opts.requestId };
   if (what.kind === "row") body.command = what.command;
   else if (what.kind === "harness") body.harness = what.id;
@@ -1911,6 +2014,7 @@ export function startLaunch(what: BranchableWhat, opts: { cwd?: string; requestI
   else body.shell = true;
   // A starter has no folder: the bridge ignores one, so none is sent.
   if (opts.cwd !== undefined && what.kind !== "starter") body.cwd = opts.cwd;
+  if (opts.besidePaneId !== undefined && what.kind !== "starter") body.paneId = opts.besidePaneId;
   return req<CreateResponse>(withScope("/api/launch", scope), { method: "POST", body: JSON.stringify(body) });
 }
 
@@ -1926,6 +2030,7 @@ export function startLaunch(what: BranchableWhat, opts: { cwd?: string; requestI
 interface StartRunBody {
   run: string;
   cwd?: string;
+  paneId?: string;
   requestId: string;
 }
 
@@ -1936,9 +2041,10 @@ interface StartRunBody {
  * `launch.run_off`, `launch.bad_line` (`detail.problem`, `detail.max`), `launch.bad_folder`,
  * `launch.folder_missing`.
  */
-export function startRun(line: string, opts: { cwd?: string; requestId: string }, scope?: Scope): Promise<CreateResponse> {
+export function startRun(line: string, opts: { cwd?: string; requestId: string; besidePaneId?: string }, scope?: Scope): Promise<CreateResponse> {
   const body: StartRunBody = { run: line, requestId: opts.requestId };
   if (opts.cwd !== undefined) body.cwd = opts.cwd;
+  if (opts.besidePaneId !== undefined) body.paneId = opts.besidePaneId;
   return req<CreateResponse>(withScope("/api/launch", scope), { method: "POST", body: JSON.stringify(body) });
 }
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useRevalidator } from "react-router";
 import {
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { useKeyboardOpen } from "@/hooks/use-keyboard";
 import { useSheetPull } from "@/hooks/use-sheet-pull";
+import { usePaneNavigation } from "@/components/pane-nav";
 import { tabCreateKey, useSpaceActions } from "@/hooks/use-spaces";
 import { useNav } from "@/hooks/use-nav";
 import { useDashPrefs, openForCount } from "@/hooks/use-dash-prefs";
@@ -20,7 +22,7 @@ import { useLaunchers } from "@/lib/launchers";
 import { shortenHome } from "@/lib/shorten-home";
 import { useNoPromptsGuard } from "@/hooks/use-no-prompts-guard";
 import { buzz } from "@/lib/haptics";
-import { handOf, mirrorFont, useDisplayPrefs } from "@/hooks/use-display-prefs";
+import { handOf, mirrorFont, paneNavOf, useDisplayPrefs } from "@/hooks/use-display-prefs";
 import { useChatWindow } from "@/hooks/use-chat-window";
 import { useChatReady } from "@/hooks/use-chat-ready";
 import { usePaneStart } from "@/hooks/use-pane-start";
@@ -65,7 +67,7 @@ import { paneSurface } from "@/lib/send-slot";
 import { answerAsk, cardHashOf, type AskTapResult } from "@/lib/dialog-ask";
 import { holdAskOfNote, screenCardMayAnswer } from "@/lib/surface/hold";
 import { askOptionFor } from "@/lib/ask-reply";
-import { cancelWalky, dropWalky, refreshNow } from "@/lib/api";
+import { cancelHeldSend, cancelWalky, dropWalky, refreshNow } from "@/lib/api";
 import { describeThrownError } from "@/lib/api-error-message";
 import { sameKeys } from "@/lib/harness/prompt-model";
 import { askOf, type Ask } from "@/lib/surface/surface";
@@ -86,7 +88,11 @@ import { paneGitHead } from "@/lib/git-head";
 import { CacheSheet } from "@/components/cache-sheet";
 import { PaneActionsSheet } from "@/components/pane-actions-sheet";
 import { CardWaitingCtx } from "@/components/chat-cards";
-import { chatStatusKey, SavedCopyRow, SessionStream, sharedFolderLine } from "@/components/session-stream";
+import { chatStatusKey, SavedCopyRow, SessionStream, sharedFolderLine, type QueuedCardAction } from "@/components/session-stream";
+import { readingRefusal } from "@/components/send-notice";
+import { sendText } from "@/lib/reply-action";
+import type { IntentId } from "@/lib/durable-control";
+import { RETURNED_CARD_DROPPED } from "@/lib/surface/send";
 import { PaneSettingsSheet } from "@/components/pane-settings-sheet";
 import { WalkyOpenProvider } from "@/components/walky-log";
 import { paneAddress, takeBackNote } from "@/lib/walky";
@@ -95,7 +101,7 @@ import { CompactStripLabels, TAB_ROW_SQUARE_TAP_TARGET } from "@/components/ui/l
 import { ReadOnlyBanner } from "@/components/read-only-banner";
 import { HostStaleBanner } from "@/components/host-stale-banner";
 import { MaskedHint } from "@/components/masked-hint";
-import { ModelTag } from "@/components/model-tag";
+import { hasFigure, ModelTag } from "@/components/model-tag";
 import { useModelOnScreen } from "@/hooks/use-model-on-screen";
 import { modelLabel } from "@/lib/model-label";
 import { useMaskedHintRetired } from "@/lib/masked-hint";
@@ -127,6 +133,7 @@ import { hasJournalAdapter, reportsSessionOnFirstPrompt } from "@/lib/journal-ag
 import { journalReadingOf, paneBody, type JournalReading } from "@/lib/chat-gate";
 import { paneRowKey, paneScope } from "@/lib/hosts";
 import { isLead, paneScopeKey } from "@/lib/scope";
+import { openReport } from "@/lib/report/store";
 import { answerRouteFor, textRouteFor } from "@/lib/send-path";
 import { useSessionCard, wearsExperimental } from "@/lib/session-cards";
 import { usePins } from "@/lib/pins";
@@ -197,6 +204,14 @@ interface AgentChatProps {
    */
   onBackArrow?: () => void;
   onSelect: (paneId: string) => void;
+  /**
+   * Drawn as the focused column of a large screen's strip (ADR 0120): the view fills the column it is
+   * given instead of centring under the phone's width ladder, and the belt's Switch pill stands down,
+   * because the sidebar beside the strip is the switcher there.
+   */
+  inStrip?: boolean;
+  /** A half-open foldable in tabletop (ADR 0120): the chrome block stands in the bottom segment. */
+  tabletop?: boolean;
 }
 
 /** How many rows at the raw screen's tail count as its footer when the model label asks if it is named. */
@@ -253,6 +268,8 @@ export function AgentChat({
   onBack,
   onBackArrow,
   onSelect,
+  inStrip = false,
+  tabletop = false,
 }: AgentChatProps) {
   const revalidator = useRevalidator();
   const nav = useNav();
@@ -294,7 +311,9 @@ export function AgentChat({
     [chooseMirrorOverride, agentNative],
   );
 
-  const { launchers, home: launchersHome } = useLaunchers(scope);
+  // On a large screen's strip the sidebar lists the launchers and the switcher is not drawn, so the
+  // pane does not read them a second time (ADR 0120).
+  const { launchers, home: launchersHome } = useLaunchers(scope, !inStrip);
   // A row that skips permission prompts is confirmed once per device before it starts (ADR 0094).
   const { guard: guardNoPrompts, sheet: noPromptsSheet } = useNoPromptsGuard();
   // "New agent in a worktree" (ADR 0089, M48): offered for a pane whose space sits in a Git repo, read
@@ -606,8 +625,9 @@ export function AgentChat({
   // pane you are in, and the pane on screen already shows its own state.
   const hereKey = agent ? paneRowKey(agent) : null;
   const elsewhereNeedsYou = agents.some((a) => a.status === "blocked" && paneRowKey(a) !== hereKey);
+  // On a large screen's strip the sidebar beside it is the switcher, so the pill would be a second one.
   const pullHandle =
-    agents.length + shellPanes.length > 0 || launchers.length > 0
+    !inStrip && (agents.length + shellPanes.length > 0 || launchers.length > 0)
       ? {
           ref: sheetPull.ref,
           onClick: () => setDrawer("switcher"),
@@ -615,6 +635,31 @@ export function AgentChat({
           alert: elsewhereNeedsYou,
         }
       : undefined;
+  // ── PANE NAVIGATION BY GESTURE (M70 spec 03, ADR 0121) ────────────────────────
+  // Two fingers (the default): hold one finger still on the reading area, then swipe a second finger.
+  // Joystick: hold the handle above the belt, then steer with the same finger. Off: neither. The axes
+  // are niri's: left and right walk this space's panes in the sidebar's order, up and down the spaces.
+  // A commit is a sideways move to the target, exactly as the space header's up and down are, so on a
+  // large screen the strip follows the URL. The setting is read at mount, like the hand.
+  // Text selection is never touched at rest, nor by a lone hold, however long: the mode arms, and holds
+  // the page off, only when a second finger lands after the hold (ADR 0121).
+  const paneNav = usePaneNavigation({
+    method: paneNavOf(prefs),
+    agent,
+    agents,
+    shellPanes,
+    tabs,
+    servers,
+    scope,
+    // A quick drag up on the handle is the Switch pill's drag: the switcher sheet, where there is one.
+    onSwitcher:
+      pullHandle === undefined
+        ? undefined
+        : () => {
+            buzz();
+            setDrawer("switcher");
+          },
+  });
   // ── COMPOSING MODE — read ONCE, here, for the whole pane ──────────────────────
   // The soft keyboard takes roughly 45% of a phone. What is left has to hold the header, the tab
   // strip, the agent's statusline, the grab handle, the status band, the controls row and the draft
@@ -685,7 +730,8 @@ export function AgentChat({
   // badge its row wears in the Spaces list. A terminal session's header is untouched.
   const experimental = wearsExperimental(useSessionCard(scope));
   const gridless = !paneGrid.capable;
-  const stripsExist = !gridless && (canFold || tabPanes.length > 1);
+  // In a large screen's strip the space header holds the tabs and the sidebar the panes (ADR 0120).
+  const stripsExist = !inStrip && !gridless && (canFold || tabPanes.length > 1);
   const folded = canFold && stripsFolded;
   // WHO OWNS THE 4px ABOVE THE MIRROR'S RULE.
   //
@@ -1748,6 +1794,70 @@ export function AgentChat({
     [refuseWrite, paneId, scope, revalidator],
   );
 
+  // A tap on a receipt card (ADR 0122). Send or Discard on a returned card is a NEW request that names
+  // the card in `resendOf` with an empty text: the bridge acts on its own copy of the text, never the
+  // phone's (it may be masked), after a fresh read of the box under the pane lock. An answer that never
+  // came keeps its intent, so a second tap asks with the same request id and never sends twice. Discard
+  // on an unconfirmed card goes through the held-cancel route, which drops the card and presses nothing.
+  const returnedIntents = useRef(new Map<string, IntentId>());
+  const handleReturned = useCallback(
+    async (requestId: string, action: QueuedCardAction): Promise<boolean> => {
+      const refusal = refuseWrite();
+      if (refusal) {
+        setStatus(refusal, "error");
+        return false;
+      }
+      if (dialogPresentRef.current) {
+        setStatus(t("chat.status.screenChanged"), "warn");
+        return false;
+      }
+      if (!isLive(paneId, scope)) {
+        setStatus(t("composer.send.reconnect"), "error");
+        return false;
+      }
+      if (action === "dismiss") {
+        try {
+          const answer = await cancelHeldSend(requestId, paneId, scope);
+          if (answer.result === "refused") {
+            setStatus(t("chat.status.sendFailed"), "error");
+            return false;
+          }
+          revalidator.revalidate();
+          return true;
+        } catch (e) {
+          setStatus(describeThrownError(e), "error");
+          return false;
+        }
+      }
+      const key = `${requestId}\u0000${action}`;
+      const result = await sendText({ paneId, scope, text: "", mode: action, resendOf: requestId, held: returnedIntents.current.get(key) ?? null });
+      if (result.status === "noAnswer") {
+        returnedIntents.current.set(key, result.intent);
+        setStatus(result.error, "error");
+        return false;
+      }
+      returnedIntents.current.delete(key);
+      if (result.status === "refused") {
+        setStatus(result.error, "error");
+        return false;
+      }
+      if (result.reading.clear || result.reading.note === "discarded") {
+        setStatus(t(action === "submit" ? "chat.status.sent" : "composer.protocol.discarded"), "success");
+        revalidator.revalidate();
+        return true;
+      }
+      // Discard on a box that changed since: the bridge pressed nothing and dropped only the card.
+      if (result.reply.detail === RETURNED_CARD_DROPPED) {
+        setStatus(t("chat.status.returnedDropped"), "warn");
+        revalidator.revalidate();
+        return true;
+      }
+      setStatus(readingRefusal(result.reading).sentence, "error");
+      return false;
+    },
+    [refuseWrite, paneId, scope, revalidator],
+  );
+
   // NOTE: the composer is deliberately NOT auto-focused on open/switch — that would pop the Android
   // keyboard and cover the output. You read the pane first, then tap the input to type. (Explicit
   // actions inside the composer still focus it; the mirror tap focuses it via composerRef.)
@@ -1888,7 +1998,8 @@ export function AgentChat({
           reaches its own cap exactly, so it runs edge to edge, which is a wider mirror and still one
           right edge. app-header.tsx's `wide` claim carries the identical ladder, or the header and
           the mirror stop sharing that edge. */}
-      <div ref={chatRootRef} className="mx-auto flex min-h-0 w-full min-w-0 max-w-[100dvw] flex-1 flex-col overflow-x-hidden md:max-w-screen-md lg:max-w-screen-lg xl:max-w-screen-xl 2xl:max-w-[1400px]">
+      {/* In a large screen's column the column is the bound (ADR 0120), so the ladder stands down there. */}
+      <div ref={chatRootRef} className={cn("flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-x-hidden", !inStrip && "mx-auto max-w-[100dvw] md:max-w-screen-md lg:max-w-screen-lg xl:max-w-screen-xl 2xl:max-w-[1400px]")}>
         {/* Header — this route's contribution to the ONE header shell, which is mounted above the
             outlet in RootLayout and is the same element on every screen (so the Collie mark is not
             only identical, it is literally the same drawing, still turning). The pane's own bits are
@@ -2228,7 +2339,8 @@ export function AgentChat({
                     data-slot="pane-place"
                     className="min-w-0 shrink-[3] truncate text-[11px] leading-3 text-muted-foreground"
                   >
-                    {headerLine ?? workspace}
+                    {/* In a strip the space header names the space, so the line keeps only the pane's own. */}
+                    {headerLine ?? (inStrip ? null : workspace)}
                   </span>
                   {/* The branch the pane's folder is on, after the workspace and in the same 12px
                       line box, so the 36px block above holds with or without it. The workspace gives
@@ -2535,7 +2647,9 @@ export function AgentChat({
               and `focusFromMirror` deliberately declines a tap that landed on a control or a text
               selection. It is a touch convenience layered over an already-reachable action. */}
           <div
+            ref={paneNav.setReading}
             role="presentation"
+            data-slot="pane-reading"
             className={cn(
               mirrorGap,
               // `relative` anchors the floating terminal-draft notice's slot, the last child below.
@@ -2601,6 +2715,12 @@ export function AgentChat({
                     readOnly || hostBlock !== undefined || actsDisabledByCache || connecting || dialogPresent || !paneLive
                       ? undefined
                       : handleSendQueuedNow
+                  }
+                  // The same gates: a returned card acts on the input box.
+                  onReturned={
+                    readOnly || hostBlock !== undefined || actsDisabledByCache || connecting || dialogPresent || !paneLive
+                      ? undefined
+                      : handleReturned
                   }
                 />
               </CardWaitingCtx.Provider>
@@ -2775,8 +2895,15 @@ export function AgentChat({
               className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-3 pb-2"
             />
             {/* The pane's model and its usage dots, small on the mirror's bottom-right corner, over both
-                bodies alike and under the notice slot above (model-tag.tsx says why there). */}
-            <ModelTag model={modelOnScreen ? undefined : agent?.model} effort={agent?.effort} usage={agent?.usage} />
+                bodies alike and under the notice slot above (model-tag.tsx says why there). With a
+                gauge or a cost to draw, the tag is the whole row Claude Code has, model first, whatever the
+                screen prints (Altan, 2026-10-25); a model ALONE stands down while the screen names
+                it, the duplicate `modelOnScreen` exists to avoid. */}
+            <ModelTag
+              model={modelOnScreen && !hasFigure(agent?.usage) ? undefined : agent?.model}
+              effort={agent?.effort}
+              usage={agent?.usage}
+            />
           </div>
 
           {/* THE CARD DOCK (.adr/0059). The lifted card used to render inside the scroller above,
@@ -2981,7 +3108,7 @@ export function AgentChat({
               {/* `relative` is the box the voice takeover is drawn over: it is `absolute inset-0` in this
                   block, a sibling of the composer, so it fills exactly the composer's own box and
                   adds no height (components/voice-takeover.tsx). */}
-              <div data-slot="chrome-block" className="relative border-t border-rule bg-chrome">
+              <div data-slot="chrome-block" data-segment={tabletop ? "bottom" : undefined} className="relative border-t border-rule bg-chrome">
                 {gridless ? (
                   // The composer of a pane with no screen: text goes through the send route with the
                   // turn the phone saw, and a Stop control posts the abort route. The keys bar, the
@@ -3013,6 +3140,7 @@ export function AgentChat({
                     // behind the back arrow is how one reaches another conversation, and a program has no
                     // folder on this machine to show. The belt keeps Display and the program's own section.
                     hand={handOf(prefs)}
+                    aboveBelt={paneNav.handle}
                     onSent={onSent}
                     onReload={() => revalidator.revalidate()}
                     onAnswerDialog={answerDialog}
@@ -3030,11 +3158,13 @@ export function AgentChat({
                   stale={actsDisabledByCache}
                   agent={agent?.agent}
                   canSteer={agent?.canSteer}
+                  // A queued message Stop gave back stands in the box: a draft refusal points at its card (ADR 0122).
+                  returnedDraft={chatFeed.window.queuedSends.some((row) => row.state === "returned")}
                   isShell={isShell}
                   cwd={agent?.cwd || undefined}
                   held={agent?.held}
-                  // Stop on the belt (M68 spec 02): the turn runs and the bridge says the profile has an
-                  // interrupt key. The rule is lib/harness-bar.ts `stopFor`; a gone pane or a read-only device has none.
+                  // Stop on the belt (M68 spec 02): the bridge says the profile has an interrupt key (live
+                  // while the turn runs, dimmed otherwise). The rule is lib/harness-bar.ts `stopFor`; a gone pane or a read-only device has none.
                   stopOffered={stopFor(agent) && !gone && !readOnly}
                   // The Chat window's turns: the composer reads them only to settle a send that
                   // ended `unknown` once its text lands as a user turn (#511).
@@ -3057,6 +3187,8 @@ export function AgentChat({
                   prefs={prefs}
                   // Settings → Hand: which thumb the belt and the reply box are laid out for.
                   hand={handOf(prefs)}
+                  // Settings → Pane navigation → Joystick: the handle band, just above the belt (ADR 0121).
+                  aboveBelt={paneNav.handle}
                   todos={agent?.todos}
                   subagents={agent?.subagents}
                   // The belt's ⚙: the button is the composer's, the sheet it opens is mounted below
@@ -3090,12 +3222,21 @@ export function AgentChat({
                       : undefined
                   }
                   draftNoticeSlot={draftNoticeSlot}
+                  floatingHint={paneNav.hint}
                 />
                 )}
               </div>
             </div>
           </Collapse>
         </div>
+
+        {/* The pane navigation overlay: portalled, fixed, drawn only while a gesture is armed (ADR 0121). */}
+        {paneNav.overlay}
+        {/* The Two fingers first-arm hint (ADR 0121). With a Composer it rides that composer's floating
+            group; a pane with no screen has none, so the hint takes the same slot by itself. */}
+        {gridless && paneNav.hint !== undefined && draftNoticeSlot !== null
+          ? createPortal(<div data-slot="floating-cards" className="pointer-events-none flex flex-col gap-1.5">{paneNav.hint}</div>, draftNoticeSlot)
+          : null}
 
         {/* Swipe-up quick switcher — just the panes (agents + shells), reached by the thumb gesture.
             Switch-only for panes: pane closing lives in the pane pill's long-press sheet, not here.
@@ -3275,6 +3416,8 @@ export function AgentChat({
           onSettings={gridless && !programReceipts ? undefined : () => setDrawer("paneSettings")}
           // The pane's walky talky messages (M62), a read row with the others. A member's pane too: the
           // lead forwards its list from that member's own log (CREW_PROTOCOL.md §21).
+          // Report a problem (ADR 0123): this machine's panes only, since the bridge reads no member's pane yet.
+          onReport={isLead(scope) ? () => openReport({ paneId, scope }) : undefined}
           onMessages={
             messagesSheet
               ? () => {
