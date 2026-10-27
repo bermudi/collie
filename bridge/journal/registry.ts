@@ -21,6 +21,7 @@ import { museJournal } from "./muse.ts";
 import { openclawJournal } from "./openclaw.ts";
 import { opencodeJournal } from "./opencode.ts";
 import { piJournal } from "./pi.ts";
+import { pizJournal } from "./piz.ts";
 import type { JournalAdapter } from "./types.ts";
 
 /**
@@ -61,6 +62,9 @@ export interface JournalRoots {
   /** OpenClaw's state folder (`$OPENCLAW_STATE_DIR`, `~/.openclaw`), one SQLite per agent under
    *  `agents/<id>/agent/`. */
   openclaw: readonly string[];
+  /** piz's database dir — `db.sqlite` at its top level (`$ZCODE_STORAGE_DIR/cli/db`, default
+   *  `~/.zcode/cli/db`). */
+  piz: readonly string[];
 }
 
 /**
@@ -91,6 +95,7 @@ export function buildJournalRegistry(roots: JournalRoots, catalogs: ModelCatalog
     kiroJournal(roots.kiro),
     museJournal(roots.muse),
     openclawJournal(roots.openclaw),
+    pizJournal(roots.piz),
   ];
   if (roots.durable !== undefined) adapters.push(durableJournal(roots.durable));
   return Object.fromEntries(adapters.map((a) => [a.agent, a]));
@@ -199,5 +204,5 @@ export function journalAgents(registry: Record<string, JournalAdapter>): string[
  * identity off a match against it — see `bridge/mux/types.ts` § `MuxPane.agent`.
  */
 export const KNOWN_HARNESS_NAMES: readonly string[] = journalAgents(
-  buildJournalRegistry({ claude: [], codex: [], pi: [], opencode: [], grok: [], hermes: [], devin: [], kiro: [], muse: [], openclaw: [] }),
+  buildJournalRegistry({ claude: [], codex: [], pi: [], opencode: [], grok: [], hermes: [], devin: [], kiro: [], muse: [], openclaw: [], piz: [] }),
 );

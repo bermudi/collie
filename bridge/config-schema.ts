@@ -711,6 +711,15 @@ export const CONFIG_SETTINGS: readonly ConfigSetting[] = [
     doc: "Where OpenClaw keeps its state. Empty follows OPENCLAW_STATE_DIR, else ~/.openclaw.",
     configField: "journalRoots",
   },
+  {
+    key: "piz_root",
+    env: "COLLIE_PIZ_ROOT",
+    section: "journal",
+    kind: "roots",
+    default: [],
+    doc: "Where piz keeps its session database. Empty follows ZCODE_STORAGE_DIR, else ~/.zcode/cli/db.",
+    configField: "journalRoots",
+  },
 
   // ── crew ───────────────────────────────────────────────────────────────────
   {

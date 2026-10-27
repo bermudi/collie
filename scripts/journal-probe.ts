@@ -222,6 +222,31 @@ async function candidateRefsUnder(
     }
   }
 
+  if (agent === "piz") {
+    // Same shape again: ONE sqlite database per root (`db.sqlite` under `cli/db` of the storage
+    // dir). Root sessions only — a `parent_id` row is a `sess_subagent_*` child, which herdr
+    // never reports (the pane names its own `sess_<uuid>` verbatim).
+    let db: Database;
+    try {
+      db = new Database(join(root, "db.sqlite"), { readonly: true });
+    } catch {
+      return { refs: [], total: 0 };
+    }
+    try {
+      const rows = db
+        .query<{ id: string }, [number]>(
+          "select id from session where parent_id is null order by time_updated desc limit ?",
+        )
+        .all(MAX_CANDIDATES);
+      const refs: AgentSessionRef[] = rows.map((r) => ({ kind: "id", value: r.id }));
+      return { refs, total: refs.length };
+    } catch {
+      return { refs: [], total: 0 };
+    } finally {
+      db.close();
+    }
+  }
+
 
   const logs = await logsNewestFirst(root);
   const refs: AgentSessionRef[] = [];

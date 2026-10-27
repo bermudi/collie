@@ -655,6 +655,14 @@ export function resolveJournalRoots(
     ),
     // OpenClaw keeps one SQLite per agent under its state folder, which `OPENCLAW_STATE_DIR` moves.
     openclaw: envRoots("COLLIE_OPENCLAW_ROOT", env.OPENCLAW_STATE_DIR ?? join(home, ".openclaw"), env),
+    // piz (the local ZCode fork) keeps ONE SQLite database under its storage dir, which
+    // `ZCODE_STORAGE_DIR` moves — the file is `<storage>/cli/db/db.sqlite`, so the root is the
+    // `cli/db` dir. ZCode treats a blank `ZCODE_STORAGE_DIR` as unset, so a blank does the same.
+    piz: envRoots(
+      "COLLIE_PIZ_ROOT",
+      join(env.ZCODE_STORAGE_DIR?.trim() || join(home, ".zcode"), "cli", "db"),
+      env,
+    ),
   };
 }
 

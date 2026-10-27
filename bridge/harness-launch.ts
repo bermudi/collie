@@ -44,6 +44,7 @@ export const HARNESS_LAUNCHES: readonly HarnessLaunch[] = [
   { id: "codex", label: "Codex", binary: "codex" },
   { id: "opencode", label: "opencode", binary: "opencode" },
   { id: "pi", label: "pi", binary: "pi" },
+  { id: "piz", label: "piz", binary: "piz" },
   { id: "omp", label: "omp", binary: "omp" },
   { id: "grok", label: "Grok", binary: "grok" },
   { id: "hermes", label: "Hermes", binary: "hermes" },

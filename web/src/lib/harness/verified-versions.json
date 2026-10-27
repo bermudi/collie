@@ -157,6 +157,19 @@
         "how": "capture",
         "evidence": "bridge/journal/fixtures/openclaw/: SQLite rows re-captured on OpenClaw 2026.10.2 and on the reporter's 2026.9.8 (both schema 24) against a scripted local model, plus the 2026-10-12 lab session rebuilt from its chat.history (experiments/openclaw-401). openclaw.test.ts reads all three; no canary runs OpenClaw."
       }
+    },
+    "piz": {
+      "version": "0.17.0",
+      "verified": "2026-10-27",
+      "how": "unverified",
+      "adapter": false,
+      "evidence": "installed 0.17.0 (bermudi's ZCode fork — thin pi-tui client + shared core, ~/build/piz); no screen adapter — raw mirror, profile-driven sends like devin. Frame/keymap pinned against a live pane capture and tui-pi source 2026-10-27 (─ box, blank interior, Ready./cwd/stats footer, Ctrl+Q queue, Alt+Up dequeue, ⧉ rows, double-Esc abort, [paste #N] markers); send path provisional until a lab run.",
+      "journal": {
+        "version": "0.17.0",
+        "verified": "2026-10-27",
+        "how": "live sweep",
+        "evidence": "bridge/journal/piz.ts verified against the live store ~/.zcode/cli/db/db.sqlite on 2026-10-27 (piz 0.17.0): opencode-V1 schema (session/message/part, data json, sequence-ordered), sess_<uuid> ids matching the pane-reported ref, 77,883 messages/322,307 parts read; synthetic/model-only/agent_runtime user rows dropped by flag, not inferred. scripts/journal-probe.ts is the drift check."
+      }
     }
   }
 }

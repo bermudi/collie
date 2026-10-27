@@ -48,6 +48,7 @@ export const JOURNAL_AGENT_NAMES: ReadonlySet<string> = new Set([
   "openclaw",
   "opencode",
   "pi",
+  "piz",
 ]);
 
 /** The agents that report their session to Herdr on the FIRST PROMPT, not at start. Mirrors

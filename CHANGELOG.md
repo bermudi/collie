@@ -23,6 +23,15 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Added
+
+- **piz joins the herd with a readable history.** `piz` is now a first-party agent name: its
+  ZCode database (`~/.zcode/cli/db/db.sqlite`, an OpenCode-V1-shaped `session`/`message`/`part`
+  store) gets a journal adapter, so a piz pane's Chat page serves its real session rows —
+  synthetic `model-only`/`agent_runtime` context injections are dropped rather than rendered as
+  user speech. `piz` is accepted by the mux contract, offered on the New page, overridable via
+  `COLLIE_PIZ_ROOT`/`ZCODE_STORAGE_DIR`, and covered by `journal-probe`.
+
 ## [0.58.0] - 2026-10-27
 
 ### Added

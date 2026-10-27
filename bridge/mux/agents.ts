@@ -36,6 +36,7 @@ export const MUX_AGENT_NAMES: readonly string[] = [
   "openclaw",
   "opencode",
   "pi",
+  "piz",
 ];
 
 /** The agent name of a pane with no agent. */

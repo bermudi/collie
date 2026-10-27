@@ -86,6 +86,7 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
 | P006 | Linux-only releases: windows workflow and zip gate dropped (ADR 9008), macOS rows and codesign dropped (ADR 9009) | `ls .github/workflows` — no `windows.yml` | deliberate | platform support returns |
 | P007 | Test suite removed (operator directive); gate is lint + typecheck + build | `ls web/vitest.config.ts` fails | deliberate divergence | a suite returns — re-add `bun run test` to the gate (marked in `merge-upstream.sh`) |
 | P008 | The app's copy names the fork: every i18n string that names the app says ColliePup, swept again at each sync (`web/src/lib/i18n/messages/*`) | `grep -rP '\bCollie\b(?!Pup)' web/src/lib/i18n/messages/` prints nothing | local, deliberately | fork retirement |
+| P009 | piz (the local ZCode fork, `~/build/piz`) support: `bridge/journal/piz.ts` plus its registry/roots/config seams, mux name + launch entry, `web/src/lib/surface/profiles/piz.json` send profile, and the agent-commands/operator-scope catalog entries | `bun scripts/journal-probe.ts` against `~/.zcode/cli/db/db.sqlite`; a live send from the phone | local, deliberately | upstream ships a zcode/piz adapter, or piz leaves the herd |
 
 ### Merge tripwires
 
