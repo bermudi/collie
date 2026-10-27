@@ -159,7 +159,9 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
   rows stay out); `docs/troubleshooting.md` (ours' macOS-free list plus theirs' new report entry);
   `.adr/README.md` (theirs' 0115–0124 rows, ours' 9001–9010 appended); `operator-scope.ts` union
   (`devin` + upstream's new `muse`). The two version files went through the driver without a word.
-- Gate green: lint, typecheck, build. No test suite ran (P007). Unreleased at this writing.
+- Gate green: lint, typecheck, build. No test suite ran (P007). Shipped in 0.58.0 (2026-10-27);
+  the deployment moved onto `versions/v0.58.0-main` (unit repointed, `current` flipped, bridge
+  restarted).
 
 ### 2026-10-24 (second sync) — `upstream/main` unchanged; strict `v1.23.4` absorbed via release-1.23 (1.23.2–1.23.4, 14 commits)
 
