@@ -23,6 +23,8 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+## [0.58.0] - 2026-10-27
+
 ### Added
 
 - **Upstream 1.24.0 and 1.24.1 are in.** `upstream/main` merged through 37351ff1, which carries both
@@ -32,6 +34,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
   Claude and Codex usage windows, and Kiro panes get Chat, History and approvals. 1.24.1 (upstream
   marked urgent) repairs sends on OMP — a pane could refuse, hold or silently lose one — and puts a
   Claude Code send during a turn back into Claude's queue (Pup).
+  ([8fea9c3](https://github.com/bermudi/collie/commit/8fea9c3517eb2dbb5c79d994a1ebeb97f2fddc68))
 
 ### Changed
 
@@ -43,6 +46,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
   branch's manifest. Two October dev-tip merges had recorded 1.24.0, a version that does not
   exist, disarming the update signal until 1.25.0 while 1.23.2–1.23.4 went unabsorbed. The gate
   runs before the record, so a failed gate leaves a clean tree the ritual can resume from (Pup).
+  ([307addd](https://github.com/bermudi/collie/commit/307addd51cf80369dab88e48a74522d9496fea4c))
 
 ### Fixed
 
@@ -52,10 +56,12 @@ Running a crew? Update the lead first; members follow on their own. Details:
   answer (letters and digits alike), Grok's and opencode's running-turn patterns are anchored so
   a draft that names them is not a running turn, and a slash command onto a draft offers Replace
   and Cancel rather than Add (Pup).
+  ([443c0a6](https://github.com/bermudi/collie/commit/443c0a670e41c9654b2ee17ce1e425fc99abd537))
 
 - **A failed merge gate no longer blocks the ritual's resume.** `scripts/merge-upstream.sh`
   records `upstream-merged` after the gate, so a failed gate leaves a clean, committed tree the
   script can resume from instead of a dirty one its entry check rejects (Pup).
+  ([ae40197](https://github.com/bermudi/collie/commit/ae401977b9c599e5973c4ca5e2e195bfa920f235))
 
 - **Pi panes keep their 0.57.7 keymap; the Steer affordance stays off for pi.** Pup's pi
   profile submits and queues on Enter (pi 1.1.1, measured for 0.57.7); upstream's steer
@@ -63,6 +69,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
   profile validation refuses at boot. The steer keys are dropped rather than guessed: a send
   during a pi turn queues on Enter exactly as before, and re-enabling Steer on pi needs pi's
   real steer keymap (Pup).
+  ([f823a16](https://github.com/bermudi/collie/commit/f823a1676f2ee5a0b1c1ce40f3a12906856caa7d))
 
 ## [0.57.9] - 2026-10-24
 
