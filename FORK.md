@@ -141,6 +141,26 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
 
 ## Sync / import log
 
+### 2026-10-27 — `upstream/main` 35d3ccfc → 37351ff1 (246 commits); strict releases ride along — v1.24.0 and v1.24.1 are ancestors, no separate absorb needed
+
+- `upstream-merged` 1.23.4 → 1.24.1; `UPSTREAM` pinned to 37351ff1. The signal's (1.23,→1.24) fire
+  rule is answered. Upstream marked 1.24.1 **urgent** (OMP panes could refuse, hold or silently lose
+  sends; a Claude send during a turn could hold or end unconfirmed).
+- The merge brings the large-screen layout (sidebar + pane strip, ADR 0120), two-finger/joystick
+  pane navigation (0121), queued-send cards (0122), report-a-problem (0123), Claude/Codex account
+  usage windows (0118), per-program send bounds (0124), Kiro panes, Muse/Grok/opencode/Antigravity
+  bars, and the 1.24.1 send repairs.
+- Conflicts: the test-suite re-import (95 delete/modify, re-deleted; 45 new suite files arrived as
+  plain adds and were swept — `web/e2e/` wholesale plus `bridge/surface/fixtures/`, neither exists
+  on Pup); the eleven dictionaries (theirs' block per hunk plus our Pup-only lines, then the
+  ColliePup sweep — no Pup-only key sat inside a conflicted hunk); `herdr-plugin.toml` ours
+  (upstream's delta was the version line only; the driver's ours-vs-theirs check cannot see that —
+  resolved by hand); `CLAUDE.md` ours (the Pup paragraph; upstream's Windows-asset and rig-gate
+  rows stay out); `docs/troubleshooting.md` (ours' macOS-free list plus theirs' new report entry);
+  `.adr/README.md` (theirs' 0115–0124 rows, ours' 9001–9010 appended); `operator-scope.ts` union
+  (`devin` + upstream's new `muse`). The two version files went through the driver without a word.
+- Gate green: lint, typecheck, build. No test suite ran (P007). Unreleased at this writing.
+
 ### 2026-10-24 (second sync) — `upstream/main` unchanged; strict `v1.23.4` absorbed via release-1.23 (1.23.2–1.23.4, 14 commits)
 
 - The signal was found disarmed: two dev-tip merges had recorded `upstream-merged = 1.24.0`, a
