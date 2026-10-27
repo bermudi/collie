@@ -11,6 +11,7 @@ export const AGENT_FAMILIES = [
   "codex",
   "devin",
   "pi",
+  "piz",
   "opencode",
   "omp",
   "grok",
@@ -47,6 +48,9 @@ export function canonicalAgent(key: string): string {
   if (key.startsWith("devin")) return "devin";
   if (key.startsWith("muse")) return "muse";
   if (key.startsWith("opencode")) return "opencode";
+  // `piz` is its own word — bermudi's ZCode fork, a different command set from pi.dev's — and it
+  // must never reach the `pi` rules below (a `piz-`/`piz.` form would, without this line).
+  if (key.startsWith("piz")) return "piz";
   if (key === "pi" || key.startsWith("pi-") || key.startsWith("pi.")) return "pi";
   // `omp` is its own prefix — no other agent string in the catalog starts with it, and it must NOT
   // be reached by the `pi` rules above: oh-my-pi ships a different command set from pi.dev's.

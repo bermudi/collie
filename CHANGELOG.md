@@ -31,6 +31,13 @@ Running a crew? Update the lead first; members follow on their own. Details:
   synthetic `model-only`/`agent_runtime` context injections are dropped rather than rendered as
   user speech. `piz` is accepted by the mux contract, offered on the New page, overridable via
   `COLLIE_PIZ_ROOT`/`ZCODE_STORAGE_DIR`, and covered by `journal-probe`.
+- **piz gets a send surface and a command palette.** A new `piz` input profile models its
+  pi-family composer (─ borders, blank interior, `Ready.`/cwd/stats footer): Enter submits and
+  steers a running turn, Ctrl+Q explicitly queues (`⧉ Follow-up`/`⧉ Steering` witnesses), Alt+Up
+  dequeues, abort needs a double Escape, and `[paste #N]` collapse markers are recognised — all
+  provisional until a send-lab run. The slash palette learns piz's real commands from its own
+  help table (`/compact`, `/model`, `/resume`, `/goal`, `/workflow`…), and `piz` is an
+  operator-scope family.
 
 ## [0.58.0] - 2026-10-27
 

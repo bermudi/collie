@@ -446,6 +446,33 @@ const MUSE: readonly AgentCommand[] = [
   { command: "/resume-codex", description: "Continue a Codex session here", takesArg: true, argHint: "[session-id-or-log-path]", common: false, dangerous: false },
 ];
 
+// ── piz (bermudi's ZCode fork) ──────────────────────────────────────────────
+// Sourced from the installed fork's own help table (`packages/shared/src/zcode-slash-command-help.ts`,
+// piz 0.17.0, read 2026-10-27) — not docs, not captures. Aliases `/variant`, `/language`,
+// `/continue`, `/clear`, `/plugin`, `/target` fold onto the rows below and are not listed.
+const PIZ: readonly AgentCommand[] = [
+  { command: "/compact", description: "Compact the current conversation; optional instructions", takesArg: true, argHint: "[instructions]", common: true, dangerous: false }, // harness-bar
+  { command: "/model", description: "Show or switch the session model", takesArg: true, argHint: "[list|provider/model]", common: true, dangerous: false }, // harness-bar
+  { command: "/resume", description: "Resume a saved session", takesArg: true, argHint: "[sessionId]", common: true, dangerous: false }, // harness-bar
+  { command: "/new", description: "Start a fresh session in the TUI (alias /clear)", takesArg: false, argHint: "", common: true, dangerous: true },
+  { command: "/mode", description: "Show or switch the permission mode", takesArg: true, argHint: "[plan|build|edit|yolo|guarded]", common: true, dangerous: false },
+  { command: "/effort", description: "Show or switch the reasoning effort (alias /variant)", takesArg: true, argHint: "[list|<level>]", common: true, dangerous: false },
+  { command: "/help", description: "Show the slash command help", takesArg: true, argHint: "[command]", common: true, dangerous: false },
+  { command: "/goal", description: "Show or set the session goal (alias /target)", takesArg: true, argHint: "[pause|resume|clear|<objective>]", common: false, dangerous: false },
+  { command: "/skill", description: "List skills, or force the next prompt to load one", takesArg: true, argHint: "[<skill-name> [task]]", common: false, dangerous: false },
+  { command: "/expert", description: "Run or manage the expert workflow", takesArg: true, argHint: "[status|resume|stop|<task>]", common: false, dangerous: false },
+  { command: "/workflow", description: "Design and launch a dynamic workflow", takesArg: true, argHint: "[objective]", common: false, dangerous: false },
+  { command: "/dwf", description: "List, cancel, or resume dynamic workflow runs", takesArg: true, argHint: "[list|cancel|resume]", common: false, dangerous: false },
+  { command: "/fork", description: "Fork a new session from a workspace checkpoint", takesArg: true, argHint: "[latest|checkpointId]", common: false, dangerous: false },
+  { command: "/rewind", description: "Inspect or restore workspace checkpoints", takesArg: true, argHint: "[latest|checkpointId]", common: false, dangerous: true },
+  { command: "/init", description: "Create or update workspace AGENTS.md instructions", takesArg: true, argHint: "[notes]", common: false, dangerous: false },
+  { command: "/mcp", description: "Show or manage configured MCP servers", takesArg: true, argHint: "[list|status|connect|disconnect]", common: false, dangerous: false },
+  { command: "/plugins", description: "Open the plugin manager (alias /plugin)", takesArg: true, argHint: "[list|enable|disable]", common: false, dangerous: false },
+  { command: "/locale", description: "Show or switch the UI locale (alias /language)", takesArg: true, argHint: "[auto|en-US|zh-CN]", common: false, dangerous: false },
+  { command: "/login", description: "Set up a Coding Plan provider", takesArg: false, argHint: "", common: false, dangerous: false },
+  { command: "/logout", description: "Remove the shared Z.ai login credentials", takesArg: false, argHint: "", common: false, dangerous: true },
+];
+
 // A Map, not an object literal: the keys tested against it come from Herdr's agent string and from
 // what the operator typed in `commands.toml`, so an object lookup would answer for inherited names
 // ("constructor", "toString") that ship no catalog at all.
@@ -453,6 +480,7 @@ const CATALOG = new Map<string, readonly AgentCommand[]>([
   ["claude", CLAUDE],
   ["codex", CODEX],
   ["pi", PI],
+  ["piz", PIZ],
   ["devin", DEVIN],
   ["opencode", OPENCODE],
   ["omp", OMP],
