@@ -5,9 +5,7 @@ This file tracks all notable changes to Collie, ordered newest version first. Th
 `### Added`, `### Changed`, `### Fixed`, `### Packaging` and `### Docs`, in that order and only
 where there is content, and every bullet opens with a short bold lead sentence, which is the line
 the GitHub Release page prints. Older versions carry a single flat list. Every entry links to its commit and credits the contributor where there is one. The
-`## [Unreleased]
-
-## [0.59.0] - 2026-10-30` section contains merged work waiting for release. The release
+`## [Unreleased]` section contains merged work waiting for release. The release
 commit renames this heading to `## [x.y.z] - YYYY-MM-DD`, adds the commit hashes, and adds a new
 empty `## [Unreleased]` section above it. The newest numbered `## [x.y.z]` heading (excluding the
 Unreleased heading) **must** match the `version` field in `herdr-plugin.toml`, `package.json`,
@@ -25,11 +23,14 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+## [0.59.1] - 2026-10-30
+
 ### Fixed
 
 - **Multi-line messages to Devin send again.** Removing Devin's input profile left Collie with no
   newline key for it, so any message of more than one line was refused. A Devin pane now gets
   Ctrl+J between lines, which Devin keeps as a line break without submitting.
+  ([7fd82fa](https://github.com/bermudi/collie/commit/7fd82fa))
 
 ## [0.59.0] - 2026-10-30
 
