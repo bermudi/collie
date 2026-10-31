@@ -9,7 +9,9 @@
 //           Surface must be free, or unknown(no-match) with the hash of the rows the person saw
 //   probe   (3, 900) on the probed path: write the probe character, require exactly that one new run
 //           and no other change, Backspace through the gate, require the S0 box again. A probe that
-//           fails with its character standing once in the box gets one Backspace and one more read
+//           fails with its character standing once in the box gets one Backspace and one more read.
+//           The bound counts only the reads: the two writes are outside it (`probeWrite` in gapsMs,
+//           and the request's bound grows by them), and the Backspace half always gets time for one read
 //   write   the whole text in one write per line (a bracketed paste where the multiplexer and the
 //           profile allow it); a line break is the profile's newline key, through the gate. Where
 //           the multiplexer frames a paste itself (`pasteBlock`), a long or multi-line message is ONE
@@ -20,7 +22,7 @@
 //           A command on a harness whose profile declares a command list needs two such reads, at
 //           least COMMAND_SETTLE_MS (160 ms) apart, that agree on the rows under the box: a list drawn
 //           late is never what Enter acts on (`commandSettle` in gapsMs)
-//   commit  the profile's submit keys through the gate with a 150 ms token; `submit-sent` is on disk first
+//   commit  the profile's submit keys through the gate with a 150 ms token minted after `submit-sent` is on disk (a slow write must not spend the token's lifetime)
 //   S2      (6, 3000) read until the box is empty or a running sign shows: `sent`; else `unknown`. A command
 //           that found nothing reads once more (6, 3000): its own screen may be slow to draw
 // A request past the sum of the bounds ends `unknown` and releases the lock. A protocol token never carries Escape; a person's Stop does, through the key gate, with a receipt (ADR 0116).
@@ -154,6 +156,26 @@
 // draft that is not Collie's (a stale row painted over the live box row): the send ends
 // `draft_present` with the draft's offers, never held (2026-10-26).
 //
+// A placeholder on a read with no styling (M78 spec 06, 2026-10-30): a multiplexer that hands out plain
+// text (herdr-core) drops the faint attribute and the colour that mark an empty box's placeholder, so a
+// placeholder of free words (a suggestion; the profile says so with `idle.placeholders.anyText`) reads
+// as a draft. On such a read the draft's probe decides by where the character lands. A typed draft has
+// its cursor at its end: the character lands after the same text, and the request is refused
+// `draft_present` as above. A placeholder is not in the input: the character lands at the start of the
+// box, alone or followed by other text (the placeholder went or changed), never before the same text
+// again (a draft whose cursor stands at its start). Then one Backspace, a read with no probe character
+// and the box as it was or empty, and the request goes on as one into an empty box: from there a read
+// with no styling whose box shows exactly that text reads as the empty box (`ghostView`), until the text
+// Collie types is those same words. Anything else fails as the probe does (`probe_failed`). A send or a
+// command takes this proof under a notice too: the probe and its Backspace are none of its keys. A
+// styled read never takes this path and makes no extra write. Both of the proof's writes are the
+// probe's (`probeWrite`), so a slow key press after a raw write stays outside its read bound.
+// A marked send (`draftHolds`, a walky talky delivery) takes the same probe on such a read, once: when
+// it comes, and from the hold when two polls read the same box text at least DRAFT_LEFT_MS apart
+// (`tickHolds`). The placeholder sends it now; a draft, or a probe that fails, keeps it held as
+// `draft_present`, never a refusal. The same text is not probed again after a draft, and only after
+// PLACEHOLDER_RETRY_MS after a failed probe; a marked send never takes the stale-screen second read.
+//
 // A screen in flux (2026-10-26): for 50 to 100 ms after a resize Herdr shows the old frame re-wrapped
 // to the new width, so S0's two reads differ in grid size (row count or widest row), or the read is torn
 // (cut inside the box). That is no reason yet to hold or refuse: S0 reads once more after SETTLE_MS
@@ -200,7 +222,7 @@ import type { PopupRead } from "../../web/src/lib/surface/popup.ts";
 import { commandListAnyText, commandListAt, isRunningRow, noticeOver, ownCommandList, popupAt, readCues, readCuesFor, runningSign, withoutCommandList, withoutPopup, withoutPromptEchoes, type CommandListRead, type Cue } from "../../web/src/lib/surface/cues.ts";
 import { loadProfiles } from "../../web/src/lib/surface/profile.ts";
 import { surfaceOfScreen } from "../../web/src/lib/surface/fold.ts";
-import { findInputFrame, rowText, type Frame, type FrameRow } from "../../web/src/lib/surface/frame.ts";
+import { findInputFrame, readIsUnstyled, rowText, type Frame, type FrameRow } from "../../web/src/lib/surface/frame.ts";
 import { liftAsk, liftDialog, readerBlocks } from "../../web/src/lib/surface/lift.ts";
 import type { AboveNotice } from "../../web/src/lib/surface/notice.ts";
 import type { CommandListRows, OtherScreenRow, Profile, ProfileMatch, QueuedRow, SteerWitness } from "../../web/src/lib/surface/profile.ts";
@@ -272,6 +294,9 @@ export { STALE_SCREEN };
 /** The wait before a stale box's second S0 read: one S0 gap. */
 const REREAD_GAP_MS = 120;
 
+/** The detail of a send that never got a whole screen to decide on. */
+const PARTIAL_READ = "The terminal says rows may be missing from the screen it reads, so Collie cannot prove the box is free. Nothing was typed.";
+
 /** The detail after a failed probe whose one Backspace took the character out again. */
 const PROBE_REMOVED = "One Backspace removed the probe character, so the box is clean again.";
 /**
@@ -322,6 +347,12 @@ export const SEND_READ_LINES = 120;
 export const CLUSTER_ROWS = 24;
 /** The gap before the first poll of a step; each later gap doubles. */
 const FIRST_GAP_MS = 80;
+/**
+ * The least time the probe's Backspace half gets: its first gap and one read's share of the probe's
+ * bound, so it always reads once. At {@link FIRST_GAP_MS} alone the poll slept its gap and found no
+ * time left to read, and the probe ended "could not confirm" (minibuch, herdr-core, 2026-10-30).
+ */
+const PROBE_BACK_FLOOR_MS = FIRST_GAP_MS + BOUNDS.probe.ms / BOUNDS.probe.reads;
 /** The gap between the two S0 reads. */
 const S0_GAP_MS = 120;
 /**
@@ -611,6 +642,8 @@ interface Snap {
   /** {@link plain} as read, nothing masked: what the lab's example keeps. */
   readonly plainRaw: readonly string[];
   readonly frame: Frame | null;
+  /** The profile's `idle.volatile.above.ticks`: the rows above the box are read through {@link tickMarked}. */
+  readonly ticks: boolean;
   readonly surface: Surface;
   readonly cueStrength: "none" | "weak" | "strong";
   /** The cues of the framed read behind {@link cueStrength}, for a refusal's example. */
@@ -724,12 +757,20 @@ const BRACKET = /\([^()]*\)/gu;
  */
 export function steadyRow(row: string, signs: readonly RegExp[] = []): string {
   // A row the profile names as a running row (idle.runningRows) shows its spinner glyph as a fixed mark.
-  if (signs.some((sign) => sign.test(row.trimEnd()))) return row.replace(/[\u2800-\u28ff]/gu, "*").replace(/\d+/gu, "0");
+  if (signs.some((sign) => sign.test(row.trimEnd()))) return tickMarked(row);
   // A spinner row with or without its bracket group reads as the glyph mark and the verb alone.
   const verb = SPINNER_VERB_ROW.exec(row);
   if (verb !== null) return `${verb[1] ?? ""}*${verb[2] ?? ""}`;
   if (!isRunningRow(row)) return row;
   return row.replace(SPINNER_LEAD, "$1*").replace(BRACKET, (run) => run.replace(/\d+/gu, "0"));
+}
+
+/**
+ * A row with its braille glyphs and its digit runs read as fixed marks: a spinner that turned, a
+ * counter or a clock that ticked reads the same. Every other character still counts.
+ */
+function tickMarked(row: string): string {
+  return row.replace(/[\u2800-\u28ff]/gu, "*").replace(/\d+/gu, "0");
 }
 
 function mark(snap: Snap | null): ReadMark | null {
@@ -1018,6 +1059,44 @@ function probeBoxPasses(s0: Snap, snap: Snap, prefix: string, probe: string): bo
 }
 
 /**
+ * Whether the probe character landed at the START of a box that read a draft, on a read with no
+ * styling (M78 spec 06): it stands there once, alone or followed by other text, and nothing else moved
+ * (no modal, no cue, no other screen, the rows under the box kept their count). A typed draft has its
+ * cursor at its end, so its probe lands after it; a placeholder is not in the input, so the probe lands
+ * where the input starts and the placeholder goes or changes. The probe before the same text again is a
+ * draft whose cursor stands at its start: no placeholder.
+ */
+function landsAtStart(s0: Snap, snap: Snap, draft: string, probe: string): boolean {
+  if (s0.frame === null || snap.frame === null || snap.otherScreen !== null || !readIsUnstyled(snap.rows)) return false;
+  if (modalAtBox(snap) || framedCueGrew(s0, snap) || cueAppeared(s0, snap)) return false;
+  if (rowsBelow(s0, s0.frame) !== rowsBelow(snap, snap.frame)) return false;
+  if (countIn(snap.texts, probe) !== countIn(s0.texts, probe) + 1) return false;
+  const box = wsFree(boxText(snap.frame));
+  return box.startsWith(probe) && box.slice(probe.length) !== wsFree(draft);
+}
+
+/**
+ * Whether a box that reads a draft may be the placeholder instead (M78 spec 06): the profile says its
+ * placeholder may be any text (`idle.placeholders.anyText`), and the read carries no styling at all, so
+ * the attribute or colour that marks the placeholder is gone. Only a probe can tell the two apart then.
+ */
+function mayHoldPlaceholder(match: PaneProfileMatch | null, s0: Snap): boolean {
+  return match?.profile.idle.placeholders.anyText === true && readIsUnstyled(s0.rows);
+}
+
+/**
+ * A read as the run knows its box (M78 spec 06): on a read with no styling, a box whose text is exactly
+ * the one a probe proved a placeholder ({@link RunState.ghost}) is the empty box, its frame marked as a
+ * placeholder and its Surface's composer `empty`. Every other read is as it was read.
+ */
+function ghostView(ghost: string | null, snap: Snap): Snap {
+  const { frame } = snap;
+  if (ghost === null || frame === null || frame.placeholder || frame.interior.text !== ghost || !readIsUnstyled(snap.rows)) return snap;
+  const surface: Surface = snap.surface.composer === "draft" ? { ...snap.surface, composer: "empty" } : snap.surface;
+  return { ...snap, frame: { ...frame, placeholder: true }, surface };
+}
+
+/**
  * Why a steer's last read before the key refused the press (M69, counsel on the Edge 5 candidate): a
  * dialog (an ask, or one Collie cannot read) is `dialog_open`, because the steer key would answer it;
  * no read, no box, or a modal the Surface cannot tell is `unreadable`, because the key would land blind.
@@ -1099,7 +1178,8 @@ function otherScreenOf(texts: readonly string[], frame: Frame | null, screens: r
 function transcriptAbove(snap: Snap, frame: Frame): string[] {
   const band = frame.volatile.above === null ? frame.top : frame.volatile.above.first;
   const end = snap.ownList?.side === "above" ? Math.min(band, snap.ownList.first) : band;
-  const rows = snap.texts.slice(0, end).map((t) => t.trimEnd());
+  // A profile whose rows above may tick in place (`idle.volatile.above.ticks`): a counter that moved is no moved screen.
+  const rows = snap.texts.slice(0, end).map((t) => (snap.ticks ? tickMarked(t) : t).trimEnd());
   while (rows.length > 0 && rows[rows.length - 1]!.length === 0) rows.pop();
   return rows;
 }
@@ -1745,10 +1825,10 @@ function ownListScroll(before: Snap, after: Snap): number {
 /** How many non-blank transcript rows must still show above the box before blank rows under a list may count as scroll. */
 const SCROLL_ANCHOR_ROWS = 2;
 
-/** {@link aboveUnchanged} for a manual send: the transcript above the box may lose text, never gain it. */
-function aboveLostOnly(before: Snap, after: Snap): boolean {
+/** {@link aboveUnchanged} for a manual send: the transcript above the box may lose text, never gain it. `topSlack` as in {@link lostTextOnly}. */
+function aboveLostOnly(before: Snap, after: Snap, topSlack = 0): boolean {
   if (before.frame === null || after.frame === null) return false;
-  return lostTextOnly(transcriptAbove(before, before.frame), transcriptAbove(after, after.frame));
+  return lostTextOnly(transcriptAbove(before, before.frame), transcriptAbove(after, after.frame), topSlack);
 }
 
 /** What a manual send asks of a framed pane: no modal cue grew, and the transcript above the box only lost text. */
@@ -1816,8 +1896,22 @@ export interface WholePaste {
   readonly images: number;
   /** The profile's image token, or null when the profile names none (then `images` is 0). */
   readonly image: RegExp | null;
-  /** The text that stays in the paste, as lines. */
+  /** The text that stays in the paste, as lines, when the harness takes the images off it. */
   readonly lines: readonly string[];
+  /**
+   * The text as typed, as lines: what the box shows when the harness takes NO image off the paste.
+   * Claude Code 2.1.312 attaches an upload path only when the path is the whole paste; a path
+   * among other text stays text, on its own row (lab, 2026-10-30, after the field case of
+   * 2026-10-29: a two-paragraph message ending its first paragraph with the upload path was typed,
+   * read back with the path as text, and never submitted). Equal to `lines` when `images` is 0.
+   */
+  readonly literal: readonly string[];
+  /**
+   * False for a paste the harness never folds into its collapse form: a lone upload path
+   * ({@link uploadAlone}) is one short line, far under {@link WHOLE_PASTE_MIN_CHARS}, so a fold in
+   * its box is not the typed text. Absent: the paste may fold.
+   */
+  readonly folds?: false;
 }
 
 /**
@@ -1837,7 +1931,8 @@ function isImageFile(path: string): boolean {
 /**
  * Whether a text goes as ONE paste, and what the box then shows of it; null for the write per line.
  * Only where the profile measured it (`paste.block`), only for a message of more than one line or of
- * more than {@link WHOLE_PASTE_MIN_CHARS} on one line (a dictation is often one long line), and never
+ * more than {@link WHOLE_PASTE_MIN_CHARS} on one line (a dictation is often one long line), or for a
+ * lone upload path of any length ({@link uploadAlone}), and never
  * for a text that starts with a reserved lead: a slash command, a shell line or a file mention keeps
  * the write it has always had, so the harness reads the lead as typed. With the profile's image
  * token, the pieces that are Collie's own uploads (the shape the web adapter's `liftedPaste` reads,
@@ -1849,15 +1944,37 @@ function isImageFile(path: string): boolean {
 export function wholePaste(match: ProfileMatch | null, lines: readonly string[], imageFile: (path: string) => boolean = isImageFile): WholePaste | null {
   const paste = match?.profile.paste;
   if (match === null || paste?.block !== true) return null;
+  const alone = uploadAlone(match, lines, imageFile);
+  if (alone !== null) return alone;
   const text = lines.join("\n");
   if (lines.length === 1 && text.length <= WHOLE_PASTE_MIN_CHARS) return null;
   if (reservedLead(lines[0] ?? "", match.profile.reservedLeads) !== null) return null;
-  if (paste.image === undefined) return { images: 0, image: null, lines };
+  if (paste.image === undefined) return { images: 0, image: null, lines, literal: lines };
   const image = new RegExp(paste.image, "uy");
   const pieces = pastePieces(text);
   const kept = pieces.filter((piece) => !(isUploadImagePath(piece) && imageFile(piece.trim())));
   const images = pieces.length - kept.length;
-  return { images, image, lines: images === 0 ? lines : kept.join("\n").split("\n") };
+  return { images, image, lines: images === 0 ? lines : kept.join("\n").split("\n"), literal: lines };
+}
+
+/**
+ * A message that is nothing but the path of one saved upload (a screenshot sent with no words): the
+ * whole text, trimmed, is one piece in Collie's upload shape ({@link isUploadImagePath}, the shape
+ * `startsWithUploadPath` reads for the reserved lead) and still a file on this disk. Its one paste
+ * is the whole paste, so the harness may attach it: Claude Code 2.1.312 shows `[Image #1]` and
+ * nothing else (live check 2026-10-30, release 1.25.0: a 94-character path ended
+ * typed_not_submitted, `mismatch`, because one short line was compared only as its literal text).
+ * The image form holds the token and no text; the literal form (`literal`) holds the path as typed,
+ * for a version that keeps it as text. Either form is exactly the typed text; anything else fails.
+ * Null for any other text, and on a profile with no image token. Not tied to `pasteBlock`: one line
+ * is one paste on every multiplexer (the write per line), so tmux reads it the same way.
+ */
+export function uploadAlone(match: ProfileMatch | null, lines: readonly string[], imageFile: (path: string) => boolean = isImageFile): WholePaste | null {
+  const image = match?.profile.paste?.image;
+  if (image === undefined || lines.length !== 1) return null;
+  const path = (lines[0] ?? "").trim();
+  if (pastePieces(path).length !== 1 || !isUploadImagePath(path) || !imageFile(path)) return null;
+  return { images: 1, image: new RegExp(image, "uy"), lines: [""], literal: lines, folds: false };
 }
 
 /**
@@ -1896,6 +2013,16 @@ function boxHolds(frame: Frame, prefix: string, lines: readonly string[], collap
  * is read: a profile that writes per line keeps the rule above.
  */
 export function boxMatches(box: string, prefix: string, lines: readonly string[], collapse: RegExp | null, whole: WholePaste | null = null): boolean {
+  if (boxMatchesForm(box, prefix, lines, collapse, whole)) return true;
+  // A paste the protocol expected to lose its images may have kept them as text: Claude Code 2.1.305
+  // took an upload path out of a text (the `images` form above), 2.1.312 leaves it in unless the path
+  // is the whole paste (`literal`). Both forms hold exactly the typed text, so either proves the box;
+  // a box that holds neither still fails.
+  return whole !== null && whole.images > 0 && boxMatchesForm(box, prefix, whole.literal, collapse, { ...whole, images: 0, lines: whole.literal });
+}
+
+/** {@link boxMatches} for one form of the box: the images taken off (`whole.images`) or none. */
+function boxMatchesForm(box: string, prefix: string, lines: readonly string[], collapse: RegExp | null, whole: WholePaste | null): boolean {
   let p = 0;
   const skip = (): void => {
     while (isSpace(box[p])) p++;
@@ -1944,7 +2071,7 @@ export function boxMatches(box: string, prefix: string, lines: readonly string[]
     };
     for (let i = 0; i < whole.images; i++) if (take(whole.image) === null) return false;
     const after = q;
-    const m = take(collapse);
+    const m = whole.folds === false ? null : take(collapse);
     const count = m?.groups?.lines;
     if (m !== null && q === squeezed.length && (count === undefined ? lines.length === 1 : Number(count) === lines.length - 1)) return true;
     p = at[after]!;
@@ -2203,6 +2330,10 @@ interface RunState {
   probed: boolean;
   /** When the run last typed its probe character: a pending one's life runs from there ({@link SendDeps.deaf}). */
   probeAt?: number;
+  /** The time the probe's writes took so far, outside its read bound ({@link SendProtocol.probeWrite}). */
+  probeWriteMs?: number;
+  /** The newest read came back marked partial (`MuxGrid.partial`) and was taken as no read. */
+  partialRead?: boolean;
   /** The screen at S0 took the manual Send (no frame found, an unreadable overlay, a weak cue): the probe and S1 compare less. */
   manual: boolean;
   /** The pane has no profile: the text went in blind, with no read ({@link SendProtocol.blindSend}). */
@@ -2282,6 +2413,20 @@ interface RunState {
   steered: boolean;
   /** The probe proved S0's draft a stale image and S0 read once more (the header): once per request. */
   reread: boolean;
+  /**
+   * The box text a probe proved a placeholder on a read with no styling (the header, M78 spec 06): a
+   * later read with no styling whose box shows exactly it reads as the empty box ({@link ghostView}).
+   * Null until then, and null again once the text Collie types is that same text.
+   */
+  ghost: string | null;
+  /**
+   * A marked send (`draftHolds`, a walky talky delivery) that probed a box which may show its
+   * placeholder as a draft (M78 spec 06): the box text it probed, else null. Its end goes back to the
+   * hold as `draft_present` whatever the probe proved, and the pane's watch remembers the text.
+   */
+  placeholderProbe: string | null;
+  /** That probe did not tell the placeholder from a draft (it failed); the watch may try the same text again later. */
+  placeholderFailed: boolean;
 }
 
 /** What the hold queue knows of one pane between polls (M56 spec 15 review). */
@@ -2305,7 +2450,24 @@ interface PaneWatch {
    * a running turn and no release ran (2026-10-26). Its cause clears on the first free poll.
    */
   cleared?: boolean;
+  /**
+   * A marked request held over a draft on a read with no styling, where the profile's placeholder may be
+   * any text (M78 spec 06): the box text the polls read, and since when they read it unchanged. Null
+   * once a poll reads anything else.
+   */
+  plainDraft?: { readonly box: string; readonly since: number } | null;
+  /** The last box text a marked request's run probed for that, when, and whether the probe failed. */
+  placeholderTried?: { readonly box: string; readonly at: number; readonly failed: boolean };
 }
+
+/**
+ * After a failed placeholder probe (M78 spec 06), how long the hold waits before it probes the same box
+ * text again. A probe that proved a draft is never repeated on the same text; a changed text is probed
+ * once it held still over {@link DRAFT_LEFT_MS}.
+ */
+const PLACEHOLDER_RETRY_MS = 30_000;
+/** The words of a marked send held because its placeholder probe could not tell the placeholder from a draft. */
+const PLACEHOLDER_UNPROVEN = "The box reads as a draft, and the probe could not tell it from the box's placeholder. Collie keeps this and tries again.";
 
 /** Polls in a row a pane must read free, after a running turn, before its oldest held request goes. */
 const FREE_POLLS = 2;
@@ -2745,7 +2907,7 @@ export class SendProtocol {
     if (state.request.when === "steer") return false;
     const clean = cleanProbe(state, end);
     // A draft proven live by its probe (2026-10-25) left the box as it was: it holds like an unprobed one did.
-    if (state.keys.length > 0 && !clean && !(end.reason === "draft_present" && probeOnly(state))) return false;
+    if (state.keys.length > 0 && !clean && !(end.reason === "draft_present" && (probeOnly(state) || state.placeholderProbe !== null))) return false;
     if (!HOLDABLE.has(state.request.mode) || state.neverHold === true) return false;
     if (end.reason === "turn_running") return true;
     if (state.manual || state.match === null) return false;
@@ -2788,6 +2950,7 @@ export class SendProtocol {
     } else {
       holds.add(input);
     }
+    this.notePlaceholderTried(state);
     const receipt = this.receiptOf(state, "held", undefined);
     this.deps.store.hold(state.record.id, receipt);
     this.count(state, receipt);
@@ -2810,9 +2973,16 @@ export class SendProtocol {
     holds.putBack(state.record.id, counted);
     if (state.startWait === true) this.startWaits.add(state.record.id);
     if (draft) holds.setCause(state.record.id, "draft_present");
+    this.notePlaceholderTried(state);
     const receipt = this.receiptOf(state, "held", undefined);
     this.deps.store.hold(state.record.id, receipt);
     return answerWith({ receipt, offers: [] }, { ...end.extra, detail: HELD });
+  }
+
+  /** A marked send's placeholder probe, on its pane's watch: the same box text is not probed again (tickHolds). */
+  private notePlaceholderTried(state: RunState): void {
+    if (state.placeholderProbe === null) return;
+    this.watchOf(state.target.session, state.target.paneId).placeholderTried = { box: state.placeholderProbe, at: this.now(), failed: state.placeholderFailed };
   }
 
   /** The phone's rows for a pane's held requests, oldest first (the snapshot carries them). */
@@ -2922,10 +3092,19 @@ export class SendProtocol {
    *    {@link DRAFT_LEFT_MS} after the first. A poll that reads a turn
    *    makes it a turn hold: the draft was submitted, and it goes after that turn. Each poll writes what
    *    holds a marked request now (`cause`), and the caller's `releaseCheck` has the last word.
+   *  - a marked request held over a draft that may be the placeholder (M78 spec 06: a read with no
+   *    styling, `unstyledOf`, and a profile whose placeholder may be any text) goes once two polls read
+   *    the same box text at least {@link DRAFT_LEFT_MS} apart, if that text was not probed yet (or its
+   *    probe failed {@link PLACEHOLDER_RETRY_MS} ago): its run probes the box once.
    * Every end keeps the text. Returns the releases it started, for a test to wait on. Never throws: a
    * release that fails is a warning.
    */
-  tickHolds(session: string, surfaceOf: (paneId: string) => Surface | undefined, boxOf?: (paneId: string) => string | null): Promise<SendAnswer | null>[] {
+  tickHolds(
+    session: string,
+    surfaceOf: (paneId: string) => Surface | undefined,
+    boxOf?: (paneId: string) => string | null,
+    unstyledOf?: (paneId: string) => boolean,
+  ): Promise<SendAnswer | null>[] {
     const holds = this.deps.holds;
     if (holds === undefined) return [];
     const now = this.now();
@@ -3026,7 +3205,30 @@ export class SendProtocol {
       // DRAFT_LEFT_MS apart, so a submitted draft has drawn its turn before anything is typed.
       // Only a marked request: another held send keeps its own release rules, whatever its label says.
       const draftLeft = next.draftHolds === true && holds.get(next.id)?.cause === "draft_present" && watch.freeReads >= FREE_POLLS && watch.freeSince !== null && now - watch.freeSince >= DRAFT_LEFT_MS;
-      if (busy || !(afterTurn || turnEnded || quiet || draftLeft || cleared)) continue;
+      // A draft that may be the placeholder (M78 spec 06): a marked request held over a draft, on a read
+      // with no styling, where the profile's placeholder may be any text. Once two polls read the same box
+      // text at least DRAFT_LEFT_MS apart (nobody is typing), the request goes, and its run probes the box
+      // once: the placeholder sends it, a draft puts it back. The same text is never probed twice after a
+      // proven draft, and only after PLACEHOLDER_RETRY_MS after a failed probe.
+      const plainDraft =
+        next.draftHolds === true &&
+        holds.get(next.id)?.cause === "draft_present" &&
+        surface !== undefined &&
+        surface.turn === "idle" &&
+        surface.modal === "none" &&
+        surface.composer === "draft" &&
+        box !== null &&
+        box !== "" &&
+        profile?.idle.placeholders.anyText === true &&
+        unstyledOf?.(paneId) === true
+          ? box
+          : null;
+      if (plainDraft === null) watch.plainDraft = null;
+      else if (watch.plainDraft?.box !== plainDraft) watch.plainDraft = { box: plainDraft, since: now };
+      const tried = watch.placeholderTried;
+      const untried = tried === undefined || tried.box !== plainDraft || (tried.failed && now - tried.at >= PLACEHOLDER_RETRY_MS);
+      const placeholder = plainDraft !== null && watch.plainDraft != null && now - watch.plainDraft.since >= DRAFT_LEFT_MS && untried;
+      if (busy || !(afterTurn || turnEnded || quiet || draftLeft || cleared || placeholder)) continue;
       if (this.deps.releaseCheck?.(next.id, session, paneId) === false) {
         this.endHeld(next, "refused", "pane_gone");
         continue;
@@ -3247,6 +3449,9 @@ export class SendProtocol {
       steer: false,
       steered: false,
       reread: false,
+      ghost: null,
+      placeholderProbe: null,
+      placeholderFailed: false,
     };
   }
 
@@ -3351,6 +3556,8 @@ export class SendProtocol {
       // character is counted as pending, and the hold goes once the box shows it (tickHolds).
       if (release && err.outcome === "refused" && state.startWait === true) return this.backToQueue(state, err);
       if (release && err.outcome === "refused" && err.reason !== undefined && ((NOT_YET.has(err.reason) && state.keys.length === 0) || cleanProbe(state, err))) return this.backToQueue(state, err);
+      // A marked send's placeholder probe proved a draft, or could not tell (M78 spec 06): back to its place.
+      if (release && err.outcome === "refused" && err.reason === "draft_present" && state.placeholderProbe !== null) return this.backToQueue(state, err);
       if (!release && this.holdsEnd(state, err)) return this.hold(state, err);
       return this.settle(state, err);
     } finally {
@@ -3584,8 +3791,9 @@ export class SendProtocol {
     // A Replace whose text starts with a reserved lead empties the box and then sends a command, so it is one from here on.
     if ((request.mode === "submit" || request.mode === "discard" || request.mode === "replace") && reservedLead(lines[0] ?? "", leads) !== null) state.command = true;
     // A draft that went as one paste is read the way the send read it.
-    if ((request.mode === "submit" || request.mode === "discard") && !state.command && this.deps.mux.pasteBlock !== undefined) {
-      state.whole = wholePaste(match, lines, this.deps.imageFile);
+    // A lone upload path is one paste on every multiplexer, so its image form is read without `pasteBlock` too (uploadAlone).
+    if ((request.mode === "submit" || request.mode === "discard") && !state.command) {
+      state.whole = this.deps.mux.pasteBlock !== undefined ? wholePaste(match, lines, this.deps.imageFile) : uploadAlone(match, lines, this.deps.imageFile);
     }
     const { whole } = state;
     // On a box at its scroll height the text Collie typed is compared by the rows in view (boxHolds).
@@ -3626,14 +3834,26 @@ export class SendProtocol {
     // more S0 read, and the run goes on from it or ends refused.
     if (residue || this.draftToProve(state, s0, holds)) {
       const started = this.now();
+      const probeWrites = state.probeWriteMs;
+      if (!residue && state.request.draftHolds === true && s0.frame !== null) state.placeholderProbe = boxText(s0.frame);
       let proven: Snap;
       try {
         proven = await this.proveDraft(state, s0);
+      } catch (err) {
+        // A marked send's placeholder probe that failed keeps the hold (M78 spec 06): it ends as a draft
+        // still present, never as a refusal that would leave the message in the inbox.
+        if (state.placeholderProbe !== null && err instanceof Ended && err.outcome === "refused" && err.reason === "probe_failed") {
+          state.placeholderFailed = true;
+          throw new Ended("refused", "draft_present", { surface: s0.surface, framed: true, detail: PLACEHOLDER_UNPROVEN });
+        }
+        throw err;
       } finally {
-        // The proof is its own gap, on a refusal too: S0's gap stays the time of its two reads.
+        // The proof is its own gap, on a refusal too: S0's gap stays the time of its two reads, and the
+        // proof's own writes stay in it, out of the send probe's `probeWrite`.
         const spent = this.now() - started;
         state.gaps.proof = spent;
         state.stepStart += spent;
+        state.probeWriteMs = probeWrites;
       }
       if (proven !== s0) {
         s0 = proven;
@@ -3735,12 +3955,21 @@ export class SendProtocol {
       (!isFree(s0.surface) && request.mode !== "append" && request.mode !== "replace") ||
       ([...text].length >= 1 && [...text].length <= SHORT_TEXT));
     let landing: Landing | null = null;
-    if (state.probed) landing = await this.probe(state, s0, prefix);
-    this.lap(state, "probe");
+    try {
+      if (state.probed) landing = await this.probe(state, s0, prefix);
+    } finally {
+      // Lapped on a failed probe too, so its receipt says where the time went.
+      this.lapProbe(state);
+    }
     // The probe showed in the box and went again: the starting harness reads keys, its window ends.
     if (state.starting && state.probed) this.noteFramed(state);
 
-    if (!state.command && !state.noticeKey && this.deps.mux.pasteBlock !== undefined) state.whole = wholePaste(match, lines, this.deps.imageFile);
+    if (!state.command && !state.noticeKey) {
+      // A lone upload path is one paste on every multiplexer (the write per line), so the harness may attach it there too (uploadAlone).
+      state.whole = this.deps.mux.pasteBlock !== undefined ? wholePaste(match, lines, this.deps.imageFile) : uploadAlone(match, lines, this.deps.imageFile);
+    }
+    // A text that is the placeholder's own words reads as the placeholder once typed: from here the box is read as it shows.
+    if (state.ghost !== null && wsFree(lines.join("")) === wsFree(state.ghost)) state.ghost = null;
     await this.write(state, lines);
     this.lap(state, "write");
 
@@ -3802,7 +4031,7 @@ export class SendProtocol {
       if (err instanceof StepLate) throw new Ended("refused", "bound", { detail: `The screen did not read inside ${String(BOUNDS.s0.ms)} ms.` });
       throw err;
     }
-    if (snap === null) throw new Ended("refused", "pane_gone", { detail: "The pane could not be read." });
+    if (snap === null) throw this.noRead(state);
     state.marks.s0 = snap;
     this.checkGeneration(state, "refused");
     if (noEchoPromptIn(snap.texts) !== null) {
@@ -3816,8 +4045,8 @@ export class SendProtocol {
     this.guard(state);
     const { gate, store } = this.deps;
     const { paneId } = state.target;
-    const token = gate.mint(paneId, GENERIC_SUBMIT, gate.revision(paneId));
     store.markSubmitSent(state.record.id);
+    const token = gate.mint(paneId, GENERIC_SUBMIT, gate.revision(paneId));
     const result = await this.within(state, gate.commit(token));
     if (!result.ok) {
       const reason: SendReason = result.reason === "mux" ? "submit_failed" : result.reason;
@@ -3848,13 +4077,19 @@ export class SendProtocol {
    */
   private draftToProve(state: RunState, s0: Snap, holds: (frame: Frame) => boolean): boolean {
     const { frame, surface } = s0;
-    if (state.reread || state.manual || frame === null || s0.notice !== null) return false;
+    if (state.reread || state.manual || frame === null) return false;
+    // A box that may show its placeholder as a draft (M78 spec 06) is proven under a notice too, for a
+    // send or a command: the probe character and its Backspace are none of the notice's keys.
+    const mayShowPlaceholder = mayHoldPlaceholder(state.match, s0) && (state.request.mode === "send" || state.request.mode === "command");
+    if (s0.notice !== null && !mayShowPlaceholder) return false;
     // A box at its scroll height shows a slice of its draft, so a probe there cannot be compared; its
     // own rules refuse or bound the clear before any key (TALL_DRAFT, LONG_DRAFT).
     if (frame.scrolled === true) return false;
     // A marked send (walky talky) is held over a draft, never refused, and nobody tapped it: a person may
-    // be typing in that box right now, and a probe there could land between their keys. It waits as before.
-    if (state.request.draftHolds === true) return false;
+    // be typing in that box right now, and a probe there could land between their keys. It waits as before,
+    // except where the draft may be the placeholder (M78 spec 06): one probe decides, and the hold queue
+    // asks for it only once the box text held still between two polls (tickHolds).
+    if (state.request.draftHolds === true && !mayShowPlaceholder) return false;
     if (surface.turn !== "idle" || surface.modal !== "none" || surface.composer !== "draft" || boxText(frame).length === 0) return false;
     switch (state.request.mode) {
       case "send":
@@ -3884,6 +4119,12 @@ export class SendProtocol {
     this.stretch(state, 2 * BOUNDS.probe.ms);
     const first = await this.draftProbe(state, s0, probe);
     if (first.landing === "live") return first.snap;
+    if (first.landing === "ghost") return this.ghostProven(state, s0, first.snap);
+    // A marked send probes once per hold check (M78 spec 06): no second S0 read and no second probe.
+    if (state.placeholderProbe !== null) {
+      if (first.landing === "nowhere") this.notePending(state);
+      throw new Ended("refused", "probe_failed", { surface: s0.surface, framed: true, detail: PLACEHOLDER_UNPROVEN });
+    }
     state.reread = true;
     // The second S0 read, a second probe, and the send's own probe that the second read forces.
     this.stretch(state, REREAD_GAP_MS + BOUNDS.s0.ms + 3 * BOUNDS.probe.ms);
@@ -3903,7 +4144,21 @@ export class SendProtocol {
     }
     const again = await this.draftProbe(state, fresh, probe);
     if (again.landing === "live") return again.snap;
+    if (again.landing === "ghost") return this.ghostProven(state, fresh, again.snap);
     throw this.staleScreen(state, state.lastRead ?? fresh, again.landing === "nowhere" ? probe : null);
+  }
+
+  /**
+   * The draft the probe proved a placeholder (M78 spec 06): from here a read with no styling that shows
+   * its text shows the empty box, this read included, and the request goes on from it.
+   */
+  private ghostProven(state: RunState, read: Snap, back: Snap): Snap {
+    state.ghost = read.frame!.interior.text;
+    // A marked send whose probe proved the placeholder is a send into an empty box from here on.
+    state.placeholderProbe = null;
+    const view = ghostView(state.ghost, back);
+    state.lastRead = view;
+    return view;
   }
 
   /**
@@ -3911,19 +4166,37 @@ export class SendProtocol {
    * landed in the box after the draft and one Backspace gave the box back; `away` when it stood elsewhere on the screen and one Backspace
    * took it back; `nowhere` when no read showed it (no key follows). A probe that changed the box some
    * other way, or opened something, fails as the send's own probe does.
+   *
+   * On a read with no styling, where the profile says its placeholder may be any text
+   * (`idle.placeholders.anyText`), a character that landed at the start of the box ({@link landsAtStart})
+   * proves the draft a placeholder (M78 spec 06): one Backspace, then the read that shows no probe
+   * character and the box as it was, or empty, is `ghost`. A styled read never takes that path: its
+   * attribute or colour already told the placeholder from a draft. Both writes are the probe's
+   * ({@link SendProtocol.probeWrite}): a slow multiplexer's key press after a raw write stays outside
+   * the read bound, and the request's bound grows by it.
    */
-  private async draftProbe(state: RunState, s0: Snap, probe: string): Promise<{ readonly landing: "live"; readonly snap: Snap } | { readonly landing: "away" | "nowhere" }> {
+  private async draftProbe(
+    state: RunState,
+    s0: Snap,
+    probe: string,
+  ): Promise<{ readonly landing: "live" | "ghost"; readonly snap: Snap } | { readonly landing: "away" | "nowhere" }> {
     const frame = s0.frame!;
     const draft = boxText(frame);
     const before = countIn(s0.texts, probe);
+    const ghostable = mayHoldPlaceholder(state.match, s0);
     const failed = (detail: string, snap: Snap | null): Ended => new Ended("refused", "probe_failed", sawNote(snap, { detail, framed: true }));
     state.probeAt = this.now();
-    await this.writeText(state, probe, false);
+    await this.probeWrite(state, () => this.writeText(state, probe, false));
     state.keys.push("probe");
     let away = false;
+    let ghost = false;
     const typed = await this.poll(state, "probe", { reads: BOUNDS.probe.reads - 1, ms: BOUNDS.probe.ms }, (snap) => {
       if (snap.frame === null) return "wait";
       if (probeBoxPasses(s0, snap, draft, probe)) return "pass";
+      if (ghostable && landsAtStart(s0, snap, draft, probe)) {
+        ghost = true;
+        return "pass";
+      }
       if (boxText(snap.frame) !== draft || modalAtBox(snap) || cueAppeared(s0, snap)) return "fail";
       if (countIn(snap.texts, probe) !== before + 1) return "wait";
       away = true;
@@ -3936,14 +4209,21 @@ export class SendProtocol {
     }
     if (typed.verdict === "fail") throw await this.probeCleanup(state, s0, typed.snap, probe, "The probe character changed more than the box.");
     try {
-      await this.keysThroughGate(state, ["Backspace"], "refused");
+      await this.probeWrite(state, () => this.keysThroughGate(state, ["Backspace"], "refused"));
     } catch (err) {
       if (err instanceof Ended && err.outcome === "refused") throw failed(`Backspace after the probe was refused: ${err.extra.detail ?? err.message}`, typed.snap);
       throw err;
     }
-    const back = await this.poll(state, "probe", { reads: BOUNDS.probe.reads, ms: BOUNDS.probe.ms }, (snap) => (snap.frame !== null && boxText(snap.frame) === draft ? "pass" : "wait"));
+    // A draft's box gives back the draft; a placeholder's gives back the placeholder, or nothing while it draws again.
+    const given = (snap: Snap): boolean => {
+      if (snap.frame === null) return false;
+      const box = boxText(snap.frame);
+      if (!ghost) return box === draft;
+      return countIn(snap.texts, probe) === before && !modalAtBox(snap) && (box === draft || box === "");
+    };
+    const back = await this.poll(state, "probe", { reads: BOUNDS.probe.reads, ms: BOUNDS.probe.ms }, (snap) => (given(snap) ? "pass" : "wait"));
     if (back.verdict !== "pass" || back.snap === null) throw failed("Backspace did not give the box back as it was.", back.snap);
-    return { landing: "live", snap: back.snap };
+    return { landing: ghost ? "ghost" : "live", snap: back.snap };
   }
 
   /**
@@ -4253,6 +4533,16 @@ export class SendProtocol {
     throw new Ended(outcome, outcome === "refused" ? "pane_gone" : "changed", { detail: "The pane holds another program now." });
   }
 
+  /**
+   * The end of a step that got no read to decide on. A partial read says the multiplexer may have left
+   * rows out, and ends `probe_failed` with nothing typed; any other missing read is a pane that could
+   * not be read.
+   */
+  private noRead(state: RunState): Ended {
+    if (state.partialRead === true) return new Ended("refused", "probe_failed", { detail: PARTIAL_READ });
+    return new Ended("refused", "pane_gone", { detail: "The pane could not be read." });
+  }
+
   private begin(state: RunState): void {
     state.stepStart = this.now();
   }
@@ -4261,6 +4551,35 @@ export class SendProtocol {
     const now = this.now();
     state.gaps[step] = now - state.stepStart;
     state.stepStart = now;
+  }
+
+  /**
+   * The probe's gap, which leaves out its writes: those are `probeWrite`, the multiplexer's cost of the
+   * probe character and its Backspace ({@link SendProtocol.probeWrite}).
+   */
+  private lapProbe(state: RunState): void {
+    const now = this.now();
+    const writes = state.probeWriteMs ?? 0;
+    state.gaps.probe = now - state.stepStart - writes;
+    if (writes > 0) state.gaps.probeWrite = writes;
+    state.stepStart = now;
+  }
+
+  /**
+   * One of the probe's two writes, timed apart from its reads. The multiplexer's write cost is no part
+   * of the probe's read bound: on herdr-core 0.1.14 a key press right after a raw write is answered
+   * about three seconds after that write (measured on a private hc session, 2026-10-30), and the minibuch
+   * receipt of that day ended "could not confirm" for it. It is `gapsMs.probeWrite`, and the request's
+   * bound grows by a write that went in, so S1 and S2 keep theirs.
+   */
+  private async probeWrite(state: RunState, write: () => Promise<void>): Promise<void> {
+    const from = this.now();
+    try {
+      await write();
+    } finally {
+      state.probeWriteMs = (state.probeWriteMs ?? 0) + (this.now() - from);
+    }
+    this.stretch(state, this.now() - from);
   }
 
   /**
@@ -4321,7 +4640,13 @@ export class SendProtocol {
     const { paneId, harness } = state.target;
     const grid = await this.within(state, this.deps.mux.readGrid(paneId, { scope: "viewport", lines: SEND_READ_LINES, styling: "preserve" }), until);
     const gateRevision = this.deps.gate.noteRead(paneId);
+    state.partialRead = false;
     if (!grid.ok) return null;
+    // The multiplexer says rows may be missing: no step decides on a screen that may lack rows.
+    if (grid.value.partial === true) {
+      state.partialRead = true;
+      return null;
+    }
     const rows = splitLines(parseAnsi(grid.value.text));
     const idle = state.match?.profile.idle ?? null;
     const frame = idle === null ? null : findInputFrame(rows, idle);
@@ -4335,6 +4660,10 @@ export class SendProtocol {
     const plainRaw = rows.map(plainOf);
     const signs = (idle?.runningRows ?? []).map((source) => new RegExp(source, "u"));
     const plain = plainRaw.map((row) => steadyRow(row, signs));
+    const ticks = idle?.volatile.above.ticks === true;
+    // The rows a person checks, with the rows above the box read as the compares read them: a counter
+    // that ticked over the box between the look and the tap is no screen the person did not see.
+    const checked = ticks && frame !== null ? plain.map((row, i) => (i < frame.top ? tickMarked(row) : row)) : plain;
     const win = bottomWindow(texts);
     this.deps.ring.push({ requestId: state.record.id, step, at: this.now(), rows: texts });
     const framed = readCuesFor(rows, frame, idle);
@@ -4349,7 +4678,7 @@ export class SendProtocol {
     // A notice over the box (`idle.notices`) is left out of every read as well: its keys act only on a
     // box holding one of its digits, so its key row is no prompt that holds the keys.
     const notice = noticeOver(texts, frame, idle);
-    const snap: Snap = {
+    const read: Snap = {
       revision: grid.value.revision,
       gateRevision,
       rows,
@@ -4357,6 +4686,7 @@ export class SendProtocol {
       plain,
       plainRaw,
       frame,
+      ticks,
       surface,
       cueStrength: framed.strength,
       cuesUnderBox: frame !== null && framed.cues.length > 0 && framed.cues.every((cue) => cue.row > frame.bottom),
@@ -4389,8 +4719,9 @@ export class SendProtocol {
       ownList,
       hash: shortHash(texts.join("\n")),
       // A running row's timer is masked (steadyRow): a ticking timer is not a screen the person did not see.
-      rowsHash: shortHash(plain.slice(win.first, win.end).join("\n")),
+      rowsHash: shortHash(checked.slice(win.first, win.end).join("\n")),
     };
+    const snap = ghostView(state.ghost, read);
     state.previousRead = state.lastRead;
     state.lastRead = snap;
     return snap;
@@ -4418,7 +4749,7 @@ export class SendProtocol {
     if (this.now() + S0_GAP_MS > until) throw late();
     await this.sleep(S0_GAP_MS);
     const second = await readInBound();
-    if (first === null || second === null) throw new Ended("refused", "pane_gone", { detail: "The pane could not be read." });
+    if (first === null || second === null) throw this.noRead(state);
     if (belowMovedAlone(first, second)) state.belowMoved = true;
     // With a frame only the box is compared: the volatile rows around it (a spinner, a timer, a token
     // count, a statusline) move on their own while a turn runs. A box that holds no draft compares
@@ -4538,18 +4869,19 @@ export class SendProtocol {
   private async probe(state: RunState, s0: Snap, prefix: string): Promise<Landing | null> {
     const probe = probeCharOf(state.match);
     const failed = (detail: string, snap: Snap | null): Ended => new Ended("refused", "probe_failed", sawNote(snap, { detail, framed: s0.frame !== null }));
-    // Reads are shared across the two halves: the character may take two, Backspace gets the rest.
+    // Reads are shared across the two halves: the character may take two, Backspace gets the rest. The
+    // bound counts the time in the two polls only; the writes are timed apart ({@link probeWrite}).
     const budget = { reads: BOUNDS.probe.reads, ms: BOUNDS.probe.ms };
-    const started = this.now();
 
     state.probeAt = this.now();
-    await this.writeText(state, probe, false);
+    await this.probeWrite(state, () => this.writeText(state, probe, false));
     state.keys.push("probe");
     let landing: Landing | null = null;
     let frameless = 0;
     // A message probe on a harness that takes a message during a turn: only the box and the rows under
     // it decide, as at S1 (2026-10-17). Commands and manual sends keep the full compare below.
     const boxOnly = s0.frame !== null && !state.command && !state.manual && queuesInTurn(state.match);
+    const typedFrom = this.now();
     const typed = await this.poll(state, "probe", { reads: budget.reads - 1, ms: budget.ms }, (snap) => {
       if (s0.frame !== null) {
         // Queued: the Surface's claim of a modal over a found box fails, and so do two reads in a row
@@ -4577,6 +4909,7 @@ export class SendProtocol {
       landing = probeLanding(s0.plain, snap.plain, probe, { freeBelow: state.manual });
       return landing !== null && !cueAppeared(s0, snap) ? "pass" : "fail";
     });
+    const spent = this.now() - typedFrom;
     // A box on screen that showed no probe at all, on a pane where its harness is starting: the box is
     // drawn but reads no keys yet. The character waits in the terminal and shows later, where the next
     // send takes it out (residueOf). No Backspace now: it would wait too, and land in what comes next.
@@ -4592,14 +4925,15 @@ export class SendProtocol {
     }
 
     try {
-      await this.keysThroughGate(state, ["Backspace"], "refused");
+      await this.probeWrite(state, () => this.keysThroughGate(state, ["Backspace"], "refused"));
     } catch (err) {
       // The probe character is in the box and its Backspace was refused: no other key follows.
       if (err instanceof Ended && err.outcome === "refused") throw failed(`Backspace after the probe was refused: ${err.extra.detail ?? err.message}`, typed.snap);
       throw err;
     }
     const readsLeft = Math.max(1, budget.reads - typed.reads);
-    const back = await this.poll(state, "probe", { reads: readsLeft, ms: Math.max(FIRST_GAP_MS, budget.ms - (this.now() - started)) }, (snap) => {
+    // Never less than one read's time: a half cut to its first gap slept and never read.
+    const back = await this.poll(state, "probe", { reads: readsLeft, ms: Math.max(PROBE_BACK_FLOOR_MS, budget.ms - spent) }, (snap) => {
       if (s0.frame !== null) {
         if (snap.frame === null) return "wait";
         return boxText(snap.frame) === boxText(s0.frame) ? "pass" : "wait";
@@ -4784,7 +5118,9 @@ export class SendProtocol {
           : manual
             ? aboveLostOnly(s0, snap)
             : command
-              ? aboveUnchanged(s0, snap, ownListScroll(s0, snap))
+              ? // A profile whose rows above lose text once the box holds a character (Codex hides its
+                // welcome picture) loses them for a command too, as the probe allows (outsideUnchanged).
+                aboveUnchanged(s0, snap, ownListScroll(s0, snap)) || (aboveLosesText(state) && aboveLostOnly(s0, snap, SCROLLBACK_SLACK))
               : outsideUnchanged(s0, snap, aboveLosesText(state)) || this.aboveMovedInTurn(state, s0, snap);
         if (!outside) {
           why = "changed";
@@ -4896,15 +5232,19 @@ export class SendProtocol {
     throw new Ended("typed_not_submitted", "mismatch", sawNote(result.snap, { framed: true, offers: ["keys"], detail, cause: NOTICE_KEY }));
   }
 
-  /** Commit: `submit-sent` on disk, then the submit keys through the gate on S1's revision. */
+  /**
+   * Commit: `submit-sent` on disk, then the submit keys through the gate on S1's revision. The token is
+   * minted after the write and `openSend`, right before the commit: a slow disk write must not spend the
+   * token's 150 ms lifetime. `submit-sent` is still on disk before the key goes out.
+   */
   private async commit(state: RunState, s1: Snap): Promise<void> {
     state.phase = "commit";
     this.guard(state);
     const keys = commitKeys(state);
     const { gate, store } = this.deps;
-    const token = gate.mint(state.target.paneId, keys, s1.gateRevision);
     store.markSubmitSent(state.record.id);
     this.openSend(state);
+    const token = gate.mint(state.target.paneId, keys, s1.gateRevision);
     const result = await this.within(state, gate.commit(token));
     if (!result.ok) {
       const reason: SendReason = result.reason === "mux" ? "submit_failed" : result.reason;

@@ -76,42 +76,6 @@ export function shownGroups(
   return out;
 }
 
-/** One drawn cluster: a group, plus the worktree groups nesting under it (pane-groups.ts). */
-export interface NestedGroup {
-  shown: ShownGroup;
-  children: ShownGroup[];
-}
-
-/**
- * Shape the drawn list for render: a worktree group (`group.parentKey`) nests under the group
- * holding its repo's own checkout — but ONLY while that parent is itself on screen. A parent
- * dropped by isolate, hide, the needs-you switch or an all-pinned workspace leaves its worktrees
- * top-level again: indented under nothing reads as a rendering bug, never as structure.
- *
- * The input order is kept whole. groupPanesByWorkspace already runs each cluster contiguous, so
- * this only re-parents — it never re-sorts, and a filtered list goes flat exactly the way the
- * Spaces navigator's does (lib/spaces.ts).
- */
-export function nestWorkspaceGroups(drawn: readonly ShownGroup[]): NestedGroup[] {
-  const shownKeys = new Set(drawn.map((d) => d.group.key));
-  const childrenByParent = new Map<string, ShownGroup[]>();
-  for (const d of drawn) {
-    const parent = d.group.parentKey;
-    if (parent !== undefined && shownKeys.has(parent)) {
-      const kin = childrenByParent.get(parent) ?? [];
-      kin.push(d);
-      childrenByParent.set(parent, kin);
-    }
-  }
-  const tops: NestedGroup[] = [];
-  for (const d of drawn) {
-    const parent = d.group.parentKey;
-    if (parent !== undefined && shownKeys.has(parent)) continue;
-    tops.push({ shown: d, children: childrenByParent.get(d.group.key) ?? [] });
-  }
-  return tops;
-}
-
 /**
  * The Pinned group's rows (ADR 0070), in PLACE ORDER: the groups flattened as they run (machine,
  * workspace number, tab number, position in the tab), keeping the pinned panes. Hand it every group,

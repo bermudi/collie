@@ -27,17 +27,10 @@
 // trailing pen at the end of the workspace. That is the one place the given order is not preserved
 // verbatim, and it is deliberate.
 //
-// ── WORKTREES NEST UNDER THE GROUP SHOWING THEIR REPO ─────────────────────────
-// Handed `workspaces` (the ambient machine's records, which carry `repoRoot`/`isWorktree`), a group
-// whose workspace is a linked worktree runs right under the group holding its repo's own checkout —
-// the same rule the Spaces navigator keeps (lib/spaces.ts `nestWorktrees`), on this axis. The link
-// is a fact about THIS list and is recomputed per call: a worktree whose repo has no group on
-// screen stays an orphan at its own place, because indenting under nothing reads as a bug.
-//
 // Pure and host-aware, so a crew's two `w1`s are two workspaces (lib/hosts.ts § spaceKey).
-import { hostKey } from "./hosts";
+import { hostKey, leadHost, primarySession, scopeHostKey, sessionsOnHost } from "./hosts";
 import { panePlaceParts } from "./pane-name";
-import type { AgentView, ServerSummary, TabView, WorkspaceView } from "./types";
+import type { AgentView, ServerSummary, SessionSummary, TabView, WorkspaceView } from "./types";
 
 /**
  * How the rows inside a group run.
@@ -48,32 +41,23 @@ import type { AgentView, ServerSummary, TabView, WorkspaceView } from "./types";
 export interface GroupOptions {
   order?: "bridge" | "fixed";
   /** The raw tab list, for the tab numbers "fixed" runs by. A tab not in it sorts after the known ones. */
-  tabs?: readonly TabView[];
+  tabs?: readonly TabView[] | undefined;
   /**
    * The snapshot's machine list, for the order machines run in: this list's own, the lead first.
    * A host it does not name sorts after the named ones, in the order its first pane was met.
    */
-  servers?: readonly ServerSummary[];
+  servers?: readonly ServerSummary[] | undefined;
   /**
-   * The ambient machine's workspace records, for worktree nesting: a group whose workspace is a
-   * linked worktree (`isWorktree`) of the repo another group shows (`repoRoot`, `isWorktree:false`)
-   * runs under that group, `parentKey` set. Omit — the pane switcher, the playground — and every
-   * group is its own island, which is what a flat list wants.
+   * The snapshot's workspace records (issue #587). When given, a linked git worktree whose repo is
+   * also open as a root workspace on the same machine and session folds its panes under that root
+   * workspace's group, after the root's own panes, so the workspace filter and the pane list agree
+   * with Spaces.
    */
-  workspaces?: readonly WorkspaceView[];
-  /**
-   * The ambient machine's member id (`ambientHost` in lib/hosts.ts). A group counts as ambient —
-   * and so able to match a workspace record — when its panes carry this host or none at all. The
-   * records are narrowed to the addressed host already, so a pane tagged with ANOTHER machine never
-   * links to them: under-matching degrades to flat, never to a wrong nest.
-   */
-  ambientHost?: string;
-  /**
-   * The ambient session's registry name. Workspace records describe the ambient session only (they
-   * carry no session tag of their own), so a group tagged with another session — a widened list —
-   * must never link to one. An untagged group is ambient by the standing rule.
-   */
-  ambientSession?: string;
+  workspaces?: readonly WorkspaceView[] | undefined;
+  /** The view's scope (`?h=` and `?s=`), so a widened (`?all=1`) list matches `workspaces` to the session they came from. */
+  scope?: { readonly host?: string; readonly session?: string } | undefined;
+  /** The session registry, for resolving the primary session on each machine in a widened (`?all=1`) list. */
+  sessions?: readonly SessionSummary[] | undefined;
 }
 
 /** The same separator `lib/hosts.ts` composes its keys with: a byte no label may contain. */
@@ -87,17 +71,14 @@ export interface WorkspaceGroup {
   label: string;
   /** Tab by tab in the order they were met, each tab's agents then that tab's bare shells. */
   panes: AgentView[];
-  /**
-   * The KEY of the group holding this workspace's repo, when this workspace is a linked worktree of
-   * it — set only when `workspaces` was handed in AND that repo's own checkout is a group in this
-   * same list. A fact about THIS list, recomputed per call; agent-list.tsx nests by it and drops it
-   * the moment the parent itself is filtered off the screen.
-   */
-  parentKey?: string;
 }
 
 /** One tab inside a workspace bucket. Never a heading — only an order. */
 interface TabBucket {
+  /** 0 for the root workspace's own tabs; 1 for a linked worktree's tabs, so the root leads its group. */
+  worktreeRank: number;
+  /** The workspace's own order among checkouts in this bucket. */
+  spaceOrder: number;
   /** Where this tab was first met in the given lists. */
   seq: number;
   agents: AgentView[];
@@ -113,20 +94,9 @@ interface Bucket {
   workspaceNumber: number;
   /** Where this workspace was first met, so two workspaces sharing a number still have an order. */
   seq: number;
-  /** The address halves the group key encodes — the worktree match needs them un-parsed. */
-  workspaceId: string;
-  host: string;
-  session: string;
-  /** The repo this group sits in, off the record `workspaces` carries — the worktree pass fills it. */
-  repoRoot?: string;
-  isWorktree?: boolean;
-  /** The key of the group holding `repoRoot`'s own checkout, when that group is in this list. */
-  parentKey?: string;
+  spaceSeqs: Map<string, number>;
   tabs: Map<string, TabBucket>;
 }
-
-/** The cluster a bucket sorts with — its repo's group when it is a linked worktree, itself otherwise. */
-const clusterKeyOf = (b: Bucket) => b.parentKey ?? b.key;
 
 /**
  * A pane's place inside its tab: the multiplexer's own position (`tabPosition`, from the bridge), with
@@ -147,6 +117,76 @@ export function workspaceGroupKey(pane: AgentView): string {
 }
 
 /**
+ * Whether a pane on `host` with `paneSession` (`pane.session`, or `undefined` when unwidened)
+ * belongs to the session that `workspaces` on `host` came from.
+ *
+ * On the lead (or solo), `localSnapshot` reads `workspaces` from `scope.session` when the lead is
+ * addressed and from its primary session when a peer is addressed. On a crew peer, `SWEEP_VIEW`
+ * (`bridge/crew/merge.ts`) always sweeps `workspaces` from the peer's primary session, while
+ * `narrowPeerBody` strips `pane.session` after filtering to `scope.session` — so an untagged pane
+ * on an addressed peer belongs to `scope.session`, which matches `workspaces` only when
+ * `scope.session` is absent or is that peer's primary session.
+ */
+function isInWorkspaceMetadataSession(
+  host: string,
+  paneSession: string | undefined,
+  scope: { readonly host?: string; readonly session?: string } | undefined,
+  servers: readonly ServerSummary[] | undefined,
+  sessions: readonly SessionSummary[] | undefined,
+): boolean {
+  const lead = leadHost(servers) ?? "";
+  const addressed = scopeHostKey(scope ?? {}, servers);
+  const primary = primarySession(sessions && sessionsOnHost(sessions, { host }, servers));
+  const metaSession = host === lead && host === addressed ? (scope?.session ?? primary) : primary;
+  if (paneSession !== undefined) {
+    return metaSession !== undefined && paneSession === metaSession;
+  }
+  if (host !== addressed || scope?.session === undefined) return true;
+  if (host === lead) return true;
+  return primary !== undefined && scope.session === primary;
+}
+
+/**
+ * Promote any stored `isolated` preference key (`host\0session\0label`) that names a linked git
+ * worktree to its open root workspace's preference key on the same machine and session (issue #587).
+ * When an orphan worktree is isolated first and its root repo is opened later, the worktree folds
+ * into the root group; promoting the key keeps the root group isolated in both the pane list and
+ * `Spaces` rather than dropping the selection as stale on one side.
+ */
+export function resolveIsolatedPrefKeys(
+  isolated: readonly string[],
+  { workspaces, scope, servers, sessions }: Pick<GroupOptions, "workspaces" | "scope" | "servers" | "sessions"> = {},
+): string[] {
+  if (isolated.length === 0 || workspaces === undefined || workspaces.length === 0) return [...isolated];
+  const rootByRepo = new Map<string, WorkspaceView>();
+  for (const w of workspaces) {
+    if (w.repoRoot !== undefined && w.isWorktree === false) {
+      const repoKey = `${hostKey(w)}${KEY_SEP}${w.repoRoot}`;
+      if (!rootByRepo.has(repoKey)) rootByRepo.set(repoKey, w);
+    }
+  }
+  if (rootByRepo.size === 0) return [...isolated];
+  return isolated.map((key) => {
+    const firstCut = key.indexOf(KEY_SEP);
+    const lastCut = key.lastIndexOf(KEY_SEP);
+    if (firstCut === -1 || lastCut === firstCut) return key;
+    const host = key.slice(0, firstCut);
+    const session = key.slice(firstCut + 1, lastCut);
+    const label = key.slice(lastCut + 1);
+    if (!isInWorkspaceMetadataSession(host, session === "" ? undefined : session, scope, servers, sessions)) {
+      return key;
+    }
+    const match = workspaces.find(
+      (w) => hostKey(w) === host && (w.label.trim() || w.workspaceId) === label,
+    );
+    if (match === undefined || match.isWorktree !== true || match.repoRoot === undefined) return key;
+    const parent = rootByRepo.get(`${host}${KEY_SEP}${match.repoRoot}`);
+    if (parent === undefined) return key;
+    return `${host}${KEY_SEP}${session}${KEY_SEP}${parent.label.trim() || parent.workspaceId}`;
+  });
+}
+
+/**
  * Bucket a herd by workspace. Every pane handed in appears exactly once, empty groups do not exist,
  * and a caller that hands the same two lists twice gets the same groups in the same order.
  *
@@ -157,13 +197,45 @@ export function workspaceGroupKey(pane: AgentView): string {
 export function groupPanesByWorkspace(
   agents: readonly AgentView[],
   shellPanes: readonly AgentView[] = [],
-  { order = "bridge", tabs, servers, workspaces, ambientHost, ambientSession }: GroupOptions = {},
+  { order = "bridge", tabs, servers, workspaces, scope, sessions }: GroupOptions = {},
 ): WorkspaceGroup[] {
   // A tab's own number, host-qualified the way panePlaceParts matches (an id is unique per machine).
   const tabNumber = (pane: AgentView): number => {
     const known = tabs?.find((tv) => tv.tabId === pane.tabId && (tv.host === undefined || tv.host === pane.host));
     return known?.number ?? Number.MAX_SAFE_INTEGER;
   };
+  // Issue #587: map each linked git worktree to the open workspace holding its repo root on the same
+  // machine, using the same `repoRoot` + `isWorktree` predicate `nestWorktrees` and `isolateSpaces`
+  // use (lib/spaces.ts). An orphan worktree whose repo is not open has no entry here and stays its
+  // own group. `minNumberBySpace` records the lowest workspace number among a root and all its open
+  // worktrees, so even an empty worktree with a lower number pulls its root group to the same
+  // position `nestWorktrees` gives it.
+  const parentBySpace = new Map<string, WorkspaceView>();
+  const minNumberBySpace = new Map<string, number>();
+  if (workspaces !== undefined && workspaces.length > 0) {
+    const rootByRepo = new Map<string, WorkspaceView>();
+    for (const w of workspaces) {
+      if (w.repoRoot !== undefined && w.isWorktree === false) {
+        const host = hostKey(w);
+        const repoKey = `${host}${KEY_SEP}${w.repoRoot}`;
+        if (!rootByRepo.has(repoKey)) {
+          rootByRepo.set(repoKey, w);
+          minNumberBySpace.set(`${host}${KEY_SEP}${w.workspaceId}`, w.number);
+        }
+      }
+    }
+    for (const w of workspaces) {
+      if (w.repoRoot === undefined || w.isWorktree !== true) continue;
+      const host = hostKey(w);
+      const parent = rootByRepo.get(`${host}${KEY_SEP}${w.repoRoot}`);
+      if (parent !== undefined) {
+        parentBySpace.set(`${host}${KEY_SEP}${w.workspaceId}`, parent);
+        const parentSpaceKey = `${host}${KEY_SEP}${parent.workspaceId}`;
+        const prev = minNumberBySpace.get(parentSpaceKey) ?? parent.number;
+        if (w.number < prev) minNumberBySpace.set(parentSpaceKey, w.number);
+      }
+    }
+  }
   const byKey = new Map<string, Bucket>();
   // Seeded from `servers`, so a named machine's rank never depends on which pane arrived first. The
   // lead's own panes may arrive untagged (a solo body), which `hostKey` reads as "".
@@ -174,10 +246,21 @@ export function groupPanesByWorkspace(
   let tabSeq = 0;
 
   const tabOf = (pane: AgentView): TabBucket => {
-    const key = workspaceGroupKey(pane);
+    const host = hostKey(pane);
+    const inMetaSession = isInWorkspaceMetadataSession(host, pane.session, scope, servers, sessions);
+    const parent = inMetaSession ? parentBySpace.get(`${host}${KEY_SEP}${pane.workspaceId}`) : undefined;
+    const rootWorkspaceId = parent !== undefined ? parent.workspaceId : pane.workspaceId;
+    const groupMinNumber = inMetaSession
+      ? minNumberBySpace.get(`${host}${KEY_SEP}${rootWorkspaceId}`)
+      : undefined;
+    const effectiveNumber =
+      groupMinNumber !== undefined ? Math.min(groupMinNumber, pane.workspaceNumber) : pane.workspaceNumber;
+    const key =
+      parent !== undefined
+        ? `${host}${KEY_SEP}${pane.session ?? ""}${KEY_SEP}${parent.workspaceId}`
+        : workspaceGroupKey(pane);
     let bucket = byKey.get(key);
     if (bucket === undefined) {
-      const host = hostKey(pane);
       let hostSeq = hostSeqs.get(host);
       if (hostSeq === undefined) {
         hostSeq = (servers?.length ?? 0) + hostSeqs.size;
@@ -187,21 +270,33 @@ export function groupPanesByWorkspace(
         key,
         // The workspace's own name, by the one place rule (lib/pane-name.ts) — the same string the
         // space strip and the crumb use, so the heading and the strip can never disagree.
-        label: panePlaceParts(pane).space,
+        label: parent !== undefined ? parent.label.trim() || parent.workspaceId : panePlaceParts(pane).space,
         hostSeq,
-        workspaceNumber: pane.workspaceNumber,
+        workspaceNumber: effectiveNumber,
         seq: workspaceSeq++,
-        workspaceId: pane.workspaceId,
-        host: hostKey(pane),
-        session: pane.session ?? "",
+        spaceSeqs: new Map(),
         tabs: new Map(),
       };
       byKey.set(key, bucket);
+    } else if (effectiveNumber < bucket.workspaceNumber) {
+      bucket.workspaceNumber = effectiveNumber;
     }
-    let tab = bucket.tabs.get(pane.tabId);
+    let spaceSeq = bucket.spaceSeqs.get(pane.workspaceId);
+    if (spaceSeq === undefined) {
+      spaceSeq = bucket.spaceSeqs.size;
+      bucket.spaceSeqs.set(pane.workspaceId, spaceSeq);
+    }
+    const tabKey = `${pane.workspaceId}${KEY_SEP}${pane.tabId}`;
+    let tab = bucket.tabs.get(tabKey);
     if (tab === undefined) {
-      tab = { seq: order === "fixed" ? tabNumber(pane) * 1e6 + tabSeq++ : tabSeq++, agents: [], shells: [] };
-      bucket.tabs.set(pane.tabId, tab);
+      tab = {
+        worktreeRank: parent !== undefined && pane.workspaceId !== parent.workspaceId ? 1 : 0,
+        spaceOrder: order === "fixed" ? pane.workspaceNumber * 1e6 + spaceSeq : spaceSeq,
+        seq: order === "fixed" ? tabNumber(pane) * 1e6 + tabSeq++ : tabSeq++,
+        agents: [],
+        shells: [],
+      };
+      bucket.tabs.set(tabKey, tab);
     }
     return tab;
   };
@@ -209,66 +304,20 @@ export function groupPanesByWorkspace(
   for (const a of agents) tabOf(a).agents.push(a);
   for (const s of shellPanes) tabOf(s).shells.push(s);
 
-  const sorted = [...byKey.values()].toSorted(
-    (a, b) => a.hostSeq - b.hostSeq || a.workspaceNumber - b.workspaceNumber || a.seq - b.seq,
-  );
-
-  // ── WORKTREE LINKAGE ─────────────────────────────────────────────────────────
-  // Only AMBIENT groups can match a record: `workspaces` is narrowed to the addressed host and
-  // describes the ambient session, so "untagged or ambient-tagged" is the whole rule on both
-  // dimensions. Anything else simply never links — a wrong nest is worse than a missed one.
-  if (workspaces !== undefined && workspaces.length > 0) {
-    const recordById = new Map<string, WorkspaceView>();
-    for (const w of workspaces) if (w.repoRoot !== undefined) recordById.set(w.workspaceId, w);
-    const ambientGroup = (b: Bucket) =>
-      (b.host === "" || b.host === ambientHost) && (b.session === "" || b.session === ambientSession);
-    // The repo's own checkout is the only possible parent (`isWorktree === false`), and there is
-    // exactly one such space per repo on a multiplexer — first claim stands.
-    const parentByRepo = new Map<string, Bucket>();
-    for (const b of sorted) {
-      if (!ambientGroup(b)) continue;
-      const record = recordById.get(b.workspaceId);
-      if (record?.repoRoot === undefined) continue;
-      b.repoRoot = record.repoRoot;
-      b.isWorktree = record.isWorktree === true;
-      if (!b.isWorktree && !parentByRepo.has(record.repoRoot)) parentByRepo.set(record.repoRoot, b);
-    }
-    for (const b of sorted) {
-      if (b.isWorktree === true && b.repoRoot !== undefined) {
-        const parent = parentByRepo.get(b.repoRoot);
-        if (parent !== undefined) b.parentKey = parent.key;
-      }
-    }
-    // A cluster takes the position of its EARLIEST member — a worktree numbered ahead of its repo
-    // pulls the whole group up to where it sits, the navigator's own rule — then the parent first
-    // and the children in the order they sorted in.
-    const pos = new Map(sorted.map((b, i) => [b.key, i] as const));
-    const clusterPos = new Map<string, number>();
-    for (const b of sorted) {
-      const c = clusterKeyOf(b);
-      clusterPos.set(c, Math.min(clusterPos.get(c) ?? Infinity, pos.get(b.key) ?? 0));
-    }
-    sorted.sort(
+  return [...byKey.values()]
+    .toSorted(
       (a, b) =>
-        (clusterPos.get(clusterKeyOf(a)) ?? 0) - (clusterPos.get(clusterKeyOf(b)) ?? 0) ||
-        Number(a.parentKey !== undefined) - Number(b.parentKey !== undefined) ||
-        (pos.get(a.key) ?? 0) - (pos.get(b.key) ?? 0),
-    );
-  }
-
-  return sorted.map((g) => {
-    const group: WorkspaceGroup = {
+        a.hostSeq - b.hostSeq || a.workspaceNumber - b.workspaceNumber || a.seq - b.seq,
+    )
+    .map((g) => ({
       key: g.key,
       label: g.label,
       panes: [...g.tabs.values()]
-        .toSorted((a, b) => a.seq - b.seq)
+        .toSorted((a, b) => a.worktreeRank - b.worktreeRank || a.spaceOrder - b.spaceOrder || a.seq - b.seq)
         .flatMap((tab) =>
           order === "fixed"
             ? tab.agents.toSorted(byPlaceInTab).concat(tab.shells.toSorted(byPlaceInTab))
             : tab.agents.concat(tab.shells),
         ),
-    };
-    if (g.parentKey !== undefined) group.parentKey = g.parentKey;
-    return group;
-  });
+    }));
 }

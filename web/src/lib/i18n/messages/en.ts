@@ -418,6 +418,21 @@ export const en = {
   "composer.upload.success": "File attached",
   "composer.upload.tooLarge": "That file is bigger than {max} MB, the limit on this collie.",
   "composer.upload.badType": "ColliePup can't attach {name}.",
+  "composer.imageEdit.title": "Edit image",
+  "composer.imageEdit.confirm": "Use this image",
+  "composer.imageEdit.cancel": "Cancel",
+  "composer.imageEdit.unavailable": "This browser can't edit images, so nothing was attached.",
+  "composer.imageEdit.failed": "Couldn't prepare that image, so nothing was attached.",
+  "composer.imageEdit.crop": "Crop",
+  "composer.imageEdit.pen": "Draw",
+  "composer.imageEdit.ellipse": "Circle",
+  "composer.imageEdit.arrow": "Arrow",
+  "composer.imageEdit.undo": "Undo",
+  "composer.imageEdit.redo": "Redo",
+  "composer.imageEdit.reset": "Reset",
+  "composer.imageEdit.loading": "Loading…",
+  "composer.imageEdit.attach": "Attach",
+  "composer.imageEdit.edit": "Edit",
   "composer.noEcho.title": "Password prompt, nothing echoes",
 
   "composer.noEcho.noLiveTyped":
@@ -766,7 +781,6 @@ export const en = {
   "chat.card.diff.less": "Show less",
   // One journal part that is a picture, drawn as a notice because there is no image block in the
   // stream. `{url}` is the journal's own reference and is shown as it stands.
-  "chat.card.image": "Image: {url}",
   // --- chat.run (a fold over several steps) ---
   // Each pair is counted on its own and the parts are joined with a comma, so each one has to read
   // as a standalone noun phrase.
@@ -1595,6 +1609,9 @@ export const en = {
   "crew.health.unreachable": "unreachable",
   "crew.health.incompatible": "incompatible",
   "crew.health.conflicted": "conflicted",
+  "crew.machine.degraded": "degraded",
+  "crew.machine.unreachable": "{instances} unreachable",
+  "crew.summary.instancesReachable": "{reachable} of {total} instances reachable",
   "crew.role.deputy": "deputy",
   "crew.sheet.goTo": "Go to this machine",
   "crew.formation.aria": "Crew formation: {machines}",
@@ -1699,6 +1716,8 @@ export const en = {
   "dialog.backToOptions": "Back to the options",
   "dialog.endsQuestionsSuffix": "(ends the questions)",
   "dialog.autocomplete.title": "Slash commands",
+  "dialog.authBox.label": "Login output",
+  "dialog.authBox.waiting": "The login command has not printed anything yet.",
   "dialog.menu.moveUp": "Move up",
   "dialog.menu.moveDown": "Move down",
   "dialog.menu.noticeDraft": "Empty the box first: a digit would join the text there.",
@@ -1712,6 +1731,8 @@ export const en = {
   // Second-tap wording (#339): the first tap arms the key, the second sends it.
   "unreadDialog.confirmKey": "Tap again to send {key}",
   "unreadDialog.confirmDismiss": "Tap again to dismiss",
+  // Report a problem from the card (ADR 0123, amendment 2026-10-28): opens the same sheet as the pane menu.
+  "unreadDialog.report": "Report a problem",
   "dialog.preview.currentAnswerAria": "Current answer",
   "dialog.preview.previewedBelowAria": "Previewed below",
   "dialog.preview.previewLabel": "Preview · {label}",
@@ -1740,6 +1761,7 @@ export const en = {
   "promptAction.answer.fieldNotReached": "Couldn't reach the answer field. Nothing was sent",
   "promptAction.answer.notCleared": "Couldn't clear the answer field. Nothing was sent",
   "promptAction.answer.notArrived": "Your answer didn't arrive in the field. Nothing was submitted",
+  "promptAction.answer.tooLong": "This answer is too long for the terminal's width: the dialog would not fit on its screen. Shorten it, widen the terminal, or pick Chat about this and send it as a message. Nothing was typed",
   "promptAction.answer.notTicked": "The answer was typed, but its row did not tick. Check it on the card.",
 
   // --- stt (speech-to-text errors, lib/stt.ts + hooks/use-stt-recorder.ts) ---
@@ -1791,6 +1813,7 @@ export const en = {
     "Your message was typed into the pane but not sent. Check the pane before sending it again.",
   "apiError.reply.send_failed": "The message couldn't be sent: {reason}",
   "apiError.keys.send_failed": "Those keys couldn't be sent: {reason}",
+  "apiError.keys.unconfirmed": "Those keys weren't confirmed in time and may still arrive. Check the pane before you send them again.",
   "apiError.prompt_changed": "The screen changed before that could be sent. Check the pane.",
   "apiError.prompt.read_failed": "The pane couldn't be read before sending. {mux} said: {detail}",
   "apiError.pane.close_failed": "The pane couldn't be closed: {reason}",
@@ -2418,6 +2441,13 @@ export const en = {
 
   // --- changes (ADR 0065) ---
   "chat.changes.label": "Files",
+  // The output, zoomed (components/output-zoom.tsx): the belt pill's name, the view's own name,
+  // its two step buttons, and the scale readout that resets it. `{scale}` is the readout ("2.5×").
+  "zoom.open": "Zoom output",
+  "zoom.title": "Zoomed output",
+  "zoom.in": "Zoom in",
+  "zoom.out": "Zoom out",
+  "zoom.reset": "Reset zoom ({scale})",
   // What a screen reader says for the small model label above the belt; {name} is the harness's own.
   "chat.model.aria": "Model {name}",
   "chat.usage.context": "ctx",
@@ -2495,6 +2525,17 @@ export const en = {
   "changes.commit.fileNewer": "The repo has a newer commit. Go back and load it to read this file.",
   "changes.file.preview": "Preview",
   "changes.file.previewAria": "Preview this file",
+  "changes.comment.selectedButton": "Comment on selected ({count})",
+  "changes.comment.clearSelection": "Clear ({count})",
+  "changes.comment.pendingBar": "Pending comments ({count}) · Bring to agent",
+  "changes.comment.sheetTitle": "Comment on {path} ({lines})",
+  "changes.comment.placeholder": "Write your comment for these lines…",
+  "changes.comment.add": "Add comment",
+  "changes.comment.save": "Save comment",
+  "changes.comment.delete": "Delete",
+  "changes.comment.basketTitle": "Pending diff comments ({count})",
+  "changes.comment.pickAgent": "Target agent in this workspace",
+  "changes.comment.bringToDraft": "Bring to {agent} draft ({count})",
   "files.loading": "Reading files…",
   "files.error": "Couldn't read this folder. Tap refresh to try again.",
   "files.file.error": "Couldn't read this file. Tap refresh to try again.",
@@ -3000,6 +3041,8 @@ export const en = {
   "report.sheet.copied": "Report copied.",
   "report.sheet.search": "Already reported?",
   "report.sheet.cutScreen": "The screen was cut to fit the link. Copy report has all of it.",
+  "report.sheet.cutDoctor.one": "{count} doctor row was left out of the setup to fit the link. Copy report has all of it.",
+  "report.sheet.cutDoctor.other": "{count} doctor rows were left out of the setup to fit the link. Copy report has all of it.",
   "report.sheet.cutSends.one": "{count} older send was left out to fit the link. Copy report has all of it.",
   "report.sheet.cutSends.other": "{count} older sends were left out to fit the link. Copy report has all of it.",
   "report.sheet.cutNote": "Your words were cut to fit the link. Copy report has all of them.",

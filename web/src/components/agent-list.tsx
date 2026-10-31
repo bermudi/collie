@@ -5,12 +5,17 @@ import { clockTime } from "@/lib/format";
 import { useMuxCapability } from "@/lib/mux-capability";
 import { SectionHeader } from "@/components/section-header";
 import { ListGroup } from "@/components/ui/list-group";
-import { groupPanesByWorkspace, type WorkspaceGroup } from "@/lib/pane-groups";
+import {
+  groupPanesByWorkspace,
+  resolveIsolatedPrefKeys,
+  workspaceGroupKey,
+  type WorkspaceGroup,
+} from "@/lib/pane-groups";
 import { StatusCounts, StatusSummaryLine } from "@/components/status-counts";
 import { ATTENTION, bucketOf, triage, worstTriage } from "@/lib/triage";
-import { groupHost, nestWorkspaceGroups, pinnedRows, shownGroups, stripEntries, type ShownGroup } from "@/lib/dash-view";
+import { groupHost, pinnedRows, shownGroups, stripEntries } from "@/lib/dash-view";
 import type { AgentView, BridgeStatus, ServerSummary, SessionSummary, TabView, WorkspaceView } from "@/lib/types";
-import { ambientHost, paneRowKey, paneScope } from "@/lib/hosts";
+import { paneRowKey, paneScope } from "@/lib/hosts";
 import { machinesHiddenFrom } from "@/lib/hidden-machines";
 import { pinMatcher, type Pin } from "@/lib/pins";
 import { inRankOrder, type PaneOrder } from "@/lib/pane-order";
@@ -77,18 +82,8 @@ interface AgentListProps {
   tabs?: readonly TabView[];
   /** The snapshot's machine list, for the order machines run in: the lead first (lib/pane-groups.ts). */
   servers?: readonly ServerSummary[] | undefined;
-  /**
-   * The ambient machine's workspace records (the loader's `ambientSpaces`), so a worktree's group
-   * nests under the group showing its repo (lib/pane-groups.ts). Omit and every workspace section
-   * stands alone, as the list always drew.
-   */
-  workspaces?: readonly WorkspaceView[];
-  /**
-   * The ambient session's registry name (`?s=`, or the primary's). Workspace records describe the
-   * ambient session only, so on a widened list another session's identically-numbered group must
-   * never link to one. Untagged groups are ambient by the standing rule (lib/hosts.ts).
-   */
-  ambientSession?: string;
+  /** The snapshot's workspace list, so linked worktrees fold under their open root workspace (issue #587). */
+  workspaces?: readonly WorkspaceView[] | undefined;
   /**
    * The workspace heading's "+" (M40/03, issue 290): a new tab in that workspace, on the heading's
    * own machine and session. Omit and no heading carries one; every strong heading still reserves
@@ -279,7 +274,6 @@ export function AgentList({
   tabs,
   servers,
   workspaces,
-  ambientSession,
   newTab,
   isolated = NO_KEYS,
   hidden = NO_KEYS,
@@ -401,21 +395,13 @@ export function AgentList({
   // the one summary line. Push and the badge carry the alarm; this screen answers "where".
   const all = triage(agents);
   const attention = all.filter((s) => ATTENTION.has(s.key) && s.agents.length > 0);
-  // The ambient machine's member id, resolved: the worktree match compares it against a pane's own
-  // tag, and an absent `?h=` means the lead's, never undefined (lib/hosts.ts `ambientHost`).
-  const ambientHostKey = ambientHost(servers, addressedHost);
-  const groups = groupPanesByWorkspace(agents, shellPanes, {
-    order: "fixed",
-    tabs,
-    servers,
-    workspaces,
-    ambientHost: ambientHostKey,
-    ambientSession,
-  });
+  const groupScope = { order: "fixed" as const, tabs, servers, workspaces, scope: viewScope, sessions: newTab?.sessions };
+  const groups = groupPanesByWorkspace(agents, shellPanes, groupScope);
   if (groups.length === 0) return null;
   // A stale key (a workspace since closed) filters nothing: an isolation nobody can see is dropped,
-  // and when every key is stale the list shows everything.
-  const isolatedSet = new Set(isolated);
+  // and when every key is stale the list shows everything. An isolated orphan worktree whose root
+  // workspace has since opened promotes to that root workspace (issue #587).
+  const isolatedSet = new Set(resolveIsolatedPrefKeys(isolated, groupScope));
   const isolatedGroups = groups.filter((g) => isolatedSet.has(workspacePrefKey(g)));
   const hiddenSet = new Set(hidden);
   // THE MACHINE FILTER (issue #288), one clause beside hide: a group on a hidden machine leaves
@@ -424,17 +410,11 @@ export function AgentList({
   // (ADR 0070). The addressed machine is never in this set, so the filter cannot empty the list, and
   // on a solo list the set is empty and the clause never matches (lib/hidden-machines.ts).
   const machineHidden = machinesHiddenFrom(hiddenMachines, servers, addressedHost);
-  // Isolate keeps the SAME shape the Spaces navigator gives it (lib/spaces.ts `isolateSpaces`):
-  // isolating the repo's own checkout shows its worktree spaces with it — they are the same
-  // project's spaces — while isolating a worktree shows just that worktree.
-  const isolatedKeys = new Set(isolatedGroups.map((g) => g.key));
   const shown =
     isolatedGroups.length > 0
-      ? [
-          ...isolatedGroups,
-          ...groups.filter((g) => g.parentKey !== undefined && isolatedKeys.has(g.parentKey)),
-        ]
+      ? isolatedGroups
       : groups.filter((g) => !hiddenSet.has(workspacePrefKey(g)) && !machineHidden.has(groupHost(g)));
+  const isolatedKeys = new Set(isolatedGroups.map((g) => g.key));
   const strip = stripEntries(groups, machineHidden, isolatedKeys);
   const allClear = attention.length === 0;
   // THE PINNED GROUP (ADR 0070). Drawn from EVERY workspace, before isolate and hide apply, and never
@@ -499,19 +479,21 @@ export function AgentList({
   // A workspace heading's "+", addressed to the heading's OWN machine and session, never the ambient
   // ones: this list holds every machine in a crew, and a crew's machines number their spaces from
   // `w1` each, so the ambient scope would open a peer's tab in the lead's `w1`. Every pane of a group
-  // shares one workspace, machine and session, so its first pane addresses the whole workspace, as
-  // the Changes tab's rows do (routes/home.tsx). A group is never empty; the guard is for the type.
+  // shares one machine and session, so its first pane resolves `at`, while the group key names the
+  // root workspace itself (which may hold only a linked worktree's panes, issue #587). A group is
+  // never empty; the guard is for the type.
   const headingNewTab = (g: WorkspaceGroup) => {
     const first = g.panes[0];
     if (newTab === undefined || first === undefined) return null;
+    const workspaceId = g.key.slice(g.key.lastIndexOf("\u0000") + 1);
     const at = paneScope(newTab.scope, first, servers, newTab.sessions);
     return (
       <WorkspaceNewTab
-        workspaceId={first.workspaceId}
+        workspaceId={workspaceId}
         label={g.label}
         at={at}
         host={first.host}
-        busy={newTab.creating.has(tabCreateKey(first.workspaceId, at))}
+        busy={newTab.creating.has(tabCreateKey(workspaceId, at))}
         onNewTab={newTab.onNewTab}
       />
     );
@@ -542,26 +524,6 @@ export function AgentList({
       tint
       stale={stale}
     />
-  );
-
-  // One workspace section's body — its heading (name, urgent dot, counts, "+") and its rows —
-  // shared by a top-level group and by a worktree child nested inside it (the render below).
-  const groupBody = ({ group: g, rows }: ShownGroup): ReactNode => (
-    <>
-      <SectionHeader
-        label={g.label}
-        tone="strong"
-        mark={urgentMark(g)}
-        className="min-h-7"
-        trailing={
-          <>
-            <StatusCounts panes={g.panes} className="shrink-0 text-[11px] text-muted-foreground" />
-            {headingNewTab(g)}
-          </>
-        }
-      />
-      <ListGroup>{rows.map((a) => row(a))}</ListGroup>
-    </>
   );
 
   const summary = (
@@ -705,24 +667,21 @@ export function AgentList({
         </section>
       )}
 
-      {/* A worktree's section nests INSIDE the section showing its repo (nestWorkspaceGroups,
-          lib/dash-view.ts): one rail ties the branch to the trunk the way the navigator's lone
-          indent does, and each child keeps its own heading and "+" — it is still a whole workspace,
-          only placed. The rail takes the hairline token, not --rule: it subdivides one region,
-          which is --border's stated job (ListGroup's doctrine). A group whose parent left the list
-          stands flat at its own place — indented under nothing would read as a bug. */}
-      {!renderBody && !ranked && nestWorkspaceGroups(drawn).map((node) => (
-        <section key={node.shown.group.key} id={groupDomId(node.shown.group.key)} className="flex scroll-mt-4 flex-col gap-2">
-          {groupBody(node.shown)}
-          {node.children.length > 0 && (
-            <div className="ml-1.5 flex flex-col gap-3 border-l-2 border-border pl-3">
-              {node.children.map((child) => (
-                <section key={child.group.key} id={groupDomId(child.group.key)} className="flex scroll-mt-4 flex-col gap-2">
-                  {groupBody(child)}
-                </section>
-              ))}
-            </div>
-          )}
+      {!renderBody && !ranked && drawn.map(({ group: g, rows }) => (
+        <section key={g.key} id={groupDomId(g.key)} className="flex scroll-mt-4 flex-col gap-2">
+          <SectionHeader
+            label={g.label}
+            tone="strong"
+            mark={urgentMark(g)}
+            className="min-h-7"
+            trailing={
+              <>
+                <StatusCounts panes={g.panes} className="shrink-0 text-[11px] text-muted-foreground" />
+                {headingNewTab(g)}
+              </>
+            }
+          />
+          <ListGroup>{rows.map((a) => row(a, workspaceGroupKey(a) === g.key ? "place" : "herd"))}</ListGroup>
         </section>
       ))}
     </div>

@@ -28,6 +28,7 @@ export const MUX_AGENT_NAMES: readonly string[] = [
   "codex",
   "cursor",
   "devin",
+  "dsh-tui",
   "grok",
   "hermes",
   "kiro",

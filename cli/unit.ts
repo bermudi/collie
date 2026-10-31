@@ -1,6 +1,7 @@
 import { join, win32 } from "node:path";
 
 import { collieBinary, HOST, type Host } from "../bridge/host.ts";
+import { HERDR_CORE_MUX } from "../bridge/mux/herdr-core/adapter.ts";
 import type { CliContext, EnvVars } from "./context.ts";
 import { instanceSuffix, PLUGIN_ID } from "./context.ts";
 
@@ -67,6 +68,13 @@ export interface ServiceSpec {
    * allowlist with a lockout the next time a probe happened to fail.
    */
   tailscaleHosts: string;
+  /**
+   * The herdr-core pass-through (M74 spec 04), or `null` for every other multiplexer. `COLLIE_MUX`
+   * is written into the unit so a supervised bridge names the core even when `.env` does not, and
+   * `HC_SESSION` and `HC_SOCKET` are written only when the operator set them: they pick which core
+   * session the bridge dials, and a unit that dropped them would dial the `default` one.
+   */
+  core: { session: string; socket: string } | null;
 }
 
 /**
@@ -86,6 +94,7 @@ export function serviceSpec(ctx: CliContext, tailscaleHosts = "", host: Host = H
     port: ctx.port,
     searchPath: harnessSearchPath(ctx.env.PATH, ctx.home),
     tailscaleHosts,
+    core: coreOf(ctx),
   };
 }
 
@@ -101,6 +110,12 @@ export function harnessSearchPath(path: string | undefined, home: string): strin
   const userDirs = [join(home, "bin"), join(home, ".local", "bin")];
   const dirs = path.split(":").filter((d) => d !== "" && !userDirs.includes(d));
   return [...userDirs, ...dirs].join(":");
+}
+
+/** The core's pass-through, when this install drives herdr-core by name (`COLLIE_MUX`, written by `collie start` for an auto-pick too). */
+function coreOf(ctx: CliContext): ServiceSpec["core"] {
+  if ((ctx.env.COLLIE_MUX ?? "").trim() !== HERDR_CORE_MUX) return null;
+  return { session: (ctx.env.HC_SESSION ?? "").trim(), socket: (ctx.env.HC_SOCKET ?? "").trim() };
 }
 
 export function unitFilePath(home: string, instance: string | null = null): string {
@@ -155,6 +170,14 @@ export function bridgeEnvironment(spec: ServiceSpec): EnvVars {
   // Assigned, never unconditionally: see {@link ServiceSpec.tailscaleHosts} — an empty value written
   // here is a lockout, not a default, so nothing is written at all.
   if (spec.tailscaleHosts !== "") env.COLLIE_TAILSCALE_HOSTS = spec.tailscaleHosts;
+  // herdr-core only, so no other install's unit changes by this knob's existence. Each core variable
+  // is written only when set, for the same reason the allowlist is: an empty value would replace a
+  // session the operator chose with the default one.
+  if (spec.core !== null) {
+    env.COLLIE_MUX = HERDR_CORE_MUX;
+    if (spec.core.session !== "") env.HC_SESSION = spec.core.session;
+    if (spec.core.socket !== "") env.HC_SOCKET = spec.core.socket;
+  }
   return env;
 }
 

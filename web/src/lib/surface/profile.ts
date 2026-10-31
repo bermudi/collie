@@ -348,6 +348,16 @@ export interface FrameLayout {
    * place starts at the box's own column. Optional, 1 or more.
    */
   readonly draftIndent?: number;
+  /**
+   * For a profile that draws its dialogs in the box's place (`dialogsInBox`): true when no dialog the
+   * harness draws there points with the prompt glyph, so the glyph on the prompt row is always the box's
+   * own and the only list under it is the profile's command list (`volatile.below.commandList`). A draft
+   * typed with newlines then reads as the box's own lines, not as a pointed list between two rules, when
+   * no row of it is an option row or a key hint and no named command list stands in
+   * the box (cues.ts `draftWrap`). Muse points with `›` and `⟩` in its dialogs and keeps `❯` for its
+   * prompt (#552). pi draws its menus with the same `❯` as its prompt, so it must not name this. Optional.
+   */
+  readonly draftLines?: boolean;
   readonly maxDraftRows: number;
   /** How many rows above the last non-blank row the bottom edge may sit (the frame module's
    *  search bound, M56 spec 03): the tallest thing the harness draws under a live box. */
@@ -464,6 +474,16 @@ export interface Profile {
        * which stalls a send and never sends one into a dialog.
        */
       readonly prefixes?: readonly string[];
+      /**
+       * Regular expressions (sources); a draft text that one matches whole, blanks at its ends cut,
+       * is a placeholder too. For a harness whose placeholder rotates through hints of one shape and
+       * whose screen may come as plain text, with no faint attribute or colour to mark it (Claude
+       * Code's `Try "…"` hints on herdr-core, 2026-10-30). Optional. A fallback: it counts only on a
+       * read with no styling anywhere (no colour, no attribute), so on a coloured multiplexer the
+       * faint and colour tests decide and a typed draft of that shape stays a draft. On a plain read
+       * a typed draft of that exact shape still reads as a placeholder.
+       */
+      readonly patterns?: readonly string[];
       /** The SGR attribute the placeholder renders with (2 is faint). */
       readonly sgr: number;
       /**
@@ -473,6 +493,15 @@ export interface Profile {
        * too; one run in any other colour is typed text. Optional.
        */
       readonly fg?: readonly string[];
+      /**
+       * The empty box may show any text as its placeholder: a suggestion the harness writes itself
+       * (Claude Code's prompt suggestion, `cat hello.txt to verify`), which no text, prefix or pattern
+       * can name, marked only by the SGR attribute or the colours above. On a read with no styling
+       * (herdr-core) such a box reads as a draft, so the Send Protocol proves it by where its probe
+       * character lands: after the text, a typed draft; at the start of the box, the placeholder, and
+       * the box is empty. Optional; a styled read never takes that path.
+       */
+      readonly anyText?: true;
     };
     readonly volatile: {
       readonly above: {
@@ -482,6 +511,13 @@ export interface Profile {
          * that hides). The Send Protocol then accepts rows above that only lost text. Optional.
          */
         readonly losesText?: true;
+        /**
+         * Rows above the box may repaint by themselves in place: a counter, a clock or a spinner that
+         * an extension's widget draws over the editor. The Send Protocol then reads every digit run
+         * and braille glyph above the box as a fixed mark; a row that changes any other character,
+         * or a new row, still moves the screen. Optional.
+         */
+        readonly ticks?: true;
       };
       readonly below: {
         readonly maxRows: number;
@@ -857,7 +893,8 @@ function textList(value: JsonValue | undefined, path: string, minLength: number)
   return items.map((item, i) => text(item, `${path}[${String(i)}]`));
 }
 
-const PLATFORMS = ["win32", "darwin", "linux"] as const;
+// `wsl` is Linux under Windows Subsystem for Linux, where an agent program may take the Windows keys.
+const PLATFORMS = ["win32", "darwin", "linux", "wsl"] as const;
 
 /** A key list as the file wrote it: the default, and the lists of the platforms that differ. */
 interface PlatformLists {
@@ -1054,12 +1091,15 @@ function parseVersions(value: JsonValue | undefined, path: string): [VersionRang
  * problem throws a {@link ProfileError} that names the field path.
  */
 
-/** `idle.volatile.above`: its row count, and `losesText` only when the profile sets it (it may only be true). */
+/** `idle.volatile.above`: its row count, and `losesText` and `ticks` only when the profile sets them (each may only be true). */
 function volatileAbove(node: JsonObject): Profile["idle"]["volatile"]["above"] {
   const maxRows = whole(field(node, "maxRows", "idle.volatile.above"), "idle.volatile.above.maxRows", 0);
-  if (node.losesText === undefined) return { maxRows };
-  if (node.losesText !== true) fail("idle.volatile.above.losesText", "must be true when present");
-  return { maxRows, losesText: true };
+  if (node.losesText !== undefined && node.losesText !== true) fail("idle.volatile.above.losesText", "must be true when present");
+  if (node.ticks !== undefined && node.ticks !== true) fail("idle.volatile.above.ticks", "must be true when present");
+  if (node.losesText === true && node.ticks === true) return { maxRows, losesText: true, ticks: true };
+  if (node.losesText === true) return { maxRows, losesText: true };
+  if (node.ticks === true) return { maxRows, ticks: true };
+  return { maxRows };
 }
 
 /** `idle.volatile.below.footerRows`: each row a unique name and a pattern that cannot match a blank row. */
@@ -1260,15 +1300,21 @@ function parseInlineHint(value: JsonValue): InlineHint {
   return { fg: colourList(field(node, "fg", path), `${path}.fg`) };
 }
 
-/** `idle.placeholders`: the texts and the SGR attribute, and the prefixes and colours only when the profile names them. */
+/** `idle.placeholders`: the texts and the SGR attribute, and the prefixes, patterns and colours only when the profile names them. */
 function parsePlaceholders(node: JsonObject): Profile["idle"]["placeholders"] {
   const base = {
     texts: textList(field(node, "texts", "idle.placeholders"), "idle.placeholders.texts", 0),
     sgr: whole(field(node, "sgr", "idle.placeholders"), "idle.placeholders.sgr", 0),
   };
   const withPrefixes = node.prefixes === undefined ? base : { ...base, prefixes: textList(node.prefixes, "idle.placeholders.prefixes", 1) };
-  if (node.fg === undefined) return withPrefixes;
-  return { ...withPrefixes, fg: colourList(node.fg, "idle.placeholders.fg") };
+  const withPatterns =
+    node.patterns === undefined
+      ? withPrefixes
+      : { ...withPrefixes, patterns: textList(node.patterns, "idle.placeholders.patterns", 1).map((item, i) => pattern(item, `idle.placeholders.patterns[${String(i)}]`).source) };
+  if (node.anyText !== undefined && node.anyText !== true && node.anyText !== false) fail("idle.placeholders.anyText", "must be true or false");
+  const withAnyText = node.anyText === true ? { ...withPatterns, anyText: true as const } : withPatterns;
+  if (node.fg === undefined) return withAnyText;
+  return { ...withAnyText, fg: colourList(node.fg, "idle.placeholders.fg") };
 }
 
 /** `idle.frame.trailer`: the last row inside the box, and the padding rows under it. */
@@ -1306,7 +1352,9 @@ function parseFrame(frameNode: JsonObject): FrameLayout {
   const maxWidgetRows = frameNode.maxWidgetRows === undefined ? undefined : whole(frameNode.maxWidgetRows, "idle.frame.maxWidgetRows", 1);
   const withWidgets = maxWidgetRows === undefined ? anchors : { ...anchors, maxWidgetRows };
   const withIndent = frameNode.draftIndent === undefined ? withWidgets : { ...withWidgets, draftIndent: whole(frameNode.draftIndent, "idle.frame.draftIndent", 1) };
-  const base = frameNode.scroll === undefined ? withIndent : { ...withIndent, scroll: parseScroll(frameNode.scroll, maxDraftRows) };
+  if (frameNode.draftLines !== undefined && frameNode.draftLines !== true && frameNode.draftLines !== false) fail("idle.frame.draftLines", "must be true or false");
+  const withLines = frameNode.draftLines === true ? { ...withIndent, draftLines: true } : withIndent;
+  const base = frameNode.scroll === undefined ? withLines : { ...withLines, scroll: parseScroll(frameNode.scroll, maxDraftRows) };
   if (walk === "edges") {
     for (const key of ["rows", "trailer", "continuation", "ownPrompt", "maxWidgetRows"] as const) {
       if (frameNode[key] !== undefined) fail(`idle.frame.${key}`, "belongs to the interior walk");
