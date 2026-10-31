@@ -2840,7 +2840,7 @@ export class SendProtocol {
     const match = joins ? ((await this.deps.profile(target.harness, target.paneId)) ?? (await this.heldPlainProfile(request, waiting, target.paneId, generation))) : null;
     if (match !== null && !(request.mode === "command" && runsInTurnEntry(request.text, match) !== null)) {
       const state = this.bareState(request, accepted.record, target, match);
-      const refusal = textRefusal(request, match);
+      const refusal = textRefusal(request, match, target.harness);
       if (refusal !== null) return this.settle(state, refusal);
       // A command the profile never lets wait is refused, never held: it would act on a later session.
       if (state.command && neverHeldEntry(request.text, match) !== null) return this.settle(state, new Ended("refused", "turn_running", { detail: NEVER_HELD }));
@@ -3775,7 +3775,7 @@ export class SendProtocol {
     const writes = request.mode === "send" || request.mode === "command" || request.mode === "append" || request.mode === "replace";
 
     if (writes) {
-      const refusal = textRefusal(request, match);
+      const refusal = textRefusal(request, match, state.target.harness);
       if (refusal !== null) throw refusal;
     }
     // A steer (M69): who asked, and whether it is a message to a pane that can be steered at all.
@@ -5011,7 +5011,7 @@ export class SendProtocol {
       if (!ack.ok) throw new Ended("refused", "write_failed", { detail: ack.detail });
       return;
     }
-    const newline = state.match?.profile.keys.newline ?? null;
+    const newline = state.match?.profile.keys.newline ?? BLIND_NEWLINE.get(state.target.harness) ?? null;
     for (let i = 0; i < lines.length; i++) {
       if (i > 0) {
         if (newline === null) throw new Ended("typed_not_submitted", "changed");
@@ -5563,12 +5563,19 @@ function draftRefusal(state: RunState, s0: Snap): Ended {
 }
 
 /**
+ * The newline key of a harness that has no profile but takes a typed line break: Devin keeps a raw
+ * Ctrl+J as a new line in its box (live, 3000.11.234) and never submits on it. Its profile was
+ * removed (the border drifted and every send was held), so a multi-line send finds its key here.
+ */
+const BLIND_NEWLINE: ReadonlyMap<string, readonly string[]> = new Map([["devin", ["ctrl+j"]]]);
+
+/**
  * The rules a text meets before any read: a plain send may not start with a reserved lead (it has the
  * command route), and a text of more than one line needs a profile's newline key. Null when it passes.
  * A Replace may start with one: it is the draft offer's answer to a command refused `draft_present`
  * (a typed `/model`, the belt's Model), the box is emptied first, and the text goes out as a command.
  */
-function textRefusal(request: SendRequest, match: ProfileMatch | null): Ended | null {
+function textRefusal(request: SendRequest, match: ProfileMatch | null, harness: string): Ended | null {
   const lines = sendLines(request.text);
   const leads = match?.profile.reservedLeads ?? GENERIC_LEADS;
   const notes = match?.profile.reservedLeadNotes;
@@ -5582,7 +5589,7 @@ function textRefusal(request: SendRequest, match: ProfileMatch | null): Ended | 
   if (match?.profile.collapse.refuseLiteral === true && lines.some((line) => new RegExp(match.profile.collapse.pattern, "u").test(line))) {
     return new Ended("refused", "reserved_lead", { detail: CHIP_TOKEN });
   }
-  if (lines.length > 1 && match === null) return new Ended("refused", "multiline", { detail: "This harness has no profile, so its newline key is unknown; send one line at a time." });
+  if (lines.length > 1 && match === null && !BLIND_NEWLINE.has(harness)) return new Ended("refused", "multiline", { detail: "This harness has no profile, so its newline key is unknown; send one line at a time." });
   return null;
 }
 

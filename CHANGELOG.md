@@ -25,6 +25,12 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+### Fixed
+
+- **Multi-line messages to Devin send again.** Removing Devin's input profile left Collie with no
+  newline key for it, so any message of more than one line was refused. A Devin pane now gets
+  Ctrl+J between lines, which Devin keeps as a line break without submitting.
+
 ## [0.59.0] - 2026-10-30
 
 ### Added
