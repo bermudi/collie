@@ -79,7 +79,7 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
 | ID | What / seam | Verify with | Upstream status | Removal condition |
 |---|---|---|---|---|
 | P001 | Devin support: journal adapter (`bridge/journal/devin.ts`, the journal registry) plus the steered-send surface (echo-as-sent-witness, one resend of a dropped submit key) | `bun scripts/journal-probe.ts` against a real devin log; a live send from the phone | local, deliberately | upstream ships a Devin adapter, or devin leaves the herd |
-| P002 | Worktree-nested herd list on the dashboard (`web/src/lib/dash-view.ts`, [ADR 9005](./.adr/9005-the-herd-list-nests-a-worktree-under-its-repo.md)) | the dashboard after a worktree opens | local, deliberately | upstream nests worktrees itself |
+| ~~P002~~ | **Retired 2026-10-30** — upstream nests worktrees under the repo-root group itself (#587, 1.25.0); the removal condition fired and the carried code is gone. ADR 9005/9006 stay as history | — | absorbed | — |
 | P003 | 0.x version line + `merge.pup-version` driver keeping it across merges (`scripts/merge-pup-version.ts`) | `scripts/check-version.sh` | deliberate (the update channel reads origin tags) | mode change or fork retirement |
 | P004 | Own update channel, carried two ways: the deployment's `[update] update_repo` in `~/.config/collie/config.toml` names `bermudi/collie` (upstream's own `COLLIE_UPDATE_REPO` seam — env, `.env`, or config), and the carried `bridge/released-tags.ts` guard makes a tag with no GitHub release invisible and unselectable as an update target | `grep -A1 '^\[update\]' ~/.config/collie/config.toml`; `rg -n releasedTagsOnly bridge/index.ts cli/update.ts` | the seam is upstream's design (deliberately used, not duplicated); the released-tags guard is deliberately local | fork retirement |
 | P005 | Upstream-merge signal: `upstream-merged` + the (major, minor) fire rule + dismissible nudge; the ritual absorbs the newest strict release the main line lacks (ADR 9007, amended by 9010) | `cat upstream-merged` vs upstream's newest strict tag — the record must never name a version that is not a released tag | deliberate | stop tracking upstream |
@@ -97,7 +97,8 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
   it for a human.
 - **P001's seam** is the journal registry and the send-verification surface — upstream's harness
   grammar work lands in the same files the steered-send logic reads.
-- **P002's seam** is view-level: keep the nesting out of the API shape upstream defines.
+- **P002 is retired** — upstream owns the worktree fold now (#587). Its old view seams
+  (`agent-list.tsx`, `pane-groups.ts`, `home.tsx`) are upstream surfaces again; take theirs.
 - **New test files upstream adds arrive as PLAIN ADDS, never as conflicts** — the delete/modify
   conflicts only cover files that existed when P007 landed. After resolving, sweep the merge's
   staged list by pattern (`git diff --cached --name-only | grep -E '\.test\.|\.spec\.|/tests/'`)
@@ -141,6 +142,52 @@ record; the arguments that closed every alternative live in the 90xx ADRs. Fresh
   pushing `main`, tags, or packaging branches publishes — operator's call.
 
 ## Sync / import log
+
+### 2026-10-30 — `upstream/main` 37351ff1 → 22b6c3ad (280 commits); strict releases ride along — v1.25.0, v1.25.1 and v1.25.2 are ancestors, no separate absorb needed
+
+- `upstream-merged` 1.24.1 → 1.25.2; `UPSTREAM` pinned to 22b6c3ad. The signal's (1.24,→1.25)
+  fire rule is answered. None of the three releases was marked urgent; 1.25.2 is a bugfix line
+  for the Herdr core (sends refused, cards unanswerable, keys losing their case).
+- The merge brings the herdr-core multiplexer adapter with auto-pick and a Collie panel mod for
+  herdr-app (1.25.0's headline), the composer's image editor before upload, send findings in
+  `collie doctor`, space labels and folders, Antigravity 1.4.8, browser-leg replay for Claude
+  (M67 — replay cassettes swept with the suite; the leg is not a gate on Pup), upstream's own
+  worktree fold into the repo-root group (#587), the `dsh-tui` harness, the 1.25.1
+  two-Collies-on-one-machine fixes and the 1.25.2 herdr-core input repairs.
+- **P002 retired — absorbed.** Upstream #587 nests a worktree pane under its repo-root group
+  itself, the patch's stated removal condition. Taken theirs wholesale in
+  `agent-list.tsx`/`pane-groups.ts`/`home.tsx` (the prop surface lost `ambientSession`), and the
+  `nestWorkspaceGroups`/`NestedGroup` renderer dropped from `dash-view.ts`. ADR 9005/9006 stay
+  as history.
+- Conflicts: the test-suite re-import (173 delete/modify, re-deleted; ~60 new suite files
+  arrived as plain adds and were swept — `web/e2e/` wholesale, replay cassettes, the dsh test
+  fixtures, `bridge/journal/fixtures/`); `cli/testdata/doctor-posix.golden.txt` dropped (its
+  doctor test is swept; the `leg*.sh` scripts are Pup's, kept); the eleven dictionaries
+  (ours' ColliePup lines plus theirs' new image-edit keys, then the sweep); union resolutions in
+  the harness seams (`journal/registry.ts`, `config-schema.ts`, `mux/agents.ts`,
+  `journal-agents.ts`, `verified-versions.json` — ours' devin + piz plus theirs' dsh);
+  `server.ts` kept Pup's strict `resolvePaneCwd` with theirs' `sessionFolder` wired as the
+  middle fallback (typed → sessionFolder → home); `cli/unit.ts` union
+  (`harnessSearchPath` + `coreOf`); `pi.json` ours (Enter stays submit/queue; the optional
+  frame-label shape propagated to `devin.json` as merge residue); the three version files by
+  hand — real deltas this time (renamed actions, contract typecheck which Pup drops with the
+  suite), so the driver printed and a human resolved; `.adr/README.md` (theirs' 0125 before
+  ours' 9001+); `.gitattributes` union; `.oxlintrc.json` theirs plus Pup's
+  `versions/**`/`current/**`/`released-tags.ts` — a residue commit (5892e139) later staged the
+  herdr-core/space-labels override entries the first pass dropped; `release.yml` ours
+  byte-identical (theirs' delta was macos-14→15 inside the dropped macOS regions);
+  `docs/install.md`, `five-minute-install.md`, `claude-code-on-your-phone.md`,
+  `troubleshooting.md` — ours' Linux-only text plus theirs' non-platform additions (setup-check,
+  Herdr-core entries), their per-OS restructure re-flattened.
+- Gate green: lint, typecheck, build; `check-version` 0.58.0 consistent. No test suite ran
+  (P007). Two hook notes: the version guard needed the ritual's Unreleased bullet ("Upstream
+  1.25.0 through 1.25.2 are in"), and `check-crew-wire.sh` raced on the 436-file staged set —
+  its `printf … | grep -q` under `pipefail` loses to SIGPIPE when grep exits early, so
+  `SKIP_CREW_WIRE_CHECK=1` stood in; the protocol decision is upstream's own exit (i), with
+  `mux`/`panes`/`host` documented in the staged `CREW_PROTOCOL.md` §19. Worth an upstream
+  report.
+- Housekeeping: 89 local `v1.*` tags deleted — they arrived on an accidental `--tags` fetch and
+  the fork keeps upstream tags out of the local store. Unreleased at this writing.
 
 ### 2026-10-27 — `upstream/main` 35d3ccfc → 37351ff1 (246 commits); strict releases ride along — v1.24.0 and v1.24.1 are ancestors, no separate absorb needed
 
