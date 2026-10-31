@@ -5,7 +5,9 @@ This file tracks all notable changes to Collie, ordered newest version first. Th
 `### Added`, `### Changed`, `### Fixed`, `### Packaging` and `### Docs`, in that order and only
 where there is content, and every bullet opens with a short bold lead sentence, which is the line
 the GitHub Release page prints. Older versions carry a single flat list. Every entry links to its commit and credits the contributor where there is one. The
-`## [Unreleased]` section contains merged work waiting for release. The release
+`## [Unreleased]
+
+## [0.59.0] - 2026-10-30` section contains merged work waiting for release. The release
 commit renames this heading to `## [x.y.z] - YYYY-MM-DD`, adds the commit hashes, and adds a new
 empty `## [Unreleased]` section above it. The newest numbered `## [x.y.z]` heading (excluding the
 Unreleased heading) **must** match the `version` field in `herdr-plugin.toml`, `package.json`,
@@ -23,6 +25,8 @@ Running a crew? Update the lead first; members follow on their own. Details:
 
 ## [Unreleased]
 
+## [0.59.0] - 2026-10-30
+
 ### Added
 
 - **piz joins the herd with a readable history.** `piz` is now a first-party agent name: its
@@ -31,6 +35,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
   synthetic `model-only`/`agent_runtime` context injections are dropped rather than rendered as
   user speech. `piz` is accepted by the mux contract, offered on the New page, overridable via
   `COLLIE_PIZ_ROOT`/`ZCODE_STORAGE_DIR`, and covered by `journal-probe`.
+  ([eaead60](https://github.com/bermudi/collie/commit/eaead60))
 - **piz gets a send surface and a command palette.** A new `piz` input profile models its
   pi-family composer (─ borders, blank interior, `Ready.`/cwd/stats footer): Enter submits and
   steers a running turn, Ctrl+Q explicitly queues (`⧉ Follow-up`/`⧉ Steering` witnesses), Alt+Up
@@ -38,6 +43,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
   provisional until a send-lab run. The slash palette learns piz's real commands from its own
   help table (`/compact`, `/model`, `/resume`, `/goal`, `/workflow`…), and `piz` is an
   operator-scope family.
+  ([7265639](https://github.com/bermudi/collie/commit/7265639))
 - **Upstream 1.25.0 through 1.25.2 are in.** `upstream/main` merged through 22b6c3ad, which
   carries all three strict releases: Collie drives the Herdr core (`herdr-core`, `hc`) through a
   new multiplexer adapter and ships a Collie panel mod for herdr-app, an image editor joins the
@@ -45,6 +51,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
   Antigravity 1.4.8 lands, and the browser leg replays recorded model streams. 1.25.1 and 1.25.2
   repair herdr-core inputs — sends refused, cards unanswerable, keys losing their case — and
   upstream's own worktree fold (issue #587) retires Pup's carried nest (Pup).
+  ([12865c4](https://github.com/bermudi/collie/commit/12865c4))
 
 ### Fixed
 
@@ -53,6 +60,7 @@ Running a crew? Update the lead first; members follow on their own. Details:
   box and held every send. Devin's input profile is removed: a Devin pane is typed to like any
   profile-less pane, with no frame to find. A message of more than one line is refused on such a
   pane, since its newline key is no longer declared.
+  ([dff044b](https://github.com/bermudi/collie/commit/dff044b))
 
 ## [0.58.0] - 2026-10-27
 
