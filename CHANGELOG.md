@@ -46,6 +46,14 @@ Running a crew? Update the lead first; members follow on their own. Details:
   repair herdr-core inputs — sends refused, cards unanswerable, keys losing their case — and
   upstream's own worktree fold (issue #587) retires Pup's carried nest (Pup).
 
+### Fixed
+
+- **Devin sends no longer refuse over the input box's border.** Devin 3000.11.234 draws a bare
+  top border where 3000.11.92 drew a labelled one, and the profile's frame check then found no
+  box and held every send. Devin's input profile is removed: a Devin pane is typed to like any
+  profile-less pane, with no frame to find. A message of more than one line is refused on such a
+  pane, since its newline key is no longer declared.
+
 ## [0.58.0] - 2026-10-27
 
 ### Added

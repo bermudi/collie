@@ -14,7 +14,6 @@ import omp from "./omp.json";
 import opencode from "./opencode.json";
 import pi from "./pi.json";
 import piz from "./piz.json";
-import devin from "./devin.json";
 
 /** Raw profile JSON by file stem. Parsed and checked by `parseProfile` (../profile.ts). */
-export const PROFILE_FILES = { agy, claude, codex, cursor, devin, grok, hermes, kiro, muse, omp, opencode, pi, piz } satisfies Readonly<Record<string, JsonValue>>;
+export const PROFILE_FILES = { agy, claude, codex, cursor, grok, hermes, kiro, muse, omp, opencode, pi, piz } satisfies Readonly<Record<string, JsonValue>>;
